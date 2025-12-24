@@ -214,11 +214,7 @@ export default function ActionPlanWorkflow() {
       const [controlsRes, testsRes, findingsRes, capasRes] = await Promise.all([
         supabase
           .from('ic_controls')
-          .select(`
-            *,
-            ic_control_tests(count),
-            ic_findings(count)
-          `)
+          .select('*')
           .eq('kiks_action_id', selectedActionPlan.kiks_action_id)
           .eq('ic_plan_id', selectedPlanId),
         supabase
@@ -227,10 +223,7 @@ export default function ActionPlanWorkflow() {
           .eq('kiks_action_id', selectedActionPlan.kiks_action_id),
         supabase
           .from('ic_findings')
-          .select(`
-            *,
-            ic_capas(count)
-          `)
+          .select('*')
           .eq('kiks_action_id', selectedActionPlan.kiks_action_id),
         supabase
           .from('ic_capas')
@@ -243,21 +236,49 @@ export default function ActionPlanWorkflow() {
       if (findingsRes.error) throw findingsRes.error;
       if (capasRes.error) throw capasRes.error;
 
+      const tests = testsRes.data || [];
+      const findings = findingsRes.data || [];
+      const capas = capasRes.data || [];
+
+      // Count tests and findings per control
+      const testCountsByControl: Record<string, number> = {};
+      const findingCountsByControl: Record<string, number> = {};
+
+      tests.forEach((test: any) => {
+        if (test.control_id) {
+          testCountsByControl[test.control_id] = (testCountsByControl[test.control_id] || 0) + 1;
+        }
+      });
+
+      findings.forEach((finding: any) => {
+        if (finding.control_id) {
+          findingCountsByControl[finding.control_id] = (findingCountsByControl[finding.control_id] || 0) + 1;
+        }
+      });
+
+      // Count CAPAs per finding
+      const capaCountsByFinding: Record<string, number> = {};
+      capas.forEach((capa: any) => {
+        if (capa.finding_id) {
+          capaCountsByFinding[capa.finding_id] = (capaCountsByFinding[capa.finding_id] || 0) + 1;
+        }
+      });
+
       const controlsWithCounts = (controlsRes.data || []).map((control: any) => ({
         ...control,
-        test_count: control.ic_control_tests?.[0]?.count || 0,
-        finding_count: control.ic_findings?.[0]?.count || 0
+        test_count: testCountsByControl[control.id] || 0,
+        finding_count: findingCountsByControl[control.id] || 0
       }));
 
-      const findingsWithCounts = (findingsRes.data || []).map((finding: any) => ({
+      const findingsWithCounts = findings.map((finding: any) => ({
         ...finding,
-        capa_count: finding.ic_capas?.[0]?.count || 0
+        capa_count: capaCountsByFinding[finding.id] || 0
       }));
 
       setControls(controlsWithCounts);
-      setControlTests(testsRes.data || []);
+      setControlTests(tests);
       setFindings(findingsWithCounts);
-      setCapas(capasRes.data || []);
+      setCapas(capas);
     } catch (error) {
       console.error('Error fetching workflow data:', error);
     }
