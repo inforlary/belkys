@@ -243,9 +243,20 @@ export default function ActionPlanWorkflow() {
       if (findingsRes.error) throw findingsRes.error;
       if (capasRes.error) throw capasRes.error;
 
-      setControls(controlsRes.data || []);
+      const controlsWithCounts = (controlsRes.data || []).map((control: any) => ({
+        ...control,
+        test_count: control.ic_control_tests?.[0]?.count || 0,
+        finding_count: control.ic_findings?.[0]?.count || 0
+      }));
+
+      const findingsWithCounts = (findingsRes.data || []).map((finding: any) => ({
+        ...finding,
+        capa_count: finding.ic_capas?.[0]?.count || 0
+      }));
+
+      setControls(controlsWithCounts);
       setControlTests(testsRes.data || []);
-      setFindings(findingsRes.data || []);
+      setFindings(findingsWithCounts);
       setCapas(capasRes.data || []);
     } catch (error) {
       console.error('Error fetching workflow data:', error);
