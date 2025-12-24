@@ -1,0 +1,419 @@
+import { useState, useEffect } from 'react';
+import { FileDown, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { exportToExcel } from '../../utils/exportHelpers';
+import { generatePeriodicDataComparisonPDF } from '../../utils/reportPDFGenerators';
+
+interface PeriodicData {
+  indicator_id: string;
+  indicator_code: string;
+  indicator_name: string;
+  department_name: string;
+  unit: string;
+  baseline_value: number | null;
+  target_value: number | null;
+  q1_2024?: number;
+  q2_2024?: number;
+  q3_2024?: number;
+  q4_2024?: number;
+  q1_2025?: number;
+  q2_2025?: number;
+  q3_2025?: number;
+  q4_2025?: number;
+  total_2024: number;
+  total_2025: number;
+  achievement_rate: number;
+  change_rate: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
+export function PeriodicDataComparison() {
+  const { profile } = useAuth();
+  const [data, setData] = useState<PeriodicData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedPeriod, setSelectedPeriod] = useState<'quarterly' | 'yearly'>('quarterly');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    loadDepartments();
+  }, [profile]);
+
+  useEffect(() => {
+    loadData();
+  }, [profile, selectedYear, selectedPeriod, selectedDepartment]);
+
+  const loadDepartments = async () => {
+    if (!profile?.organization_id) return;
+
+    try {
+      let deptQuery = supabase
+        .from('departments')
+        .select('id, name')
+        .eq('organization_id', profile.organization_id)
+        .order('name');
+
+      if (profile.role !== 'admin' && profile.role !== 'manager' && profile.department_id) {
+        deptQuery = deptQuery.eq('id', profile.department_id);
+      }
+
+      const { data: depts } = await deptQuery;
+      setDepartments(depts || []);
+    } catch (error) {
+      console.error('Birimler yüklenirken hata:', error);
+    }
+  };
+
+  const loadData = async () => {
+    if (!profile?.organization_id) return;
+
+    try {
+      setLoading(true);
+
+      let goalsQuery = supabase
+        .from('goals')
+        .select('id, department_id')
+        .eq('organization_id', profile.organization_id);
+
+      if (profile.role !== 'admin' && profile.role !== 'manager' && profile.department_id) {
+        goalsQuery = goalsQuery.eq('department_id', profile.department_id);
+      }
+
+      if (selectedDepartment !== 'all') {
+        goalsQuery = goalsQuery.eq('department_id', selectedDepartment);
+      }
+
+      const { data: allowedGoals } = await goalsQuery;
+      const allowedGoalIds = allowedGoals?.map(g => g.id) || [];
+
+      if (allowedGoalIds.length === 0) {
+        setData([]);
+        setLoading(false);
+        return;
+      }
+
+      let indicatorsQuery = supabase
+        .from('indicators')
+        .select(`
+          id,
+          code,
+          name,
+          unit,
+          goal_id,
+          baseline_value,
+          target_value,
+          goals (
+            department_id,
+            departments (name)
+          )
+        `)
+        .eq('organization_id', profile.organization_id)
+        .in('goal_id', allowedGoalIds)
+        .order('code');
+
+      const { data: indicators } = await indicatorsQuery;
+
+      console.log('First indicator raw data:', indicators?.[0]);
+
+      if (!indicators || indicators.length === 0) {
+        setData([]);
+        setLoading(false);
+        return;
+      }
+
+      const indicatorIds = indicators.map(i => i.id);
+      const currentYear = selectedYear;
+      const previousYear = selectedYear - 1;
+
+      const [currentYearEntries, previousYearEntries] = await Promise.all([
+        supabase
+          .from('indicator_data_entries')
+          .select('indicator_id, period_quarter, value, period_year')
+          .eq('period_year', currentYear)
+          .in('status', ['approved'])
+          .in('indicator_id', indicatorIds),
+        supabase
+          .from('indicator_data_entries')
+          .select('indicator_id, period_quarter, value, period_year')
+          .eq('period_year', previousYear)
+          .in('status', ['approved'])
+          .in('indicator_id', indicatorIds),
+      ]);
+
+      const processedData: PeriodicData[] = indicators.map(indicator => {
+        const currentData: Record<string, number> = {};
+        const previousData: Record<string, number> = {};
+
+        currentYearEntries.data?.forEach(entry => {
+          if (entry.indicator_id === indicator.id) {
+            currentData[`q${entry.period_quarter}`] = entry.value;
+          }
+        });
+
+        previousYearEntries.data?.forEach(entry => {
+          if (entry.indicator_id === indicator.id) {
+            previousData[`q${entry.period_quarter}`] = entry.value;
+          }
+        });
+
+        const total_current = Object.values(currentData).reduce((sum, val) => sum + val, 0);
+        const total_previous = Object.values(previousData).reduce((sum, val) => sum + val, 0);
+
+        let change_rate = 0;
+        if (total_previous > 0) {
+          change_rate = ((total_current - total_previous) / total_previous) * 100;
+        }
+
+        let achievement_rate = 0;
+        const targetValue = indicator.target_value ? Number(indicator.target_value) : null;
+        const baselineValue = indicator.baseline_value ? Number(indicator.baseline_value) : null;
+
+        if (targetValue && targetValue > 0) {
+          if (baselineValue !== null && baselineValue !== undefined) {
+            achievement_rate = ((total_current - baselineValue) / (targetValue - baselineValue)) * 100;
+          } else {
+            achievement_rate = (total_current / targetValue) * 100;
+          }
+        }
+
+        let trend: 'up' | 'down' | 'stable' = 'stable';
+        if (change_rate > 5) trend = 'up';
+        else if (change_rate < -5) trend = 'down';
+
+        const baselineVal = indicator.baseline_value ? Number(indicator.baseline_value) : null;
+        const targetVal = indicator.target_value ? Number(indicator.target_value) : null;
+
+        console.log(`Indicator ${indicator.code}: baseline_value=${indicator.baseline_value} -> ${baselineVal}, target_value=${indicator.target_value} -> ${targetVal}`);
+
+        return {
+          indicator_id: indicator.id,
+          indicator_code: indicator.code || '',
+          indicator_name: indicator.name,
+          department_name: (indicator.goals as any)?.departments?.name || '',
+          unit: indicator.unit,
+          baseline_value: baselineVal,
+          target_value: targetVal,
+          [`q1_${previousYear}`]: previousData.q1,
+          [`q2_${previousYear}`]: previousData.q2,
+          [`q3_${previousYear}`]: previousData.q3,
+          [`q4_${previousYear}`]: previousData.q4,
+          [`q1_${currentYear}`]: currentData.q1,
+          [`q2_${currentYear}`]: currentData.q2,
+          [`q3_${currentYear}`]: currentData.q3,
+          [`q4_${currentYear}`]: currentData.q4,
+          total_2024: total_previous,
+          total_2025: total_current,
+          achievement_rate,
+          change_rate,
+          trend,
+        };
+      });
+
+      setData(processedData);
+    } catch (error) {
+      console.error('Veri yükleme hatası:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExcelExport = () => {
+    const exportData = data.map(item => ({
+      'Gösterge Kodu': item.indicator_code,
+      'Gösterge Adı': item.indicator_name,
+      'Birim': item.department_name,
+      'Ölçü Birimi': item.unit,
+      [`${selectedYear - 1} Ç1`]: item[`q1_${selectedYear - 1}` as keyof PeriodicData] || '-',
+      [`${selectedYear - 1} Ç2`]: item[`q2_${selectedYear - 1}` as keyof PeriodicData] || '-',
+      [`${selectedYear - 1} Ç3`]: item[`q3_${selectedYear - 1}` as keyof PeriodicData] || '-',
+      [`${selectedYear - 1} Ç4`]: item[`q4_${selectedYear - 1}` as keyof PeriodicData] || '-',
+      [`${selectedYear - 1} Toplam`]: item.total_2024,
+      [`${selectedYear} Ç1`]: item[`q1_${selectedYear}` as keyof PeriodicData] || '-',
+      [`${selectedYear} Ç2`]: item[`q2_${selectedYear}` as keyof PeriodicData] || '-',
+      [`${selectedYear} Ç3`]: item[`q3_${selectedYear}` as keyof PeriodicData] || '-',
+      [`${selectedYear} Ç4`]: item[`q4_${selectedYear}` as keyof PeriodicData] || '-',
+      [`${selectedYear} Toplam`]: item.total_2025,
+      'Değişim %': item.change_rate.toFixed(1),
+      'Trend': item.trend === 'up' ? 'Artış' : item.trend === 'down' ? 'Azalış' : 'Sabit',
+    }));
+
+    exportToExcel(exportData, `Dönemsel_Veri_Karşılaştırma_${selectedYear}`);
+  };
+
+  const handlePDFExport = () => {
+    generatePeriodicDataComparisonPDF(data, selectedYear);
+  };
+
+  if (loading) {
+    return <div className="text-center py-8 text-slate-500">Yükleniyor...</div>;
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="text-center py-8 text-slate-500">
+        Seçili döneme ait onaylanmış veri girişi bulunmamaktadır.
+      </div>
+    );
+  }
+
+  const currentYear = selectedYear;
+  const previousYear = selectedYear - 1;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Dönemsel Veri Karşılaştırma</h3>
+          <p className="text-sm text-slate-600 mt-1">
+            Birim bazında girilen verilerin dönemsel karşılaştırması
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExcelExport}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            <FileDown className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={handlePDFExport}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 bg-slate-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-slate-500" />
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value={2025}>2025</option>
+            <option value={2024}>2024</option>
+            <option value={2023}>2023</option>
+          </select>
+        </div>
+
+        {(profile?.role === 'admin' || profile?.role === 'manager') && (
+          <div>
+            <select
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">Tüm Birimler</option>
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>
+                  Gösterge
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>
+                  Birim
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>
+                  Başlangıç
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>
+                  Hedef
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider" colSpan={4}>
+                  {currentYear}
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>
+                  Gerçekleşen
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>
+                  Başarı %
+                </th>
+              </tr>
+              <tr>
+                <th className="px-2 py-2 text-center text-xs font-medium text-slate-400">Ç1</th>
+                <th className="px-2 py-2 text-center text-xs font-medium text-slate-400">Ç2</th>
+                <th className="px-2 py-2 text-center text-xs font-medium text-slate-400">Ç3</th>
+                <th className="px-2 py-2 text-center text-xs font-medium text-slate-400">Ç4</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {data.map((item) => (
+                <tr key={item.indicator_id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 text-sm text-slate-900">
+                    <div className="font-medium">{item.indicator_code}</div>
+                    <div className="text-xs text-slate-600">{item.indicator_name}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600">
+                    {item.department_name}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-center text-slate-900">
+                    {item.baseline_value !== null && item.baseline_value !== undefined ? item.baseline_value.toFixed(2) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-center font-medium text-slate-900">
+                    {item.target_value !== null && item.target_value !== undefined ? item.target_value.toFixed(2) : '-'}
+                  </td>
+                  <td className="px-2 py-3 text-sm text-center text-slate-600">
+                    {item[`q1_${currentYear}` as keyof PeriodicData] !== undefined ?
+                      (item[`q1_${currentYear}` as keyof PeriodicData] as number).toFixed(2) : '-'}
+                  </td>
+                  <td className="px-2 py-3 text-sm text-center text-slate-600">
+                    {item[`q2_${currentYear}` as keyof PeriodicData] !== undefined ?
+                      (item[`q2_${currentYear}` as keyof PeriodicData] as number).toFixed(2) : '-'}
+                  </td>
+                  <td className="px-2 py-3 text-sm text-center text-slate-600">
+                    {item[`q3_${currentYear}` as keyof PeriodicData] !== undefined ?
+                      (item[`q3_${currentYear}` as keyof PeriodicData] as number).toFixed(2) : '-'}
+                  </td>
+                  <td className="px-2 py-3 text-sm text-center text-slate-600">
+                    {item[`q4_${currentYear}` as keyof PeriodicData] !== undefined ?
+                      (item[`q4_${currentYear}` as keyof PeriodicData] as number).toFixed(2) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-center font-medium text-slate-900 bg-slate-50">
+                    {item.total_2025.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-center">
+                    <span className={`font-medium ${
+                      item.achievement_rate >= 100 ? 'text-green-600' :
+                      item.achievement_rate >= 70 ? 'text-blue-600' :
+                      item.achievement_rate >= 50 ? 'text-yellow-600' :
+                      'text-red-600'
+                    }`}>
+                      {item.achievement_rate > 0 ? `%${item.achievement_rate.toFixed(1)}` : '-'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-medium text-blue-900 mb-2">Bilgi</h4>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li>• Rapor sadece onaylanmış veri girişlerini gösterir</li>
+          <li>• Trend: ±%5'ten fazla değişim artış/azalış olarak gösterilir</li>
+          <li>• Ç1-Ç4: Yılın çeyrek dönemlerini temsil eder</li>
+          <li>• Kullanıcılar sadece kendi birimlerinin verilerini görür</li>
+          <li>• Yöneticiler tüm birimlerin verilerini karşılaştırabilir</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
