@@ -665,15 +665,15 @@ export default function InstitutionalFramework() {
                               <span
                                 key={role}
                                 className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                                  role === 'R' ? 'bg-blue-500 text-white' :
-                                  role === 'A' ? 'bg-green-500 text-white' :
-                                  role === 'C' ? 'bg-yellow-500 text-white' :
+                                  role === 'S' ? 'bg-blue-500 text-white' :
+                                  role === 'Y' ? 'bg-green-500 text-white' :
+                                  role === 'D' ? 'bg-yellow-500 text-white' :
                                   'bg-purple-500 text-white'
                                 }`}
                                 title={
-                                  role === 'R' ? 'Sorumlu' :
-                                  role === 'A' ? 'Yetkili' :
-                                  role === 'C' ? 'Danışılan' :
+                                  role === 'S' ? 'Sorumlu' :
+                                  role === 'Y' ? 'Yetkili' :
+                                  role === 'D' ? 'Danışılan' :
                                   'Bilgilendirilen'
                                 }
                               >
