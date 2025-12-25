@@ -220,15 +220,18 @@ export default function ActionPlanWorkflow() {
         supabase
           .from('ic_control_tests')
           .select('*')
-          .eq('kiks_action_id', selectedActionPlan.kiks_action_id),
+          .eq('kiks_action_id', selectedActionPlan.kiks_action_id)
+          .eq('ic_plan_id', selectedPlanId),
         supabase
           .from('ic_findings')
           .select('*')
-          .eq('kiks_action_id', selectedActionPlan.kiks_action_id),
+          .eq('kiks_action_id', selectedActionPlan.kiks_action_id)
+          .eq('ic_plan_id', selectedPlanId),
         supabase
           .from('ic_capas')
           .select('*')
           .eq('kiks_action_id', selectedActionPlan.kiks_action_id)
+          .eq('ic_plan_id', selectedPlanId)
       ]);
 
       if (controlsRes.error) throw controlsRes.error;
@@ -338,6 +341,7 @@ export default function ActionPlanWorkflow() {
           organization_id: profile?.organization_id,
           control_id: selectedControl,
           kiks_action_id: selectedActionPlan?.kiks_action_id,
+          ic_plan_id: selectedPlanId,
           test_date: testFormData.test_date,
           test_period_start: testFormData.test_period_start,
           test_period_end: testFormData.test_period_end,
@@ -382,6 +386,7 @@ export default function ActionPlanWorkflow() {
           organization_id: profile?.organization_id,
           control_test_id: selectedTest,
           kiks_action_id: selectedActionPlan?.kiks_action_id,
+          ic_plan_id: selectedPlanId,
           finding_title: findingFormData.finding_title,
           finding_description: findingFormData.finding_description,
           severity: findingFormData.severity,
@@ -422,6 +427,7 @@ export default function ActionPlanWorkflow() {
           organization_id: profile?.organization_id,
           finding_id: selectedFinding,
           kiks_action_id: selectedActionPlan?.kiks_action_id,
+          ic_plan_id: selectedPlanId,
           title: capaFormData.title,
           description: capaFormData.description,
           capa_type: capaFormData.capa_type,
