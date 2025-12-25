@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Users, Shield, AlertTriangle, Plus, Edit2, Trash2, X, Search, Filter, AlertCircle } from 'lucide-react';
+import { Building2, Users, Shield, AlertTriangle, Plus, Edit2, Trash2, X, Search, Filter, AlertCircle, List, Grid3x3, Columns } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
@@ -75,6 +75,7 @@ export default function InstitutionalFramework() {
   const [editingSod, setEditingSod] = useState<SoDRule | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [raciView, setRaciView] = useState<'list' | 'horizontal' | 'vertical'>('list');
 
   const [raciForm, setRaciForm] = useState({
     activity_name: '',
@@ -437,6 +438,283 @@ export default function InstitutionalFramework() {
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'vice_president';
 
+  const getAllPersons = () => {
+    const personsMap = new Map<string, { name: string; type: 'user' | 'role' }>();
+
+    filteredRaciEntries.forEach(entry => {
+      if (entry.responsible_user) {
+        personsMap.set(`user_${entry.responsible_user_id}`, { name: entry.responsible_user, type: 'user' });
+      }
+      if (entry.responsible_role) {
+        personsMap.set(`role_${entry.responsible_role}`, { name: entry.responsible_role, type: 'role' });
+      }
+      if (entry.accountable_user) {
+        personsMap.set(`user_${entry.accountable_user_id}`, { name: entry.accountable_user, type: 'user' });
+      }
+      if (entry.accountable_role) {
+        personsMap.set(`role_${entry.accountable_role}`, { name: entry.accountable_role, type: 'role' });
+      }
+      entry.consulted_roles?.forEach(role => {
+        personsMap.set(`role_${role}`, { name: role, type: 'role' });
+      });
+      entry.consulted_user_ids?.forEach((userId, idx) => {
+        const user = users.find(u => u.id === userId);
+        if (user) personsMap.set(`user_${userId}`, { name: user.full_name, type: 'user' });
+      });
+      entry.informed_roles?.forEach(role => {
+        personsMap.set(`role_${role}`, { name: role, type: 'role' });
+      });
+      entry.informed_user_ids?.forEach((userId, idx) => {
+        const user = users.find(u => u.id === userId);
+        if (user) personsMap.set(`user_${userId}`, { name: user.full_name, type: 'user' });
+      });
+    });
+
+    return Array.from(personsMap.entries()).map(([key, value]) => ({ key, ...value }));
+  };
+
+  const getRACIForCell = (entry: RACIEntry, personKey: string): string[] => {
+    const roles: string[] = [];
+    const [type, id] = personKey.split('_');
+
+    if (type === 'user') {
+      if (entry.responsible_user_id === id) roles.push('R');
+      if (entry.accountable_user_id === id) roles.push('A');
+      if (entry.consulted_user_ids?.includes(id)) roles.push('C');
+      if (entry.informed_user_ids?.includes(id)) roles.push('I');
+    } else if (type === 'role') {
+      const roleName = personKey.substring(5);
+      if (entry.responsible_role === roleName) roles.push('R');
+      if (entry.accountable_role === roleName) roles.push('A');
+      if (entry.consulted_roles?.includes(roleName)) roles.push('C');
+      if (entry.informed_roles?.includes(roleName)) roles.push('I');
+    }
+
+    return roles;
+  };
+
+  const renderHorizontalMatrix = () => {
+    const persons = getAllPersons();
+
+    if (filteredRaciEntries.length === 0) {
+      return (
+        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <p className="text-gray-500">Henüz RACI girişi bulunmuyor</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse">
+            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase border-b-2 border-gray-300 min-w-[200px] sticky left-0 bg-gray-100 z-10">
+                  Aktivite / Süreç
+                </th>
+                {persons.map(person => (
+                  <th
+                    key={person.key}
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-700 border-b-2 border-gray-300 min-w-[80px]"
+                  >
+                    <div className="flex flex-col items-center">
+                      <span className="font-semibold">{person.name}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded mt-1 ${
+                        person.type === 'user'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {person.type === 'user' ? 'Kişi' : 'Rol'}
+                      </span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredRaciEntries.map((entry, idx) => (
+                <tr key={entry.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="px-4 py-3 border-r-2 border-gray-200 sticky left-0 bg-inherit z-10">
+                    <div className="font-medium text-sm text-gray-900">{entry.activity_name}</div>
+                    {entry.process_name && (
+                      <div className="text-xs text-gray-500 mt-1">{entry.process_name}</div>
+                    )}
+                  </td>
+                  {persons.map(person => {
+                    const roles = getRACIForCell(entry, person.key);
+                    return (
+                      <td
+                        key={`${entry.id}-${person.key}`}
+                        className="px-3 py-3 text-center border-l border-gray-200"
+                      >
+                        {roles.length > 0 && (
+                          <div className="flex items-center justify-center gap-1">
+                            {roles.map(role => (
+                              <span
+                                key={role}
+                                className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                                  role === 'R' ? 'bg-blue-500 text-white' :
+                                  role === 'A' ? 'bg-green-500 text-white' :
+                                  role === 'C' ? 'bg-yellow-500 text-white' :
+                                  'bg-purple-500 text-white'
+                                }`}
+                                title={
+                                  role === 'R' ? 'Responsible (Sorumlu)' :
+                                  role === 'A' ? 'Accountable (Yetkili)' :
+                                  role === 'C' ? 'Consulted (Danışılan)' :
+                                  'Informed (Bilgilendirilen)'
+                                }
+                              >
+                                {role}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
+          <div className="flex items-center gap-4 text-xs text-gray-600">
+            <span className="font-semibold">Açıklama:</span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white font-bold">R</span>
+              <span>Responsible (Sorumlu)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white font-bold">A</span>
+              <span>Accountable (Yetkili)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white font-bold">C</span>
+              <span>Consulted (Danışılan)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white font-bold">I</span>
+              <span>Informed (Bilgilendirilen)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderVerticalMatrix = () => {
+    const persons = getAllPersons();
+
+    if (filteredRaciEntries.length === 0) {
+      return (
+        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <p className="text-gray-500">Henüz RACI girişi bulunmuyor</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse">
+            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase border-b-2 border-gray-300 min-w-[200px] sticky left-0 bg-gray-100 z-10">
+                  Kişi / Rol
+                </th>
+                {filteredRaciEntries.map(entry => (
+                  <th
+                    key={entry.id}
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-700 border-b-2 border-gray-300 min-w-[120px]"
+                  >
+                    <div className="flex flex-col items-center">
+                      <span className="font-semibold">{entry.activity_name}</span>
+                      {entry.process_name && (
+                        <span className="text-[10px] text-gray-500 mt-1">{entry.process_name}</span>
+                      )}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {persons.map((person, idx) => (
+                <tr key={person.key} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="px-4 py-3 border-r-2 border-gray-200 sticky left-0 bg-inherit z-10">
+                    <div className="font-medium text-sm text-gray-900">{person.name}</div>
+                    <span className={`inline-block text-[10px] px-2 py-0.5 rounded mt-1 ${
+                      person.type === 'user'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {person.type === 'user' ? 'Kişi' : 'Rol'}
+                    </span>
+                  </td>
+                  {filteredRaciEntries.map(entry => {
+                    const roles = getRACIForCell(entry, person.key);
+                    return (
+                      <td
+                        key={`${person.key}-${entry.id}`}
+                        className="px-3 py-3 text-center border-l border-gray-200"
+                      >
+                        {roles.length > 0 && (
+                          <div className="flex items-center justify-center gap-1">
+                            {roles.map(role => (
+                              <span
+                                key={role}
+                                className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                                  role === 'R' ? 'bg-blue-500 text-white' :
+                                  role === 'A' ? 'bg-green-500 text-white' :
+                                  role === 'C' ? 'bg-yellow-500 text-white' :
+                                  'bg-purple-500 text-white'
+                                }`}
+                                title={
+                                  role === 'R' ? 'Responsible (Sorumlu)' :
+                                  role === 'A' ? 'Accountable (Yetkili)' :
+                                  role === 'C' ? 'Consulted (Danışılan)' :
+                                  'Informed (Bilgilendirilen)'
+                                }
+                              >
+                                {role}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
+          <div className="flex items-center gap-4 text-xs text-gray-600">
+            <span className="font-semibold">Açıklama:</span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white font-bold">R</span>
+              <span>Responsible (Sorumlu)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white font-bold">A</span>
+              <span>Accountable (Yetkili)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white font-bold">C</span>
+              <span>Consulted (Danışılan)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white font-bold">I</span>
+              <span>Informed (Bilgilendirilen)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!hasPlan) {
     return (
       <div className="p-6">
@@ -512,6 +790,47 @@ export default function InstitutionalFramework() {
           </div>
         </div>
 
+        {activeTab === 'raci' && (
+          <div className="flex gap-2 bg-white rounded-lg p-1 shadow-sm">
+            <button
+              onClick={() => setRaciView('list')}
+              className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
+                raciView === 'list'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              title="Liste Görünümü"
+            >
+              <List className="w-4 h-4" />
+              <span className="text-sm">Liste</span>
+            </button>
+            <button
+              onClick={() => setRaciView('horizontal')}
+              className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
+                raciView === 'horizontal'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              title="Yatay Matris: Aktiviteler x Kişiler"
+            >
+              <Grid3x3 className="w-4 h-4" />
+              <span className="text-sm">Yatay</span>
+            </button>
+            <button
+              onClick={() => setRaciView('vertical')}
+              className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
+                raciView === 'vertical'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+              title="Dikey Matris: Kişiler x Aktiviteler"
+            >
+              <Columns className="w-4 h-4" />
+              <span className="text-sm">Dikey</span>
+            </button>
+          </div>
+        )}
+
         {activeTab === 'sod' && (
           <div className="flex items-center gap-2">
             <Filter className="w-5 h-5 text-gray-400" />
@@ -557,6 +876,7 @@ export default function InstitutionalFramework() {
       ) : (
         <>
           {activeTab === 'raci' ? (
+            raciView === 'list' ? (
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -660,6 +980,11 @@ export default function InstitutionalFramework() {
                 </table>
               </div>
             </div>
+            ) : raciView === 'horizontal' ? (
+              renderHorizontalMatrix()
+            ) : (
+              renderVerticalMatrix()
+            )
           ) : (
             <div className="grid gap-4">
               {filteredSodRules.length === 0 ? (
@@ -818,6 +1143,86 @@ export default function InstitutionalFramework() {
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Consulted (Danışılan)</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Roller</label>
+                <input
+                  type="text"
+                  value={raciForm.consulted_roles.join(', ')}
+                  onChange={(e) => setRaciForm({
+                    ...raciForm,
+                    consulted_roles: e.target.value.split(',').map(r => r.trim()).filter(r => r)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Rolleri virgülle ayırın"
+                />
+                <p className="text-xs text-gray-500 mt-1">Örn: Hukuk Müşaviri, Mali İşler Müdürü</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kişiler</label>
+                <select
+                  multiple
+                  value={raciForm.consulted_user_ids}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions, option => option.value);
+                    setRaciForm({ ...raciForm, consulted_user_ids: selected });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent min-h-[100px]"
+                >
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Ctrl/Cmd tuşuyla birden fazla seçim yapın</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Informed (Bilgilendirilen)</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Roller</label>
+                <input
+                  type="text"
+                  value={raciForm.informed_roles.join(', ')}
+                  onChange={(e) => setRaciForm({
+                    ...raciForm,
+                    informed_roles: e.target.value.split(',').map(r => r.trim()).filter(r => r)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Rolleri virgülle ayırın"
+                />
+                <p className="text-xs text-gray-500 mt-1">Örn: Başkan, İç Kontrol Birimi</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kişiler</label>
+                <select
+                  multiple
+                  value={raciForm.informed_user_ids}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions, option => option.value);
+                    setRaciForm({ ...raciForm, informed_user_ids: selected });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent min-h-[100px]"
+                >
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Ctrl/Cmd tuşuyla birden fazla seçim yapın</p>
+              </div>
             </div>
           </div>
 
