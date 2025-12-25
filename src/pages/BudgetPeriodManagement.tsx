@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, AlertCircle, CheckCircle, Clock, Play, Pause, Lock, Unlock, ArrowRight, Plus } from 'lucide-react';
+import { Calendar, AlertCircle, CheckCircle, Clock, Play, Pause, Lock, Unlock, ArrowRight, Plus, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import Modal from '../components/ui/Modal';
 
 interface BudgetPeriod {
   id: string;
@@ -72,6 +73,9 @@ export default function BudgetPeriodManagement() {
   const [currentPeriod, setCurrentPeriod] = useState<BudgetPeriod | null>(null);
   const [constraints, setConstraints] = useState<PeriodConstraints | null>(null);
   const [creating, setCreating] = useState(false);
+  const [showManualStatusModal, setShowManualStatusModal] = useState(false);
+  const [selectedPeriodForManualChange, setSelectedPeriodForManualChange] = useState<BudgetPeriod | null>(null);
+  const [manualStatusValue, setManualStatusValue] = useState('');
 
   useEffect(() => {
     loadPeriods();
@@ -180,6 +184,37 @@ export default function BudgetPeriodManagement() {
       executing: 'closed',
     };
     return transitions[currentStatus] || null;
+  };
+
+  const handleOpenManualStatusModal = (period: BudgetPeriod) => {
+    setSelectedPeriodForManualChange(period);
+    setManualStatusValue(period.period_status);
+    setShowManualStatusModal(true);
+  };
+
+  const handleManualStatusChange = async () => {
+    if (!selectedPeriodForManualChange || !manualStatusValue) return;
+
+    if (!confirm(`${selectedPeriodForManualChange.budget_year} yılı döneminin durumunu "${statusLabels[manualStatusValue]}" olarak değiştirmek istediğinize emin misiniz?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.rpc('transition_period_status', {
+        p_period_id: selectedPeriodForManualChange.id,
+        p_new_status: manualStatusValue,
+        p_transition_type: 'manual',
+        p_notes: `Manuel durum değişikliği: ${selectedPeriodForManualChange.period_status} -> ${manualStatusValue}`,
+      });
+
+      if (error) throw error;
+
+      alert(`Dönem durumu "${statusLabels[manualStatusValue]}" olarak güncellendi`);
+      setShowManualStatusModal(false);
+      await loadPeriods();
+    } catch (error: any) {
+      alert(`Hata: ${error.message}`);
+    }
   };
 
   if (loading) {
@@ -328,14 +363,23 @@ export default function BudgetPeriodManagement() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {getNextStatus(period.period_status) && (
+                    <div className="flex items-center gap-2">
+                      {getNextStatus(period.period_status) && (
+                        <button
+                          onClick={() => handleTransitionStatus(period.id, getNextStatus(period.period_status)!)}
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          → {statusLabels[getNextStatus(period.period_status)!]}
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleTransitionStatus(period.id, getNextStatus(period.period_status)!)}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        onClick={() => handleOpenManualStatusModal(period)}
+                        className="p-1 text-gray-500 hover:text-gray-700"
+                        title="Manuel Durum Değiştir"
                       >
-                        → {statusLabels[getNextStatus(period.period_status)!]}
+                        <RotateCcw className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -408,6 +452,76 @@ export default function BudgetPeriodManagement() {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={showManualStatusModal}
+        onClose={() => setShowManualStatusModal(false)}
+        title="Manuel Durum Değiştir"
+      >
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-yellow-800">
+                  Bu özellik ile dönemi istediğiniz duruma manuel olarak geçirebilirsiniz.
+                  Kapalı dönemleri tekrar açabilir veya herhangi bir duruma geçiş yapabilirsiniz.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {selectedPeriodForManualChange && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Dönem:</span> {selectedPeriodForManualChange.budget_year} Mali Yılı
+                </p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Mevcut Durum:</span>{' '}
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[selectedPeriodForManualChange.period_status]}`}>
+                    {statusLabels[selectedPeriodForManualChange.period_status]}
+                  </span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Yeni Durum Seçin
+                </label>
+                <select
+                  value={manualStatusValue}
+                  onChange={(e) => setManualStatusValue(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="draft">Taslak</option>
+                  <option value="preparation">Hazırlık</option>
+                  <option value="approval">Onay Sürecinde</option>
+                  <option value="approved">Onaylandı</option>
+                  <option value="active">Aktif</option>
+                  <option value="executing">Yürütülüyor</option>
+                  <option value="closed">Kapalı</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4">
+                <button
+                  onClick={() => setShowManualStatusModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleManualStatusChange}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Durumu Değiştir
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
