@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ClipboardCheck, Calendar, TrendingUp, Plus, Edit2, Trash2, CheckCircle, XCircle, AlertCircle, Filter } from 'lucide-react';
+import { Search, ClipboardCheck, Calendar, TrendingUp, Plus, Edit2, Trash2, CheckCircle, XCircle, AlertCircle, Filter, Paperclip, Download, FileText, X, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
@@ -49,6 +49,7 @@ export default function MonitoringEvaluation() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterResult, setFilterResult] = useState<string>('all');
   const [filterPeriod, setFilterPeriod] = useState<string>('all');
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const [testForm, setTestForm] = useState({
     control_id: '',
@@ -228,6 +229,77 @@ export default function MonitoringEvaluation() {
       evidence_urls: test.evidence_urls || []
     });
     setShowTestModal(true);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !profile?.organization_id) return;
+
+    setUploadingFiles(true);
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${profile.organization_id}/${fileName}`;
+
+        const { error: uploadError, data } = await supabase.storage
+          .from('ic-test-evidence')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          alert(`Dosya yüklenirken hata oluştu: ${file.name}`);
+          continue;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('ic-test-evidence')
+          .getPublicUrl(filePath);
+
+        uploadedUrls.push(publicUrl);
+      }
+
+      setTestForm({
+        ...testForm,
+        evidence_urls: [...testForm.evidence_urls, ...uploadedUrls]
+      });
+
+      alert(`${uploadedUrls.length} dosya başarıyla yüklendi`);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert('Dosyalar yüklenirken hata oluştu');
+    } finally {
+      setUploadingFiles(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveFile = async (url: string) => {
+    if (!confirm('Bu dosyayı kaldırmak istediğinizden emin misiniz?')) return;
+
+    try {
+      const path = url.split('/ic-test-evidence/')[1];
+      if (path) {
+        await supabase.storage.from('ic-test-evidence').remove([path]);
+      }
+
+      setTestForm({
+        ...testForm,
+        evidence_urls: testForm.evidence_urls.filter(u => u !== url)
+      });
+    } catch (error) {
+      console.error('Error removing file:', error);
+      alert('Dosya silinirken hata oluştu');
+    }
+  };
+
+  const getFileName = (url: string) => {
+    const parts = url.split('/');
+    const fileName = parts[parts.length - 1];
+    return decodeURIComponent(fileName);
   };
 
   const resetForm = () => {
@@ -520,6 +592,32 @@ export default function MonitoringEvaluation() {
                           <p className="text-sm text-gray-700">{test.test_notes}</p>
                         </div>
                       )}
+
+                      {test.evidence_urls && test.evidence_urls.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Paperclip className="w-4 h-4 text-gray-500" />
+                            <p className="text-xs text-gray-500">Kanıt Dosyaları ({test.evidence_urls.length})</p>
+                          </div>
+                          <div className="space-y-1">
+                            {test.evidence_urls.map((url, index) => (
+                              <a
+                                key={index}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors group"
+                              >
+                                <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                <span className="text-xs text-gray-700 flex-1 truncate">
+                                  {getFileName(url)}
+                                </span>
+                                <Download className="w-4 h-4 text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {isAdmin && (
@@ -662,6 +760,71 @@ export default function MonitoringEvaluation() {
               rows={4}
               placeholder="Test detayları, bulgular, yorumlar..."
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Kanıt Dosyaları
+            </label>
+
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-teal-500 transition-colors">
+              <input
+                type="file"
+                id="evidence-upload"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                onChange={handleFileUpload}
+                disabled={uploadingFiles}
+                className="hidden"
+              />
+              <label
+                htmlFor="evidence-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className={`w-8 h-8 ${uploadingFiles ? 'text-gray-400' : 'text-teal-600'}`} />
+                <span className="text-sm text-gray-600">
+                  {uploadingFiles ? 'Dosyalar yükleniyor...' : 'Dosya yüklemek için tıklayın veya sürükleyin'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  PDF, Resim, Word, Excel dosyaları (Max 10MB)
+                </span>
+              </label>
+            </div>
+
+            {testForm.evidence_urls.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-sm font-medium text-gray-700">
+                  Yüklenen Dosyalar ({testForm.evidence_urls.length})
+                </p>
+                {testForm.evidence_urls.map((url, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    <span className="text-sm text-gray-700 flex-1 truncate">
+                      {getFileName(url)}
+                    </span>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1 text-teal-600 hover:bg-teal-50 rounded"
+                      title="İndir"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                    <button
+                      onClick={() => handleRemoveFile(url)}
+                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                      title="Sil"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">
