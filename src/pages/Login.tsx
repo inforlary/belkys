@@ -34,7 +34,7 @@ export default function Login() {
           </div>
 
           <h1 className="text-2xl font-bold text-center text-slate-900 mb-8">
-            Belediye Kurumsal Yönetim Sistemi
+          Kurumsal Yönetim Sistemi
           </h1>
 
           {error && (
