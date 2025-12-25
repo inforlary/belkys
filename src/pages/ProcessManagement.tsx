@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Plus, Edit2, Trash2, ChevronDown, ChevronRight, MapPin, AlertCircle, Save, X, Link as LinkIcon, Target } from 'lucide-react';
+import { Activity, Plus, Edit2, Trash2, ChevronDown, ChevronRight, MapPin, AlertCircle, Save, X, Link as LinkIcon, Target, Network } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
@@ -62,6 +62,7 @@ export default function ProcessManagement() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showStepsModal, setShowStepsModal] = useState(false);
+  const [showFlowDiagram, setShowFlowDiagram] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
   const [processSteps, setProcessSteps] = useState<ProcessStep[]>([]);
@@ -953,6 +954,17 @@ export default function ProcessManagement() {
                     >
                       Adımları Yönet
                     </button>
+                    <button
+                      onClick={() => {
+                        setSelectedProcess(process);
+                        loadProcessSteps(process.id);
+                        setShowFlowDiagram(true);
+                      }}
+                      className="text-green-600 hover:text-green-800 text-sm px-3 py-1 border border-green-600 rounded flex items-center gap-1"
+                    >
+                      <Network className="w-4 h-4" />
+                      Akış Diyagramı
+                    </button>
                     {canEdit && (
                       <>
                         <button
@@ -1011,6 +1023,165 @@ export default function ProcessManagement() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Flow Diagram Modal */}
+      {showFlowDiagram && selectedProcess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Network className="w-6 h-6 text-green-600" />
+                    İş Akış Diyagramı
+                  </h2>
+                  <p className="text-sm text-gray-600">{selectedProcess.name}</p>
+                </div>
+                <button
+                  onClick={() => setShowFlowDiagram(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {processSteps.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p>Bu süreç için henüz adım eklenmemiş.</p>
+                  <p className="text-sm mt-2">Akış diyagramını görüntülemek için önce süreç adımlarını ekleyin.</p>
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-lg p-8">
+                  {/* Başlangıç */}
+                  <div className="flex flex-col items-center mb-6">
+                    <div className="bg-green-500 text-white rounded-full px-6 py-3 font-medium shadow-lg">
+                      BAŞLANGIÇ
+                    </div>
+                    <div className="w-0.5 h-8 bg-gray-400"></div>
+                  </div>
+
+                  {/* Adımlar */}
+                  {processSteps.map((step, index) => (
+                    <div key={step.id} className="flex flex-col items-center mb-6">
+                      {/* Adım Kutusu */}
+                      <div className={`w-full max-w-2xl rounded-lg shadow-md p-4 border-2 ${
+                        step.is_critical_control_point
+                          ? 'bg-red-50 border-red-500'
+                          : 'bg-white border-blue-500'
+                      }`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
+                            step.is_critical_control_point ? 'bg-red-500' : 'bg-blue-500'
+                          }`}>
+                            {step.step_number}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                              {step.step_name}
+                              {step.is_critical_control_point && (
+                                <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  KKN
+                                </span>
+                              )}
+                            </div>
+                            {step.step_description && (
+                              <p className="text-sm text-gray-600 mb-2">{step.step_description}</p>
+                            )}
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              {step.responsible_user_name && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Sorumlu:</span>
+                                  <span className="text-gray-600 ml-1">{step.responsible_user_name}</span>
+                                </div>
+                              )}
+                              {step.responsible_role && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Rol:</span>
+                                  <span className="text-gray-600 ml-1">{step.responsible_role}</span>
+                                </div>
+                              )}
+                              {step.inputs && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Girdiler:</span>
+                                  <span className="text-gray-600 ml-1">{step.inputs}</span>
+                                </div>
+                              )}
+                              {step.outputs && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Çıktılar:</span>
+                                  <span className="text-gray-600 ml-1">{step.outputs}</span>
+                                </div>
+                              )}
+                              {step.tools_used && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Araçlar:</span>
+                                  <span className="text-gray-600 ml-1">{step.tools_used}</span>
+                                </div>
+                              )}
+                              {step.estimated_duration && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Süre:</span>
+                                  <span className="text-gray-600 ml-1">{step.estimated_duration}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ok */}
+                      {index < processSteps.length - 1 && (
+                        <div className="flex flex-col items-center py-2">
+                          <div className="w-0.5 h-6 bg-gray-400"></div>
+                          <div className="text-gray-400">▼</div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Bitiş */}
+                  <div className="flex flex-col items-center mt-6">
+                    <div className="w-0.5 h-8 bg-gray-400"></div>
+                    <div className="bg-red-500 text-white rounded-full px-6 py-3 font-medium shadow-lg">
+                      BİTİŞ
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="mt-8 pt-6 border-t border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Açıklamalar:</h4>
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                        <span className="text-gray-600">Normal Adım</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-red-500 rounded"></div>
+                        <span className="text-gray-600">Kritik Kontrol Noktası (KKN)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-red-500" />
+                        <span className="text-gray-600">KKN İşareti</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => setShowFlowDiagram(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

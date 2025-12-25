@@ -46,6 +46,7 @@ import InternalControlSelfAssessment from './pages/InternalControlSelfAssessment
 import InternalControlPlans from './pages/InternalControlPlans';
 import KIKSStandards from './pages/KIKSStandards';
 import InstitutionalFramework from './pages/InstitutionalFramework';
+import OrganizationManagement from './pages/OrganizationManagement';
 import ProcessManagement from './pages/ProcessManagement';
 import RiskManagement from './pages/RiskManagement';
 import ControlActivities from './pages/ControlActivities';
@@ -235,6 +236,8 @@ const renderPage = () => {
         return <KIKSStandards />;
       case 'institutional-framework':
         return <InstitutionalFramework />;
+      case 'organization-management':
+        return <OrganizationManagement />;
       case 'process-management':
         return <ProcessManagement />;
       case 'risk-management':

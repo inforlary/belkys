@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye } from 'lucide-react';
+import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import GlobalSearch from './GlobalSearch';
 
@@ -276,6 +276,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: Users, label: 'Rol Yönetimi', path: 'ic-role-management', adminOnly: true },
         { icon: FileText, label: 'KİKS Standartları', path: 'kiks-standards', adminOnly: true },
         { icon: Building2, label: 'Kurumsal Çerçeve', path: 'institutional-framework', adminOnly: true },
+        { icon: GitBranch, label: 'Organizasyon Yönetimi', path: 'organization-management' },
         { icon: Activity, label: 'Süreç Yönetimi', path: 'process-management' },
         { icon: AlertTriangle, label: 'Risk Yönetimi', path: 'risk-management' },
         { icon: ShieldCheck, label: 'Kontrol Faaliyetleri', path: 'control-activities' },
