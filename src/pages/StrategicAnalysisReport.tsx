@@ -157,19 +157,49 @@ export default function StrategicAnalysisReport() {
   const selectedPlan = strategicPlans.find(p => p.id === selectedPlanId);
 
   const pestleByCategory = {
-    politik: pestleData.filter(p => p.category.toLowerCase() === 'politik'),
-    ekonomik: pestleData.filter(p => p.category.toLowerCase() === 'ekonomik'),
-    sosyal: pestleData.filter(p => p.category.toLowerCase() === 'sosyal'),
-    teknolojik: pestleData.filter(p => p.category.toLowerCase() === 'teknolojik'),
-    yasal: pestleData.filter(p => p.category.toLowerCase() === 'yasal'),
-    çevresel: pestleData.filter(p => p.category.toLowerCase() === 'çevresel'),
+    politik: pestleData.filter(p => {
+      const cat = p.category.toLowerCase();
+      return cat === 'politik' || cat === 'political';
+    }),
+    ekonomik: pestleData.filter(p => {
+      const cat = p.category.toLowerCase();
+      return cat === 'ekonomik' || cat === 'economic';
+    }),
+    sosyal: pestleData.filter(p => {
+      const cat = p.category.toLowerCase();
+      return cat === 'sosyal' || cat === 'social';
+    }),
+    teknolojik: pestleData.filter(p => {
+      const cat = p.category.toLowerCase();
+      return cat === 'teknolojik' || cat === 'technological';
+    }),
+    yasal: pestleData.filter(p => {
+      const cat = p.category.toLowerCase();
+      return cat === 'yasal' || cat === 'legal';
+    }),
+    çevresel: pestleData.filter(p => {
+      const cat = p.category.toLowerCase();
+      return cat === 'çevresel' || cat === 'environmental';
+    }),
   };
 
   const swotByCategory = {
-    strengths: swotData.filter(s => s.category.toLowerCase() === 'strength'),
-    weaknesses: swotData.filter(s => s.category.toLowerCase() === 'weakness'),
-    opportunities: swotData.filter(s => s.category.toLowerCase() === 'opportunity'),
-    threats: swotData.filter(s => s.category.toLowerCase() === 'threat'),
+    strengths: swotData.filter(s => {
+      const cat = s.category.toLowerCase();
+      return cat === 'strength' || cat === 'güçlü yön' || cat === 'güçlü';
+    }),
+    weaknesses: swotData.filter(s => {
+      const cat = s.category.toLowerCase();
+      return cat === 'weakness' || cat === 'zayıf yön' || cat === 'zayıf';
+    }),
+    opportunities: swotData.filter(s => {
+      const cat = s.category.toLowerCase();
+      return cat === 'opportunity' || cat === 'fırsat';
+    }),
+    threats: swotData.filter(s => {
+      const cat = s.category.toLowerCase();
+      return cat === 'threat' || cat === 'tehdit';
+    }),
   };
 
   const generateTOWSStrategies = (): TOWSStrategy[] => {
