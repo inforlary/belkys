@@ -84,7 +84,7 @@ export default function Login() {
           </form>
 
           <div className="mt-6 text-center text-sm text-slate-600">
-            <p>Belediye Kurumsal Yönetim Sistemi v4.5</p>
+            <p>Belediye Kurumsal Yönetim Sistemi v6.1</p>
           </div>
         </div>
       </div>
