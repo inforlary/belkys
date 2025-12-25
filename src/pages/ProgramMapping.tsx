@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Save, Search, X, Trash2, Info, Edit2, Filter } from 'lucide-react';
+import { Save, Search, X, Trash2, Info, Edit2, Filter, Calendar, AlertCircle } from 'lucide-react';
+import { useBudgetPeriod } from '../hooks/useBudgetPeriod';
 
 interface Department {
   id: string;
@@ -52,6 +53,7 @@ interface Mapping {
   sub_program_id: string;
   activity_id: string;
   indicator_id: string | null;
+  fiscal_year: number;
   is_active: boolean;
   created_at: string;
   departments: {
@@ -78,6 +80,7 @@ interface Mapping {
 
 export default function ProgramMapping() {
   const { user, profile } = useAuth();
+  const { currentPeriod, constraints, loading: periodLoading, canCreate, getCurrentFiscalYear } = useBudgetPeriod();
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -225,6 +228,12 @@ const loadDepartments = async () => {
   const loadMappings = async () => {
     setLoading(true);
     try {
+      const fiscalYear = getCurrentFiscalYear();
+      if (!fiscalYear) {
+        setMappings([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('program_activity_indicator_mappings')
         .select(`
@@ -236,6 +245,7 @@ const loadDepartments = async () => {
           indicators (name, code)
         `)
         .eq('organization_id', profile?.organization_id)
+        .eq('fiscal_year', fiscalYear)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -262,8 +272,19 @@ const getUsedIndicatorIds = () => {
   };
 
 const handleSave = async () => {
+    if (!canCreate()) {
+      alert('Şu anda veri girişi yapılamaz. Lütfen dönem durumunu kontrol edin.');
+      return;
+    }
+
     if (!selectedDepartmentId || !selectedProgramId || !selectedSubProgramId || selectedActivityIds.length === 0) {
       alert('Lütfen tüm zorunlu alanları doldurun');
+      return;
+    }
+
+    const fiscalYear = getCurrentFiscalYear();
+    if (!fiscalYear) {
+      alert('Aktif bütçe dönemi bulunamadı');
       return;
     }
 
@@ -298,6 +319,7 @@ const handleSave = async () => {
               sub_program_id: selectedSubProgramId,
               activity_id: activityId,
               indicator_id: null,
+              fiscal_year: fiscalYear,
               created_by: user?.id
             });
           } else {
@@ -309,6 +331,7 @@ const handleSave = async () => {
                 sub_program_id: selectedSubProgramId,
                 activity_id: activityId,
                 indicator_id: indicatorId,
+                fiscal_year: fiscalYear,
                 created_by: user?.id
               });
             }
@@ -417,12 +440,78 @@ const filteredMappings = mappings.filter(m => {
 
   const availableIndicators = getAvailableIndicators();
 
+  if (periodLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!currentPeriod) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">Aktif Bütçe Dönemi Bulunamadı</h3>
+              <p className="text-yellow-800">
+                Şu anda aktif bir bütçe dönemi bulunmamaktadır. Lütfen yöneticinizle iletişime geçin veya Bütçe Dönemi Yönetimi sayfasından yeni bir dönem başlatın.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Performans Program Faaliyet Eşleştirme</h1>
         <p className="text-gray-600 mt-1">Birim programlarını stratejik plan göstergeleriyle eşleştirin</p>
       </div>
+
+      {currentPeriod && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold text-blue-900">
+                  {currentPeriod.budget_year} Mali Yılı Bütçesi
+                </h3>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  currentPeriod.period_status === 'preparation' ? 'bg-blue-100 text-blue-700' :
+                  currentPeriod.period_status === 'approval' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-green-100 text-green-700'
+                }`}>
+                  {currentPeriod.period_status === 'preparation' ? 'Hazırlık' :
+                   currentPeriod.period_status === 'approval' ? 'Onay' : 'Aktif'}
+                </span>
+              </div>
+              {constraints && (
+                <p className="text-sm text-blue-700 mt-1">{constraints.message}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!canCreate() && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-red-900 mb-1">Veri Girişi Kapalı</h3>
+              <p className="text-sm text-red-700">
+                Şu anda yeni eşleştirme eklenemez. Dönem durumu veri girişine izin vermiyor.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         {editingMappingId && (
@@ -594,7 +683,7 @@ const filteredMappings = mappings.filter(m => {
 <div className="flex gap-3">
           <button
             onClick={handleSave}
-            disabled={saving || selectedActivityIds.length === 0}
+            disabled={saving || selectedActivityIds.length === 0 || !canCreate()}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             <Save className="w-4 h-4" />
