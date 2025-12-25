@@ -129,6 +129,10 @@ export default function SuperAdmin() {
 
       if (error) throw error;
 
+      if (org.is_active) {
+        await supabase.rpc('terminate_organization_sessions', { org_id: org.id });
+      }
+
       await supabase.from('super_admin_activity_logs').insert({
         super_admin_id: user?.id,
         action: org.is_active ? 'deactivate_organization' : 'activate_organization',
@@ -165,28 +169,25 @@ export default function SuperAdmin() {
         .select('id')
         .eq('organization_id', org.id);
 
-      const { error: deleteOrgError } = await supabase
-        .from('organizations')
-        .delete()
-        .eq('id', org.id);
-
-      if (deleteOrgError) throw deleteOrgError;
-
       if (userIds && userIds.length > 0) {
         for (const userProfile of userIds) {
           try {
-            const { error: deleteUserError } = await supabase.functions.invoke('delete-user', {
-              body: { userId: userProfile.id }
-            });
-
-            if (deleteUserError) {
-              console.error('Auth user deletion error (non-critical):', deleteUserError);
+            const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userProfile.id);
+            if (authDeleteError) {
+              console.error('Auth user deletion error (non-critical):', authDeleteError);
             }
           } catch (authError) {
             console.error('Auth user deletion error (non-critical):', authError);
           }
         }
       }
+
+      const { error: deleteOrgError } = await supabase
+        .from('organizations')
+        .delete()
+        .eq('id', org.id);
+
+      if (deleteOrgError) throw deleteOrgError;
 
       await supabase.from('super_admin_activity_logs').insert({
         super_admin_id: user?.id,

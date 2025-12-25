@@ -64,8 +64,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       })();
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    const sessionCheckInterval = setInterval(async () => {
+      if (user && profile && !profile.is_super_admin && profile.organization_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('is_active')
+          .eq('id', profile.organization_id)
+          .maybeSingle();
+
+        if (orgData && !orgData.is_active) {
+          await signOut();
+          alert('Belediyeniz devre dışı bırakılmıştır. Lütfen sistem yöneticisi ile iletişime geçin.');
+        }
+      }
+    }, 30000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(sessionCheckInterval);
+    };
+  }, [user, profile]);
 
   const loadProfile = async (userId: string) => {
     try {
