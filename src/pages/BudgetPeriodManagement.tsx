@@ -230,12 +230,10 @@ export default function BudgetPeriodManagement() {
       }
 
       if (currentChanged) {
-        if (manualIsCurrentValue) {
-          await supabase
-            .from('budget_periods')
-            .update({ is_current: false })
-            .eq('organization_id', selectedPeriodForManualChange.organization_id);
-        }
+        await supabase
+          .from('budget_periods')
+          .update({ is_current: false })
+          .eq('organization_id', selectedPeriodForManualChange.organization_id);
 
         const { error } = await supabase
           .from('budget_periods')
