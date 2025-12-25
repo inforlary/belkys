@@ -58,7 +58,8 @@ export default function DepartmentLicenseManager() {
           license_issued_date,
           license_max_users,
           license_notes,
-          organization:organizations(id, name)
+          organization_id,
+          organizations!inner(id, name)
         `)
         .order('name');
 
@@ -78,7 +79,19 @@ export default function DepartmentLicenseManager() {
       });
 
       const departmentsWithCounts = data?.map(d => ({
-        ...d,
+        id: d.id,
+        name: d.name,
+        code: d.code,
+        license_key: d.license_key,
+        license_status: d.license_status,
+        license_expiry_date: d.license_expiry_date,
+        license_issued_date: d.license_issued_date,
+        license_max_users: d.license_max_users,
+        license_notes: d.license_notes,
+        organization: {
+          id: d.organizations.id,
+          name: d.organizations.name
+        },
         user_count: countMap.get(d.id) || 0
       }));
 

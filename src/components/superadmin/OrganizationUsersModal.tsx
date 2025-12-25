@@ -48,7 +48,7 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
           full_name,
           role,
           created_at,
-          department:departments(id, name)
+          department:departments!department_id(id, name)
         `)
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
