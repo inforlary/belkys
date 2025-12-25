@@ -87,6 +87,10 @@ import ProgramMapping from './pages/ProgramMapping';
 import DepartmentProgramMappingView from './pages/DepartmentProgramMappingView';
 import DepartmentBudgetData2024 from './pages/DepartmentBudgetData2024';
 import PerformanceCards from './pages/PerformanceCards';
+import DataRequestTemplates from './pages/DataRequestTemplates';
+import DataRequestManagement from './pages/DataRequestManagement';
+import MyDataRequests from './pages/MyDataRequests';
+import DataRequestTracking from './pages/DataRequestTracking';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -293,6 +297,14 @@ const renderPage = () => {
         return <DepartmentBudgetData2024 />;
       case 'performance-cards':
         return <PerformanceCards />;
+      case 'data-request-templates':
+        return <DataRequestTemplates />;
+      case 'data-request-management':
+        return <DataRequestManagement />;
+      case 'my-data-requests':
+        return <MyDataRequests />;
+      case 'data-request-tracking':
+        return <DataRequestTracking />;
       default:
         console.log('[App.tsx] No match found for currentPath, returning Dashboard');
         return profile?.is_super_admin ? <SuperAdmin /> : <Dashboard />;

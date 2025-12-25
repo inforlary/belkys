@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch } from 'lucide-react';
+import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Inbox, Send, ClipboardList, CheckCircle } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import GlobalSearch from './GlobalSearch';
 
@@ -286,6 +286,16 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: GitMerge, label: 'Eylem Planı İş Akışı', path: 'action-plan-workflow' },
         { icon: BarChart3, label: 'İç Kontrol Raporları', path: 'internal-control-reports' },
         { icon: GitMerge, label: 'Entegre Risk Raporu', path: 'integrated-risk-report' },
+      ],
+    },
+    {
+      label: 'Veri Talep Sistemi',
+      icon: Inbox,
+      items: [
+        { icon: ClipboardList, label: 'Form Şablonları', path: 'data-request-templates', adminOnly: true },
+        { icon: Send, label: 'Talep Oluştur', path: 'data-request-management', adminOnly: true },
+        { icon: Inbox, label: 'Taleplerim', path: 'my-data-requests', requiresDepartment: true },
+        { icon: CheckCircle, label: 'Cevapları Takip Et', path: 'data-request-tracking', adminOnly: true },
       ],
     },
   ];
