@@ -304,30 +304,10 @@ export default function ControlActivities() {
 
         if (error) throw error;
       } else {
-        const maxCodeResult = await supabase
-          .from('ic_controls')
-          .select('control_code')
-          .eq('organization_id', profile.organization_id)
-          .eq('ic_plan_id', selectedPlanId)
-          .order('control_code', { ascending: false })
-          .limit(1);
-
-        let nextNumber = 1;
-        if (maxCodeResult.data && maxCodeResult.data.length > 0) {
-          const lastCode = maxCodeResult.data[0].control_code;
-          const match = lastCode.match(/CTRL-(\d+)/);
-          if (match) {
-            nextNumber = parseInt(match[1]) + 1;
-          }
-        }
-
-        const controlCode = `CTRL-${String(nextNumber).padStart(3, '0')}`;
-
         const { error } = await supabase
           .from('ic_controls')
           .insert({
             ...dataToSave,
-            control_code: controlCode,
             organization_id: profile.organization_id,
             ic_plan_id: selectedPlanId
           });
