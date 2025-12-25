@@ -78,11 +78,8 @@ import ActionPlan from './pages/ActionPlan';
 import ActionPlanWorkflow from './pages/ActionPlanWorkflow';
 import ICRoleManagement from './pages/ICRoleManagement';
 import IntegratedRiskReport from './pages/IntegratedRiskReport';
-import BudgetPerformanceMapping from './pages/BudgetPerformanceMapping';
 import BudgetPerformanceJustification from './pages/BudgetPerformanceJustification';
 import BudgetPerformanceInformation from './pages/BudgetPerformanceInformation';
-import BudgetPerformanceHistorical from './pages/BudgetPerformanceHistorical';
-import BudgetPerformanceProgramDashboard from './pages/BudgetPerformanceProgramDashboard';
 import ProgramMapping from './pages/ProgramMapping';
 import DepartmentProgramMappingView from './pages/DepartmentProgramMappingView';
 import DepartmentBudgetData2024 from './pages/DepartmentBudgetData2024';
@@ -276,16 +273,10 @@ const renderPage = () => {
         return <UserProfile />;
       case 'activities-optimized':
         return <ActivitiesOptimized />;
-      case 'budget-performance-mapping':
-        return <BudgetPerformanceMapping />;
       case 'budget-performance-justification':
         return <BudgetPerformanceJustification />;
       case 'budget-performance-information':
         return <BudgetPerformanceInformation />;
-      case 'budget-performance-historical':
-        return <BudgetPerformanceHistorical />;
-      case 'budget-performance-program-dashboard':
-        return <BudgetPerformanceProgramDashboard />;
       case 'program-mapping':
         if (profile?.role !== 'admin' && profile?.role !== 'super_admin' && profile?.role !== 'vice_president') {
           return <Dashboard />;
