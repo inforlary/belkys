@@ -65,16 +65,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     const sessionCheckInterval = setInterval(async () => {
-      if (user && profile && !profile.is_super_admin && profile.organization_id) {
-        const { data: orgData } = await supabase
-          .from('organizations')
-          .select('is_active')
-          .eq('id', profile.organization_id)
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (currentSession?.user) {
+        const { data: currentProfile } = await supabase
+          .from('profiles')
+          .select('is_super_admin, organization_id')
+          .eq('id', currentSession.user.id)
           .maybeSingle();
 
-        if (orgData && !orgData.is_active) {
-          await signOut();
-          alert('Belediyeniz devre dışı bırakılmıştır. Lütfen sistem yöneticisi ile iletişime geçin.');
+        if (currentProfile && !currentProfile.is_super_admin && currentProfile.organization_id) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('is_active')
+            .eq('id', currentProfile.organization_id)
+            .maybeSingle();
+
+          if (orgData && !orgData.is_active) {
+            await supabase.auth.signOut();
+            alert('Belediyeniz devre dışı bırakılmıştır. Lütfen sistem yöneticisi ile iletişime geçin.');
+          }
         }
       }
     }, 30000);
@@ -83,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription.unsubscribe();
       clearInterval(sessionCheckInterval);
     };
-  }, [user, profile]);
+  }, []);
 
   const loadProfile = async (userId: string) => {
     try {
