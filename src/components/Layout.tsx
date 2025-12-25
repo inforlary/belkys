@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Inbox, Send, ClipboardList, CheckCircle } from 'lucide-react';
+import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Inbox, Send, ClipboardList, CheckCircle, Clock } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import GlobalSearch from './GlobalSearch';
 
@@ -254,6 +254,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       label: 'Bütçe ve Performans',
       icon: TrendingUp,
       items: [
+        { icon: Clock, label: 'Bütçe Dönemi Yönetimi', path: 'budget-period-management', adminOnly: true },
         { icon: TrendingDown, label: 'Gider Girişi', path: 'budget-expense-entry' },
         { icon: TrendingUp, label: 'Gelir Girişi', path: 'budget-revenue-entry' },
         { icon: Layers, label: 'Program Eşleştirme', path: 'program-mapping', strictAdminOnly: true },

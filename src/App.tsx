@@ -88,6 +88,7 @@ import DataRequestTemplates from './pages/DataRequestTemplates';
 import DataRequestManagement from './pages/DataRequestManagement';
 import MyDataRequests from './pages/MyDataRequests';
 import DataRequestTracking from './pages/DataRequestTracking';
+import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -196,6 +197,8 @@ const renderPage = () => {
         return <BudgetProposalForm />;
       case 'budget-program-structure':
         return <BudgetProgramStructure />;
+      case 'budget-period-management':
+        return <BudgetPeriodManagement />;
       case 'budget-expense-items':
         console.log('[App.tsx] Matched budget-expense-items case!');
         return <BudgetExpenseItems />;
