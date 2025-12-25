@@ -583,19 +583,19 @@ export default function InstitutionalFramework() {
           <div className="flex items-center gap-4 text-xs text-gray-600">
             <span className="font-semibold">Açıklama:</span>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white font-bold">R</span>
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white font-bold">S</span>
               <span>Sorumlu</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white font-bold">A</span>
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white font-bold">Y</span>
               <span>Yetkili</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white font-bold">C</span>
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white font-bold">D</span>
               <span>Danışılan</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white font-bold">I</span>
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white font-bold">B</span>
               <span>Bilgilendirilen</span>
             </div>
           </div>
