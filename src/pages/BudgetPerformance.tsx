@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
-import { TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Calendar, LinkIcon, Target, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useBudgetPeriod } from '../hooks/useBudgetPeriod';
 
 export default function BudgetPerformance() {
   const { profile } = useAuth();
+  const { getCurrentFiscalYear } = useBudgetPeriod();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalExpense: 0,
     totalRevenue: 0,
     activePrograms: 0,
     activeCampaigns: 0,
+    totalMappings: 0,
+    mappingsWithIndicators: 0,
+    mappedDepartments: 0,
   });
 
   useEffect(() => {
@@ -23,6 +28,7 @@ export default function BudgetPerformance() {
   const loadStats = async () => {
     try {
       setLoading(true);
+      const fiscalYear = getCurrentFiscalYear();
 
       const { data: expenseData } = await supabase
         .from('expense_budget_entries')
@@ -46,6 +52,13 @@ export default function BudgetPerformance() {
         .eq('organization_id', profile?.organization_id)
         .eq('status', 'active');
 
+      const { data: mappingsData } = await supabase
+        .from('program_activity_indicator_mappings')
+        .select('id, department_id, indicator_id')
+        .eq('organization_id', profile?.organization_id)
+        .eq('fiscal_year', fiscalYear || new Date().getFullYear())
+        .eq('is_active', true);
+
       const totalExpense = (expenseData || []).reduce((sum, entry) =>
         sum + (entry.amount_2025 || 0) + (entry.amount_2026 || 0) + (entry.amount_2027 || 0), 0
       );
@@ -54,11 +67,18 @@ export default function BudgetPerformance() {
         sum + (entry.amount_2025 || 0) + (entry.amount_2026 || 0) + (entry.amount_2027 || 0), 0
       );
 
+      const totalMappings = mappingsData?.length || 0;
+      const mappingsWithIndicators = mappingsData?.filter(m => m.indicator_id)?.length || 0;
+      const uniqueDepartments = new Set(mappingsData?.map(m => m.department_id)).size;
+
       setStats({
         totalExpense,
         totalRevenue,
         activePrograms: programsData?.length || 0,
         activeCampaigns: campaignsData?.length || 0,
+        totalMappings,
+        mappingsWithIndicators,
+        mappedDepartments: uniqueDepartments,
       });
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
@@ -145,6 +165,56 @@ export default function BudgetPerformance() {
             </div>
           </div>
         </Card>
+      </div>
+
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Program Eşleştirme İstatistikleri</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600">Toplam Eşleştirme</p>
+                <p className="text-2xl font-bold text-slate-900 mt-2">
+                  {stats.totalMappings}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Program-Faaliyet</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <LinkIcon className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600">Gösterge Eşleştirme</p>
+                <p className="text-2xl font-bold text-slate-900 mt-2">
+                  {stats.mappingsWithIndicators}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Stratejik Plan ile</p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Target className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600">Eşleştirilmiş Birim</p>
+                <p className="text-2xl font-bold text-slate-900 mt-2">
+                  {stats.mappedDepartments}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Müdürlük/Birim</p>
+              </div>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
 
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
