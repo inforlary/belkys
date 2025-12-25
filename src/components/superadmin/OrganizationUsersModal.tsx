@@ -53,7 +53,12 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading users:', error);
+        alert('Kullanıcılar yüklenirken hata: ' + error.message);
+        throw error;
+      }
+      console.log('Loaded users:', data);
       setUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
