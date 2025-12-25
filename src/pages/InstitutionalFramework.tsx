@@ -560,10 +560,10 @@ export default function InstitutionalFramework() {
                                   'bg-purple-500 text-white'
                                 }`}
                                 title={
-                                  role === 'R' ? 'Responsible (Sorumlu)' :
-                                  role === 'A' ? 'Accountable (Yetkili)' :
-                                  role === 'C' ? 'Consulted (Danışılan)' :
-                                  'Informed (Bilgilendirilen)'
+                                  role === 'R' ? 'Sorumlu' :
+                                  role === 'A' ? 'Yetkili' :
+                                  role === 'C' ? 'Danışılan' :
+                                  'Bilgilendirilen'
                                 }
                               >
                                 {role}
@@ -584,19 +584,19 @@ export default function InstitutionalFramework() {
             <span className="font-semibold">Açıklama:</span>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white font-bold">R</span>
-              <span>Responsible (Sorumlu)</span>
+              <span>Sorumlu</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white font-bold">A</span>
-              <span>Accountable (Yetkili)</span>
+              <span>Yetkili</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white font-bold">C</span>
-              <span>Consulted (Danışılan)</span>
+              <span>Danışılan</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white font-bold">I</span>
-              <span>Informed (Bilgilendirilen)</span>
+              <span>Bilgilendirilen</span>
             </div>
           </div>
         </div>
@@ -671,10 +671,10 @@ export default function InstitutionalFramework() {
                                   'bg-purple-500 text-white'
                                 }`}
                                 title={
-                                  role === 'R' ? 'Responsible (Sorumlu)' :
-                                  role === 'A' ? 'Accountable (Yetkili)' :
-                                  role === 'C' ? 'Consulted (Danışılan)' :
-                                  'Informed (Bilgilendirilen)'
+                                  role === 'R' ? 'Sorumlu' :
+                                  role === 'A' ? 'Yetkili' :
+                                  role === 'C' ? 'Danışılan' :
+                                  'Bilgilendirilen'
                                 }
                               >
                                 {role}
@@ -695,19 +695,19 @@ export default function InstitutionalFramework() {
             <span className="font-semibold">Açıklama:</span>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white font-bold">R</span>
-              <span>Responsible (Sorumlu)</span>
+              <span>Sorumlu</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white font-bold">A</span>
-              <span>Accountable (Yetkili)</span>
+              <span>Yetkili</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white font-bold">C</span>
-              <span>Consulted (Danışılan)</span>
+              <span>Danışılan</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white font-bold">I</span>
-              <span>Informed (Bilgilendirilen)</span>
+              <span>Bilgilendirilen</span>
             </div>
           </div>
         </div>
@@ -889,13 +889,13 @@ export default function InstitutionalFramework() {
                         Süreç
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                        Responsible (Sorumlu)
+                        Sorumlu
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                        Accountable (Yetkili)
+                        Yetkili
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                        Consulted / Informed
+                        Danışılan / Bilgilendirilen
                       </th>
                       {isAdmin && (
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -1090,7 +1090,7 @@ export default function InstitutionalFramework() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Responsible Rol</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Rol</label>
               <input
                 type="text"
                 value={raciForm.responsible_role}
@@ -1101,7 +1101,7 @@ export default function InstitutionalFramework() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Responsible Kişi</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Kişi</label>
               <select
                 value={raciForm.responsible_user_id}
                 onChange={(e) => setRaciForm({ ...raciForm, responsible_user_id: e.target.value })}
@@ -1119,7 +1119,7 @@ export default function InstitutionalFramework() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Accountable Rol</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Yetkili Rol</label>
               <input
                 type="text"
                 value={raciForm.accountable_role}
@@ -1130,7 +1130,7 @@ export default function InstitutionalFramework() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Accountable Kişi</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Yetkili Kişi</label>
               <select
                 value={raciForm.accountable_user_id}
                 onChange={(e) => setRaciForm({ ...raciForm, accountable_user_id: e.target.value })}
@@ -1147,7 +1147,7 @@ export default function InstitutionalFramework() {
           </div>
 
           <div className="border-t pt-4 mt-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Consulted (Danışılan)</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Danışılan</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Roller</label>
@@ -1187,7 +1187,7 @@ export default function InstitutionalFramework() {
           </div>
 
           <div className="border-t pt-4 mt-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Informed (Bilgilendirilen)</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Bilgilendirilen</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Roller</label>
