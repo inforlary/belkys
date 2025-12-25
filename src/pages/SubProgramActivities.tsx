@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Save, X, Search, Trash2, Edit2 } from 'lucide-react';
+import StatusBadge from '../components/ui/StatusBadge';
+import StatusWorkflowButtons from '../components/ui/StatusWorkflowButtons';
 
 interface Program {
   id: string;
@@ -23,6 +25,16 @@ interface Activity {
   activity_code: string;
   activity_name: string;
   description: string;
+  status: string;
+  organization_id: string;
+  department_id?: string;
+  created_by?: string;
+  submitted_by?: string;
+  approved_by?: string;
+  submitted_at?: string;
+  approved_at?: string;
+  rejected_at?: string;
+  rejection_reason?: string;
   sub_program: {
     full_code: string;
     name: string;
@@ -90,7 +102,7 @@ export default function SubProgramActivities() {
     e.preventDefault();
 
     try {
-      const payload = {
+      const payload: any = {
         sub_program_id: formData.sub_program_id,
         activity_code: formData.activity_code,
         activity_name: formData.activity_name,
@@ -106,12 +118,17 @@ export default function SubProgramActivities() {
         if (error) throw error;
         alert('Faaliyet güncellendi');
       } else {
+        payload.status = 'draft';
+        payload.organization_id = profile.organization_id;
+        payload.department_id = profile.department_id;
+        payload.created_by = profile.id;
+
         const { error } = await supabase
           .from('sub_program_activities')
           .insert([payload]);
 
         if (error) throw error;
-        alert('Faaliyet oluşturuldu');
+        alert('Faaliyet taslak olarak oluşturuldu');
       }
 
       resetForm();
@@ -162,6 +179,46 @@ export default function SubProgramActivities() {
     } catch (error: any) {
       console.error('Error deleting activity:', error);
       alert(error.message || 'Silme sırasında hata oluştu');
+    }
+  }
+
+  async function handleStatusChange(id: string, newStatus: string, rejectionReason?: string) {
+    try {
+      const updateData: any = {
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      if (newStatus === 'pending_director_approval') {
+        updateData.submitted_by = profile.id;
+        updateData.submitted_at = new Date().toISOString();
+      } else if (newStatus === 'approved') {
+        updateData.approved_by = profile.id;
+        updateData.approved_at = new Date().toISOString();
+      } else if (newStatus === 'rejected') {
+        updateData.rejection_reason = rejectionReason;
+        updateData.rejected_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('sub_program_activities')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const statusMessages: Record<string, string> = {
+        pending_director_approval: 'Faaliyet müdür onayına gönderildi',
+        pending_admin_approval: 'Faaliyet yönetici onayına gönderildi',
+        approved: 'Faaliyet onaylandı',
+        rejected: 'Faaliyet reddedildi'
+      };
+
+      alert(statusMessages[newStatus] || 'Durum güncellendi');
+      loadData();
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      alert(error.message || 'Durum güncellenirken hata oluştu');
     }
   }
 
@@ -336,6 +393,7 @@ export default function SubProgramActivities() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Alt Program</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Faaliyet</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Açıklama</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Durum</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">İşlemler</th>
               </tr>
             </thead>
@@ -365,21 +423,41 @@ export default function SubProgramActivities() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
+                    <div className="flex justify-center">
+                      <StatusBadge status={activity.status || 'draft'} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex items-center justify-center space-x-2">
-                      <button
-                        onClick={() => editActivity(activity)}
-                        className="text-blue-600 hover:text-blue-700"
-                        title="Düzenle"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteActivity(activity.id)}
-                        className="text-red-600 hover:text-red-700"
-                        title="Sil"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {activity.status === 'draft' && activity.created_by === profile.id && (
+                        <button
+                          onClick={() => editActivity(activity)}
+                          className="text-blue-600 hover:text-blue-700"
+                          title="Düzenle"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {((activity.status === 'draft' && activity.created_by === profile.id) ||
+                        profile.role === 'admin' ||
+                        profile.is_super_admin) && (
+                        <button
+                          onClick={() => deleteActivity(activity.id)}
+                          className="text-red-600 hover:text-red-700"
+                          title="Sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      <StatusWorkflowButtons
+                        currentStatus={activity.status || 'draft'}
+                        userRole={profile.role}
+                        isCreator={activity.created_by === profile.id}
+                        onStatusChange={(newStatus, reason) => handleStatusChange(activity.id, newStatus, reason)}
+                        rejectionReason={activity.rejection_reason}
+                      />
                     </div>
                   </td>
                 </tr>
