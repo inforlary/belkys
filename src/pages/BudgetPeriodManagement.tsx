@@ -66,7 +66,7 @@ const statusIcons: Record<string, React.ReactNode> = {
 };
 
 export default function BudgetPeriodManagement() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [periods, setPeriods] = useState<BudgetPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPeriod, setCurrentPeriod] = useState<BudgetPeriod | null>(null);
@@ -75,7 +75,7 @@ export default function BudgetPeriodManagement() {
 
   useEffect(() => {
     loadPeriods();
-  }, [user]);
+  }, [user, profile]);
 
   const loadPeriods = async () => {
     if (!user) return;
@@ -136,6 +136,11 @@ export default function BudgetPeriodManagement() {
   };
 
   const handleStartNextYear = async () => {
+    if (!profile?.organization_id) {
+      alert('Organizasyon bilgisi bulunamadı');
+      return;
+    }
+
     if (!confirm('Yeni yıl bütçe hazırlığını başlatmak istediğinize emin misiniz?')) {
       return;
     }
@@ -144,7 +149,7 @@ export default function BudgetPeriodManagement() {
       setCreating(true);
 
       const { data, error } = await supabase.rpc('start_next_year_budget_preparation', {
-        p_organization_id: user?.organization_id,
+        p_organization_id: profile.organization_id,
       });
 
       if (error) throw error;
