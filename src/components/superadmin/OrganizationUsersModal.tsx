@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Mail, Trash2, Shield, UserCircle, Search, RefreshCw } from 'lucide-react';
+import { Users, Mail, Trash2, Shield, UserCircle, Search, RefreshCw, Key, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
@@ -14,6 +14,7 @@ interface User {
     id: string;
     name: string;
   };
+  tempPassword?: string;
 }
 
 interface OrganizationUsersModalProps {
@@ -27,6 +28,10 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -88,6 +93,55 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
     } finally {
       setDeletingUserId(null);
     }
+  };
+
+  const handleEditPassword = (userId: string) => {
+    setEditingUserId(userId);
+    setNewPassword('');
+    setShowPassword(false);
+  };
+
+  const handleSavePassword = async (userId: string, userEmail: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      alert('Şifre en az 6 karakter olmalıdır');
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-user-password', {
+        body: { userId, newPassword }
+      });
+
+      if (error) throw error;
+
+      await supabase.from('super_admin_activity_logs').insert({
+        action: 'reset_password',
+        entity_type: 'user',
+        entity_id: userId,
+        details: {
+          organizationId,
+          organizationName,
+          userEmail,
+        },
+      });
+
+      setUsers(users.map(u => u.id === userId ? { ...u, tempPassword: newPassword } : u));
+      setEditingUserId(null);
+      setNewPassword('');
+      alert('Şifre başarıyla güncellendi');
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      alert('Şifre güncellenirken bir hata oluştu: ' + (error.message || ''));
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingUserId(null);
+    setNewPassword('');
+    setShowPassword(false);
   };
 
   const getRoleBadge = (role: string) => {
@@ -170,21 +224,88 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
                           <span className="font-medium">Müdürlük:</span> {user.department.name}
                         </div>
                       )}
+                      {editingUserId === user.id ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Key className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium text-gray-700">Yeni Şifre:</span>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type={showPassword ? 'text' : 'password'}
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              placeholder="En az 6 karakter"
+                              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSavePassword(user.id, user.email)}
+                              disabled={savingPassword || !newPassword}
+                              className="flex-1"
+                            >
+                              {savingPassword ? 'Kaydediliyor...' : 'Kaydet'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCancelEdit}
+                              disabled={savingPassword}
+                              className="flex-1"
+                            >
+                              İptal
+                            </Button>
+                          </div>
+                        </div>
+                      ) : user.tempPassword ? (
+                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Key className="w-4 h-4 text-green-600" />
+                            <span className="text-green-700 font-medium">Giriş Şifresi:</span>
+                            <code className="px-2 py-1 bg-white rounded border border-green-300 text-green-900 font-mono">
+                              {user.tempPassword}
+                            </code>
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="text-xs text-gray-400 mt-1">
                         Oluşturulma: {new Date(user.created_at).toLocaleString('tr-TR')}
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteUser(user.id, user.email)}
-                    disabled={deletingUserId === user.id}
-                    className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {deletingUserId === user.id ? 'Siliniyor...' : 'Sil'}
-                  </Button>
+                  <div className="flex gap-2">
+                    {editingUserId !== user.id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditPassword(user.id)}
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Key className="w-4 h-4" />
+                        Şifre
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteUser(user.id, user.email)}
+                      disabled={deletingUserId === user.id}
+                      className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {deletingUserId === user.id ? 'Siliniyor...' : 'Sil'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
