@@ -12,7 +12,7 @@ import StandardFinancingTypesManager from '../components/superadmin/StandardFina
 import StandardExpenseCodesManager from '../components/superadmin/StandardExpenseCodesManager';
 import StandardRevenueCodesManager from '../components/superadmin/StandardRevenueCodesManager';
 import StandardProgramsManager from '../components/superadmin/StandardProgramsManager';
-import DepartmentLicenseManager from '../components/superadmin/DepartmentLicenseManager';
+import OrganizationLicenseManager from '../components/superadmin/OrganizationLicenseManager';
 import KIKSStandards from './KIKSStandards';
 
 interface Organization {
@@ -40,7 +40,7 @@ interface OrganizationStats {
   indicatorCount: number;
 }
 
-type TabType = 'organizations' | 'standard-codes' | 'kiks-standards' | 'department-licenses';
+type TabType = 'organizations' | 'standard-codes' | 'kiks-standards' | 'organization-licenses';
 type StandardCodeTab = 'expense' | 'revenue' | 'financing' | 'programs';
 
 export default function SuperAdmin() {
@@ -301,16 +301,16 @@ export default function SuperAdmin() {
             </div>
           </button>
           <button
-            onClick={() => setActiveTab('department-licenses')}
+            onClick={() => setActiveTab('organization-licenses')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'department-licenses'
+              activeTab === 'organization-licenses'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
             <div className="flex items-center gap-2">
               <Key className="w-5 h-5" />
-              Müdürlük Lisansları
+              Belediye Lisansları
             </div>
           </button>
         </nav>
@@ -648,8 +648,8 @@ export default function SuperAdmin() {
         <KIKSStandards />
       )}
 
-      {activeTab === 'department-licenses' && (
-        <DepartmentLicenseManager />
+      {activeTab === 'organization-licenses' && (
+        <OrganizationLicenseManager />
       )}
 
       {showCreateModal && (
