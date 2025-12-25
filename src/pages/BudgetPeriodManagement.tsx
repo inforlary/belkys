@@ -76,6 +76,7 @@ export default function BudgetPeriodManagement() {
   const [showManualStatusModal, setShowManualStatusModal] = useState(false);
   const [selectedPeriodForManualChange, setSelectedPeriodForManualChange] = useState<BudgetPeriod | null>(null);
   const [manualStatusValue, setManualStatusValue] = useState('');
+  const [manualIsCurrentValue, setManualIsCurrentValue] = useState(false);
 
   useEffect(() => {
     loadPeriods();
@@ -189,27 +190,62 @@ export default function BudgetPeriodManagement() {
   const handleOpenManualStatusModal = (period: BudgetPeriod) => {
     setSelectedPeriodForManualChange(period);
     setManualStatusValue(period.period_status);
+    setManualIsCurrentValue(period.is_current);
     setShowManualStatusModal(true);
   };
 
   const handleManualStatusChange = async () => {
     if (!selectedPeriodForManualChange || !manualStatusValue) return;
 
-    if (!confirm(`${selectedPeriodForManualChange.budget_year} yılı döneminin durumunu "${statusLabels[manualStatusValue]}" olarak değiştirmek istediğinize emin misiniz?`)) {
+    const statusChanged = selectedPeriodForManualChange.period_status !== manualStatusValue;
+    const currentChanged = selectedPeriodForManualChange.is_current !== manualIsCurrentValue;
+
+    if (!statusChanged && !currentChanged) {
+      alert('Hiçbir değişiklik yapılmadı');
+      return;
+    }
+
+    let confirmMsg = `${selectedPeriodForManualChange.budget_year} yılı döneminde şu değişiklikleri yapmak istediğinize emin misiniz?\n\n`;
+    if (statusChanged) {
+      confirmMsg += `- Durum: "${statusLabels[selectedPeriodForManualChange.period_status]}" → "${statusLabels[manualStatusValue]}"\n`;
+    }
+    if (currentChanged) {
+      confirmMsg += `- Güncel Dönem: ${selectedPeriodForManualChange.is_current ? 'Evet' : 'Hayır'} → ${manualIsCurrentValue ? 'Evet' : 'Hayır'}\n`;
+    }
+
+    if (!confirm(confirmMsg)) {
       return;
     }
 
     try {
-      const { error } = await supabase.rpc('transition_period_status', {
-        p_period_id: selectedPeriodForManualChange.id,
-        p_new_status: manualStatusValue,
-        p_transition_type: 'manual',
-        p_notes: `Manuel durum değişikliği: ${selectedPeriodForManualChange.period_status} -> ${manualStatusValue}`,
-      });
+      if (statusChanged) {
+        const { error } = await supabase.rpc('transition_period_status', {
+          p_period_id: selectedPeriodForManualChange.id,
+          p_new_status: manualStatusValue,
+          p_transition_type: 'manual',
+          p_notes: `Manuel durum değişikliği: ${selectedPeriodForManualChange.period_status} -> ${manualStatusValue}`,
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
-      alert(`Dönem durumu "${statusLabels[manualStatusValue]}" olarak güncellendi`);
+      if (currentChanged) {
+        if (manualIsCurrentValue) {
+          await supabase
+            .from('budget_periods')
+            .update({ is_current: false })
+            .eq('organization_id', selectedPeriodForManualChange.organization_id);
+        }
+
+        const { error } = await supabase
+          .from('budget_periods')
+          .update({ is_current: manualIsCurrentValue })
+          .eq('id', selectedPeriodForManualChange.id);
+
+        if (error) throw error;
+      }
+
+      alert('Dönem başarıyla güncellendi');
       setShowManualStatusModal(false);
       await loadPeriods();
     } catch (error: any) {
@@ -502,6 +538,26 @@ export default function BudgetPeriodManagement() {
                   <option value="executing">Yürütülüyor</option>
                   <option value="closed">Kapalı</option>
                 </select>
+              </div>
+
+              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="is_current_checkbox"
+                  checked={manualIsCurrentValue}
+                  onChange={(e) => setManualIsCurrentValue(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <label htmlFor="is_current_checkbox" className="text-sm font-medium text-gray-700">
+                  Güncel Dönem Olarak İşaretle (is_current)
+                </label>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  <strong>Not:</strong> Güncel dönem işaretlendiğinde, sistemdeki diğer tüm dönemler otomatik olarak güncel olmaktan çıkarılır.
+                  Tüm yeni veri girişleri ve raporlar güncel döneme bağlanır.
+                </p>
               </div>
 
               <div className="flex gap-3 justify-end pt-4">
