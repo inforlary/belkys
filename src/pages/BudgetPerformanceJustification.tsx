@@ -14,8 +14,10 @@ import {
   Plus,
   Check,
   Edit3,
-  RotateCcw
+  RotateCcw,
+  Calendar
 } from 'lucide-react';
+import { useBudgetPeriod } from '../hooks/useBudgetPeriod';
 
 interface Department {
   id: string;
@@ -76,6 +78,7 @@ interface Justification {
 
 export default function BudgetPerformanceJustification() {
   const { profile } = useAuth();
+  const { currentPeriod, constraints, loading: periodLoading, canCreate, getCurrentFiscalYear } = useBudgetPeriod();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -91,7 +94,6 @@ export default function BudgetPerformanceJustification() {
   const [bulkAddSearch, setBulkAddSearch] = useState('');
   const [selectedCodesForBulk, setSelectedCodesForBulk] = useState<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<{activityId: string, index: number} | null>(null);
-  const [fiscalYear, setFiscalYear] = useState<number>(2025);
 
   const [formData, setFormData] = useState<{ [key: string]: {
     legal_basis: string;
@@ -109,11 +111,11 @@ export default function BudgetPerformanceJustification() {
   }, [profile?.organization_id]);
 
   useEffect(() => {
-    if (selectedDepartment) {
+    if (selectedDepartment && currentPeriod) {
       loadActivities();
       loadJustifications();
     }
-  }, [selectedDepartment, fiscalYear]);
+  }, [selectedDepartment, currentPeriod]);
 
   const loadInitialData = async () => {
     setCodesLoading(true);
@@ -188,6 +190,9 @@ export default function BudgetPerformanceJustification() {
   const loadActivities = async () => {
     if (!selectedDepartment) return;
 
+    const fiscalYear = getCurrentFiscalYear();
+    if (!fiscalYear) return;
+
     setLoading(true);
     try {
       const { data: mappings, error: mappingsError } = await supabase
@@ -195,6 +200,7 @@ export default function BudgetPerformanceJustification() {
         .select('activity_id')
         .eq('organization_id', profile!.organization_id)
         .eq('department_id', selectedDepartment.id)
+        .eq('fiscal_year', fiscalYear)
         .eq('is_active', true);
 
       if (mappingsError) throw mappingsError;
@@ -245,6 +251,9 @@ export default function BudgetPerformanceJustification() {
 
   const loadJustifications = async () => {
     if (!selectedDepartment) return;
+
+    const fiscalYear = getCurrentFiscalYear();
+    if (!fiscalYear) return;
 
     try {
       const { data, error } = await supabase
@@ -481,6 +490,17 @@ export default function BudgetPerformanceJustification() {
   };
 
   const handleSave = async (activity: Activity, isDraft: boolean) => {
+    if (!canCreate()) {
+      alert('Şu anda veri girişi yapılamaz. Lütfen dönem durumunu kontrol edin.');
+      return;
+    }
+
+    const fiscalYear = getCurrentFiscalYear();
+    if (!fiscalYear) {
+      alert('Aktif bütçe dönemi bulunamadı');
+      return;
+    }
+
     setSavingActivityId(activity.id);
     try {
       const data = formData[activity.id];
@@ -582,12 +602,78 @@ export default function BudgetPerformanceJustification() {
     return <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">Reddedildi</span>;
   };
 
+  if (periodLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!currentPeriod) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">Aktif Bütçe Dönemi Bulunamadı</h3>
+              <p className="text-yellow-800">
+                Şu anda aktif bir bütçe dönemi bulunmamaktadır. Lütfen yöneticinizle iletişime geçin.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Faaliyet Gerekçe Formları</h1>
         <p className="text-gray-600">Müdürlüğünüze atanan faaliyetler için gerekçe ve bütçe gider kalemleri oluşturun</p>
       </div>
+
+      {currentPeriod && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold text-blue-900">
+                  {currentPeriod.budget_year} Mali Yılı Bütçesi
+                </h3>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  currentPeriod.period_status === 'preparation' ? 'bg-blue-100 text-blue-700' :
+                  currentPeriod.period_status === 'approval' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-green-100 text-green-700'
+                }`}>
+                  {currentPeriod.period_status === 'preparation' ? 'Hazırlık' :
+                   currentPeriod.period_status === 'approval' ? 'Onay' : 'Aktif'}
+                </span>
+              </div>
+              {constraints && (
+                <p className="text-sm text-blue-700 mt-1">{constraints.message}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!canCreate() && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-red-900 mb-1">Veri Girişi Kapalı</h3>
+              <p className="text-sm text-red-700">
+                Şu anda yeni gerekçe eklenemez veya düzenlenemez. Dönem durumu veri girişine izin vermiyor.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
