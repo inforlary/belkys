@@ -230,17 +230,22 @@ export default function BudgetPeriodManagement() {
       }
 
       if (currentChanged) {
-        await supabase
+        const { error: resetError } = await supabase
           .from('budget_periods')
           .update({ is_current: false })
-          .eq('organization_id', selectedPeriodForManualChange.organization_id);
+          .eq('organization_id', selectedPeriodForManualChange.organization_id)
+          .neq('id', selectedPeriodForManualChange.id);
 
-        const { error } = await supabase
-          .from('budget_periods')
-          .update({ is_current: manualIsCurrentValue })
-          .eq('id', selectedPeriodForManualChange.id);
+        if (resetError) throw resetError;
 
-        if (error) throw error;
+        if (manualIsCurrentValue) {
+          const { error: setError } = await supabase
+            .from('budget_periods')
+            .update({ is_current: true })
+            .eq('id', selectedPeriodForManualChange.id);
+
+          if (setError) throw setError;
+        }
       }
 
       alert('Dönem başarıyla güncellendi');
