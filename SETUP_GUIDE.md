@@ -164,4 +164,4 @@ src/
 
 ## Destek
 
-Sorularınız için: destek@example.com
+Sorularınız için: destek@belkys.com.tr
