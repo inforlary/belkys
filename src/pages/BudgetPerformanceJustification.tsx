@@ -94,6 +94,7 @@ export default function BudgetPerformanceJustification() {
   const [bulkAddSearch, setBulkAddSearch] = useState('');
   const [selectedCodesForBulk, setSelectedCodesForBulk] = useState<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<{activityId: string, index: number} | null>(null);
+  const [fiscalYear, setFiscalYear] = useState<number>(2026);
 
   const [formData, setFormData] = useState<{ [key: string]: {
     legal_basis: string;
@@ -109,6 +110,12 @@ export default function BudgetPerformanceJustification() {
       loadInitialData();
     }
   }, [profile?.organization_id]);
+
+  useEffect(() => {
+    if (currentPeriod) {
+      setFiscalYear(currentPeriod.budget_year);
+    }
+  }, [currentPeriod]);
 
   useEffect(() => {
     if (selectedDepartment && currentPeriod) {
@@ -699,16 +706,10 @@ export default function BudgetPerformanceJustification() {
 
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Mali Yıl</label>
-          <select
-            value={fiscalYear}
-            onChange={(e) => setFiscalYear(Number(e.target.value))}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900"
-          >
-            <option value={2025}>2025</option>
-            <option value={2026}>2026</option>
-            <option value={2027}>2027</option>
-            <option value={2028}>2028</option>
-          </select>
+          <div className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-semibold">
+            {fiscalYear}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Aktif dönemin mali yılı</p>
         </div>
       </div>
 
