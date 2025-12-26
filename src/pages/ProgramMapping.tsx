@@ -102,12 +102,12 @@ const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
   const [editingMappingId, setEditingMappingId] = useState<string | null>(null);
 
 useEffect(() => {
-    if (profile?.organization_id) {
+    if (profile?.organization_id && currentPeriod) {
       loadDepartments();
       loadPrograms();
       loadMappings();
     }
-  }, [profile?.organization_id]);
+  }, [profile?.organization_id, currentPeriod]);
 
   useEffect(() => {
     if (selectedProgramId) {
@@ -702,7 +702,15 @@ const filteredMappings = mappings.filter(m => {
 <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">Mevcut Eşleştirmeler</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">Mevcut Eşleştirmeler</h2>
+              {currentPeriod && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {currentPeriod.budget_year} Mali Yılı
+                </span>
+              )}
+            </div>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
@@ -838,6 +846,11 @@ const filteredMappings = mappings.filter(m => {
         {filteredMappings.length > 0 && (
           <div className="px-4 py-3 border-t border-gray-200 text-sm text-gray-500">
             Toplam {filteredMappings.length} eşleştirme
+            {currentPeriod && (
+              <span className="ml-2 text-blue-600 font-medium">
+                ({currentPeriod.budget_year} Mali Yılı)
+              </span>
+            )}
           </div>
         )}
       </div>

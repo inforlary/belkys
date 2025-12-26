@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
+import { useBudgetPeriod } from '../hooks/useBudgetPeriod';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { Search, Filter, FileText, Edit2, Save, X } from 'lucide-react';
+import { Search, Filter, FileText, Edit2, Save, X, Calendar } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 
 interface Department {
@@ -78,6 +79,7 @@ interface SubProgramGoal {
 export default function DepartmentProgramMappingView() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
+  const { currentPeriod, getCurrentFiscalYear } = useBudgetPeriod();
 
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -108,16 +110,22 @@ export default function DepartmentProgramMappingView() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (profile) {
+    if (profile && currentPeriod) {
       loadData();
     }
-  }, [profile]);
+  }, [profile, currentPeriod]);
 
 const loadData = async () => {
     if (!profile) return;
     setLoading(true);
 
     try {
+      const fiscalYear = getCurrentFiscalYear();
+      if (!fiscalYear) {
+        setLoading(false);
+        return;
+      }
+
       let mappingsQuery = supabase
         .from('program_activity_indicator_mappings')
         .select(`
@@ -129,6 +137,7 @@ const loadData = async () => {
           indicators(id, code, name)
         `)
         .eq('organization_id', profile.organization_id)
+        .eq('fiscal_year', fiscalYear)
         .order('created_at', { ascending: false });
 
       if (profile.role !== 'admin' && profile.role !== 'super_admin' && profile.department_id) {
@@ -495,6 +504,22 @@ const canEditMapping = (mapping: Mapping) => {
         </div>
       </div>
 
+      {currentPeriod && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-blue-900">
+                {currentPeriod.budget_year} Mali Yılı Eşleştirmeleri
+              </h3>
+              <p className="text-sm text-blue-700 mt-0.5">
+                Bu sayfada aktif mali yıla ({currentPeriod.budget_year}) ait program eşleştirmeleri görüntülenmektedir.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -574,6 +599,11 @@ const canEditMapping = (mapping: Mapping) => {
           <div className="flex items-center justify-between mt-4 pt-4 border-t">
             <div className="text-sm text-gray-600">
               Toplam {filteredMappings.length} eşleştirme bulundu
+              {currentPeriod && (
+                <span className="ml-2 text-blue-600 font-medium">
+                  ({currentPeriod.budget_year} Mali Yılı)
+                </span>
+              )}
             </div>
             <Button
               variant="outline"
