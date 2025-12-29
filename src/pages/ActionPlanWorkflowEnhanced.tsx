@@ -361,16 +361,51 @@ export default function ActionPlanWorkflowEnhanced() {
     }
   };
 
+  const generateControlCode = async () => {
+    if (!profile?.organization_id || !selectedPlanId) return 'CTRL-001';
+
+    try {
+      const year = new Date().getFullYear();
+      const { data, error } = await supabase
+        .from('ic_controls')
+        .select('control_code')
+        .eq('organization_id', profile.organization_id)
+        .eq('ic_plan_id', selectedPlanId)
+        .like('control_code', `CTRL-${year}-%`)
+        .order('control_code', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      let nextNumber = 1;
+      if (data && data.length > 0) {
+        const lastCode = data[0].control_code;
+        const match = lastCode.match(/CTRL-\d{4}-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      return `CTRL-${year}-${String(nextNumber).padStart(3, '0')}`;
+    } catch (error) {
+      console.error('Kontrol kodu oluşturulurken hata:', error);
+      return `CTRL-${new Date().getFullYear()}-001`;
+    }
+  };
+
   const handleAddControl = async () => {
     if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
 
     try {
       setSaving(true);
+
+      const autoCode = await generateControlCode();
+
       const { error } = await supabase.from('ic_controls').insert({
         organization_id: profile.organization_id,
         ic_plan_id: selectedPlanId,
         kiks_action_id: selectedKiksActionId,
-        control_code: controlForm.control_code,
+        control_code: autoCode,
         control_title: controlForm.control_title,
         control_description: controlForm.control_description,
         control_type: 'Manuel',
@@ -394,16 +429,51 @@ export default function ActionPlanWorkflowEnhanced() {
     }
   };
 
+  const generateTestCode = async () => {
+    if (!profile?.organization_id || !selectedPlanId) return 'TEST-001';
+
+    try {
+      const year = new Date().getFullYear();
+      const { data, error } = await supabase
+        .from('ic_control_tests')
+        .select('test_code')
+        .eq('organization_id', profile.organization_id)
+        .eq('ic_plan_id', selectedPlanId)
+        .like('test_code', `TEST-${year}-%`)
+        .order('test_code', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      let nextNumber = 1;
+      if (data && data.length > 0) {
+        const lastCode = data[0].test_code;
+        const match = lastCode.match(/TEST-\d{4}-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      return `TEST-${year}-${String(nextNumber).padStart(3, '0')}`;
+    } catch (error) {
+      console.error('Test kodu oluşturulurken hata:', error);
+      return `TEST-${new Date().getFullYear()}-001`;
+    }
+  };
+
   const handleAddTest = async () => {
     if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
 
     try {
       setSaving(true);
+
+      const autoCode = await generateTestCode();
+
       const { error } = await supabase.from('ic_control_tests').insert({
         organization_id: profile.organization_id,
         ic_plan_id: selectedPlanId,
         kiks_action_id: selectedKiksActionId,
-        test_code: testForm.test_code,
+        test_code: autoCode,
         test_date: testForm.test_date,
         test_result: testForm.test_result,
         tester_name: testForm.tester_name
@@ -425,16 +495,51 @@ export default function ActionPlanWorkflowEnhanced() {
     }
   };
 
+  const generateFindingCode = async () => {
+    if (!profile?.organization_id || !selectedPlanId) return 'FIND-001';
+
+    try {
+      const year = new Date().getFullYear();
+      const { data, error } = await supabase
+        .from('ic_findings')
+        .select('finding_code')
+        .eq('organization_id', profile.organization_id)
+        .eq('ic_plan_id', selectedPlanId)
+        .like('finding_code', `FIND-${year}-%`)
+        .order('finding_code', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      let nextNumber = 1;
+      if (data && data.length > 0) {
+        const lastCode = data[0].finding_code;
+        const match = lastCode.match(/FIND-\d{4}-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      return `FIND-${year}-${String(nextNumber).padStart(3, '0')}`;
+    } catch (error) {
+      console.error('Bulgu kodu oluşturulurken hata:', error);
+      return `FIND-${new Date().getFullYear()}-001`;
+    }
+  };
+
   const handleAddFinding = async () => {
     if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
 
     try {
       setSaving(true);
+
+      const autoCode = await generateFindingCode();
+
       const { error } = await supabase.from('ic_findings').insert({
         organization_id: profile.organization_id,
         ic_plan_id: selectedPlanId,
         kiks_action_id: selectedKiksActionId,
-        finding_code: findingForm.finding_code,
+        finding_code: autoCode,
         finding_title: findingForm.finding_title,
         finding_description: findingForm.finding_description,
         severity: findingForm.severity,
@@ -458,22 +563,57 @@ export default function ActionPlanWorkflowEnhanced() {
     }
   };
 
+  const generateCapaCode = async () => {
+    if (!profile?.organization_id || !selectedPlanId) return 'CAPA-001';
+
+    try {
+      const year = new Date().getFullYear();
+      const { data, error } = await supabase
+        .from('ic_capas')
+        .select('capa_code')
+        .eq('organization_id', profile.organization_id)
+        .eq('ic_plan_id', selectedPlanId)
+        .like('capa_code', `CAPA-${year}-%`)
+        .order('capa_code', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      let nextNumber = 1;
+      if (data && data.length > 0) {
+        const lastCode = data[0].capa_code;
+        const match = lastCode.match(/CAPA-\d{4}-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      return `CAPA-${year}-${String(nextNumber).padStart(3, '0')}`;
+    } catch (error) {
+      console.error('CAPA kodu oluşturulurken hata:', error);
+      return `CAPA-${new Date().getFullYear()}-001`;
+    }
+  };
+
   const handleAddCapa = async () => {
     if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
 
     try {
       setSaving(true);
+
+      const autoCode = await generateCapaCode();
+
       const { error } = await supabase.from('ic_capas').insert({
         organization_id: profile.organization_id,
         ic_plan_id: selectedPlanId,
         kiks_action_id: selectedKiksActionId,
-        capa_code: capaForm.capa_code,
-        title: capaForm.title,
-        description: capaForm.description,
+        capa_code: autoCode,
+        capa_title: capaForm.title,
+        capa_description: capaForm.description,
         action_type: capaForm.action_type,
         due_date: capaForm.due_date,
-        status: 'Planlanan',
-        assigned_to: profile.full_name || ''
+        status: 'open',
+        responsible_user_id: profile.id
       });
 
       if (error) throw error;
@@ -886,15 +1026,10 @@ export default function ActionPlanWorkflowEnhanced() {
 
       <Modal isOpen={showControlModal} onClose={() => setShowControlModal(false)} title="Yeni Kontrol Ekle">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Kontrol Kodu</label>
-            <input
-              type="text"
-              value={controlForm.control_code}
-              onChange={(e) => setControlForm({ ...controlForm, control_code: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Örn: K-001"
-            />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              Kontrol kodu otomatik olarak oluşturulacaktır (CTRL-2025-XXX formatında)
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Kontrol Başlığı</label>
@@ -937,15 +1072,10 @@ export default function ActionPlanWorkflowEnhanced() {
 
       <Modal isOpen={showTestModal} onClose={() => setShowTestModal(false)} title="Yeni Test Ekle">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Test Kodu</label>
-            <input
-              type="text"
-              value={testForm.test_code}
-              onChange={(e) => setTestForm({ ...testForm, test_code: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Örn: T-001"
-            />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              Test kodu otomatik olarak oluşturulacaktır (TEST-2025-XXX formatında)
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Test Tarihi</label>
@@ -997,15 +1127,10 @@ export default function ActionPlanWorkflowEnhanced() {
 
       <Modal isOpen={showFindingModal} onClose={() => setShowFindingModal(false)} title="Yeni Bulgu Ekle">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bulgu Kodu</label>
-            <input
-              type="text"
-              value={findingForm.finding_code}
-              onChange={(e) => setFindingForm({ ...findingForm, finding_code: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              placeholder="Örn: B-001"
-            />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              Bulgu kodu otomatik olarak oluşturulacaktır (FIND-2025-XXX formatında)
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Bulgu Başlığı</label>
@@ -1061,15 +1186,10 @@ export default function ActionPlanWorkflowEnhanced() {
 
       <Modal isOpen={showCapaModal} onClose={() => setShowCapaModal(false)} title="Yeni CAPA Ekle">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">CAPA Kodu</label>
-            <input
-              type="text"
-              value={capaForm.capa_code}
-              onChange={(e) => setCapaForm({ ...capaForm, capa_code: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              placeholder="Örn: C-001"
-            />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              CAPA kodu otomatik olarak oluşturulacaktır (CAPA-2025-XXX formatında)
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>

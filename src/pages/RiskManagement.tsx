@@ -125,7 +125,7 @@ export default function RiskManagement() {
             *,
             ic_processes(name),
             profiles!ic_risks_risk_owner_id_fkey(full_name),
-            kiks:ic_kiks_standards(code, title)
+            kiks:ic_kiks_sub_standards(code, title)
           `)
           .eq('organization_id', profile.organization_id)
           .eq('ic_plan_id', selectedPlanId)
@@ -221,13 +221,24 @@ export default function RiskManagement() {
   };
 
   const loadKiksStandards = async () => {
-    if (!profile?.organization_id) return;
+    if (!profile?.organization_id || !selectedPlanId) return;
 
     try {
       const { data, error } = await supabase
-        .from('ic_kiks_standards')
-        .select('id, code, title, component')
-        .eq('organization_id', profile.organization_id)
+        .from('ic_kiks_sub_standards')
+        .select(`
+          id,
+          code,
+          title,
+          ic_kiks_main_standards!inner(
+            title,
+            ic_kiks_categories!inner(
+              name
+            )
+          )
+        `)
+        .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
+        .eq('ic_plan_id', selectedPlanId)
         .order('code', { ascending: true });
 
       if (error) throw error;
@@ -235,8 +246,8 @@ export default function RiskManagement() {
       const formattedData = (data || []).map((item: any) => ({
         id: item.id,
         code: item.code,
-        title: `${item.code} - ${item.title}`,
-        component: item.component
+        title: `${item.code} - ${item.ic_kiks_main_standards?.title || ''} - ${item.title}`,
+        component: item.ic_kiks_main_standards?.ic_kiks_categories?.name || ''
       }));
 
       setKiksStandards(formattedData);
