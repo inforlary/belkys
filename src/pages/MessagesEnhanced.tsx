@@ -88,8 +88,10 @@ type ViewMode = 'inbox' | 'sent' | 'starred' | 'archived' | 'drafts';
 export default function MessagesEnhanced() {
   const { profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('inbox');
   const [loading, setLoading] = useState(true);
   const [showComposeModal, setShowComposeModal] = useState(false);
@@ -171,7 +173,20 @@ export default function MessagesEnhanced() {
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
-      setMessages(data || []);
+
+      const threadMap = new Map<string, Message>();
+      (data || []).forEach((message) => {
+        const threadId = message.thread_id || message.id;
+        const existing = threadMap.get(threadId);
+        if (!existing || new Date(message.created_at) > new Date(existing.created_at)) {
+          threadMap.set(threadId, message);
+        }
+      });
+
+      const uniqueMessages = Array.from(threadMap.values())
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setMessages(uniqueMessages);
 
       const { data: contactsData } = await supabase
         .from('profiles')
@@ -204,6 +219,20 @@ export default function MessagesEnhanced() {
     }
 
     try {
+      const threadData = await supabase
+        .from('message_threads')
+        .insert({
+          organization_id: profile.organization_id,
+          subject: composeData.subject || 'Konu yok',
+          participants: [profile.id, composeData.recipient_id],
+          created_by: profile.id,
+          last_message_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (threadData.error) throw threadData.error;
+
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -213,7 +242,8 @@ export default function MessagesEnhanced() {
           subject: composeData.subject || 'Konu yok',
           message: composeData.message,
           priority: composeData.priority,
-          status: 'unread'
+          status: 'unread',
+          thread_id: threadData.data.id
         })
         .select()
         .single();
@@ -241,21 +271,31 @@ export default function MessagesEnhanced() {
   };
 
   const handleReply = async () => {
-    if (!selectedMessage || !replyData.message) return;
+    if (!selectedThreadId || !replyData.message || !threadMessages.length) return;
 
     try {
+      await supabase
+        .from('message_threads')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', selectedThreadId);
+
+      const lastMessage = threadMessages[threadMessages.length - 1];
+      const recipientId = lastMessage.sender_id === profile?.id
+        ? lastMessage.recipient_id
+        : lastMessage.sender_id;
+
       const { data, error } = await supabase
         .from('messages')
         .insert({
           organization_id: profile?.organization_id,
           sender_id: profile?.id,
-          recipient_id: selectedMessage.sender_id,
-          subject: `Re: ${selectedMessage.subject}`,
+          recipient_id: recipientId,
+          subject: lastMessage.subject,
           message: replyData.message,
-          priority: selectedMessage.priority,
+          priority: lastMessage.priority,
           status: 'unread',
-          reply_to_id: selectedMessage.id,
-          thread_id: selectedMessage.thread_id
+          reply_to_id: lastMessage.id,
+          thread_id: selectedThreadId
         })
         .select()
         .single();
@@ -266,9 +306,8 @@ export default function MessagesEnhanced() {
         await uploadAttachments(data.id, replyData.attachments);
       }
 
-      alert('Yanıt gönderildi!');
       setReplyData({ message: '', attachments: [] });
-      loadData();
+      await loadThreadMessages(selectedThreadId);
     } catch (error) {
       console.error('Error replying:', error);
       alert('Yanıt gönderilirken bir hata oluştu.');
@@ -362,11 +401,39 @@ export default function MessagesEnhanced() {
     }
   };
 
+  const loadThreadMessages = async (threadId: string | null) => {
+    if (!threadId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:profiles!messages_sender_id_fkey(full_name, email, role),
+          recipient:profiles!messages_recipient_id_fkey(full_name, email, role),
+          attachments:message_attachments(id, file_name, file_size, file_type, storage_path)
+        `)
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setThreadMessages(data || []);
+      setSelectedThreadId(threadId);
+
+      const unreadMessages = data?.filter(
+        msg => msg.recipient_id === profile?.id && !msg.read_at
+      ) || [];
+      for (const msg of unreadMessages) {
+        await handleMarkAsRead(msg);
+      }
+    } catch (error) {
+      console.error('Error loading thread messages:', error);
+    }
+  };
+
   const handleSelectMessage = (message: Message) => {
     setSelectedMessage(message);
-    if (message.recipient_id === profile?.id && !message.read_at) {
-      handleMarkAsRead(message);
-    }
+    loadThreadMessages(message.thread_id);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, isReply: boolean = false) => {
@@ -602,42 +669,67 @@ export default function MessagesEnhanced() {
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-6">
-                    <div className="prose max-w-none">
-                      <p className="text-gray-800 whitespace-pre-wrap">{selectedMessage.message}</p>
-                    </div>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {threadMessages.length > 0 ? (
+                      threadMessages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.sender_id === profile?.id ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[70%] rounded-lg p-4 ${
+                              msg.sender_id === profile?.id
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium">
+                                {msg.sender?.full_name}
+                              </span>
+                              <span className="text-xs opacity-70">
+                                {new Date(msg.created_at).toLocaleString('tr-TR')}
+                              </span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
 
-                    {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
-                      <div className="mt-6 border-t pt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                          <Paperclip className="w-4 h-4" />
-                          Ekler ({selectedMessage.attachments.length})
-                        </h4>
-                        <div className="space-y-2">
-                          {selectedMessage.attachments.map((attachment) => (
-                            <button
-                              key={attachment.id}
-                              onClick={() => handleDownloadAttachment(attachment)}
-                              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
-                            >
-                              <div className="flex items-center gap-3">
-                                <Paperclip className="w-4 h-4 text-gray-500" />
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900">{attachment.file_name}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {(attachment.file_size / 1024).toFixed(2)} KB
-                                  </p>
-                                </div>
+                            {msg.attachments && msg.attachments.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                {msg.attachments.map((attachment) => (
+                                  <button
+                                    key={attachment.id}
+                                    onClick={() => handleDownloadAttachment(attachment)}
+                                    className={`w-full flex items-center justify-between p-2 rounded transition-colors text-left ${
+                                      msg.sender_id === profile?.id
+                                        ? 'bg-blue-500 hover:bg-blue-400'
+                                        : 'bg-gray-200 hover:bg-gray-300'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Paperclip className="w-3 h-3" />
+                                      <div>
+                                        <p className="text-xs font-medium">{attachment.file_name}</p>
+                                        <p className="text-xs opacity-70">
+                                          {(attachment.file_size / 1024).toFixed(2)} KB
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <span className="text-xs opacity-70">İndir</span>
+                                  </button>
+                                ))}
                               </div>
-                              <span className="text-xs text-blue-600 hover:text-blue-700">İndir</span>
-                            </button>
-                          ))}
+                            )}
+                          </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="prose max-w-none">
+                        <p className="text-gray-800 whitespace-pre-wrap">{selectedMessage?.message}</p>
                       </div>
                     )}
                   </div>
 
-                  {viewMode === 'inbox' && (
+                  {selectedThreadId && (
                     <div className="p-4 border-t bg-gray-50">
                       <div className="flex items-start gap-3">
                         <textarea
