@@ -11,7 +11,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Target
+  Target,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -459,6 +460,74 @@ export default function ActionPlanWorkflow() {
     }
   };
 
+  const handleDeleteControl = async (id: string) => {
+    if (!confirm('Bu kontrolü silmek istediğinizden emin misiniz?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('ic_controls')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchWorkflowData();
+    } catch (error: any) {
+      console.error('Kontrol silinirken hata:', error);
+      alert('Kontrol silinemedi: ' + error.message);
+    }
+  };
+
+  const handleDeleteTest = async (id: string) => {
+    if (!confirm('Bu testi silmek istediğinizden emin misiniz?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('ic_control_tests')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchWorkflowData();
+    } catch (error: any) {
+      console.error('Test silinirken hata:', error);
+      alert('Test silinemedi: ' + error.message);
+    }
+  };
+
+  const handleDeleteFinding = async (id: string) => {
+    if (!confirm('Bu bulguyu silmek istediğinizden emin misiniz?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('ic_findings')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchWorkflowData();
+    } catch (error: any) {
+      console.error('Bulgu silinirken hata:', error);
+      alert('Bulgu silinemedi: ' + error.message);
+    }
+  };
+
+  const handleDeleteCapa = async (id: string) => {
+    if (!confirm('Bu CAPA kaydını silmek istediğinizden emin misiniz?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('ic_capas')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchWorkflowData();
+    } catch (error: any) {
+      console.error('CAPA silinirken hata:', error);
+      alert('CAPA silinemedi: ' + error.message);
+    }
+  };
+
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
@@ -651,15 +720,24 @@ export default function ActionPlanWorkflow() {
                                 </span>
                               </div>
                             </div>
-                            <div className="flex gap-4 text-sm text-gray-600">
-                              <div className="flex items-center gap-1">
-                                <TestTube className="w-4 h-4" />
-                                <span>{control.test_count || 0} Test</span>
+                            <div className="flex items-center gap-4">
+                              <div className="flex gap-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-1">
+                                  <TestTube className="w-4 h-4" />
+                                  <span>{control.test_count || 0} Test</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  <span>{control.finding_count || 0} Bulgu</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <AlertTriangle className="w-4 h-4" />
-                                <span>{control.finding_count || 0} Bulgu</span>
-                              </div>
+                              <button
+                                onClick={() => handleDeleteControl(control.id)}
+                                className="text-red-600 hover:text-red-800 p-1"
+                                title="Kontrolü Sil"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -818,17 +896,26 @@ export default function ActionPlanWorkflow() {
                       {controlTests.map(test => (
                         <div key={test.id} className="border rounded-lg p-4">
                           <div className="flex items-start justify-between">
-                            <div>
+                            <div className="flex-1">
                               <p className="text-sm text-gray-600">Test Tarihi: {new Date(test.test_date).toLocaleDateString('tr-TR')}</p>
                               <p className="text-sm mt-1">Örnek: {test.sample_size}, İstisna: {test.exceptions_found}</p>
                             </div>
-                            <span className={`text-xs px-2 py-1 rounded ${
-                              test.test_result === 'pass' ? 'bg-green-100 text-green-800' :
-                              test.test_result === 'pass_with_exceptions' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {TEST_RESULT_LABELS[test.test_result as keyof typeof TEST_RESULT_LABELS]}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                test.test_result === 'pass' ? 'bg-green-100 text-green-800' :
+                                test.test_result === 'pass_with_exceptions' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {TEST_RESULT_LABELS[test.test_result as keyof typeof TEST_RESULT_LABELS]}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteTest(test.id)}
+                                className="text-red-600 hover:text-red-800 p-1"
+                                title="Testi Sil"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -961,7 +1048,7 @@ export default function ActionPlanWorkflow() {
                                 Tespit: {new Date(finding.identified_date).toLocaleDateString('tr-TR')}
                               </p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                               <span className={`text-xs px-2 py-1 rounded ${
                                 finding.severity === 'critical' ? 'bg-red-100 text-red-800' :
                                 finding.severity === 'high' ? 'bg-orange-100 text-orange-800' :
@@ -973,6 +1060,13 @@ export default function ActionPlanWorkflow() {
                               <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">
                                 {finding.capa_count || 0} CAPA
                               </span>
+                              <button
+                                onClick={() => handleDeleteFinding(finding.id)}
+                                className="text-red-600 hover:text-red-800 p-1"
+                                title="Bulguyu Sil"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1140,7 +1234,7 @@ export default function ActionPlanWorkflow() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                               <span className={`text-xs px-2 py-1 rounded ${
                                 capa.priority === 'critical' ? 'bg-red-100 text-red-800' :
                                 capa.priority === 'high' ? 'bg-orange-100 text-orange-800' :
@@ -1157,6 +1251,13 @@ export default function ActionPlanWorkflow() {
                               }`}>
                                 {capa.status}
                               </span>
+                              <button
+                                onClick={() => handleDeleteCapa(capa.id)}
+                                className="text-red-600 hover:text-red-800 p-1"
+                                title="CAPA'yı Sil"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
                         </div>
