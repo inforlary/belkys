@@ -279,7 +279,6 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: AlertCircle, label: 'Bulgular Yönetimi', path: 'findings-management' },
         { icon: FileWarning, label: 'DÖF Yönetimi', path: 'capa-management' },
         { icon: ClipboardCheck, label: 'Eylem Planı', path: 'action-plan' },
-        { icon: GitMerge, label: 'Eylem Planı İş Akışı (Eski)', path: 'action-plan-workflow' },
         { icon: Workflow, label: 'Eylem Planı İş Akışı', path: 'action-plan-workflow-enhanced' },
         { icon: BarChart3, label: 'İç Kontrol Raporları', path: 'internal-control-reports' },
         { icon: GitMerge, label: 'Entegre Risk Raporu', path: 'integrated-risk-report' },

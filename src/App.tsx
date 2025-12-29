@@ -73,7 +73,6 @@ import ProgramActivityMapping from './pages/ProgramActivityMapping';
 import MappedEconomicCodeEntry from './pages/MappedEconomicCodeEntry';
 import SubProgramActivities from './pages/SubProgramActivities';
 import ActionPlan from './pages/ActionPlan';
-import ActionPlanWorkflow from './pages/ActionPlanWorkflow';
 import ActionPlanWorkflowEnhanced from './pages/ActionPlanWorkflowEnhanced';
 import FindingsManagement from './pages/FindingsManagement';
 import ICRoleManagement from './pages/ICRoleManagement';
@@ -249,8 +248,6 @@ const renderPage = () => {
         return <CAPAManagement />;
       case 'action-plan':
         return <ActionPlan />;
-      case 'action-plan-workflow':
-        return <ActionPlanWorkflow />;
       case 'action-plan-workflow-enhanced':
         return <ActionPlanWorkflowEnhanced />;
       case 'findings-management':
