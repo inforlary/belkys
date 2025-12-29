@@ -250,11 +250,6 @@ export default function MessagesEnhanced() {
 
       if (error) throw error;
 
-      if (composeData.attachments.length > 0 && data) {
-        await uploadAttachments(data.id, composeData.attachments);
-      }
-
-      alert('Mesaj gönderildi!');
       setShowComposeModal(false);
       setComposeData({
         recipient_id: '',
@@ -263,6 +258,12 @@ export default function MessagesEnhanced() {
         priority: 'normal',
         attachments: []
       });
+
+      if (composeData.attachments.length > 0 && data) {
+        await uploadAttachments(data.id, composeData.attachments);
+      }
+
+      alert('Mesaj gönderildi!');
       loadData();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -308,6 +309,7 @@ export default function MessagesEnhanced() {
 
       setReplyData({ message: '', attachments: [] });
       await loadThreadMessages(selectedThreadId);
+      loadData();
     } catch (error) {
       console.error('Error replying:', error);
       alert('Yanıt gönderilirken bir hata oluştu.');
@@ -316,24 +318,39 @@ export default function MessagesEnhanced() {
 
   const uploadAttachments = async (messageId: string, files: File[]) => {
     for (const file of files) {
-      const fileName = `${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('message-attachments')
-        .upload(fileName, file);
+      try {
+        const fileName = `${Date.now()}_${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('message-attachments')
+          .upload(fileName, file);
 
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        continue;
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          alert(`Dosya yüklenirken hata oluştu: ${file.name}`);
+          continue;
+        }
+
+        const { error: insertError } = await supabase.from('message_attachments').insert({
+          message_id: messageId,
+          file_name: file.name,
+          file_size: file.size,
+          file_type: file.type,
+          storage_path: fileName,
+          uploaded_by: profile?.id
+        });
+
+        if (insertError) {
+          console.error('Database insert error:', insertError);
+          alert(`Ek kaydedilirken hata oluştu: ${file.name} - ${insertError.message}`);
+
+          await supabase.storage
+            .from('message-attachments')
+            .remove([fileName]);
+        }
+      } catch (error) {
+        console.error('Attachment upload error:', error);
+        alert(`Ek yüklenirken beklenmeyen hata: ${file.name}`);
       }
-
-      await supabase.from('message_attachments').insert({
-        message_id: messageId,
-        file_name: file.name,
-        file_size: file.size,
-        file_type: file.type,
-        storage_path: fileName,
-        uploaded_by: profile?.id
-      });
     }
   };
 
