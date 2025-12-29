@@ -212,7 +212,7 @@ export default function MessagesEnhanced() {
           subject: composeData.subject || 'Konu yok',
           message: composeData.message,
           priority: composeData.priority,
-          status: 'sent'
+          status: 'unread'
         })
         .select()
         .single();
@@ -252,7 +252,7 @@ export default function MessagesEnhanced() {
           subject: `Re: ${selectedMessage.subject}`,
           message: replyData.message,
           priority: selectedMessage.priority,
-          status: 'sent',
+          status: 'unread',
           reply_to_id: selectedMessage.id,
           thread_id: selectedMessage.thread_id
         })
