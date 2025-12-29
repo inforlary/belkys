@@ -939,22 +939,22 @@ export default function PerformanceCards() {
                           FAALİYETLER
                         </th>
                         <th className="py-3 px-3 text-center font-semibold border border-white whitespace-nowrap">
-                          2025/5 Yıl<br/>Bütçe
+                          2025<br/>Bütçe
                         </th>
                         <th className="py-3 px-3 text-center font-semibold border border-white whitespace-nowrap">
-                          2025 Yıl Sonu<br/>Harcama
+                          2025 Haziran<br/>Sonu Harcama
                         </th>
                         <th className="py-3 px-3 text-center font-semibold border border-white whitespace-nowrap">
-                          2025 Yıl Sonu<br/>Har. Tah.
+                          2025 Yıl<br/>Sonu Tah.
                         </th>
                         <th className="py-3 px-3 text-center font-semibold border border-white whitespace-nowrap">
                           2026<br/>Bütçe
                         </th>
                         <th className="py-3 px-3 text-center font-semibold border border-white whitespace-nowrap">
-                          2027<br/>Tahmin
+                          2027<br/>Tahmini
                         </th>
                         <th className="py-3 px-3 text-center font-semibold border border-white whitespace-nowrap">
-                          2028<br/>Tahmin
+                          2028<br/>Tahmini
                         </th>
                       </tr>
                     </thead>
@@ -969,104 +969,106 @@ export default function PerformanceCards() {
                           return acc;
                         }, {} as Record<string, { activityCode: string; activityName: string; costs: ActivityCost[] }>);
 
-                        return Object.values(groupedByActivity).map((group, groupIdx) => {
-                          const budgetInCosts = group.costs.filter(c => c.financing_type === 'Bütçe İçi');
-                          const budgetOutCosts = group.costs.filter(c => c.financing_type === 'Bütçe Dışı');
+                        const calculateTotal = (costs: ActivityCost[], field: keyof ActivityCost) => {
+                          return costs.reduce((sum, c) => sum + (Number(c[field]) || 0), 0);
+                        };
 
-                          const calculateTotal = (costs: ActivityCost[], field: keyof ActivityCost) => {
-                            return costs.reduce((sum, c) => sum + (Number(c[field]) || 0), 0);
-                          };
+                        const allBudgetInCosts = subProgram.activity_costs.filter(c => c.financing_type === 'Bütçe İçi');
+                        const overallBudgetInTotal = {
+                          year_2025_budget: calculateTotal(allBudgetInCosts, 'year_2025_budget'),
+                          year_2025_actual: calculateTotal(allBudgetInCosts, 'year_2025_actual'),
+                          year_2025_estimated: calculateTotal(allBudgetInCosts, 'year_2025_estimated'),
+                          year_2026: calculateTotal(allBudgetInCosts, 'year_2026'),
+                          year_2027: calculateTotal(allBudgetInCosts, 'year_2027'),
+                          year_2028: calculateTotal(allBudgetInCosts, 'year_2028'),
+                        };
 
-                          const totalBudgetIn = {
-                            year_2025_budget: calculateTotal(budgetInCosts, 'year_2025_budget'),
-                            year_2025_actual: calculateTotal(budgetInCosts, 'year_2025_actual'),
-                            year_2025_estimated: calculateTotal(budgetInCosts, 'year_2025_estimated'),
-                            year_2026: calculateTotal(budgetInCosts, 'year_2026'),
-                            year_2027: calculateTotal(budgetInCosts, 'year_2027'),
-                            year_2028: calculateTotal(budgetInCosts, 'year_2028'),
-                          };
+                        const allCosts = subProgram.activity_costs;
+                        const overallTotal = {
+                          year_2025_budget: calculateTotal(allCosts, 'year_2025_budget'),
+                          year_2025_actual: calculateTotal(allCosts, 'year_2025_actual'),
+                          year_2025_estimated: calculateTotal(allCosts, 'year_2025_estimated'),
+                          year_2026: calculateTotal(allCosts, 'year_2026'),
+                          year_2027: calculateTotal(allCosts, 'year_2027'),
+                          year_2028: calculateTotal(allCosts, 'year_2028'),
+                        };
 
-                          const totalBudgetOut = {
-                            year_2025_budget: calculateTotal(budgetOutCosts, 'year_2025_budget'),
-                            year_2025_actual: calculateTotal(budgetOutCosts, 'year_2025_actual'),
-                            year_2025_estimated: calculateTotal(budgetOutCosts, 'year_2025_estimated'),
-                            year_2026: calculateTotal(budgetOutCosts, 'year_2026'),
-                            year_2027: calculateTotal(budgetOutCosts, 'year_2027'),
-                            year_2028: calculateTotal(budgetOutCosts, 'year_2028'),
-                          };
+                        return (
+                          <>
+                            {Object.values(groupedByActivity).map((group, groupIdx) => {
+                              const budgetInCosts = group.costs.filter(c => c.financing_type === 'Bütçe İçi');
+                              const budgetOutCosts = group.costs.filter(c => c.financing_type === 'Bütçe Dışı');
 
-                          const grandTotal = {
-                            year_2025_budget: totalBudgetIn.year_2025_budget + totalBudgetOut.year_2025_budget,
-                            year_2025_actual: totalBudgetIn.year_2025_actual + totalBudgetOut.year_2025_actual,
-                            year_2025_estimated: totalBudgetIn.year_2025_estimated + totalBudgetOut.year_2025_estimated,
-                            year_2026: totalBudgetIn.year_2026 + totalBudgetOut.year_2026,
-                            year_2027: totalBudgetIn.year_2027 + totalBudgetOut.year_2027,
-                            year_2028: totalBudgetIn.year_2028 + totalBudgetOut.year_2028,
-                          };
+                              const totalBudgetIn = {
+                                year_2025_budget: calculateTotal(budgetInCosts, 'year_2025_budget'),
+                                year_2025_actual: calculateTotal(budgetInCosts, 'year_2025_actual'),
+                                year_2025_estimated: calculateTotal(budgetInCosts, 'year_2025_estimated'),
+                                year_2026: calculateTotal(budgetInCosts, 'year_2026'),
+                                year_2027: calculateTotal(budgetInCosts, 'year_2027'),
+                                year_2028: calculateTotal(budgetInCosts, 'year_2028'),
+                              };
 
-                          return (
-                            <React.Fragment key={groupIdx}>
-                              <tr className="bg-pink-50">
-                                <td colSpan={7} className="py-3 px-4 border border-gray-300 font-semibold text-gray-900">
-                                  {group.activityCode} - {group.activityName}
-                                </td>
-                              </tr>
-                              {budgetInCosts.length > 0 && (
-                                <>
-                                  <tr className="bg-white">
-                                    <td className="py-2 px-4 border border-gray-300 pl-8">Bütçe İçi</td>
-                                    <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_budget)}</td>
-                                    <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_actual)}</td>
-                                    <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_estimated)}</td>
-                                    <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2026)}</td>
-                                    <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2027)}</td>
-                                    <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2028)}</td>
+                              const totalBudgetOut = {
+                                year_2025_budget: calculateTotal(budgetOutCosts, 'year_2025_budget'),
+                                year_2025_actual: calculateTotal(budgetOutCosts, 'year_2025_actual'),
+                                year_2025_estimated: calculateTotal(budgetOutCosts, 'year_2025_estimated'),
+                                year_2026: calculateTotal(budgetOutCosts, 'year_2026'),
+                                year_2027: calculateTotal(budgetOutCosts, 'year_2027'),
+                                year_2028: calculateTotal(budgetOutCosts, 'year_2028'),
+                              };
+
+                              return (
+                                <React.Fragment key={groupIdx}>
+                                  <tr className="bg-pink-50">
+                                    <td colSpan={7} className="py-3 px-4 border border-gray-300 font-semibold text-gray-900">
+                                      {group.activityCode} - {group.activityName}
+                                    </td>
                                   </tr>
-                                </>
-                              )}
-                              {budgetOutCosts.length > 0 && (
-                                <tr className="bg-white">
-                                  <td className="py-2 px-4 border border-gray-300 pl-8">Bütçe Dışı</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_budget)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_actual)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_estimated)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2026)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2027)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2028)}</td>
-                                </tr>
-                              )}
-                              <tr className="bg-gray-100 font-semibold">
-                                <td className="py-2 px-4 border border-gray-300">Toplam</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(grandTotal.year_2025_budget)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(grandTotal.year_2025_actual)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(grandTotal.year_2025_estimated)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(grandTotal.year_2026)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(grandTotal.year_2027)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(grandTotal.year_2028)}</td>
-                              </tr>
-                              <tr className="bg-gray-100 font-semibold">
-                                <td className="py-2 px-4 border border-gray-300">Toplam Bütçe İçi</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_budget)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_actual)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_estimated)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2026)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2027)}</td>
-                                <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2028)}</td>
-                              </tr>
-                              {budgetOutCosts.length > 0 && (
-                                <tr className="bg-gray-100 font-semibold">
-                                  <td className="py-2 px-4 border border-gray-300">Toplam Bütçe Dışı</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_budget)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_actual)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_estimated)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2026)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2027)}</td>
-                                  <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2028)}</td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          );
-                        });
+                                  {budgetInCosts.length > 0 && (
+                                    <tr className="bg-white">
+                                      <td className="py-2 px-4 border border-gray-300 pl-8">Bütçe İçi</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_budget)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_actual)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2025_estimated)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2026)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2027)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetIn.year_2028)}</td>
+                                    </tr>
+                                  )}
+                                  {budgetOutCosts.length > 0 && (
+                                    <tr className="bg-white">
+                                      <td className="py-2 px-4 border border-gray-300 pl-8">Bütçe Dışı</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_budget)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_actual)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2025_estimated)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2026)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2027)}</td>
+                                      <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(totalBudgetOut.year_2028)}</td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                            <tr className="bg-gray-100 font-semibold">
+                              <td className="py-2 px-4 border border-gray-300">Toplam</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallTotal.year_2025_budget)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallTotal.year_2025_actual)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallTotal.year_2025_estimated)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallTotal.year_2026)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallTotal.year_2027)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallTotal.year_2028)}</td>
+                            </tr>
+                            <tr className="bg-gray-100 font-semibold">
+                              <td className="py-2 px-4 border border-gray-300">Bütçe İçi</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallBudgetInTotal.year_2025_budget)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallBudgetInTotal.year_2025_actual)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallBudgetInTotal.year_2025_estimated)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallBudgetInTotal.year_2026)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallBudgetInTotal.year_2027)}</td>
+                              <td className="py-2 px-3 border border-gray-300 text-right">{formatCurrency(overallBudgetInTotal.year_2028)}</td>
+                            </tr>
+                          </>
+                        );
                       })()}
                     </tbody>
                   </table>
