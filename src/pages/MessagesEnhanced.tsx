@@ -316,17 +316,45 @@ export default function MessagesEnhanced() {
     }
   };
 
+  const sanitizeFileName = (fileName: string): string => {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    const name = lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
+    const extension = lastDotIndex > 0 ? fileName.substring(lastDotIndex) : '';
+
+    let sanitized = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    if (sanitized.length > 100) {
+      sanitized = sanitized.substring(0, 100);
+    }
+
+    return sanitized + extension;
+  };
+
   const uploadAttachments = async (messageId: string, files: File[]) => {
+    const maxSize = 10 * 1024 * 1024;
+
     for (const file of files) {
       try {
-        const fileName = `${Date.now()}_${file.name}`;
+        if (file.size > maxSize) {
+          alert(`Dosya çok büyük: ${file.name} (Maksimum: 10MB)`);
+          continue;
+        }
+
+        const sanitizedName = sanitizeFileName(file.name);
+        const storagePath = `${Date.now()}_${sanitizedName}`;
+
         const { error: uploadError } = await supabase.storage
           .from('message-attachments')
-          .upload(fileName, file);
+          .upload(storagePath, file);
 
         if (uploadError) {
           console.error('Storage upload error:', uploadError);
-          alert(`Dosya yüklenirken hata oluştu: ${file.name}`);
+          alert(`Dosya yüklenirken hata oluştu: ${file.name}\nHata: ${uploadError.message}`);
           continue;
         }
 
@@ -335,17 +363,17 @@ export default function MessagesEnhanced() {
           file_name: file.name,
           file_size: file.size,
           file_type: file.type,
-          storage_path: fileName,
+          storage_path: storagePath,
           uploaded_by: profile?.id
         });
 
         if (insertError) {
           console.error('Database insert error:', insertError);
-          alert(`Ek kaydedilirken hata oluştu: ${file.name} - ${insertError.message}`);
+          alert(`Ek kaydedilirken hata oluştu: ${file.name}\nHata: ${insertError.message}`);
 
           await supabase.storage
             .from('message-attachments')
-            .remove([fileName]);
+            .remove([storagePath]);
         }
       } catch (error) {
         console.error('Attachment upload error:', error);
