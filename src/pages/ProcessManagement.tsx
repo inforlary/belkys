@@ -224,7 +224,7 @@ export default function ProcessManagement() {
           )
         `)
         .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
-        .eq('ic_plan_id', selectedPlanId)
+        .is('ic_plan_id', null)
         .order('code', { ascending: true });
 
       if (error) throw error;
