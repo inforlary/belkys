@@ -148,7 +148,8 @@ export default function MessagesEnhanced() {
         .select(`
           *,
           sender:profiles!messages_sender_id_fkey(full_name, email, role),
-          recipient:profiles!messages_recipient_id_fkey(full_name, email, role)
+          recipient:profiles!messages_recipient_id_fkey(full_name, email, role),
+          attachments:message_attachments(id, file_name, file_size, file_type, storage_path)
         `)
         .eq('organization_id', profile.organization_id)
         .eq('is_deleted', false);
@@ -294,6 +295,28 @@ export default function MessagesEnhanced() {
         storage_path: fileName,
         uploaded_by: profile?.id
       });
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: MessageAttachment) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('message-attachments')
+        .download(attachment.storage_path);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = attachment.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading attachment:', error);
+      alert('Dosya indirilirken bir hata oluştu.');
     }
   };
 
@@ -503,6 +526,9 @@ export default function MessagesEnhanced() {
                         {viewMode === 'sent' ? message.recipient?.full_name : message.sender?.full_name}
                       </span>
                       <div className="flex items-center gap-1">
+                        {message.attachments && message.attachments.length > 0 && (
+                          <Paperclip className="w-3 h-3 text-gray-500" />
+                        )}
                         {message.is_starred && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
                         {message.read_at && message.sender_id === profile?.id && (
                           <CheckCheck className="w-3 h-3 text-blue-500" />
@@ -580,6 +606,35 @@ export default function MessagesEnhanced() {
                     <div className="prose max-w-none">
                       <p className="text-gray-800 whitespace-pre-wrap">{selectedMessage.message}</p>
                     </div>
+
+                    {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
+                      <div className="mt-6 border-t pt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                          <Paperclip className="w-4 h-4" />
+                          Ekler ({selectedMessage.attachments.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {selectedMessage.attachments.map((attachment) => (
+                            <button
+                              key={attachment.id}
+                              onClick={() => handleDownloadAttachment(attachment)}
+                              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <Paperclip className="w-4 h-4 text-gray-500" />
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{attachment.file_name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {(attachment.file_size / 1024).toFixed(2)} KB
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-xs text-blue-600 hover:text-blue-700">İndir</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {viewMode === 'inbox' && (
