@@ -112,7 +112,6 @@ export default function ActionPlanWorkflowEnhanced() {
                 .from('ic_kiks_sub_standards')
                 .select('id, code, title')
                 .eq('main_standard_id', mainStandard.id)
-                .eq('ic_plan_id', selectedPlanId)
                 .order('code');
 
               if (subError) throw subError;
