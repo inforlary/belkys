@@ -11,11 +11,14 @@ import {
   Target,
   Trash2,
   Edit2,
-  BarChart3
+  BarChart3,
+  X,
+  Save
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
+import Modal from '../components/ui/Modal';
 
 interface KiksCategory {
   id: string;
@@ -74,12 +77,26 @@ export default function ActionPlanWorkflowEnhanced() {
   const [expandedSubStandards, setExpandedSubStandards] = useState<Set<string>>(new Set());
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
   const [selectedActionPlan, setSelectedActionPlan] = useState<string | null>(null);
+  const [selectedKiksActionId, setSelectedKiksActionId] = useState<string | null>(null);
   const [detailedData, setDetailedData] = useState<DetailedData | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [totalStats, setTotalStats] = useState({ controls: 0, tests: 0, findings: 0, capas: 0 });
+
+  const [showControlModal, setShowControlModal] = useState(false);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [showFindingModal, setShowFindingModal] = useState(false);
+  const [showCapaModal, setShowCapaModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [controlForm, setControlForm] = useState({ control_code: '', control_title: '', control_description: '' });
+  const [testForm, setTestForm] = useState({ test_code: '', test_date: '', test_result: '', tester_name: '' });
+  const [findingForm, setFindingForm] = useState({ finding_code: '', finding_title: '', finding_description: '', severity: 'Orta' });
+  const [capaForm, setCapaForm] = useState({ capa_code: '', title: '', description: '', action_type: 'Düzeltici', due_date: '' });
 
   useEffect(() => {
     if (profile && selectedPlanId) {
       fetchHierarchicalData();
+      fetchTotalStats();
     }
   }, [profile, selectedPlanId]);
 
@@ -302,7 +319,177 @@ export default function ActionPlanWorkflowEnhanced() {
 
   const handleActionPlanClick = (kiksActionId: string, actionPlanId: string) => {
     setSelectedActionPlan(actionPlanId);
+    setSelectedKiksActionId(kiksActionId);
     fetchDetailedData(kiksActionId, actionPlanId);
+  };
+
+  const fetchTotalStats = async () => {
+    if (!profile?.organization_id || !selectedPlanId) return;
+
+    try {
+      const [controlsRes, testsRes, findingsRes, capasRes] = await Promise.all([
+        supabase
+          .from('ic_controls')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', profile.organization_id)
+          .eq('ic_plan_id', selectedPlanId),
+        supabase
+          .from('ic_control_tests')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', profile.organization_id)
+          .eq('ic_plan_id', selectedPlanId),
+        supabase
+          .from('ic_findings')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', profile.organization_id)
+          .eq('ic_plan_id', selectedPlanId),
+        supabase
+          .from('ic_capas')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', profile.organization_id)
+          .eq('ic_plan_id', selectedPlanId)
+      ]);
+
+      setTotalStats({
+        controls: controlsRes.count || 0,
+        tests: testsRes.count || 0,
+        findings: findingsRes.count || 0,
+        capas: capasRes.count || 0
+      });
+    } catch (error) {
+      console.error('Toplam istatistikler yüklenirken hata:', error);
+    }
+  };
+
+  const handleAddControl = async () => {
+    if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
+
+    try {
+      setSaving(true);
+      const { error } = await supabase.from('ic_controls').insert({
+        organization_id: profile.organization_id,
+        ic_plan_id: selectedPlanId,
+        kiks_action_id: selectedKiksActionId,
+        control_code: controlForm.control_code,
+        control_title: controlForm.control_title,
+        control_description: controlForm.control_description,
+        control_type: 'Manuel',
+        frequency: 'Aylık',
+        responsible_person: profile.full_name || ''
+      });
+
+      if (error) throw error;
+
+      setShowControlModal(false);
+      setControlForm({ control_code: '', control_title: '', control_description: '' });
+      if (selectedKiksActionId && selectedActionPlan) {
+        fetchDetailedData(selectedKiksActionId, selectedActionPlan);
+      }
+      fetchTotalStats();
+    } catch (error) {
+      console.error('Kontrol eklenirken hata:', error);
+      alert('Kontrol eklenirken bir hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddTest = async () => {
+    if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
+
+    try {
+      setSaving(true);
+      const { error } = await supabase.from('ic_control_tests').insert({
+        organization_id: profile.organization_id,
+        ic_plan_id: selectedPlanId,
+        kiks_action_id: selectedKiksActionId,
+        test_code: testForm.test_code,
+        test_date: testForm.test_date,
+        test_result: testForm.test_result,
+        tester_name: testForm.tester_name
+      });
+
+      if (error) throw error;
+
+      setShowTestModal(false);
+      setTestForm({ test_code: '', test_date: '', test_result: '', tester_name: '' });
+      if (selectedKiksActionId && selectedActionPlan) {
+        fetchDetailedData(selectedKiksActionId, selectedActionPlan);
+      }
+      fetchTotalStats();
+    } catch (error) {
+      console.error('Test eklenirken hata:', error);
+      alert('Test eklenirken bir hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddFinding = async () => {
+    if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
+
+    try {
+      setSaving(true);
+      const { error } = await supabase.from('ic_findings').insert({
+        organization_id: profile.organization_id,
+        ic_plan_id: selectedPlanId,
+        kiks_action_id: selectedKiksActionId,
+        finding_code: findingForm.finding_code,
+        finding_title: findingForm.finding_title,
+        finding_description: findingForm.finding_description,
+        severity: findingForm.severity,
+        status: 'Açık',
+        identified_by: profile.full_name || ''
+      });
+
+      if (error) throw error;
+
+      setShowFindingModal(false);
+      setFindingForm({ finding_code: '', finding_title: '', finding_description: '', severity: 'Orta' });
+      if (selectedKiksActionId && selectedActionPlan) {
+        fetchDetailedData(selectedKiksActionId, selectedActionPlan);
+      }
+      fetchTotalStats();
+    } catch (error) {
+      console.error('Bulgu eklenirken hata:', error);
+      alert('Bulgu eklenirken bir hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddCapa = async () => {
+    if (!profile?.organization_id || !selectedPlanId || !selectedKiksActionId) return;
+
+    try {
+      setSaving(true);
+      const { error } = await supabase.from('ic_capas').insert({
+        organization_id: profile.organization_id,
+        ic_plan_id: selectedPlanId,
+        kiks_action_id: selectedKiksActionId,
+        capa_code: capaForm.capa_code,
+        title: capaForm.title,
+        description: capaForm.description,
+        action_type: capaForm.action_type,
+        due_date: capaForm.due_date,
+        status: 'Planlanan',
+        assigned_to: profile.full_name || ''
+      });
+
+      if (error) throw error;
+
+      setShowCapaModal(false);
+      setCapaForm({ capa_code: '', title: '', description: '', action_type: 'Düzeltici', due_date: '' });
+      if (selectedKiksActionId && selectedActionPlan) {
+        fetchDetailedData(selectedKiksActionId, selectedActionPlan);
+      }
+      fetchTotalStats();
+    } catch (error) {
+      console.error('CAPA eklenirken hata:', error);
+      alert('CAPA eklenirken bir hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!hasPlan) {
@@ -343,6 +530,52 @@ export default function ActionPlanWorkflowEnhanced() {
         <p className="text-gray-600 mt-1">
           KİKS standartları ve eylemler bazında organize edilmiş iş akışı
         </p>
+      </div>
+
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-green-600" />
+              <span className="text-sm font-medium text-green-900">Toplam Kontroller</span>
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-green-700">{totalStats.controls}</div>
+          <div className="text-xs text-green-600 mt-1">Tüm eylemler</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TestTube className="w-6 h-6 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">Toplam Testler</span>
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-blue-700">{totalStats.tests}</div>
+          <div className="text-xs text-blue-600 mt-1">Tüm eylemler</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-6 h-6 text-orange-600" />
+              <span className="text-sm font-medium text-orange-900">Toplam Bulgular</span>
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-orange-700">{totalStats.findings}</div>
+          <div className="text-xs text-orange-600 mt-1">Tüm eylemler</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <FileWarning className="w-6 h-6 text-red-600" />
+              <span className="text-sm font-medium text-red-900">Toplam CAPA</span>
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-red-700">{totalStats.capas}</div>
+          <div className="text-xs text-red-600 mt-1">Tüm eylemler</div>
+        </div>
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -516,12 +749,21 @@ export default function ActionPlanWorkflowEnhanced() {
               </div>
 
               <div className="space-y-4">
-                {detailedData.controls.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                       <ShieldCheck className="w-5 h-5 text-green-600" />
                       Kontrol Faaliyetleri
                     </h3>
+                    <button
+                      onClick={() => setShowControlModal(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Ekle
+                    </button>
+                  </div>
+                  {detailedData.controls.length > 0 ? (
                     <div className="space-y-2">
                       {detailedData.controls.map((control: any) => (
                         <div key={control.id} className="border rounded-lg p-3 hover:bg-gray-50">
@@ -530,15 +772,28 @@ export default function ActionPlanWorkflowEnhanced() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 text-sm border border-dashed rounded-lg">
+                      Henüz kontrol eklenmemiş
+                    </div>
+                  )}
+                </div>
 
-                {detailedData.tests.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                       <TestTube className="w-5 h-5 text-blue-600" />
                       Kontrol Testleri
                     </h3>
+                    <button
+                      onClick={() => setShowTestModal(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Ekle
+                    </button>
+                  </div>
+                  {detailedData.tests.length > 0 ? (
                     <div className="space-y-2">
                       {detailedData.tests.map((test: any) => (
                         <div key={test.id} className="border rounded-lg p-3 hover:bg-gray-50">
@@ -549,15 +804,28 @@ export default function ActionPlanWorkflowEnhanced() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 text-sm border border-dashed rounded-lg">
+                      Henüz test eklenmemiş
+                    </div>
+                  )}
+                </div>
 
-                {detailedData.findings.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5 text-orange-600" />
                       Bulgular
                     </h3>
+                    <button
+                      onClick={() => setShowFindingModal(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Ekle
+                    </button>
+                  </div>
+                  {detailedData.findings.length > 0 ? (
                     <div className="space-y-2">
                       {detailedData.findings.map((finding: any) => (
                         <div key={finding.id} className="border rounded-lg p-3 hover:bg-gray-50">
@@ -566,15 +834,28 @@ export default function ActionPlanWorkflowEnhanced() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 text-sm border border-dashed rounded-lg">
+                      Henüz bulgu eklenmemiş
+                    </div>
+                  )}
+                </div>
 
-                {detailedData.capas.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                       <FileWarning className="w-5 h-5 text-red-600" />
                       CAPA (Düzeltici ve Önleyici Faaliyetler)
                     </h3>
+                    <button
+                      onClick={() => setShowCapaModal(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Ekle
+                    </button>
+                  </div>
+                  {detailedData.capas.length > 0 ? (
                     <div className="space-y-2">
                       {detailedData.capas.map((capa: any) => (
                         <div key={capa.id} className="border rounded-lg p-3 hover:bg-gray-50">
@@ -583,8 +864,12 @@ export default function ActionPlanWorkflowEnhanced() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 text-sm border border-dashed rounded-lg">
+                      Henüz CAPA eklenmemiş
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -598,6 +883,252 @@ export default function ActionPlanWorkflowEnhanced() {
           )}
         </div>
       </div>
+
+      <Modal isOpen={showControlModal} onClose={() => setShowControlModal(false)} title="Yeni Kontrol Ekle">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kontrol Kodu</label>
+            <input
+              type="text"
+              value={controlForm.control_code}
+              onChange={(e) => setControlForm({ ...controlForm, control_code: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="Örn: K-001"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kontrol Başlığı</label>
+            <input
+              type="text"
+              value={controlForm.control_title}
+              onChange={(e) => setControlForm({ ...controlForm, control_title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="Kontrol başlığı"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+            <textarea
+              value={controlForm.control_description}
+              onChange={(e) => setControlForm({ ...controlForm, control_description: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              rows={3}
+              placeholder="Kontrol açıklaması"
+            />
+          </div>
+          <div className="flex gap-3 justify-end pt-4 border-t">
+            <button
+              onClick={() => setShowControlModal(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleAddControl}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showTestModal} onClose={() => setShowTestModal(false)} title="Yeni Test Ekle">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Test Kodu</label>
+            <input
+              type="text"
+              value={testForm.test_code}
+              onChange={(e) => setTestForm({ ...testForm, test_code: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Örn: T-001"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Test Tarihi</label>
+            <input
+              type="date"
+              value={testForm.test_date}
+              onChange={(e) => setTestForm({ ...testForm, test_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Test Sonucu</label>
+            <input
+              type="text"
+              value={testForm.test_result}
+              onChange={(e) => setTestForm({ ...testForm, test_result: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Test sonucu"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Test Eden Kişi</label>
+            <input
+              type="text"
+              value={testForm.tester_name}
+              onChange={(e) => setTestForm({ ...testForm, tester_name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Ad Soyad"
+            />
+          </div>
+          <div className="flex gap-3 justify-end pt-4 border-t">
+            <button
+              onClick={() => setShowTestModal(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleAddTest}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showFindingModal} onClose={() => setShowFindingModal(false)} title="Yeni Bulgu Ekle">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bulgu Kodu</label>
+            <input
+              type="text"
+              value={findingForm.finding_code}
+              onChange={(e) => setFindingForm({ ...findingForm, finding_code: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              placeholder="Örn: B-001"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bulgu Başlığı</label>
+            <input
+              type="text"
+              value={findingForm.finding_title}
+              onChange={(e) => setFindingForm({ ...findingForm, finding_title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              placeholder="Bulgu başlığı"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+            <textarea
+              value={findingForm.finding_description}
+              onChange={(e) => setFindingForm({ ...findingForm, finding_description: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              rows={3}
+              placeholder="Bulgu açıklaması"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Önem Derecesi</label>
+            <select
+              value={findingForm.severity}
+              onChange={(e) => setFindingForm({ ...findingForm, severity: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            >
+              <option value="Düşük">Düşük</option>
+              <option value="Orta">Orta</option>
+              <option value="Yüksek">Yüksek</option>
+              <option value="Kritik">Kritik</option>
+            </select>
+          </div>
+          <div className="flex gap-3 justify-end pt-4 border-t">
+            <button
+              onClick={() => setShowFindingModal(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleAddFinding}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showCapaModal} onClose={() => setShowCapaModal(false)} title="Yeni CAPA Ekle">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">CAPA Kodu</label>
+            <input
+              type="text"
+              value={capaForm.capa_code}
+              onChange={(e) => setCapaForm({ ...capaForm, capa_code: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Örn: C-001"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
+            <input
+              type="text"
+              value={capaForm.title}
+              onChange={(e) => setCapaForm({ ...capaForm, title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="CAPA başlığı"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+            <textarea
+              value={capaForm.description}
+              onChange={(e) => setCapaForm({ ...capaForm, description: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              rows={3}
+              placeholder="CAPA açıklaması"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Aksiyon Türü</label>
+            <select
+              value={capaForm.action_type}
+              onChange={(e) => setCapaForm({ ...capaForm, action_type: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            >
+              <option value="Düzeltici">Düzeltici</option>
+              <option value="Önleyici">Önleyici</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tamamlanma Tarihi</label>
+            <input
+              type="date"
+              value={capaForm.due_date}
+              onChange={(e) => setCapaForm({ ...capaForm, due_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+          <div className="flex gap-3 justify-end pt-4 border-t">
+            <button
+              onClick={() => setShowCapaModal(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleAddCapa}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
