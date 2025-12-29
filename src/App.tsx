@@ -76,6 +76,8 @@ import MappedEconomicCodeEntry from './pages/MappedEconomicCodeEntry';
 import SubProgramActivities from './pages/SubProgramActivities';
 import ActionPlan from './pages/ActionPlan';
 import ActionPlanWorkflow from './pages/ActionPlanWorkflow';
+import ActionPlanWorkflowEnhanced from './pages/ActionPlanWorkflowEnhanced';
+import FindingsManagement from './pages/FindingsManagement';
 import ICRoleManagement from './pages/ICRoleManagement';
 import IntegratedRiskReport from './pages/IntegratedRiskReport';
 import BudgetPerformanceJustification from './pages/BudgetPerformanceJustification';
@@ -256,6 +258,10 @@ const renderPage = () => {
         return <ActionPlan />;
       case 'action-plan-workflow':
         return <ActionPlanWorkflow />;
+      case 'action-plan-workflow-enhanced':
+        return <ActionPlanWorkflowEnhanced />;
+      case 'findings-management':
+        return <FindingsManagement />;
       case 'ic-role-management':
         return <ICRoleManagement />;
       case 'internal-control-reports':
