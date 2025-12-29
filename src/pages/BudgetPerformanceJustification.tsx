@@ -72,7 +72,7 @@ interface Justification {
   justification: string;
   cost_elements: string;
   budget_needs: any;
-  status: 'draft' | 'submitted_to_vp' | 'vp_approved' | 'submitted_to_admin' | 'admin_approved' | 'rejected';
+  status: 'draft' | 'submitted_to_director' | 'director_approved' | 'submitted_to_vp' | 'vp_approved' | 'submitted_to_admin' | 'admin_approved' | 'rejected';
   fiscal_year: number;
 }
 
@@ -95,6 +95,7 @@ export default function BudgetPerformanceJustification() {
   const [selectedCodesForBulk, setSelectedCodesForBulk] = useState<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<{activityId: string, index: number} | null>(null);
   const [fiscalYear, setFiscalYear] = useState<number>(2026);
+  const [activeTab, setActiveTab] = useState<'entry' | 'approval'>('entry');
 
   const [formData, setFormData] = useState<{ [key: string]: {
     legal_basis: string;
@@ -533,6 +534,36 @@ export default function BudgetPerformanceJustification() {
 
       const existingJustification = justifications.find(j => j.activity_id === activity.id);
 
+      let status = 'draft';
+      const now = new Date().toISOString();
+      const additionalFields: any = {};
+
+      if (!isDraft) {
+        if (profile?.role === 'admin') {
+          status = 'admin_approved';
+          additionalFields.admin_submitted_at = now;
+          additionalFields.admin_submitted_by = profile.id;
+          additionalFields.admin_reviewed_at = now;
+          additionalFields.admin_reviewed_by = profile.id;
+        } else if (profile?.role === 'user') {
+          status = 'submitted_to_director';
+          additionalFields.director_submitted_at = now;
+          additionalFields.director_submitted_by = profile.id;
+        } else if (profile?.role === 'director') {
+          status = 'submitted_to_vp';
+          additionalFields.director_reviewed_at = now;
+          additionalFields.director_reviewed_by = profile.id;
+          additionalFields.vp_submitted_at = now;
+          additionalFields.vp_submitted_by = profile.id;
+        } else if (profile?.role === 'vice_president') {
+          status = 'submitted_to_admin';
+          additionalFields.vp_reviewed_at = now;
+          additionalFields.vp_reviewed_by = profile.id;
+          additionalFields.admin_submitted_at = now;
+          additionalFields.admin_submitted_by = profile.id;
+        }
+      }
+
       const justificationData = {
         organization_id: profile!.organization_id,
         department_id: selectedDepartment!.id,
@@ -547,8 +578,9 @@ export default function BudgetPerformanceJustification() {
           global_increase_rate_2027: data.global_increase_rate_2027,
           global_increase_rate_2028: data.global_increase_rate_2028
         },
-        status: 'draft',
-        fiscal_year: fiscalYear
+        status,
+        fiscal_year: fiscalYear,
+        ...additionalFields
       };
 
       if (existingJustification) {
@@ -566,7 +598,22 @@ export default function BudgetPerformanceJustification() {
         if (error) throw error;
       }
 
-      alert(isDraft ? 'Taslak olarak kaydedildi.' : 'Başarıyla tamamlandı.');
+      if (isDraft) {
+        alert('Taslak olarak kaydedildi.');
+      } else {
+        if (profile?.role === 'admin') {
+          alert('Başarıyla kaydedildi ve onaylandı.');
+        } else if (profile?.role === 'user') {
+          alert('Başarıyla kaydedildi ve müdüre gönderildi.');
+        } else if (profile?.role === 'director') {
+          alert('Başarıyla kaydedildi ve başkan yardımcısına gönderildi.');
+        } else if (profile?.role === 'vice_president') {
+          alert('Başarıyla kaydedildi ve yöneticiye gönderildi.');
+        } else {
+          alert('Başarıyla kaydedildi.');
+        }
+      }
+
       await loadJustifications();
       setExpandedActivity(null);
     } catch (error: any) {
@@ -574,6 +621,92 @@ export default function BudgetPerformanceJustification() {
       alert('Kaydetme hatası: ' + error.message);
     } finally {
       setSavingActivityId(null);
+    }
+  };
+
+  const handleApprove = async (justification: Justification) => {
+    try {
+      const now = new Date().toISOString();
+      let updateData: any = {};
+
+      if (profile?.role === 'director' && justification.status === 'submitted_to_director') {
+        updateData = {
+          status: 'submitted_to_vp',
+          director_reviewed_at: now,
+          director_reviewed_by: profile.id,
+          vp_submitted_at: now,
+          vp_submitted_by: profile.id
+        };
+      } else if (profile?.role === 'vice_president' && justification.status === 'submitted_to_vp') {
+        updateData = {
+          status: 'submitted_to_admin',
+          vp_reviewed_at: now,
+          vp_reviewed_by: profile.id,
+          admin_submitted_at: now,
+          admin_submitted_by: profile.id
+        };
+      } else if (profile?.role === 'admin' && justification.status === 'submitted_to_admin') {
+        updateData = {
+          status: 'admin_approved',
+          admin_reviewed_at: now,
+          admin_reviewed_by: profile.id
+        };
+      } else {
+        alert('Bu işlemi yapmaya yetkiniz yok.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('activity_justifications')
+        .update(updateData)
+        .eq('id', justification.id);
+
+      if (error) throw error;
+
+      alert('Başarıyla onaylandı ve bir sonraki aşamaya gönderildi.');
+      await loadJustifications();
+    } catch (error: any) {
+      console.error('Error approving:', error);
+      alert('Onaylama hatası: ' + error.message);
+    }
+  };
+
+  const handleReject = async (justification: Justification) => {
+    const reason = prompt('Reddetme sebebini girin:');
+    if (!reason) return;
+
+    try {
+      const now = new Date().toISOString();
+      let updateData: any = {
+        status: 'rejected'
+      };
+
+      if (profile?.role === 'director') {
+        updateData.director_reviewed_at = now;
+        updateData.director_reviewed_by = profile.id;
+        updateData.director_rejection_reason = reason;
+      } else if (profile?.role === 'vice_president') {
+        updateData.vp_reviewed_at = now;
+        updateData.vp_reviewed_by = profile.id;
+        updateData.vp_rejection_reason = reason;
+      } else if (profile?.role === 'admin') {
+        updateData.admin_reviewed_at = now;
+        updateData.admin_reviewed_by = profile.id;
+        updateData.admin_rejection_reason = reason;
+      }
+
+      const { error } = await supabase
+        .from('activity_justifications')
+        .update(updateData)
+        .eq('id', justification.id);
+
+      if (error) throw error;
+
+      alert('Reddedildi. Kullanıcı düzeltme yapabilir.');
+      await loadJustifications();
+    } catch (error: any) {
+      console.error('Error rejecting:', error);
+      alert('Reddetme hatası: ' + error.message);
     }
   };
 
@@ -587,12 +720,18 @@ export default function BudgetPerformanceJustification() {
     return justifications.find(j => j.activity_id === activityId);
   };
 
-  const getStatusBadge = (status?: 'draft' | 'submitted_to_vp' | 'vp_approved' | 'submitted_to_admin' | 'admin_approved' | 'rejected') => {
+  const getStatusBadge = (status?: 'draft' | 'submitted_to_director' | 'director_approved' | 'submitted_to_vp' | 'vp_approved' | 'submitted_to_admin' | 'admin_approved' | 'rejected') => {
     if (!status) {
       return <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Oluşturulmamış</span>;
     }
     if (status === 'draft') {
       return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">Taslak</span>;
+    }
+    if (status === 'submitted_to_director') {
+      return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Müdür Onayında</span>;
+    }
+    if (status === 'director_approved') {
+      return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">Müdür Onaylandı</span>;
     }
     if (status === 'submitted_to_vp') {
       return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Başkan Yrd. Onayında</span>;
@@ -720,6 +859,160 @@ export default function BudgetPerformanceJustification() {
         </div>
       ) : (
         <>
+          {(profile?.role === 'director' || profile?.role === 'vice_president' || profile?.role === 'admin') && (
+            <div className="mb-6 flex gap-2 border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('entry')}
+                className={`px-6 py-3 font-medium border-b-2 transition-colors ${
+                  activeTab === 'entry'
+                    ? 'border-red-500 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Veri Girişi
+              </button>
+              <button
+                onClick={() => setActiveTab('approval')}
+                className={`px-6 py-3 font-medium border-b-2 transition-colors ${
+                  activeTab === 'approval'
+                    ? 'border-red-500 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Onay Bekleyenler
+                {justifications.filter(j => {
+                  if (profile?.role === 'director') return j.status === 'submitted_to_director';
+                  if (profile?.role === 'vice_president') return j.status === 'submitted_to_vp';
+                  if (profile?.role === 'admin') return j.status === 'submitted_to_admin';
+                  return false;
+                }).length > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    {justifications.filter(j => {
+                      if (profile?.role === 'director') return j.status === 'submitted_to_director';
+                      if (profile?.role === 'vice_president') return j.status === 'submitted_to_vp';
+                      if (profile?.role === 'admin') return j.status === 'submitted_to_admin';
+                      return false;
+                    }).length}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {activeTab === 'approval' && (
+            <div className="space-y-4">
+              {justifications.filter(j => {
+                const matchesDept = j.department_id === selectedDepartment?.id;
+                if (profile?.role === 'director') return matchesDept && j.status === 'submitted_to_director';
+                if (profile?.role === 'vice_president') return matchesDept && j.status === 'submitted_to_vp';
+                if (profile?.role === 'admin') return matchesDept && j.status === 'submitted_to_admin';
+                return false;
+              }).map((justification) => {
+                const activity = activities.find(a => a.activity_id === justification.activity_id);
+                if (!activity) return null;
+
+                return (
+                  <div key={justification.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded text-gray-700">
+                            {activity.program?.code}.{activity.sub_program?.code}.{activity.activity_code}
+                          </span>
+                          {getStatusBadge(justification.status)}
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                          {activity.activity_name}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Program: {activity.program?.name} / Alt Program: {activity.sub_program?.name}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mb-4">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-1">Yasal Dayanak:</h4>
+                        <p className="text-sm text-gray-600">{justification.legal_basis}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-1">Gerekçe:</h4>
+                        <p className="text-sm text-gray-600">{justification.justification}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-1">Maliyet Unsurları:</h4>
+                        <p className="text-sm text-gray-600">{justification.cost_elements}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Bütçe Kalemleri:</h4>
+                        {justification.budget_needs?.items?.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ekonomik Kod</th>
+                                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">2026</th>
+                                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">2027</th>
+                                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">2028</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {justification.budget_needs.items.map((item: any, idx: number) => {
+                                  const code = economicCodes.find(c => c.id === item.economic_code_id);
+                                  return (
+                                    <tr key={idx}>
+                                      <td className="px-3 py-2 text-sm text-gray-900">{code?.full_code} - {code?.name}</td>
+                                      <td className="px-3 py-2 text-sm text-right text-gray-900">{item.amount_2026?.toLocaleString('tr-TR')} ₺</td>
+                                      <td className="px-3 py-2 text-sm text-right text-gray-900">{item.amount_2027?.toLocaleString('tr-TR')} ₺</td>
+                                      <td className="px-3 py-2 text-sm text-right text-gray-900">{item.amount_2028?.toLocaleString('tr-TR')} ₺</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">Bütçe kalemi eklenmemiş</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={() => handleApprove(justification)}
+                        className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Check className="w-4 h-4" />
+                        Onayla ve İlerlet
+                      </button>
+                      <button
+                        onClick={() => handleReject(justification)}
+                        className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <X className="w-4 h-4" />
+                        Reddet
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {justifications.filter(j => {
+                const matchesDept = j.department_id === selectedDepartment?.id;
+                if (profile?.role === 'director') return matchesDept && j.status === 'submitted_to_director';
+                if (profile?.role === 'vice_president') return matchesDept && j.status === 'submitted_to_vp';
+                if (profile?.role === 'admin') return matchesDept && j.status === 'submitted_to_admin';
+                return false;
+              }).length === 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+                  <Check className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <p className="text-gray-600 font-semibold">Onay bekleyen kayıt bulunmuyor</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'entry' && (
+          <>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -1368,6 +1661,8 @@ export default function BudgetPerformanceJustification() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
