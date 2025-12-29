@@ -26,8 +26,6 @@ import GoalCards from './pages/GoalCards';
 import ActivityReports from './pages/ActivityReports';
 import BudgetPrograms from './pages/BudgetPrograms';
 import BudgetCodes from './pages/BudgetCodes';
-import BudgetExpenseEntry from './pages/BudgetExpenseEntry';
-import BudgetRevenueEntry from './pages/BudgetRevenueEntry';
 import BudgetReports from './pages/BudgetReports';
 import BudgetAuthorizations from './pages/BudgetAuthorizations';
 import BudgetPerformance from './pages/BudgetPerformance';
@@ -84,7 +82,6 @@ import BudgetPerformanceJustification from './pages/BudgetPerformanceJustificati
 import BudgetPerformanceInformation from './pages/BudgetPerformanceInformation';
 import ProgramMapping from './pages/ProgramMapping';
 import DepartmentProgramMappingView from './pages/DepartmentProgramMappingView';
-import DepartmentBudgetData2024 from './pages/DepartmentBudgetData2024';
 import PerformanceCards from './pages/PerformanceCards';
 import DataRequestTemplates from './pages/DataRequestTemplates';
 import DataRequestManagement from './pages/DataRequestManagement';
@@ -175,10 +172,6 @@ const renderPage = () => {
         return <BudgetPrograms />;
       case 'budget-codes':
         return <BudgetCodes />;
-      case 'budget-expense-entry':
-        return <BudgetExpenseEntry />;
-      case 'budget-revenue-entry':
-        return <BudgetRevenueEntry />;
       case 'budget-reports':
         return <BudgetReports />;
       case 'budget-authorizations':
@@ -293,8 +286,6 @@ const renderPage = () => {
         return <ProgramMapping />;
       case 'department-program-mapping-view':
         return <DepartmentProgramMappingView />;
-      case 'department-budget-data-2024':
-        return <DepartmentBudgetData2024 />;
       case 'performance-cards':
         return <PerformanceCards />;
       case 'data-request-templates':

@@ -8,7 +8,6 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronRight,
-  DollarSign,
   Calendar,
   Download,
   FileSpreadsheet
@@ -97,7 +96,7 @@ export default function BudgetPerformanceInformation() {
   const { profile } = useAuth();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-  const [fiscalYear, setFiscalYear] = useState<number>(2025);
+  const [fiscalYear, setFiscalYear] = useState<number>(2026);
   const [selectedYear, setSelectedYear] = useState<2026 | 2027 | 2028>(2026);
   const [viewMode, setViewMode] = useState<ViewMode>('department');
   const [loading, setLoading] = useState(false);
@@ -887,7 +886,6 @@ export default function BudgetPerformanceInformation() {
               onChange={(e) => setFiscalYear(Number(e.target.value))}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value={2025}>2025</option>
               <option value={2026}>2026</option>
               <option value={2027}>2027</option>
               <option value={2028}>2028</option>
@@ -958,7 +956,7 @@ export default function BudgetPerformanceInformation() {
             <div className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-green-600" />
+                  <span className="text-green-600 font-bold text-xl">₺</span>
                   Ekonomik Kod Toplamları (1. Seviye) - {selectedYear}
                 </h2>
                 {economicCodeSummary.length === 0 ? (

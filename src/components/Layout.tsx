@@ -255,13 +255,10 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       icon: TrendingUp,
       items: [
         { icon: Clock, label: 'Bütçe Dönemi Yönetimi', path: 'budget-period-management', adminOnly: true },
-        { icon: TrendingDown, label: 'Gider Girişi', path: 'budget-expense-entry' },
-        { icon: TrendingUp, label: 'Gelir Girişi', path: 'budget-revenue-entry' },
         { icon: Layers, label: 'Program Eşleştirme', path: 'program-mapping', strictAdminOnly: true },
         { icon: Eye, label: 'Program Görüntüle', path: 'department-program-mapping-view' },
         { icon: FileText, label: 'Faaliyet Gerekçesi', path: 'budget-performance-justification', requiresDepartment: true },
         { icon: BarChart3, label: 'Performans Bilgisi', path: 'budget-performance-information', requiresDepartment: true },
-        { icon: DollarSign, label: 'Müdürlük Bütçe Verileri 2024', path: 'department-budget-data-2024', strictAdminOnly: true },
         { icon: FileBarChart, label: 'Performans Kartları', path: 'performance-cards', adminOnly: true },
       ],
     },
