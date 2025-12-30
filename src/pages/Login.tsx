@@ -84,7 +84,7 @@ export default function Login() {
           </form>
 
           <div className="mt-6 text-center text-sm text-slate-600">
-            <p>Belediye Kamu Yönetim Sistemleri - v6</p>
+            <p>BelKYS Kurumsal Yönetim Sistemleri - v6</p>
             <p>info@belkys.com.tr</p>
           </div>
         </div>
