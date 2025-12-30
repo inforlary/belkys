@@ -232,7 +232,7 @@ export default function RiskManagement() {
           title,
           ic_kiks_categories(name)
         `)
-        .eq('organization_id', profile.organization_id)
+        .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
         .eq('is_active', true)
         .order('order_index', { ascending: true });
 
