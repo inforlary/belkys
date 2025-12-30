@@ -86,6 +86,7 @@ export default function Login() {
           <div className="mt-6 text-center text-sm text-slate-600">
             <p>BelKYS Kurumsal Yönetim Sistemleri - v6</p>
             <p>info@belkys.com.tr</p>
+            <p>İletişim: +905554446161</p>
           </div>
         </div>
       </div>
