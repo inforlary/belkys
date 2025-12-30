@@ -129,7 +129,7 @@ export default function ProcessManagement() {
           *,
           departments(name),
           profiles!ic_processes_owner_user_id_fkey(full_name),
-          ic_kiks_standards(title)
+          ic_kiks_main_standards(code, title)
         `)
         .eq('organization_id', profile.organization_id)
         .eq('ic_plan_id', selectedPlanId)
@@ -158,7 +158,7 @@ export default function ProcessManagement() {
             ...process,
             department_name: process.departments?.name,
             owner_name: process.profiles?.full_name,
-            kiks_standard_title: process.ic_kiks_standards?.title,
+            kiks_standard_title: process.ic_kiks_main_standards ? `${process.ic_kiks_main_standards.code} - ${process.ic_kiks_main_standards.title}` : undefined,
             step_count: stepsResult.count || 0,
             activity_count: activitiesResult.count || 0,
             risk_count: risksResult.count || 0
@@ -211,29 +211,24 @@ export default function ProcessManagement() {
 
     try {
       const { data, error } = await supabase
-        .from('ic_kiks_sub_standards')
+        .from('ic_kiks_main_standards')
         .select(`
           id,
           code,
           title,
-          ic_kiks_main_standards!inner(
-            title,
-            ic_kiks_categories!inner(
-              name
-            )
-          )
+          ic_kiks_categories(name)
         `)
-        .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
-        .is('ic_plan_id', null)
-        .order('code', { ascending: true });
+        .eq('organization_id', profile.organization_id)
+        .eq('is_active', true)
+        .order('order_index', { ascending: true });
 
       if (error) throw error;
 
       const formattedData = (data || []).map((item: any) => ({
         id: item.id,
         code: item.code,
-        title: `${item.code} - ${item.ic_kiks_main_standards?.title || ''} - ${item.title}`,
-        component: item.ic_kiks_main_standards?.ic_kiks_categories?.name || ''
+        title: `${item.code} - ${item.title}`,
+        component: item.ic_kiks_categories?.name || ''
       }));
 
       setKiksStandards(formattedData);
@@ -617,7 +612,7 @@ export default function ProcessManagement() {
                     <option value="">Seçiniz</option>
                     {kiksStandards.map(kiks => (
                       <option key={kiks.id} value={kiks.id}>
-                        {kiks.code} - {kiks.title}
+                        {kiks.title}
                       </option>
                     ))}
                   </select>

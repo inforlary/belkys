@@ -125,7 +125,7 @@ export default function RiskManagement() {
             *,
             ic_processes(name),
             profiles!ic_risks_risk_owner_id_fkey(full_name),
-            kiks:ic_kiks_sub_standards(code, title)
+            ic_kiks_main_standards(code, title)
           `)
           .eq('organization_id', profile.organization_id)
           .eq('ic_plan_id', selectedPlanId)
@@ -170,7 +170,7 @@ export default function RiskManagement() {
             ...risk,
             process_name: risk.ic_processes?.name,
             risk_owner_name: risk.profiles?.full_name,
-            kiks_standard_title: risk.kiks ? `${risk.kiks.code} - ${risk.kiks.title}` : undefined,
+            kiks_standard_title: risk.ic_kiks_main_standards ? `${risk.ic_kiks_main_standards.code} - ${risk.ic_kiks_main_standards.title}` : undefined,
             isLinkedToStrategicPlan: linkedRiskMap.has(risk.id),
             collaborationPlans: linkedRiskMap.get(risk.id) || [],
             activity_count: activitiesResult.count || 0,
@@ -225,29 +225,24 @@ export default function RiskManagement() {
 
     try {
       const { data, error } = await supabase
-        .from('ic_kiks_sub_standards')
+        .from('ic_kiks_main_standards')
         .select(`
           id,
           code,
           title,
-          ic_kiks_main_standards!inner(
-            title,
-            ic_kiks_categories!inner(
-              name
-            )
-          )
+          ic_kiks_categories(name)
         `)
-        .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
-        .is('ic_plan_id', null)
-        .order('code', { ascending: true });
+        .eq('organization_id', profile.organization_id)
+        .eq('is_active', true)
+        .order('order_index', { ascending: true });
 
       if (error) throw error;
 
       const formattedData = (data || []).map((item: any) => ({
         id: item.id,
         code: item.code,
-        title: `${item.code} - ${item.ic_kiks_main_standards?.title || ''} - ${item.title}`,
-        component: item.ic_kiks_main_standards?.ic_kiks_categories?.name || ''
+        title: `${item.code} - ${item.title}`,
+        component: item.ic_kiks_categories?.name || ''
       }));
 
       setKiksStandards(formattedData);
