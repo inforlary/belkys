@@ -211,16 +211,20 @@ export default function ProcessManagement() {
 
     try {
       const { data, error } = await supabase
-        .from('ic_kiks_main_standards')
+        .from('ic_kiks_sub_standards')
         .select(`
           id,
           code,
           title,
-          ic_kiks_categories(name)
+          main_standard_id,
+          ic_kiks_main_standards!inner(
+            code,
+            ic_kiks_categories(name)
+          )
         `)
-        .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
+        .or(`ic_plan_id.is.null,ic_plan_id.eq.${selectedPlanId}`)
         .eq('is_active', true)
-        .order('order_index', { ascending: true });
+        .order('code', { ascending: true });
 
       if (error) throw error;
 
@@ -228,12 +232,35 @@ export default function ProcessManagement() {
         id: item.id,
         code: item.code,
         title: `${item.code} - ${item.title}`,
-        component: item.ic_kiks_categories?.name || ''
-      }));
+        component: item.ic_kiks_main_standards?.ic_kiks_categories?.name || ''
+      })).sort((a, b) => {
+        const parseCode = (code: string) => {
+          const match = code.match(/([A-ZİÖÜŞĞÇ\s]+)\s*(\d+)\.(\d+)/);
+          if (match) {
+            return {
+              prefix: match[1].trim(),
+              major: parseInt(match[2]),
+              minor: parseInt(match[3])
+            };
+          }
+          return { prefix: code, major: 0, minor: 0 };
+        };
+
+        const aCode = parseCode(a.code);
+        const bCode = parseCode(b.code);
+
+        if (aCode.prefix !== bCode.prefix) {
+          return aCode.prefix.localeCompare(bCode.prefix, 'tr');
+        }
+        if (aCode.major !== bCode.major) {
+          return aCode.major - bCode.major;
+        }
+        return aCode.minor - bCode.minor;
+      });
 
       setKiksStandards(formattedData);
     } catch (error) {
-      console.error('KİKS standartları yüklenirken hata:', error);
+      console.error('KİKS genel şartları yüklenirken hata:', error);
     }
   };
 
