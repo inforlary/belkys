@@ -31,7 +31,7 @@ export function IndicatorForm({
     baseline_value: 0,
     measurement_frequency: 'annual' as MeasurementFrequency,
     reporting_frequency: '',
-    calculation_method: 'cumulative',
+    calculation_method: 'cumulative_increasing',
     description: '',
     calculation_notes: '',
     goal_impact_percentage: null as number | null,
@@ -396,10 +396,12 @@ export function IndicatorForm({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           >
-            <option value="cumulative">Artış Modeli (B {'>'} A)</option>
-            <option value="cumulative_decreasing">Azalış Modeli (B {'<'} A)</option>
-            <option value="maintenance">Koruma Modeli (B = A)</option>
-            <option value="percentage">Yüzde (%) Değer</option>
+            <option value="cumulative_increasing">1. Kümülatif Artan Değer</option>
+            <option value="cumulative_decreasing">2. Kümülatif Azalan Değer</option>
+            <option value="percentage_increasing">3. Yüzde Artan Değer</option>
+            <option value="percentage_decreasing">4. Yüzde Azalan Değer</option>
+            <option value="maintenance_increasing">5. Artan Koruma Modeli</option>
+            <option value="maintenance_decreasing">6. Azalan Koruma Modeli</option>
           </select>
         </div>
       </div>
@@ -431,85 +433,101 @@ export function IndicatorForm({
           />
 
           <div className="mt-3 text-xs text-blue-800 space-y-3 bg-white bg-opacity-60 p-3 rounded">
-            <div className="bg-blue-100 p-3 rounded">
-              <p className="font-bold text-sm mb-2">Temel Formül (Tüm Yöntemler İçin):</p>
-              <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
-                Performans (%) = ((C - A) / (B - A)) × 100
-              </p>
-              <div className="mt-2 space-y-1">
-                <p><strong>A:</strong> Başlangıç Değeri (Plan başındaki mevcut değer)</p>
-                <p><strong>B:</strong> Hedef Değeri (Yıl sonu ulaşılması planlanan değer)</p>
-                <p><strong>C:</strong> Gerçekleşen Değer (İzleme sonunda ulaşılan değer)</p>
-              </div>
-            </div>
-
-            {formData.calculation_method === 'cumulative' && (
+            {formData.calculation_method === 'cumulative_increasing' && (
               <div className="space-y-2">
-                <p className="font-semibold">🟢 Artış Modeli (B {'>'} A)</p>
-                <p><strong>C Hesabı:</strong> Başlangıç + (Ç1 + Ç2 + Ç3 + Ç4)</p>
-                <div className="bg-green-50 p-2 rounded mt-2 border border-green-200">
-                  <p className="font-semibold mb-1">Örnek: Eğitim Sayısı (Artış)</p>
-                  <p>• A (Başlangıç): 1600 eğitim</p>
-                  <p>• B (Hedef): 3000 eğitim</p>
-                  <p>• Ç1-Ç4 Toplamı: 1200 eğitim</p>
-                  <p>• C = 1600 + 1200 = 2800</p>
-                  <p className="font-semibold mt-1 text-green-700">İlerleme = (2800-1600)/(3000-1600) × 100 = %85.7</p>
-                </div>
-                <p className="text-blue-700 italic mt-2">
-                  ✓ Kullanım: Eğitim sayısı, ağaç sayısı, proje sayısı gibi artan göstergeler
+                <p className="font-semibold">1. Kümülatif Artan Değer</p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
+                  İlerleme = ((Başlangıç + Çeyrek Toplamı - Başlangıç) / (Hedef - Başlangıç)) × 100
                 </p>
+                <div className="bg-green-50 p-2 rounded mt-2 border border-green-200">
+                  <p className="font-semibold mb-1">Örnek: Eğitim Sayısı</p>
+                  <p>• Başlangıç: 100 eğitim</p>
+                  <p>• Hedef: 500 eğitim</p>
+                  <p>• Çeyrek Toplamı: 200 eğitim</p>
+                  <p className="font-semibold mt-1 text-green-700">İlerleme = ((100+200-100)/(500-100)) × 100 = %50</p>
+                </div>
               </div>
             )}
+
             {formData.calculation_method === 'cumulative_decreasing' && (
               <div className="space-y-2">
-                <p className="font-semibold">🔵 Azalış Modeli (B {'<'} A)</p>
-                <p><strong>C Hesabı:</strong> Başlangıç - (Ç1 + Ç2 + Ç3 + Ç4)</p>
+                <p className="font-semibold">2. Kümülatif Azalan Değer</p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
+                  İlerleme = ((Başlangıç - Çeyrek Toplamı - Başlangıç) / (Hedef - Başlangıç)) × 100
+                </p>
                 <div className="bg-red-50 p-2 rounded mt-2 border border-red-200">
-                  <p className="font-semibold mb-1">Örnek: Kaza Sayısı (Azalış)</p>
-                  <p>• A (Başlangıç): 2400 kaza</p>
-                  <p>• B (Hedef): 1600 kaza (azaltma)</p>
-                  <p>• Ç1-Ç4 Toplamı: 600 azalma</p>
-                  <p>• C = 2400 - 600 = 1800</p>
-                  <p className="font-semibold mt-1 text-red-700">İlerleme = (1800-2400)/(1600-2400) × 100 = %75</p>
+                  <p className="font-semibold mb-1">Örnek: Kaza Sayısı</p>
+                  <p>• Başlangıç: 100 kaza</p>
+                  <p>• Hedef: 20 kaza</p>
+                  <p>• Çeyrek Toplamı: 40 azalma</p>
+                  <p className="font-semibold mt-1 text-red-700">İlerleme = ((100-40-100)/(20-100)) × 100 = %50</p>
                 </div>
-                <p className="text-blue-700 italic mt-2">
-                  ✓ Kullanım: Kaza sayısı, atık miktarı, maliyet gibi azalan göstergeler
-                </p>
               </div>
             )}
-            {formData.calculation_method === 'maintenance' && (
+
+            {formData.calculation_method === 'percentage_increasing' && (
               <div className="space-y-2">
-                <p className="font-semibold">🟡 Koruma Modeli (B = A)</p>
-                <p><strong>C Hesabı:</strong> Çeyrek değerlerin toplamı</p>
-                <div className="bg-amber-50 p-2 rounded mt-2 border border-amber-200">
-                  <p className="font-semibold mb-1">Örnek: Kalite Oranı (Koruma)</p>
-                  <p>• A (Başlangıç): 85%</p>
-                  <p>• B (Hedef): 85% (koruma)</p>
-                  <p>• Ç1-Ç4 Toplamı: 85%</p>
-                  <p>• C = 85%</p>
-                  <p className="font-semibold mt-1 text-amber-700">İlerleme = (C/B) × 100 = (85/85) × 100 = %100</p>
-                  <p className="text-xs mt-1">Not: C {'>'} B ise aşan değer gösterilir (örn: %105.9), ama hedefte %100 alınır</p>
-                </div>
-                <p className="text-blue-700 italic mt-2">
-                  ✓ Kullanım: Mevcut seviyenin korunması gereken göstergeler
+                <p className="font-semibold">3. Yüzde Artan Değer</p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
+                  İlerleme = ((Çeyrek Toplamı / Ölçüm Sıklığı) / Hedef) × 100
                 </p>
+                <div className="bg-blue-50 p-2 rounded mt-2 border border-blue-200">
+                  <p className="font-semibold mb-1">Örnek: Memnuniyet Oranı (Aylık Ölçüm)</p>
+                  <p>• Hedef: 90%</p>
+                  <p>• Çeyrek Toplamı: 360%</p>
+                  <p>• Ölçüm Sıklığı: 12 (Aylık)</p>
+                  <p className="font-semibold mt-1 text-blue-700">İlerleme = ((360/12)/90) × 100 = %33.3</p>
+                </div>
+                <p className="text-xs text-gray-600 italic">Not: Başlangıç değeri kullanılmaz</p>
               </div>
             )}
-            {formData.calculation_method === 'percentage' && (
+
+            {formData.calculation_method === 'percentage_decreasing' && (
               <div className="space-y-2">
-                <p className="font-semibold">📊 Yüzde (%) Değer</p>
-                <p><strong>C Hesabı:</strong> Çeyrek değerlerin toplamı (A=0)</p>
+                <p className="font-semibold">4. Yüzde Azalan Değer</p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
+                  İlerleme = (((Çeyrek Toplamı / Ölçüm Sıklığı) - Başlangıç) / (Hedef - Başlangıç)) × 100
+                </p>
                 <div className="bg-yellow-50 p-2 rounded mt-2 border border-yellow-200">
-                  <p className="font-semibold mb-1">Örnek: Hedefe Ulaşma Oranı</p>
-                  <p>• A (Başlangıç): 0</p>
-                  <p>• B (Hedef): 100</p>
-                  <p>• Ç1-Ç4 Toplamı: 80</p>
-                  <p>• C = 80</p>
-                  <p className="font-semibold mt-1 text-yellow-700">İlerleme = (80-0)/(100-0) × 100 = %80</p>
+                  <p className="font-semibold mb-1">Örnek: Şikayet Oranı (3 Aylık Ölçüm)</p>
+                  <p>• Başlangıç: 15%</p>
+                  <p>• Hedef: 5%</p>
+                  <p>• Çeyrek Toplamı: 40%</p>
+                  <p>• Ölçüm Sıklığı: 4 (3 Aylık)</p>
+                  <p className="font-semibold mt-1 text-yellow-700">İlerleme = (((40/4)-15)/(5-15)) × 100 = %50</p>
                 </div>
-                <p className="text-blue-700 italic mt-2">
-                  ✓ Kullanım: Başlangıç değeri olmayan, doğrudan yüzde bazlı göstergeler
+              </div>
+            )}
+
+            {formData.calculation_method === 'maintenance_increasing' && (
+              <div className="space-y-2">
+                <p className="font-semibold">5. Artan Koruma Modeli</p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
+                  İlerleme = (Çeyrek Toplamı / Hedef) × 100
                 </p>
+                <div className="bg-purple-50 p-2 rounded mt-2 border border-purple-200">
+                  <p className="font-semibold mb-1">Örnek: Kalite Puanı</p>
+                  <p>• Hedef: 400</p>
+                  <p>• Çeyrek Toplamı: 350</p>
+                  <p className="font-semibold mt-1 text-purple-700">İlerleme = (350/400) × 100 = %87.5</p>
+                </div>
+                <p className="text-xs text-gray-600 italic">Not: Başlangıç değeri kullanılmaz</p>
+              </div>
+            )}
+
+            {formData.calculation_method === 'maintenance_decreasing' && (
+              <div className="space-y-2">
+                <p className="font-semibold">6. Azalan Koruma Modeli</p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
+                  İlerleme = (Hedef / Çeyrek Toplamı) × 100
+                </p>
+                <div className="bg-orange-50 p-2 rounded mt-2 border border-orange-200">
+                  <p className="font-semibold mb-1">Örnek: Hata Sayısı</p>
+                  <p>• Hedef: 10</p>
+                  <p>• Çeyrek Toplamı: 15</p>
+                  <p className="font-semibold mt-1 text-orange-700">İlerleme = (10/15) × 100 = %66.7</p>
+                </div>
+                <p className="text-xs text-gray-600 italic">Not: Başlangıç değeri kullanılmaz</p>
               </div>
             )}
           </div>
