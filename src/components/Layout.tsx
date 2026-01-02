@@ -275,6 +275,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: Activity, label: 'Süreç Yönetimi', path: 'process-management' },
         { icon: AlertTriangle, label: 'Risk Yönetimi', path: 'risk-management' },
         { icon: TrendingUp, label: 'Risk İştahı', path: 'risk-appetite-management', adminOnly: true },
+        { icon: FileBarChart, label: 'Risk Raporları', path: 'risk-reports' },
         { icon: ShieldCheck, label: 'Kontrol Faaliyetleri', path: 'control-activities' },
         { icon: Search, label: 'İzleme & Değerlendirme', path: 'monitoring-evaluation' },
         { icon: AlertCircle, label: 'Bulgular Yönetimi', path: 'findings-management' },
