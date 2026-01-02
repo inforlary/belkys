@@ -48,6 +48,7 @@ import OrganizationManagement from './pages/OrganizationManagement';
 import ProcessManagement from './pages/ProcessManagement';
 import RiskManagement from './pages/RiskManagement';
 import RiskAppetiteManagement from './pages/RiskAppetiteManagement';
+import RiskProfile from './pages/RiskProfile';
 import ControlActivities from './pages/ControlActivities';
 import MonitoringEvaluation from './pages/MonitoringEvaluation';
 import CAPAManagement from './pages/CAPAManagement';
@@ -112,6 +113,9 @@ function AppContent() {
 const renderPage = () => {
     console.log('[App.tsx] renderPage called with currentPath:', currentPath);
 
+    if (currentPath.startsWith('risk-profile/')) {
+      return <RiskProfile />;
+    }
     if (currentPath.startsWith('budget-proposals/') && currentPath.includes('/edit')) {
       return <BudgetProposalEdit />;
     }

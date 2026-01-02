@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Plus, Edit2, Trash2, TrendingUp, TrendingDown, AlertCircle, Save, X, Link as LinkIcon, FileText } from 'lucide-react';
+import { AlertTriangle, Plus, Edit2, Trash2, TrendingUp, TrendingDown, AlertCircle, Save, X, Link as LinkIcon, FileText, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
+import { useLocation } from '../hooks/useLocation';
 import { RiskHeatMap } from '../components/RiskHeatMap';
 
 interface Risk {
@@ -68,6 +69,7 @@ const STATUS_COLORS = {
 export default function RiskManagement() {
   const { profile } = useAuth();
   const { selectedPlanId, selectedPlan, hasPlan, loading: planLoading } = useICPlan();
+  const { navigate } = useLocation();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [processes, setProcesses] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -841,7 +843,7 @@ export default function RiskManagement() {
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Artık Risk</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Azalma</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-                    {isAdmin && <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İşlemler</th>}
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İşlemler</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -912,24 +914,35 @@ export default function RiskManagement() {
                           {STATUS_LABELS[risk.status]}
                         </span>
                       </td>
-                      {isAdmin && (
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleEdit(risk)}
-                              className="text-blue-600 hover:text-blue-800"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(risk.id)}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => navigate(`risk-profile/${risk.id}`)}
+                            className="text-gray-600 hover:text-gray-800"
+                            title="Detay"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {isAdmin && (
+                            <>
+                              <button
+                                onClick={() => handleEdit(risk)}
+                                className="text-blue-600 hover:text-blue-800"
+                                title="Düzenle"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(risk.id)}
+                                className="text-red-600 hover:text-red-800"
+                                title="Sil"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
