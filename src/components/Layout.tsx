@@ -241,6 +241,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: BarChart3, label: 'Performans Karşılaştırma', path: 'performance-comparison', adminOnly: true },
         { icon: CreditCard, label: 'Hedef Kartları', path: 'goal-cards', adminOnly: true },
         { icon: Calendar, label: 'Çeyrek Aktivasyon', path: 'quarter-activation', adminOnly: true },
+        { icon: ClipboardCheck, label: 'Yıl Sonu Değerlendirme', path: 'strategic-plan-evaluation' },
       ],
     },
     {

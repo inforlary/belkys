@@ -90,6 +90,7 @@ import DataRequestManagement from './pages/DataRequestManagement';
 import MyDataRequests from './pages/MyDataRequests';
 import DataRequestTracking from './pages/DataRequestTracking';
 import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
+import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -303,6 +304,8 @@ const renderPage = () => {
         return <MyDataRequests />;
       case 'data-request-tracking':
         return <DataRequestTracking />;
+      case 'strategic-plan-evaluation':
+        return <StrategicPlanEvaluation />;
       default:
         console.log('[App.tsx] No match found for currentPath, returning Dashboard');
         return profile?.is_super_admin ? <SuperAdmin /> : <Dashboard />;
