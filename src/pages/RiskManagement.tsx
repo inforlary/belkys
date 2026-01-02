@@ -72,6 +72,7 @@ export default function RiskManagement() {
   const [processes, setProcesses] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [kiksStandards, setKiksStandards] = useState<any[]>([]);
+  const [appetiteSettings, setAppetiteSettings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -107,7 +108,8 @@ export default function RiskManagement() {
         loadRisks(),
         loadProcesses(),
         loadUsers(),
-        loadKiksStandards()
+        loadKiksStandards(),
+        loadAppetiteSettings()
       ]);
     } finally {
       setLoading(false);
@@ -278,6 +280,40 @@ export default function RiskManagement() {
     }
   };
 
+  const loadAppetiteSettings = async () => {
+    if (!profile?.organization_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('risk_appetite_settings')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'approved')
+        .lte('valid_from', new Date().toISOString().split('T')[0])
+        .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString().split('T')[0]}`);
+
+      if (error) throw error;
+      setAppetiteSettings(data || []);
+    } catch (error) {
+      console.error('Risk iştahı ayarları yüklenirken hata:', error);
+    }
+  };
+
+  const checkAppetiteViolation = (category: string, residualScore: number) => {
+    const appetite = appetiteSettings.find(s => s.risk_category === category);
+    if (!appetite) return null;
+
+    if (residualScore > appetite.max_acceptable_score) {
+      return {
+        violated: true,
+        limit: appetite.max_acceptable_score,
+        excess: residualScore - appetite.max_acceptable_score
+      };
+    }
+
+    return { violated: false, limit: appetite.max_acceptable_score, excess: 0 };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.organization_id || !selectedPlanId) return;
@@ -420,6 +456,10 @@ export default function RiskManagement() {
   });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'vice_president';
+
+  const currentRiskScore = formData.residual_likelihood * formData.residual_impact;
+  const appetiteCheck = checkAppetiteViolation(formData.risk_category, currentRiskScore);
+  const isAppetiteViolated = appetiteCheck?.violated;
 
   return (
     <div className="p-6">
@@ -709,6 +749,25 @@ export default function RiskManagement() {
                       </div>
                     </div>
 
+                    {isAppetiteViolated && (
+                      <div className="bg-red-50 border border-red-300 rounded-lg p-4">
+                        <div className="flex items-start space-x-3">
+                          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-red-900 mb-1">Risk İştahı İhlali</h4>
+                            <p className="text-sm text-red-800 mb-2">
+                              Bu riskin artık skoru ({currentRiskScore}), tanımlanan risk iştahını ({appetiteCheck?.limit}) aşmaktadır.
+                              Aşım miktarı: +{appetiteCheck?.excess}
+                            </p>
+                            <p className="text-sm text-red-800 font-medium">
+                              Risk iştahı ihlaline rağmen bu riski "Kabul Edildi" durumuna getiremezsiniz.
+                              Önce risk azaltma faaliyetleri ile skoru düşürmelisiniz.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
                       <select
@@ -717,7 +776,13 @@ export default function RiskManagement() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       >
                         {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
+                          <option
+                            key={key}
+                            value={key}
+                            disabled={key === 'accepted' && isAppetiteViolated}
+                          >
+                            {label}{key === 'accepted' && isAppetiteViolated ? ' (İştah İhlali - Devre Dışı)' : ''}
+                          </option>
                         ))}
                       </select>
                     </div>

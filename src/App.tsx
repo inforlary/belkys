@@ -47,6 +47,7 @@ import InstitutionalFramework from './pages/InstitutionalFramework';
 import OrganizationManagement from './pages/OrganizationManagement';
 import ProcessManagement from './pages/ProcessManagement';
 import RiskManagement from './pages/RiskManagement';
+import RiskAppetiteManagement from './pages/RiskAppetiteManagement';
 import ControlActivities from './pages/ControlActivities';
 import MonitoringEvaluation from './pages/MonitoringEvaluation';
 import CAPAManagement from './pages/CAPAManagement';
@@ -240,6 +241,8 @@ const renderPage = () => {
         return <ProcessManagement />;
       case 'risk-management':
         return <RiskManagement />;
+      case 'risk-appetite-management':
+        return <RiskAppetiteManagement />;
       case 'control-activities':
         return <ControlActivities />;
       case 'monitoring-evaluation':

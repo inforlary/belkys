@@ -16,6 +16,7 @@ interface DashboardStats {
   totalRisks: number;
   criticalRisks: number;
   highRisks: number;
+  appetiteViolations: number;
   totalControls: number;
   keyControls: number;
   effectiveControls: number;
@@ -34,6 +35,7 @@ export default function InternalControlDashboard() {
     totalRisks: 0,
     criticalRisks: 0,
     highRisks: 0,
+    appetiteViolations: 0,
     totalControls: 0,
     keyControls: 0,
     effectiveControls: 0,
@@ -67,7 +69,8 @@ export default function InternalControlDashboard() {
         loadCapaStats(),
         loadKiksCompliance(),
         loadRisksForHeatmap(),
-        loadRecentCapas()
+        loadRecentCapas(),
+        loadAppetiteViolations()
       ]);
     } finally {
       setLoading(false);
@@ -202,6 +205,27 @@ export default function InternalControlDashboard() {
       }));
     } catch (error) {
       console.error('KİKS uyum istatistikleri yüklenirken hata:', error);
+    }
+  };
+
+  const loadAppetiteViolations = async () => {
+    if (!profile?.organization_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('risk_appetite_violations')
+        .select('id')
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'active');
+
+      if (error) throw error;
+
+      setStats(prev => ({
+        ...prev,
+        appetiteViolations: data?.length || 0
+      }));
+    } catch (error) {
+      console.error('Risk iştahı ihlalleri yüklenirken hata:', error);
     }
   };
 
@@ -709,7 +733,7 @@ export default function InternalControlDashboard() {
       </div>
 
       {/* İkinci Seviye KPI'lar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900">Kontrol Etkinliği</h3>
@@ -791,6 +815,35 @@ export default function InternalControlDashboard() {
             )}
           </div>
         </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900">Risk İştahı</h3>
+            {stats.appetiteViolations > 0 && (
+              <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded font-semibold">
+                {stats.appetiteViolations} İhlal
+              </span>
+            )}
+          </div>
+          <div className="text-sm text-gray-600">
+            {stats.appetiteViolations > 0 ? (
+              <div>
+                <div className="flex items-center gap-2 text-red-600 mb-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="font-semibold">İştah Limitleri Aşıldı</span>
+                </div>
+                <p className="text-xs">
+                  {stats.appetiteViolations} risk tanımlı iştah limitlerini aşmaktadır
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle className="w-4 h-4" />
+                <span>Tüm riskler limitlerdedir</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* İşbirliği Riskleri Widget */}
@@ -860,7 +913,7 @@ export default function InternalControlDashboard() {
       </div>
 
       {/* Uyarılar ve Aksiyonlar */}
-      {(stats.overdueCapas > 0 || stats.criticalRisks > 0) && (
+      {(stats.overdueCapas > 0 || stats.criticalRisks > 0 || stats.appetiteViolations > 0) && (
         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h3 className="font-semibold text-yellow-900 flex items-center gap-2 mb-3">
             <AlertTriangle className="w-5 h-5" />
@@ -877,6 +930,12 @@ export default function InternalControlDashboard() {
               <div className="flex items-center gap-2 text-yellow-800">
                 <span className="w-2 h-2 bg-red-600 rounded-full" />
                 {stats.criticalRisks} adet kritik risk acil aksiyon gerektirmektedir
+              </div>
+            )}
+            {stats.appetiteViolations > 0 && (
+              <div className="flex items-center gap-2 text-yellow-800">
+                <span className="w-2 h-2 bg-red-600 rounded-full" />
+                {stats.appetiteViolations} adet risk tanımlı iştah limitlerini aşmaktadır
               </div>
             )}
           </div>
