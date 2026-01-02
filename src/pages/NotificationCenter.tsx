@@ -21,19 +21,17 @@ import {
 
 interface Notification {
   id: string;
-  type: string;
+  notification_type: string;
   priority: string;
   category: string;
   title: string;
   message: string;
   action_url: string | null;
-  action_text: string | null;
-  entity_type: string | null;
+  action_label: string | null;
+  related_entity_type: string | null;
   is_read: boolean;
   read_at: string | null;
-  is_archived: boolean;
   created_at: string;
-  sender_id: string | null;
 }
 
 interface NotificationPreferences {
@@ -54,21 +52,20 @@ const priorityColors: Record<string, string> = {
 };
 
 const typeIcons: Record<string, any> = {
-  system: Info,
   approval: CheckCheck,
-  deadline: Clock,
-  mention: Mail,
-  message: Mail,
-  report: Info,
   alert: AlertCircle,
   info: Info,
+  warning: AlertCircle,
+  error: AlertCircle,
+  reminder: Clock,
+  success: Check,
 };
 
 export default function NotificationCenter() {
   const { profile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'archived'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [showSettings, setShowSettings] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     email_enabled: true,
@@ -83,7 +80,6 @@ export default function NotificationCenter() {
   const [stats, setStats] = useState({
     total: 0,
     unread: 0,
-    archived: 0,
   });
 
   useEffect(() => {
@@ -105,11 +101,7 @@ export default function NotificationCenter() {
         .order('created_at', { ascending: false });
 
       if (filter === 'unread') {
-        query = query.eq('is_read', false).eq('is_archived', false);
-      } else if (filter === 'archived') {
-        query = query.eq('is_archived', true);
-      } else {
-        query = query.eq('is_archived', false);
+        query = query.eq('is_read', false);
       }
 
       const { data, error } = await query.limit(200);
@@ -117,29 +109,21 @@ export default function NotificationCenter() {
       if (error) throw error;
       setNotifications(data || []);
 
-      const [totalCount, unreadCount, archivedCount] = await Promise.all([
+      const [totalCount, unreadCount] = await Promise.all([
+        supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', profile.id),
         supabase
           .from('notifications')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', profile.id)
-          .eq('is_archived', false),
-        supabase
-          .from('notifications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', profile.id)
-          .eq('is_read', false)
-          .eq('is_archived', false),
-        supabase
-          .from('notifications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', profile.id)
-          .eq('is_archived', true),
+          .eq('is_read', false),
       ]);
 
       setStats({
         total: totalCount.count || 0,
         unread: unreadCount.count || 0,
-        archived: archivedCount.count || 0,
       });
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -173,8 +157,9 @@ export default function NotificationCenter() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await supabase.rpc('mark_notification_read', {
+      await supabase.rpc('mark_notification_as_read', {
         p_notification_id: notificationId,
+        p_user_id: profile?.id
       });
       loadNotifications();
     } catch (error) {
@@ -184,21 +169,12 @@ export default function NotificationCenter() {
 
   const markAllAsRead = async () => {
     try {
-      await supabase.rpc('mark_all_notifications_read');
-      loadNotifications();
-    } catch (error) {
-      console.error('Error marking all as read:', error);
-    }
-  };
-
-  const archiveNotification = async (notificationId: string) => {
-    try {
-      await supabase.rpc('archive_notification', {
-        p_notification_id: notificationId,
+      await supabase.rpc('mark_all_notifications_as_read', {
+        p_user_id: profile?.id
       });
       loadNotifications();
     } catch (error) {
-      console.error('Error archiving notification:', error);
+      console.error('Error marking all as read:', error);
     }
   };
 
@@ -279,7 +255,7 @@ export default function NotificationCenter() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardBody>
             <div className="flex items-center justify-between">
@@ -304,17 +280,6 @@ export default function NotificationCenter() {
           </CardBody>
         </Card>
 
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Arşivlenen</p>
-                <p className="text-2xl font-bold text-gray-600">{stats.archived}</p>
-              </div>
-              <Archive className="w-10 h-10 text-gray-500" />
-            </div>
-          </CardBody>
-        </Card>
       </div>
 
       <Card>
@@ -340,16 +305,6 @@ export default function NotificationCenter() {
             >
               Okunmamış ({stats.unread})
             </button>
-            <button
-              onClick={() => setFilter('archived')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === 'archived'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Arşiv ({stats.archived})
-            </button>
           </div>
         </CardHeader>
         <CardBody>
@@ -364,15 +319,13 @@ export default function NotificationCenter() {
               <p className="text-gray-600">
                 {filter === 'unread'
                   ? 'Okunmamış bildiriminiz yok.'
-                  : filter === 'archived'
-                  ? 'Arşivlenmiş bildiriminiz yok.'
                   : 'Henüz bildiriminiz yok.'}
               </p>
             </div>
           ) : (
             <div className="space-y-2">
               {notifications.map((notification) => {
-                const TypeIcon = typeIcons[notification.type] || Info;
+                const TypeIcon = typeIcons[notification.notification_type] || Info;
 
                 return (
                   <div
@@ -441,33 +394,22 @@ export default function NotificationCenter() {
                                 <Check className="w-5 h-5" />
                               </button>
                             )}
-                            {!notification.is_archived && (
-                              <button
-                                onClick={() => archiveNotification(notification.id)}
-                                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                                title="Arşivle"
-                              >
-                                <Archive className="w-5 h-5" />
-                              </button>
-                            )}
-                            {notification.is_archived && (
-                              <button
-                                onClick={() => deleteNotification(notification.id)}
-                                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Sil"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => deleteNotification(notification.id)}
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                              title="Sil"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
                           </div>
                         </div>
 
-                        {notification.action_url && notification.action_text && (
+                        {notification.action_url && notification.action_label && (
                           <button
                             onClick={() => (window.location.hash = notification.action_url!)}
                             className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                           >
-                            {notification.action_text} →
+                            {notification.action_label} →
                           </button>
                         )}
                       </div>

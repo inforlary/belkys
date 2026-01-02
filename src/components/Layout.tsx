@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, AlertCircle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Inbox, Send, ClipboardList, CheckCircle, Clock, Workflow } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import GlobalSearch from './GlobalSearch';
+import NotificationBell from './NotificationBell';
 
 interface LayoutProps {
   children: ReactNode;
@@ -564,6 +565,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
             <div className="flex items-center space-x-4">
               {!profile?.is_super_admin && <GlobalSearch />}
+              {!profile?.is_super_admin && <NotificationBell />}
               {!profile?.is_super_admin && latestNotification && unreadNotifications > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center gap-3">
                   <div className="flex-1">
