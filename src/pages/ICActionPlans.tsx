@@ -53,6 +53,9 @@ export default function ICActionPlans() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<ActionPlan | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -156,6 +159,45 @@ export default function ICActionPlans() {
     } catch (error) {
       console.error('Error deleting plan:', error);
       alert('Eylem planı silinirken hata oluştu');
+    }
+  };
+
+  const handleUpdatePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedPlan || !formData.name || !formData.start_date || !formData.end_date) {
+      alert('Lütfen tüm zorunlu alanları doldurun');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ic_action_plans')
+        .update({
+          name: formData.name,
+          description: formData.description,
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+          status: formData.status
+        })
+        .eq('id', selectedPlan.id);
+
+      if (error) throw error;
+
+      setShowEditModal(false);
+      setSelectedPlan(null);
+      setFormData({
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        status: 'draft'
+      });
+      await loadActionPlans();
+      alert('Eylem planı başarıyla güncellendi');
+    } catch (error) {
+      console.error('Error updating plan:', error);
+      alert('Eylem planı güncellenirken hata oluştu');
     }
   };
 
@@ -275,7 +317,15 @@ export default function ICActionPlans() {
                         <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
                           <button
                             onClick={() => {
-                              navigate(`/internal-control/action-plans/${plan.id}/edit`);
+                              setSelectedPlan(plan);
+                              setFormData({
+                                name: plan.name,
+                                description: plan.description || '',
+                                start_date: plan.start_date,
+                                end_date: plan.end_date,
+                                status: plan.status
+                              });
+                              setShowEditModal(true);
                               setShowMenu(null);
                             }}
                             className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
@@ -342,7 +392,10 @@ export default function ICActionPlans() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => navigate(`/internal-control/action-plans/${plan.id}`)}
+                    onClick={() => {
+                      setSelectedPlan(plan);
+                      setShowDetailModal(true);
+                    }}
                     className="w-full"
                   >
                     Detayları Gör
@@ -442,6 +495,211 @@ export default function ICActionPlans() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedPlan(null);
+          setFormData({
+            name: '',
+            description: '',
+            start_date: '',
+            end_date: '',
+            status: 'draft'
+          });
+        }}
+        title="Eylem Planını Düzenle"
+      >
+        <form onSubmit={handleUpdatePlan} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Plan Adı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Açıklama
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Başlangıç Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bitiş Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formData.end_date}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Durum
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="draft">Taslak</option>
+              <option value="active">Aktif</option>
+              <option value="completed">Tamamlandı</option>
+              <option value="cancelled">İptal Edildi</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setShowEditModal(false);
+                setSelectedPlan(null);
+              }}
+            >
+              İptal
+            </Button>
+            <Button type="submit">
+              Güncelle
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedPlan(null);
+        }}
+        title="Eylem Planı Detayları"
+      >
+        {selectedPlan && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-500 mb-1">Plan Adı</label>
+              <p className="text-gray-900 font-semibold">{selectedPlan.name}</p>
+            </div>
+
+            {selectedPlan.description && (
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Açıklama</label>
+                <p className="text-gray-900">{selectedPlan.description}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Başlangıç Tarihi</label>
+                <p className="text-gray-900">{new Date(selectedPlan.start_date).toLocaleDateString('tr-TR')}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Bitiş Tarihi</label>
+                <p className="text-gray-900">{new Date(selectedPlan.end_date).toLocaleDateString('tr-TR')}</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-500 mb-1">Durum</label>
+              <StatusBadge
+                status={selectedPlan.status}
+                label={statusLabels[selectedPlan.status]}
+                variant={statusColors[selectedPlan.status] as any}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Toplam Eylem</label>
+                <p className="text-2xl font-bold text-gray-900">{selectedPlan.actions_count || 0}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Tamamlanan</label>
+                <p className="text-2xl font-bold text-green-600">{selectedPlan.completed_actions || 0}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Gecikmeli</label>
+                <p className="text-2xl font-bold text-red-600">{selectedPlan.delayed_actions || 0}</p>
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <label className="block text-sm font-medium text-gray-500 mb-2">İlerleme</label>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="bg-green-500 h-3 rounded-full transition-all"
+                  style={{
+                    width: `${selectedPlan.actions_count
+                      ? Math.round((selectedPlan.completed_actions! / selectedPlan.actions_count) * 100)
+                      : 0}%`
+                  }}
+                />
+              </div>
+              <p className="text-sm text-gray-600 mt-1 text-right">
+                {selectedPlan.actions_count
+                  ? Math.round((selectedPlan.completed_actions! / selectedPlan.actions_count) * 100)
+                  : 0}% Tamamlandı
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setFormData({
+                    name: selectedPlan.name,
+                    description: selectedPlan.description || '',
+                    start_date: selectedPlan.start_date,
+                    end_date: selectedPlan.end_date,
+                    status: selectedPlan.status
+                  });
+                  setShowEditModal(true);
+                }}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Düzenle
+              </Button>
+              <Button onClick={() => setShowDetailModal(false)}>
+                Kapat
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
