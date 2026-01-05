@@ -181,14 +181,25 @@ export default function StrategicPlanEvaluation() {
   const loadIndicators = async () => {
     if (!profile?.organization_id) return;
 
-    const { data: goalsData, error: goalsError } = await supabase
+    let query = supabase
       .from('goals')
       .select('id')
       .eq('organization_id', profile.organization_id);
 
+    if (profile.department_id && !isAdmin && !isVP) {
+      query = query.eq('department_id', profile.department_id);
+    }
+
+    const { data: goalsData, error: goalsError } = await query;
+
     if (goalsError || !goalsData) return;
 
     const goalIds = goalsData.map(g => g.id);
+
+    if (goalIds.length === 0) {
+      setIndicators([]);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('indicators')
@@ -342,13 +353,10 @@ export default function StrategicPlanEvaluation() {
       updateFields.director_approved_at = new Date().toISOString();
       updateFields.director_approved_by = user.id;
     } else if (currentStatus === 'director_approved' && (isAdmin || isVP)) {
-      newStatus = 'admin_approved';
+      newStatus = 'completed';
       updateFields.status = newStatus;
       updateFields.admin_approved_at = new Date().toISOString();
       updateFields.admin_approved_by = user.id;
-    } else if (currentStatus === 'admin_approved' && (isAdmin || isVP)) {
-      newStatus = 'completed';
-      updateFields.status = newStatus;
     } else {
       alert('Bu durumda onaylama yetkiniz yok.');
       return;
@@ -432,8 +440,8 @@ export default function StrategicPlanEvaluation() {
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; className: string }> = {
       draft: { label: 'Taslak', className: 'bg-gray-100 text-gray-800' },
-      submitted: { label: 'Onay Bekliyor', className: 'bg-yellow-100 text-yellow-800' },
-      director_approved: { label: 'Müdür Onayladı', className: 'bg-blue-100 text-blue-800' },
+      submitted: { label: 'Müdür Onayı Bekliyor', className: 'bg-yellow-100 text-yellow-800' },
+      director_approved: { label: 'Yönetici Onayı Bekliyor', className: 'bg-blue-100 text-blue-800' },
       admin_approved: { label: 'Yönetici Onayladı', className: 'bg-green-100 text-green-800' },
       completed: { label: 'Tamamlandı', className: 'bg-green-600 text-white' }
     };
@@ -501,7 +509,7 @@ export default function StrategicPlanEvaluation() {
       {showDashboard && (isAdmin || isVP) && progress && (
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Değerlendirme İlerlemesi</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">{progress.total_departments}</div>
               <div className="text-sm text-gray-600">Toplam Müdürlük</div>
@@ -512,15 +520,11 @@ export default function StrategicPlanEvaluation() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">{progress.evaluations_submitted}</div>
-              <div className="text-sm text-gray-600">Onay Bekliyor</div>
+              <div className="text-sm text-gray-600">Müdür Onayı Bekliyor</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{progress.evaluations_director_approved}</div>
-              <div className="text-sm text-gray-600">Müdür Onayı</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{progress.evaluations_admin_approved}</div>
-              <div className="text-sm text-gray-600">Yönetici Onayı</div>
+              <div className="text-sm text-gray-600">Yönetici Onayı Bekliyor</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-700">{progress.evaluations_completed}</div>
