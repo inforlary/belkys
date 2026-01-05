@@ -716,7 +716,7 @@ export default function KIKSStandards() {
       }
 
       setShowModal(false);
-      loadCategories(selectedPlanId);
+      await loadCategories(selectedPlanId);
     } catch (error: any) {
       console.error('Kayıt hatası:', error);
       alert('Kayıt başarısız: ' + (error.message || ''));
@@ -737,7 +737,7 @@ export default function KIKSStandards() {
         .eq('id', id);
 
       if (error) throw error;
-      loadCategories(selectedPlanId);
+      await loadCategories(selectedPlanId);
     } catch (error: any) {
       console.error('Silme hatası:', error);
       alert('Silme başarısız: ' + (error.message || ''));
