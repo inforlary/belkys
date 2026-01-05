@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import { Building2, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface ExternalAudit {
@@ -93,8 +92,7 @@ export default function ExternalAuditManagement() {
   };
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Dış Denetim Yönetimi</h1>
@@ -216,7 +214,6 @@ export default function ExternalAuditManagement() {
             ))
           )}
         </div>
-      </div>
-    </Layout>
+    </div>
   );
 }

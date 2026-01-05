@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import Modal from '../components/ui/Modal';
 import {
   Award,
@@ -285,7 +284,7 @@ export default function QualityManagement() {
   const objectivesTotal = objectives.length;
 
   return (
-    <Layout>
+    <>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -865,6 +864,6 @@ export default function QualityManagement() {
           </div>
         </form>
       </Modal>
-    </Layout>
+    </>
   );
 }

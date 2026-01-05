@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import { Lightbulb, Plus, ThumbsUp, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 interface Suggestion {
@@ -109,8 +108,7 @@ export default function ImprovementSuggestions() {
   };
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">İyileştirme Önerileri</h1>
@@ -234,7 +232,6 @@ export default function ImprovementSuggestions() {
             ))
           )}
         </div>
-      </div>
-    </Layout>
+    </div>
   );
 }

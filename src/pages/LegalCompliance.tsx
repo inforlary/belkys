@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import { Scale, FileText, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 
 interface ComplianceRequirement {
@@ -102,8 +101,7 @@ export default function LegalCompliance() {
   };
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Yasal Uyumluluk Yönetimi</h1>
@@ -239,7 +237,6 @@ export default function LegalCompliance() {
             )}
           </div>
         </div>
-      </div>
-    </Layout>
+    </div>
   );
 }

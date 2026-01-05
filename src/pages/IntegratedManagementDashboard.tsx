@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import {
   Activity,
   AlertTriangle,
@@ -177,8 +176,7 @@ export default function IntegratedManagementDashboard() {
   const overallStatus = getModuleStatus(overallScore);
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Entegre Yönetim Sistemi</h1>
@@ -341,7 +339,6 @@ export default function IntegratedManagementDashboard() {
             arasındaki ilişki görselde gösterilen yapıya uygun olarak kurulmuştur.
           </p>
         </div>
-      </div>
-    </Layout>
+    </div>
   );
 }
