@@ -55,7 +55,8 @@ export default function RiskRegister() {
     residual_likelihood: 2,
     residual_impact: 2,
     risk_response: 'mitigate',
-    status: 'identified'
+    status: 'identified',
+    monitoring_level: 'tactical'
   });
 
   useEffect(() => {
@@ -183,7 +184,7 @@ export default function RiskRegister() {
           residual_level: getRiskLevel(residualScore),
           risk_response: formData.risk_response,
           response_rationale: null,
-          monitoring_level: 'medium',
+          monitoring_level: formData.monitoring_level,
           review_frequency: 'quarterly',
           status: formData.status,
           identified_by_id: profile?.id
@@ -206,7 +207,8 @@ export default function RiskRegister() {
         residual_likelihood: 2,
         residual_impact: 2,
         risk_response: 'mitigate',
-        status: 'identified'
+        status: 'identified',
+        monitoring_level: 'tactical'
       });
       loadRisks();
     } catch (error: any) {
@@ -620,7 +622,7 @@ export default function RiskRegister() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    İlişkili Amaç
+                    İlişkili Hedef
                   </label>
                   <select
                     value={formData.goal_id}
@@ -641,7 +643,7 @@ export default function RiskRegister() {
                   </select>
                   {formData.owner_unit_id && filteredGoals.length === 0 && (
                     <p className="mt-1 text-xs text-amber-600">
-                      Bu birim için tanımlı amaç bulunmuyor
+                      Bu birim için tanımlı hedef bulunmuyor
                     </p>
                   )}
                 </div>
@@ -743,7 +745,7 @@ export default function RiskRegister() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Risk Yanıtı
@@ -757,6 +759,22 @@ export default function RiskRegister() {
                     <option value="mitigate">Azalt</option>
                     <option value="transfer">Transfer Et</option>
                     <option value="avoid">Kaçın</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    İzleme Seviyesi <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.monitoring_level}
+                    onChange={(e) => setFormData({ ...formData, monitoring_level: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    required
+                  >
+                    <option value="strategic">Stratejik</option>
+                    <option value="tactical">Taktiksel</option>
+                    <option value="operational">Operasyonel</option>
                   </select>
                 </div>
 
