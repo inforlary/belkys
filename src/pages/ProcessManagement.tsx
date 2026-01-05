@@ -356,9 +356,9 @@ export default function ProcessManagement() {
     try {
       const dataToSave = {
         ...formData,
-        department_id: formData.department_id || null,
-        owner_user_id: formData.owner_user_id || null,
-        kiks_standard_id: formData.kiks_standard_id || null,
+        department_id: formData.department_id?.trim() || null,
+        owner_user_id: formData.owner_user_id?.trim() || null,
+        kiks_standard_id: formData.kiks_standard_id?.trim() || null,
       };
 
       if (editingId) {
