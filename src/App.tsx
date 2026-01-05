@@ -91,6 +91,7 @@ import MyDataRequests from './pages/MyDataRequests';
 import DataRequestTracking from './pages/DataRequestTracking';
 import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
+import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -132,6 +133,8 @@ const renderPage = () => {
     switch (currentPath) {
       case 'dashboard':
         return <Dashboard />;
+      case 'integrated-management':
+        return <IntegratedManagementDashboard />;
       case 'reports':
         return <Reports />;
       case 'plans':

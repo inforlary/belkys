@@ -195,6 +195,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
   const topMenuItems: MenuItem[] = [
     { icon: LayoutDashboard, label: 'Ana Sayfa', path: 'dashboard' },
+    { icon: Activity, label: 'Entegre Yönetim', path: 'integrated-management' },
     { icon: FolderOpen, label: 'Dokümanlar', path: 'document-library' },
   ];
 
