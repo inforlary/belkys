@@ -346,9 +346,12 @@ export default function ActivityReportEdit() {
       return '<p>Performans göstergesi bulunamadı.</p>';
     }
 
-    let html = '<table border="1" style="width:100%; border-collapse: collapse;"><thead><tr>';
-    html += '<th>Gösterge Kodu</th><th>Gösterge Adı</th><th>Hedef</th><th>Gerçekleşme</th><th>Oran (%)</th>';
+    let html = '<h3>Performans Göstergeleri Tablosu</h3>';
+    html += '<table border="1" style="width:100%; border-collapse: collapse; margin-bottom: 30px;"><thead><tr>';
+    html += '<th>Gösterge Kodu</th><th>Gösterge Adı</th><th>Hedef</th><th>Gerçekleşme</th><th>Gerçekleşme Oranı (%)</th><th>Sapma</th><th>Sapma Yüzdesi (%)</th>';
     html += '</tr></thead><tbody>';
+
+    const deviations: Array<{name: string; deviation: number; deviationPercent: number; target: number; actual: number}> = [];
 
     for (const indicator of indicators) {
       const { data: entries } = await supabase
@@ -360,18 +363,56 @@ export default function ActivityReportEdit() {
         .limit(1);
 
       const actualValue = entries && entries.length > 0 ? entries[0].actual_value : 0;
-      const rate = indicator.target_value ? ((actualValue / indicator.target_value) * 100).toFixed(2) : '0';
+      const targetValue = indicator.target_value || 0;
+      const rate = targetValue > 0 ? ((actualValue / targetValue) * 100).toFixed(2) : '0';
+      const deviation = actualValue - targetValue;
+      const deviationPercent = targetValue > 0 ? (((actualValue - targetValue) / targetValue) * 100).toFixed(2) : '0';
+
+      const deviationColor = deviation >= 0 ? 'green' : 'red';
 
       html += `<tr>
         <td>${indicator.code}</td>
         <td>${indicator.name}</td>
-        <td>${indicator.target_value || '-'}</td>
-        <td>${actualValue}</td>
+        <td>${targetValue.toLocaleString('tr-TR')}</td>
+        <td>${actualValue.toLocaleString('tr-TR')}</td>
         <td>${rate}%</td>
+        <td style="color: ${deviationColor}; font-weight: bold;">${deviation >= 0 ? '+' : ''}${deviation.toLocaleString('tr-TR')}</td>
+        <td style="color: ${deviationColor}; font-weight: bold;">${deviationPercent >= 0 ? '+' : ''}${deviationPercent}%</td>
       </tr>`;
+
+      if (Math.abs(parseFloat(deviationPercent)) > 10) {
+        deviations.push({
+          name: indicator.name,
+          deviation,
+          deviationPercent: parseFloat(deviationPercent),
+          target: targetValue,
+          actual: actualValue
+        });
+      }
     }
 
     html += '</tbody></table>';
+
+    if (deviations.length > 0) {
+      html += '<h3>Sapma Analizleri</h3>';
+      html += '<p>Hedeften %10\'dan fazla sapma gösteren göstergeler için detaylı analiz:</p>';
+      html += '<ul style="list-style-type: disc; margin-left: 20px;">';
+
+      for (const dev of deviations) {
+        const status = dev.deviationPercent > 0 ? 'hedefi aşmıştır' : 'hedefe ulaşamamıştır';
+        const reason = dev.deviationPercent > 0
+          ? 'Bu durum, planlanan faaliyetlerin beklenenden daha etkili gerçekleştirildiğini göstermektedir.'
+          : 'Bu durumun nedenleri arasında kaynak yetersizliği, dış faktörler veya planlama eksiklikleri bulunabilir.';
+
+        html += `<li><strong>${dev.name}:</strong> Hedeflenen ${dev.target.toLocaleString('tr-TR')} değere karşılık ${dev.actual.toLocaleString('tr-TR')} gerçekleşme ile %${Math.abs(dev.deviationPercent).toFixed(2)} ${status}. ${reason}</li>`;
+      }
+
+      html += '</ul>';
+    } else {
+      html += '<h3>Sapma Analizleri</h3>';
+      html += '<p>Tüm göstergeler kabul edilebilir sapma aralığında (%±10) gerçekleşmiştir.</p>';
+    }
+
     return html;
   };
 
@@ -386,26 +427,189 @@ export default function ActivityReportEdit() {
       return '<p>Bütçe verisi bulunamadı.</p>';
     }
 
-    let html = '<table border="1" style="width:100%; border-collapse: collapse;"><thead><tr>';
-    html += '<th>Program Kodu</th><th>Program Adı</th><th>Ödenek</th><th>Harcama</th><th>Oran (%)</th>';
+    let html = '<h3>Bütçe Uygulama Sonuçları</h3>';
+    html += '<table border="1" style="width:100%; border-collapse: collapse; margin-bottom: 30px;"><thead><tr>';
+    html += '<th>Program Kodu</th><th>Program Adı</th><th>Ödenek (TL)</th><th>Harcama (TL)</th><th>Kullanım Oranı (%)</th><th>Kalan Ödenek (TL)</th>';
     html += '</tr></thead><tbody>';
 
+    let totalAllocation = 0;
+    let totalExpense = 0;
+
     for (const program of programs) {
+      const { data: expenseEntries } = await supabase
+        .from('expense_budget_entries')
+        .select('allocated_amount, expense_amount')
+        .eq('organization_id', profile!.organization_id)
+        .eq('program_id', program.id);
+
+      let programAllocation = 0;
+      let programExpense = 0;
+
+      if (expenseEntries && expenseEntries.length > 0) {
+        programAllocation = expenseEntries.reduce((sum, entry) => sum + (entry.allocated_amount || 0), 0);
+        programExpense = expenseEntries.reduce((sum, entry) => sum + (entry.expense_amount || 0), 0);
+      }
+
+      const utilizationRate = programAllocation > 0 ? ((programExpense / programAllocation) * 100).toFixed(2) : '0';
+      const remainingAllocation = programAllocation - programExpense;
+
+      totalAllocation += programAllocation;
+      totalExpense += programExpense;
+
       html += `<tr>
         <td>${program.code}</td>
         <td>${program.name}</td>
-        <td>0</td>
-        <td>0</td>
-        <td>0%</td>
+        <td>${programAllocation.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td>${programExpense.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td>${utilizationRate}%</td>
+        <td>${remainingAllocation.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>`;
     }
 
+    const totalUtilizationRate = totalAllocation > 0 ? ((totalExpense / totalAllocation) * 100).toFixed(2) : '0';
+    const totalRemaining = totalAllocation - totalExpense;
+
+    html += `<tr style="font-weight: bold; background-color: #f3f4f6;">
+      <td colspan="2">TOPLAM</td>
+      <td>${totalAllocation.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td>${totalExpense.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td>${totalUtilizationRate}%</td>
+      <td>${totalRemaining.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+    </tr>`;
+
     html += '</tbody></table>';
+
+    const { data: revenueEntries } = await supabase
+      .from('revenue_budget_entries')
+      .select('estimated_amount, realized_amount')
+      .eq('organization_id', profile!.organization_id);
+
+    if (revenueEntries && revenueEntries.length > 0) {
+      const totalEstimatedRevenue = revenueEntries.reduce((sum, entry) => sum + (entry.estimated_amount || 0), 0);
+      const totalRealizedRevenue = revenueEntries.reduce((sum, entry) => sum + (entry.realized_amount || 0), 0);
+      const revenueRealizationRate = totalEstimatedRevenue > 0 ? ((totalRealizedRevenue / totalEstimatedRevenue) * 100).toFixed(2) : '0';
+
+      html += '<h3>Gelir Tahsilatı</h3>';
+      html += '<table border="1" style="width:100%; border-collapse: collapse;"><thead><tr>';
+      html += '<th>Tahmini Gelir (TL)</th><th>Tahsil Edilen (TL)</th><th>Tahsilat Oranı (%)</th>';
+      html += '</tr></thead><tbody>';
+      html += `<tr>
+        <td>${totalEstimatedRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td>${totalRealizedRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td>${revenueRealizationRate}%</td>
+      </tr></tbody></table>`;
+    }
+
     return html;
   };
 
   const fetchInternalControlData = async (sectionCode: string): Promise<string> => {
-    return '<p>İç kontrol güvence beyanı buraya eklenecektir.</p>';
+    const { data: icPlans } = await supabase
+      .from('ic_plans')
+      .select('*')
+      .eq('organization_id', profile!.organization_id)
+      .eq('fiscal_year', report!.year)
+      .maybeSingle();
+
+    if (!icPlans) {
+      return '<p>Bu dönem için iç kontrol planı bulunamadı.</p>';
+    }
+
+    const { data: assessments } = await supabase
+      .from('ic_assessments')
+      .select('*')
+      .eq('organization_id', profile!.organization_id)
+      .eq('ic_plan_id', icPlans.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: actionPlans } = await supabase
+      .from('ic_action_plans')
+      .select('*')
+      .eq('organization_id', profile!.organization_id)
+      .eq('ic_plan_id', icPlans.id);
+
+    const { data: controlTests } = await supabase
+      .from('ic_control_tests')
+      .select('test_result')
+      .eq('organization_id', profile!.organization_id)
+      .eq('ic_plan_id', icPlans.id);
+
+    const completedActions = actionPlans?.filter(a => a.status === 'completed').length || 0;
+    const totalActions = actionPlans?.length || 0;
+    const actionCompletionRate = totalActions > 0 ? ((completedActions / totalActions) * 100).toFixed(2) : '0';
+
+    const passedTests = controlTests?.filter(t => t.test_result === 'effective').length || 0;
+    const totalTests = controlTests?.length || 0;
+    const testSuccessRate = totalTests > 0 ? ((passedTests / totalTests) * 100).toFixed(2) : '0';
+
+    let html = '<h3>İÇ KONTROL GÜVENCE BEYANI</h3>';
+    html += '<p style="text-align: justify; line-height: 1.8; margin-bottom: 20px;">';
+    html += `${report!.year} yılı faaliyet sonuçlarına ilişkin olarak; harcama birimlerinin ürettikleri bilgiler esas alınmak suretiyle `;
+    html += 'hazırlanan iç kontrol güvence beyanı çerçevesinde aşağıdaki hususlar değerlendirilmiştir:';
+    html += '</p>';
+
+    html += '<h4 style="margin-top: 20px;">1. İç Kontrol Sistemi Değerlendirmesi</h4>';
+    html += '<p style="text-align: justify; line-height: 1.8;">';
+
+    if (assessments) {
+      const overallScore = assessments.overall_score || 0;
+      let assessmentLevel = 'Geliştirilmeli';
+      if (overallScore >= 80) assessmentLevel = 'İyi';
+      else if (overallScore >= 60) assessmentLevel = 'Orta';
+
+      html += `İdaremizde iç kontrol sistemi ${report!.year} yılında yapılan değerlendirme sonucunda %${overallScore} genel puan ile `;
+      html += `<strong>"${assessmentLevel}"</strong> seviyesinde bulunmuştur. `;
+    } else {
+      html += 'İdaremizde iç kontrol sistemi mevcut olmakla birlikte, yapılan değerlendirmeler neticesinde iyileştirme gerektiren alanlar tespit edilmiştir. ';
+    }
+
+    html += 'Mali yönetim ve kontrol süreçlerimiz, 5018 sayılı Kamu Mali Yönetimi ve Kontrol Kanunu ile İç Kontrol ve Ön Mali Kontrole İlişkin Usul ve Esaslar çerçevesinde yürütülmektedir.';
+    html += '</p>';
+
+    html += '<h4 style="margin-top: 20px;">2. Tespit Edilen Aksaklıklar ve Alınan Tedbirler</h4>';
+    html += '<p style="text-align: justify; line-height: 1.8;">';
+    html += `Raporlama döneminde toplam ${totalActions} adet aksiyon planı tespit edilmiş olup, bunlardan ${completedActions} adedi (%${actionCompletionRate}) tamamlanmıştır. `;
+
+    if (parseFloat(actionCompletionRate) >= 80) {
+      html += 'İyileştirme faaliyetlerimiz planlanan şekilde gerçekleştirilmiş ve iç kontrol sistemimizin etkinliği artırılmıştır.';
+    } else if (parseFloat(actionCompletionRate) >= 50) {
+      html += 'İyileştirme faaliyetlerimiz devam etmekte olup, gelecek dönemde tamamlanması hedeflenmektedir.';
+    } else {
+      html += 'Tespit edilen eksikliklerin giderilmesi için gerekli aksiyonlar alınmış ve takibi yapılmaktadır.';
+    }
+    html += '</p>';
+
+    html += '<h4 style="margin-top: 20px;">3. Kontrol Faaliyetleri</h4>';
+    html += '<p style="text-align: justify; line-height: 1.8;">';
+    html += `${report!.year} yılında toplam ${totalTests} adet kontrol testi gerçekleştirilmiş olup, ${passedTests} adedi (%${testSuccessRate}) etkin olarak değerlendirilmiştir. `;
+    html += 'Kontrol faaliyetlerimiz düzenli olarak gözden geçirilmekte ve gerekli iyileştirmeler yapılmaktadır.';
+    html += '</p>';
+
+    html += '<h4 style="margin-top: 20px;">4. İzleme Faaliyetleri</h4>';
+    html += '<p style="text-align: justify; line-height: 1.8;">';
+    html += 'İç kontrol sisteminin işleyişi düzenli olarak izlenmekte ve değerlendirilmektedir. İç Kontrol İzleme ve Yönlendirme Kurulu toplantıları düzenli olarak yapılmakta, ';
+    html += 'tespit edilen eksikliklerin giderilmesi için gerekli tedbirler alınmaktadır.';
+    html += '</p>';
+
+    html += '<div style="margin-top: 40px; padding: 20px; border: 1px solid #ccc; background-color: #f9f9f9;">';
+    html += '<p style="text-align: justify; line-height: 1.8; font-style: italic;">';
+    html += 'Yukarıda belirtilen hususlar dikkate alındığında, idaremizin iç kontrol sisteminin genel olarak ';
+
+    if (parseFloat(testSuccessRate) >= 80 && parseFloat(actionCompletionRate) >= 80) {
+      html += '<strong>yeterli düzeyde</strong> olduğu, ancak sürekli iyileştirme ilkesi gereğince çalışmaların devam ettiği ';
+    } else if (parseFloat(testSuccessRate) >= 60 && parseFloat(actionCompletionRate) >= 60) {
+      html += '<strong>kabul edilebilir düzeyde</strong> olduğu, belirli alanlarda iyileştirme çalışmalarının sürdürüldüğü ';
+    } else {
+      html += '<strong>geliştirilmeye muhtaç</strong> olduğu ve bu doğrultuda kapsamlı iyileştirme faaliyetlerinin yürütüldüğü ';
+    }
+
+    html += 'değerlendirilmektedir.';
+    html += '</p>';
+    html += '</div>';
+
+    return html;
   };
 
   const handleSubmitReport = async () => {

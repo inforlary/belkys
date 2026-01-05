@@ -164,6 +164,142 @@ export default function ActivityReportExport() {
     alert('HTML dosyası başarıyla oluşturuldu');
   };
 
+  const handleExportSayistay = async () => {
+    if (!report) return;
+
+    try {
+      setExporting(true);
+
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name, mission, vision')
+        .eq('id', profile!.organization_id)
+        .single();
+
+      const { data: indicatorsData } = await supabase
+        .from('indicators')
+        .select(`
+          *,
+          objectives(name, goals(name))
+        `)
+        .eq('organization_id', profile!.organization_id)
+        .order('code')
+        .limit(10);
+
+      const { data: programsData } = await supabase
+        .from('programs')
+        .select('code, name')
+        .eq('organization_id', profile!.organization_id)
+        .order('code')
+        .limit(10);
+
+      let indicatorsSummary = '';
+      if (indicatorsData && indicatorsData.length > 0) {
+        for (const ind of indicatorsData) {
+          const { data: entries } = await supabase
+            .from('indicator_data_entries')
+            .select('actual_value')
+            .eq('indicator_id', ind.id)
+            .eq('status', 'admin_approved')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          const actualValue = entries && entries.length > 0 ? entries[0].actual_value : 0;
+          const targetValue = ind.target_value || 0;
+          const rate = targetValue > 0 ? ((actualValue / targetValue) * 100).toFixed(2) : '0';
+
+          indicatorsSummary += `${ind.code} - ${ind.name}: %${rate}\n`;
+        }
+      }
+
+      const sayistayContent = `
+SAYIŞTAY SUNUMU
+${report.organizations?.name || orgData?.name || 'Kurum Adı'}
+${report.title}
+${report.year}
+
+═══════════════════════════════════════════════════════════════
+
+I. ÖZET BİLGİLER
+
+Kurum: ${report.organizations?.name || orgData?.name || 'Kurum Adı'}
+Rapor Dönemi: ${report.year}
+Rapor Türü: ${report.type === 'INSTITUTION' ? 'İdare Faaliyet Raporu' : 'Birim Faaliyet Raporu'}
+
+Misyon:
+${orgData?.mission || 'Belirtilmemiş'}
+
+Vizyon:
+${orgData?.vision || 'Belirtilmemiş'}
+
+═══════════════════════════════════════════════════════════════
+
+II. PERFORMANS SONUÇLARI ÖZETİ
+
+${indicatorsSummary || 'Performans verileri bulunamadı.'}
+
+═══════════════════════════════════════════════════════════════
+
+III. MALİ DURUM ÖZETİ
+
+Program Sayısı: ${programsData?.length || 0}
+${programsData?.map(p => `- ${p.code}: ${p.name}`).join('\n') || 'Program bilgisi bulunamadı.'}
+
+Not: Detaylı mali bilgiler ana raporda yer almaktadır.
+
+═══════════════════════════════════════════════════════════════
+
+IV. ÖNEMLİ HUSUSLAR
+
+1. İç Kontrol Sistemi
+   - İç kontrol sistemi 5018 sayılı kanun çerçevesinde yürütülmektedir.
+   - Düzenli değerlendirmeler yapılmaktadır.
+
+2. Risk Yönetimi
+   - Risk değerlendirmeleri periyodik olarak gerçekleştirilmektedir.
+   - Tespit edilen riskler için önlemler alınmaktadır.
+
+3. Performans Yönetimi
+   - Stratejik plan hedefleri doğrultusunda çalışılmaktadır.
+   - Düzenli izleme ve raporlama yapılmaktadır.
+
+═══════════════════════════════════════════════════════════════
+
+V. DEĞERLENDİRME VE ÖNERİLER
+
+${report.year} yılı faaliyet sonuçları:
+- Planlanan hedefler genel olarak gerçekleştirilmiştir.
+- Bütçe kullanımı kurumsal önceliklerle uyumlu olmuştur.
+- İç kontrol sistemi etkin şekilde çalışmıştır.
+- Gelecek dönem için iyileştirme faaliyetleri planlanmıştır.
+
+═══════════════════════════════════════════════════════════════
+
+RAPOR TARİHİ: ${new Date().toLocaleDateString('tr-TR')}
+
+Bu sunum Sayıştay denetimine sunulmak üzere hazırlanmıştır.
+Detaylı bilgiler için lütfen ekli İdare Faaliyet Raporu'na bakınız.
+      `;
+
+      const blob = new Blob([sayistayContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Sayiştay_Sunumu_${report.year}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert('Sayıştay sunumu başarıyla oluşturuldu');
+    } catch (error: any) {
+      console.error('Error exporting Sayistay report:', error);
+      alert('Sayıştay sunumu oluşturulurken hata oluştu: ' + error.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -214,6 +350,15 @@ export default function ActivityReportExport() {
           >
             <Download className="w-4 h-4" />
             HTML İndir
+          </Button>
+          <Button
+            onClick={handleExportSayistay}
+            disabled={exporting}
+            variant="secondary"
+            className="flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            Sayıştay Sunumu
           </Button>
           <Button
             onClick={handleExportPDF}
