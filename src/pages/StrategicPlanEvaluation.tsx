@@ -98,7 +98,8 @@ export default function StrategicPlanEvaluation() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isDirector = profile?.role === 'director';
   const isVP = profile?.role === 'vice_president';
-  const canViewDashboard = true;
+  const canViewProgressDashboard = isAdmin || isVP;
+  const canViewReports = true;
   const canApprove = isAdmin || isDirector || isVP;
 
   useEffect(() => {
@@ -697,7 +698,7 @@ export default function StrategicPlanEvaluation() {
         </nav>
       </div>
 
-      {activeTab === 'reports' && canViewDashboard ? (
+      {activeTab === 'reports' && canViewReports ? (
         <YearEndReports
           fiscalYear={evaluationYear}
           onRefresh={loadData}
@@ -705,7 +706,7 @@ export default function StrategicPlanEvaluation() {
         />
       ) : (
         <>
-          {showDashboard && canViewDashboard && progress && (
+          {showDashboard && canViewProgressDashboard && progress && (
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Değerlendirme İlerlemesi</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
