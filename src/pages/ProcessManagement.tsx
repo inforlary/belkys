@@ -263,27 +263,10 @@ export default function ProcessManagement() {
     if (!profile?.organization_id) return;
 
     try {
-      let query = supabase
-        .from('ic_kiks_sub_standards')
-        .select(`
-          id,
-          code,
-          title,
-          main_standard_id,
-          ic_kiks_main_standards!inner(
-            code,
-            ic_kiks_categories(name)
-          )
-        `)
-        .eq('is_active', true);
-
-      if (selectedPlanId) {
-        query = query.or(`ic_plan_id.is.null,ic_plan_id.eq.${selectedPlanId}`);
-      } else {
-        query = query.is('ic_plan_id', null);
-      }
-
-      const { data, error } = await query.order('code', { ascending: true });
+      const { data, error } = await supabase
+        .from('ic_kiks_main_standards')
+        .select('id, code, title')
+        .order('code', { ascending: true });
 
       if (error) throw error;
 
@@ -291,18 +274,17 @@ export default function ProcessManagement() {
         id: item.id,
         code: item.code,
         title: `${item.code} - ${item.title}`,
-        component: item.ic_kiks_main_standards?.ic_kiks_categories?.name || ''
+        component: ''
       })).sort((a, b) => {
         const parseCode = (code: string) => {
-          const match = code.match(/([A-ZİÖÜŞĞÇ\s]+)\s*(\d+)\.(\d+)/);
+          const match = code.match(/([A-ZİÖÜŞĞÇ\s]+)\s*(\d+)/);
           if (match) {
             return {
               prefix: match[1].trim(),
-              major: parseInt(match[2]),
-              minor: parseInt(match[3])
+              major: parseInt(match[2])
             };
           }
-          return { prefix: code, major: 0, minor: 0 };
+          return { prefix: code, major: 0 };
         };
 
         const aCode = parseCode(a.code);
@@ -311,10 +293,7 @@ export default function ProcessManagement() {
         if (aCode.prefix !== bCode.prefix) {
           return aCode.prefix.localeCompare(bCode.prefix, 'tr');
         }
-        if (aCode.major !== bCode.major) {
-          return aCode.major - bCode.major;
-        }
-        return aCode.minor - bCode.minor;
+        return aCode.major - bCode.major;
       });
 
       setKiksStandards(formattedData);
