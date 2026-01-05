@@ -657,7 +657,7 @@ export default function StrategicPlanEvaluation() {
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
-          {canViewDashboard && (
+          {canViewProgressDashboard && (
             <Button
               onClick={() => setShowDashboard(!showDashboard)}
               variant="secondary"
@@ -682,7 +682,7 @@ export default function StrategicPlanEvaluation() {
             <FileText className="w-4 h-4 inline mr-2" />
             Değerlendirme Girişi
           </button>
-          {canViewDashboard && (
+          {canViewReports && (
             <button
               onClick={() => setActiveTab('reports')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
