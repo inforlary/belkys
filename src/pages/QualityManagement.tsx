@@ -621,6 +621,7 @@ export default function QualityManagement() {
               value={objectiveForm.title}
               onChange={(e) => setObjectiveForm({ ...objectiveForm, title: e.target.value })}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Ör: Müşteri Memnuniyetini %90'a Çıkarmak"
               required
             />
           </div>
@@ -634,6 +635,7 @@ export default function QualityManagement() {
               onChange={(e) => setObjectiveForm({ ...objectiveForm, description: e.target.value })}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
               rows={3}
+              placeholder="Hedefin detaylı açıklaması..."
             />
           </div>
 
@@ -748,6 +750,7 @@ export default function QualityManagement() {
               value={surveyForm.survey_title}
               onChange={(e) => setSurveyForm({ ...surveyForm, survey_title: e.target.value })}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Ör: 2024 Birinci Çeyrek Müşteri Memnuniyeti"
               required
             />
           </div>
@@ -843,6 +846,7 @@ export default function QualityManagement() {
               onChange={(e) => setSurveyForm({ ...surveyForm, key_findings: e.target.value })}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
               rows={3}
+              placeholder="Anket sonuçlarının özeti ve önemli bulgular..."
             />
           </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import Modal from '../components/ui/Modal';
 import { Search, Plus, Calendar, CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
 
 interface QualityAudit {
@@ -23,18 +24,74 @@ interface QualityAudit {
   } | null;
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+}
+
 export default function QualityAudits() {
   const { user, organization } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [audits, setAudits] = useState<QualityAudit[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showModal, setShowModal] = useState(false);
+
+  const [form, setForm] = useState({
+    audit_title: '',
+    audit_type: 'process',
+    planned_date: '',
+    auditee_department_id: '',
+    auditor_id: '',
+    scope: '',
+    status: 'planned'
+  });
 
   useEffect(() => {
     if (organization?.id) {
       fetchAudits();
+      fetchDepartments();
+      fetchUsers();
     }
   }, [organization?.id]);
+
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, name')
+        .eq('organization_id', organization?.id)
+        .order('name');
+
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('organization_id', organization?.id)
+        .order('full_name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
   const fetchAudits = async () => {
     try {
@@ -56,6 +113,70 @@ export default function QualityAudits() {
       console.error('Error fetching audits:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setSaving(true);
+
+      const { data: lastAudit } = await supabase
+        .from('quality_audits')
+        .select('audit_code')
+        .eq('organization_id', organization?.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let auditNumber = 1;
+      if (lastAudit?.audit_code) {
+        const match = lastAudit.audit_code.match(/KD-(\d+)/);
+        if (match) {
+          auditNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      const audit_code = `KD-${auditNumber.toString().padStart(4, '0')}`;
+
+      const { error } = await supabase
+        .from('quality_audits')
+        .insert({
+          organization_id: organization?.id,
+          audit_code,
+          audit_title: form.audit_title,
+          audit_type: form.audit_type,
+          planned_date: form.planned_date,
+          auditee_department_id: form.auditee_department_id,
+          auditor_id: form.auditor_id || null,
+          scope: form.scope,
+          status: form.status,
+          conformities: 0,
+          minor_nonconformities: 0,
+          major_nonconformities: 0,
+          opportunities_for_improvement: 0
+        });
+
+      if (error) throw error;
+
+      setShowModal(false);
+      setForm({
+        audit_title: '',
+        audit_type: 'process',
+        planned_date: '',
+        auditee_department_id: '',
+        auditor_id: '',
+        scope: '',
+        status: 'planned'
+      });
+      fetchAudits();
+      alert('Kalite denetimi başarıyla oluşturuldu!');
+    } catch (error) {
+      console.error('Error creating audit:', error);
+      alert('Kalite denetimi oluşturulurken hata oluştu!');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -104,7 +225,8 @@ export default function QualityAudits() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Kalite Denetimleri</h1>
@@ -112,7 +234,10 @@ export default function QualityAudits() {
               İç kalite denetimleri ve uygunsuzluk yönetimi
             </p>
           </div>
-          <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Yeni Denetim
           </button>
@@ -267,6 +392,142 @@ export default function QualityAudits() {
             )}
           </div>
         </div>
-    </div>
+      </div>
+
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Yeni Kalite Denetimi"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Denetim Başlığı *
+            </label>
+            <input
+              type="text"
+              value={form.audit_title}
+              onChange={(e) => setForm({ ...form, audit_title: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Denetim Türü *
+              </label>
+              <select
+                value={form.audit_type}
+                onChange={(e) => setForm({ ...form, audit_type: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="process">Süreç Denetimi</option>
+                <option value="product">Ürün Denetimi</option>
+                <option value="system">Sistem Denetimi</option>
+                <option value="compliance">Uyumluluk Denetimi</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Planlanan Tarih *
+              </label>
+              <input
+                type="date"
+                value={form.planned_date}
+                onChange={(e) => setForm({ ...form, planned_date: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Denetlenecek Birim *
+              </label>
+              <select
+                value={form.auditee_department_id}
+                onChange={(e) => setForm({ ...form, auditee_department_id: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Seçiniz...</option>
+                {departments.map(dept => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Denetçi
+              </label>
+              <select
+                value={form.auditor_id}
+                onChange={(e) => setForm({ ...form, auditor_id: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seçiniz...</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.full_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Denetim Kapsamı
+            </label>
+            <textarea
+              value={form.scope}
+              onChange={(e) => setForm({ ...form, scope: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              rows={3}
+              placeholder="Denetimin kapsamını açıklayınız..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Durum *
+            </label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm({ ...form, status: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="planned">Planlandı</option>
+              <option value="in_progress">Devam Ediyor</option>
+              <option value="completed">Tamamlandı</option>
+              <option value="cancelled">İptal Edildi</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

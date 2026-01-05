@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import Modal from '../components/ui/Modal';
 import { Lightbulb, Plus, ThumbsUp, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 interface Suggestion {
@@ -22,17 +23,50 @@ interface Suggestion {
   created_at: string;
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
 export default function ImprovementSuggestions() {
   const { user, organization } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [showModal, setShowModal] = useState(false);
+
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    category: 'process',
+    priority: 'medium',
+    department_id: '',
+    estimated_benefit: '',
+    implementation_cost: ''
+  });
 
   useEffect(() => {
     if (organization?.id) {
       fetchSuggestions();
+      fetchDepartments();
     }
   }, [organization?.id]);
+
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, name')
+        .eq('organization_id', organization?.id)
+        .order('name');
+
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
 
   const fetchSuggestions = async () => {
     try {
@@ -54,6 +88,68 @@ export default function ImprovementSuggestions() {
       console.error('Error fetching suggestions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setSaving(true);
+
+      const { data: lastSuggestion } = await supabase
+        .from('improvement_suggestions')
+        .select('suggestion_code')
+        .eq('organization_id', organization?.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let suggestionNumber = 1;
+      if (lastSuggestion?.suggestion_code) {
+        const match = lastSuggestion.suggestion_code.match(/IO-(\d+)/);
+        if (match) {
+          suggestionNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      const suggestion_code = `IO-${suggestionNumber.toString().padStart(4, '0')}`;
+
+      const { error } = await supabase
+        .from('improvement_suggestions')
+        .insert({
+          organization_id: organization?.id,
+          suggestion_code,
+          title: form.title,
+          description: form.description,
+          category: form.category,
+          priority: form.priority,
+          department_id: form.department_id || null,
+          estimated_benefit: form.estimated_benefit,
+          implementation_cost: form.implementation_cost,
+          suggested_by: user?.id,
+          status: 'submitted'
+        });
+
+      if (error) throw error;
+
+      setShowModal(false);
+      setForm({
+        title: '',
+        description: '',
+        category: 'process',
+        priority: 'medium',
+        department_id: '',
+        estimated_benefit: '',
+        implementation_cost: ''
+      });
+      fetchSuggestions();
+      alert('İyileştirme önerisi başarıyla gönderildi!');
+    } catch (error) {
+      console.error('Error creating suggestion:', error);
+      alert('İyileştirme önerisi gönderilirken hata oluştu!');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -85,7 +181,9 @@ export default function ImprovementSuggestions() {
       'quality': 'Kalite',
       'cost': 'Maliyet',
       'safety': 'Güvenlik',
-      'environment': 'Çevre'
+      'environment': 'Çevre',
+      'efficiency': 'Verimlilik',
+      'customer_satisfaction': 'Müşteri Memnuniyeti'
     };
     return labels[category] || category;
   };
@@ -100,6 +198,16 @@ export default function ImprovementSuggestions() {
     }
   };
 
+  const getPriorityLabel = (priority: string) => {
+    const labels: Record<string, string> = {
+      'critical': 'Kritik',
+      'high': 'Yüksek',
+      'medium': 'Orta',
+      'low': 'Düşük'
+    };
+    return labels[priority] || priority;
+  };
+
   const stats = {
     total: suggestions.length,
     submitted: suggestions.filter(s => s.status === 'submitted').length,
@@ -108,7 +216,8 @@ export default function ImprovementSuggestions() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">İyileştirme Önerileri</h1>
@@ -201,7 +310,7 @@ export default function ImprovementSuggestions() {
                       <div>
                         <span className="text-xs text-gray-500">Öncelik: </span>
                         <span className={`text-sm font-medium ${getPriorityColor(suggestion.priority)}`}>
-                          {suggestion.priority.toUpperCase()}
+                          {getPriorityLabel(suggestion.priority)}
                         </span>
                       </div>
                       <div>
@@ -232,6 +341,141 @@ export default function ImprovementSuggestions() {
             ))
           )}
         </div>
-    </div>
+      </div>
+
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Yeni İyileştirme Önerisi"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Öneri Başlığı *
+            </label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+              placeholder="Öneriniz için kısa bir başlık..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Açıklama *
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              rows={4}
+              required
+              placeholder="Önerinizi detaylı olarak açıklayınız..."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Kategori *
+              </label>
+              <select
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="process">Süreç İyileştirme</option>
+                <option value="quality">Kalite İyileştirme</option>
+                <option value="cost">Maliyet Azaltma</option>
+                <option value="safety">Güvenlik</option>
+                <option value="environment">Çevre</option>
+                <option value="efficiency">Verimlilik</option>
+                <option value="customer_satisfaction">Müşteri Memnuniyeti</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Öncelik *
+              </label>
+              <select
+                value={form.priority}
+                onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="low">Düşük</option>
+                <option value="medium">Orta</option>
+                <option value="high">Yüksek</option>
+                <option value="critical">Kritik</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              İlgili Birim
+            </label>
+            <select
+              value={form.department_id}
+              onChange={(e) => setForm({ ...form, department_id: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seçiniz...</option>
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Beklenen Fayda
+            </label>
+            <textarea
+              value={form.estimated_benefit}
+              onChange={(e) => setForm({ ...form, estimated_benefit: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              rows={2}
+              placeholder="Bu öneri uygulandığında ne gibi faydalar sağlayacak?"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tahmini Maliyet
+            </label>
+            <input
+              type="text"
+              value={form.implementation_cost}
+              onChange={(e) => setForm({ ...form, implementation_cost: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Ör: Düşük, 10.000 TL, Maliyet yok"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Gönderiliyor...' : 'Gönder'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }
