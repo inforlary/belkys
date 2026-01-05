@@ -24,6 +24,10 @@ import GoalRelationshipMatrix from './pages/GoalRelationshipMatrix';
 import CollaborationCostEstimate from './pages/CollaborationCostEstimate';
 import GoalCards from './pages/GoalCards';
 import ActivityReports from './pages/ActivityReports';
+import ActivityReportEdit from './pages/ActivityReportEdit';
+import ActivityReportDetail from './pages/ActivityReportDetail';
+import ActivityReportExport from './pages/ActivityReportExport';
+import ActivityReportUnitSubmissions from './pages/ActivityReportUnitSubmissions';
 import BudgetPrograms from './pages/BudgetPrograms';
 import BudgetCodes from './pages/BudgetCodes';
 import BudgetReports from './pages/BudgetReports';
@@ -147,6 +151,15 @@ const renderPage = () => {
     if (currentPath.startsWith('budget-proposals/') && !currentPath.includes('/new') && !currentPath.includes('/edit')) {
       return <BudgetProposalDetail />;
     }
+    if (currentPath.startsWith('activity-reports/') && currentPath.includes('/edit')) {
+      return <ActivityReportEdit />;
+    }
+    if (currentPath.startsWith('activity-reports/') && currentPath.includes('/export')) {
+      return <ActivityReportExport />;
+    }
+    if (currentPath.startsWith('activity-reports/') && !currentPath.includes('/edit') && !currentPath.includes('/export') && !currentPath.includes('/unit-submissions')) {
+      return <ActivityReportDetail />;
+    }
 
     console.log('[App.tsx] === ROUTING DEBUG ===');
     console.log('[App.tsx] currentPath:', currentPath);
@@ -183,6 +196,8 @@ const renderPage = () => {
         return <GoalCards />;
       case 'activity-reports':
         return <ActivityReports />;
+      case 'activity-reports/unit-submissions':
+        return <ActivityReportUnitSubmissions />;
       case 'users':
         return <Users />;
       case 'departments':

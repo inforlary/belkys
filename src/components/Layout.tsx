@@ -250,6 +250,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       icon: FileText,
       items: [
         { icon: FileText, label: 'Raporlarım', path: 'activity-reports', requiresDepartment: true },
+        { icon: CheckSquare, label: 'Birim Teslim Durumu', path: 'activity-reports/unit-submissions', adminOnly: true },
         { icon: Settings, label: 'Rapor Yönetimi', path: 'report-management', adminOnly: true },
       ],
     },
