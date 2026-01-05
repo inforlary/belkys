@@ -36,6 +36,23 @@ export default function RiskRegister() {
   const [filterLevel, setFilterLevel] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [categories, setCategories] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [objectives, setObjectives] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    description: '',
+    category_id: '',
+    owner_unit_id: '',
+    objective_id: '',
+    inherent_likelihood: 3,
+    inherent_impact: 3,
+    residual_likelihood: 2,
+    residual_impact: 2,
+    risk_response: 'mitigate',
+    status: 'identified'
+  });
 
   useEffect(() => {
     if (profile?.organization_id) {
@@ -46,7 +63,7 @@ export default function RiskRegister() {
   const loadData = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadRisks(), loadCategories()]);
+      await Promise.all([loadRisks(), loadCategories(), loadDepartments(), loadObjectives()]);
     } finally {
       setLoading(false);
     }
@@ -79,6 +96,92 @@ export default function RiskRegister() {
 
     if (error) throw error;
     setCategories(data || []);
+  };
+
+  const loadDepartments = async () => {
+    const { data, error } = await supabase
+      .from('departments')
+      .select('id, name')
+      .eq('organization_id', profile?.organization_id)
+      .order('name');
+
+    if (error) throw error;
+    setDepartments(data || []);
+  };
+
+  const loadObjectives = async () => {
+    const { data, error } = await supabase
+      .from('objectives')
+      .select('id, title')
+      .eq('organization_id', profile?.organization_id)
+      .order('title');
+
+    if (error) throw error;
+    setObjectives(data || []);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const inherentScore = formData.inherent_likelihood * formData.inherent_impact;
+    const residualScore = formData.residual_likelihood * formData.residual_impact;
+
+    const getRiskLevel = (score: number) => {
+      if (score >= 21) return 'critical';
+      if (score >= 17) return 'very_high';
+      if (score >= 10) return 'high';
+      if (score >= 5) return 'medium';
+      return 'low';
+    };
+
+    try {
+      const { error } = await supabase
+        .from('risks')
+        .insert({
+          organization_id: profile?.organization_id,
+          code: formData.code,
+          name: formData.name,
+          description: formData.description,
+          category_id: formData.category_id || null,
+          owner_unit_id: formData.owner_unit_id || null,
+          objective_id: formData.objective_id || null,
+          inherent_likelihood: formData.inherent_likelihood,
+          inherent_impact: formData.inherent_impact,
+          inherent_score: inherentScore,
+          residual_likelihood: formData.residual_likelihood,
+          residual_impact: formData.residual_impact,
+          residual_score: residualScore,
+          risk_level: getRiskLevel(residualScore),
+          risk_response: formData.risk_response,
+          status: formData.status
+        });
+
+      if (error) throw error;
+
+      setShowAddModal(false);
+      setFormData({
+        code: '',
+        name: '',
+        description: '',
+        category_id: '',
+        owner_unit_id: '',
+        objective_id: '',
+        inherent_likelihood: 3,
+        inherent_impact: 3,
+        residual_likelihood: 2,
+        residual_impact: 2,
+        risk_response: 'mitigate',
+        status: 'identified'
+      });
+      loadRisks();
+    } catch (error: any) {
+      console.error('Risk eklenirken hata:', error);
+      if (error.code === '23505') {
+        alert('Bu kod zaten kullanılmaktadır');
+      } else {
+        alert('Risk eklenemedi');
+      }
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -174,7 +277,7 @@ export default function RiskRegister() {
         </div>
         {isAdmin && (
           <button
-            onClick={() => navigate('risks/register/new')}
+            onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             <Plus className="w-5 h-5" />
@@ -365,6 +468,259 @@ export default function RiskRegister() {
           </table>
         </div>
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4">
+              <h2 className="text-xl font-bold text-gray-900">Yeni Risk Ekle</h2>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Risk Kodu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="R-001"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Risk Kategorisi
+                  </label>
+                  <select
+                    value={formData.category_id}
+                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Seçiniz...</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Risk Adı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Risk açıklaması..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Detaylı Açıklama
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Risk ile ilgili detaylı bilgi..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sorumlu Birim
+                  </label>
+                  <select
+                    value={formData.owner_unit_id}
+                    onChange={(e) => setFormData({ ...formData, owner_unit_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Seçiniz...</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    İlişkili Hedef
+                  </label>
+                  <select
+                    value={formData.objective_id}
+                    onChange={(e) => setFormData({ ...formData, objective_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Seçiniz...</option>
+                    {objectives.map(obj => (
+                      <option key={obj.id} value={obj.id}>{obj.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Doğal Risk Değerlendirmesi</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Olasılık (1-5)
+                    </label>
+                    <select
+                      value={formData.inherent_likelihood}
+                      onChange={(e) => setFormData({ ...formData, inherent_likelihood: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="1">1 - Çok Düşük</option>
+                      <option value="2">2 - Düşük</option>
+                      <option value="3">3 - Orta</option>
+                      <option value="4">4 - Yüksek</option>
+                      <option value="5">5 - Çok Yüksek</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Etki (1-5)
+                    </label>
+                    <select
+                      value={formData.inherent_impact}
+                      onChange={(e) => setFormData({ ...formData, inherent_impact: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="1">1 - Çok Düşük</option>
+                      <option value="2">2 - Düşük</option>
+                      <option value="3">3 - Orta</option>
+                      <option value="4">4 - Yüksek</option>
+                      <option value="5">5 - Çok Yüksek</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Skor
+                    </label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-center font-semibold text-lg">
+                      {formData.inherent_likelihood * formData.inherent_impact}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Artık Risk Değerlendirmesi</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Olasılık (1-5)
+                    </label>
+                    <select
+                      value={formData.residual_likelihood}
+                      onChange={(e) => setFormData({ ...formData, residual_likelihood: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="1">1 - Çok Düşük</option>
+                      <option value="2">2 - Düşük</option>
+                      <option value="3">3 - Orta</option>
+                      <option value="4">4 - Yüksek</option>
+                      <option value="5">5 - Çok Yüksek</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Etki (1-5)
+                    </label>
+                    <select
+                      value={formData.residual_impact}
+                      onChange={(e) => setFormData({ ...formData, residual_impact: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="1">1 - Çok Düşük</option>
+                      <option value="2">2 - Düşük</option>
+                      <option value="3">3 - Orta</option>
+                      <option value="4">4 - Yüksek</option>
+                      <option value="5">5 - Çok Yüksek</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Skor
+                    </label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-center font-semibold text-lg">
+                      {formData.residual_likelihood * formData.residual_impact}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Risk Yanıtı
+                  </label>
+                  <select
+                    value={formData.risk_response}
+                    onChange={(e) => setFormData({ ...formData, risk_response: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="accept">Kabul Et</option>
+                    <option value="mitigate">Azalt</option>
+                    <option value="transfer">Transfer Et</option>
+                    <option value="avoid">Kaçın</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Durum
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="identified">Tanımlandı</option>
+                    <option value="assessed">Değerlendirildi</option>
+                    <option value="treatment_planned">Faaliyet Planlandı</option>
+                    <option value="under_treatment">İşlem Görüyor</option>
+                    <option value="monitoring">İzleniyor</option>
+                    <option value="closed">Kapatıldı</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t pt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Risk Ekle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
