@@ -11,6 +11,7 @@ import autoTable from 'jspdf-autotable';
 interface YearEndReportsProps {
   fiscalYear: number;
   onRefresh: () => void;
+  departmentId?: string;
 }
 
 interface EvaluationSummary {
@@ -78,7 +79,7 @@ interface DepartmentComparison {
   completion_rate: number;
 }
 
-export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReportsProps) {
+export default function YearEndReports({ fiscalYear, onRefresh, departmentId }: YearEndReportsProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'summary' | 'indicators' | 'criteria' | 'comparison'>('summary');
@@ -90,7 +91,7 @@ export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReports
 
   useEffect(() => {
     loadReportData();
-  }, [fiscalYear, profile?.organization_id]);
+  }, [fiscalYear, profile?.organization_id, departmentId]);
 
   const loadReportData = async () => {
     if (!profile?.organization_id) return;
@@ -114,7 +115,8 @@ export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReports
     try {
       const { data, error } = await supabase.rpc('get_year_end_evaluation_summary', {
         p_organization_id: profile!.organization_id,
-        p_fiscal_year: fiscalYear
+        p_fiscal_year: fiscalYear,
+        p_department_id: departmentId || null
       });
 
       if (error) {
@@ -135,7 +137,7 @@ export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReports
       const { data, error } = await supabase.rpc('get_indicator_evaluations_report', {
         p_organization_id: profile!.organization_id,
         p_fiscal_year: fiscalYear,
-        p_department_id: null
+        p_department_id: departmentId || null
       });
 
       if (error) {
@@ -155,7 +157,8 @@ export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReports
     try {
       const { data, error } = await supabase.rpc('get_criteria_analysis_report', {
         p_organization_id: profile!.organization_id,
-        p_fiscal_year: fiscalYear
+        p_fiscal_year: fiscalYear,
+        p_department_id: departmentId || null
       });
 
       if (error) {
@@ -175,7 +178,8 @@ export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReports
     try {
       const { data, error } = await supabase.rpc('get_department_evaluation_comparison', {
         p_organization_id: profile!.organization_id,
-        p_fiscal_year: fiscalYear
+        p_fiscal_year: fiscalYear,
+        p_department_id: departmentId || null
       });
 
       if (error) {

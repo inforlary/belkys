@@ -98,7 +98,7 @@ export default function StrategicPlanEvaluation() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isDirector = profile?.role === 'director';
   const isVP = profile?.role === 'vice_president';
-  const canViewDashboard = isAdmin || isVP;
+  const canViewDashboard = true;
   const canApprove = isAdmin || isDirector || isVP;
 
   useEffect(() => {
@@ -698,7 +698,11 @@ export default function StrategicPlanEvaluation() {
       </div>
 
       {activeTab === 'reports' && canViewDashboard ? (
-        <YearEndReports fiscalYear={evaluationYear} onRefresh={loadData} />
+        <YearEndReports
+          fiscalYear={evaluationYear}
+          onRefresh={loadData}
+          departmentId={(isAdmin || isVP) ? undefined : profile?.department_id}
+        />
       ) : (
         <>
           {showDashboard && canViewDashboard && progress && (
