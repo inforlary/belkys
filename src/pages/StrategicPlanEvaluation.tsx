@@ -582,7 +582,17 @@ export default function StrategicPlanEvaluation() {
           <div className="mt-6">
             <h3 className="font-medium mb-3">Müdürlük Bazında Durum</h3>
             <div className="space-y-2">
-              {allEvaluations.map(evalItem => (
+              {allEvaluations.map(evalItem => {
+                console.log('Evaluation item:', {
+                  id: evalItem.id,
+                  status: evalItem.status,
+                  department_id: evalItem.department_id,
+                  profile_department_id: profile?.department_id,
+                  isDirector,
+                  match: evalItem.department_id === profile?.department_id
+                });
+
+                return (
                 <div key={evalItem.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <div className="font-medium">{evalItem.department?.name}</div>
@@ -637,7 +647,8 @@ export default function StrategicPlanEvaluation() {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </Card>
