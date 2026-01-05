@@ -11,9 +11,10 @@ interface RiskIndicator {
   name: string;
   indicator_type: string;
   unit_of_measure: string;
-  green_threshold: number;
-  yellow_threshold: number;
-  red_threshold: number;
+  measurement_frequency: string;
+  green_threshold: string;
+  yellow_threshold: string;
+  red_threshold: string;
   direction: string;
   is_active: boolean;
   risk: {
@@ -40,10 +41,12 @@ export default function RiskIndicators() {
     name: '',
     indicator_type: 'kri',
     unit_of_measure: '',
-    green_threshold: 0,
-    yellow_threshold: 0,
-    red_threshold: 0,
-    direction: 'lower_better'
+    measurement_frequency: 'monthly',
+    green_threshold: '',
+    yellow_threshold: '',
+    red_threshold: '',
+    direction: 'lower_better',
+    description: ''
   });
 
   useEffect(() => {
@@ -143,10 +146,12 @@ export default function RiskIndicators() {
         name: '',
         indicator_type: 'kri',
         unit_of_measure: '',
-        green_threshold: 0,
-        yellow_threshold: 0,
-        red_threshold: 0,
-        direction: 'lower_better'
+        measurement_frequency: 'monthly',
+        green_threshold: '',
+        yellow_threshold: '',
+        red_threshold: '',
+        direction: 'lower_better',
+        description: ''
       });
       setSelectedRisk('');
       loadIndicators();
@@ -367,7 +372,18 @@ export default function RiskIndicators() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Açıklama</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  rows={2}
+                  placeholder="Gösterge ile ilgili açıklama..."
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Ölçü Birimi</label>
                   <input
@@ -376,7 +392,23 @@ export default function RiskIndicators() {
                     onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                     placeholder="Adet, %, TL vb."
+                    required
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Ölçüm Sıklığı</label>
+                  <select
+                    value={formData.measurement_frequency}
+                    onChange={(e) => setFormData({ ...formData, measurement_frequency: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  >
+                    <option value="daily">Günlük</option>
+                    <option value="weekly">Haftalık</option>
+                    <option value="monthly">Aylık</option>
+                    <option value="quarterly">Çeyreklik</option>
+                    <option value="annually">Yıllık</option>
+                  </select>
                 </div>
 
                 <div>
@@ -396,11 +428,11 @@ export default function RiskIndicators() {
                 <div>
                   <label className="block text-sm font-medium text-green-700 mb-1">Yeşil Eşik</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     value={formData.green_threshold}
-                    onChange={(e) => setFormData({ ...formData, green_threshold: parseFloat(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, green_threshold: e.target.value })}
                     className="w-full px-3 py-2 border border-green-300 rounded-lg"
+                    placeholder="Örn: <5, 0-10, >=95"
                     required
                   />
                 </div>
@@ -408,11 +440,11 @@ export default function RiskIndicators() {
                 <div>
                   <label className="block text-sm font-medium text-yellow-700 mb-1">Sarı Eşik</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     value={formData.yellow_threshold}
-                    onChange={(e) => setFormData({ ...formData, yellow_threshold: parseFloat(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, yellow_threshold: e.target.value })}
                     className="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                    placeholder="Örn: 5-10, 10-20"
                     required
                   />
                 </div>
@@ -420,11 +452,11 @@ export default function RiskIndicators() {
                 <div>
                   <label className="block text-sm font-medium text-red-700 mb-1">Kırmızı Eşik</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     value={formData.red_threshold}
-                    onChange={(e) => setFormData({ ...formData, red_threshold: parseFloat(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, red_threshold: e.target.value })}
                     className="w-full px-3 py-2 border border-red-300 rounded-lg"
+                    placeholder="Örn: >10, >=20"
                     required
                   />
                 </div>
