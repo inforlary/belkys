@@ -403,11 +403,10 @@ export default function RiskIndicators() {
                     onChange={(e) => setFormData({ ...formData, measurement_frequency: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   >
-                    <option value="daily">Günlük</option>
-                    <option value="weekly">Haftalık</option>
                     <option value="monthly">Aylık</option>
                     <option value="quarterly">Çeyreklik</option>
-                    <option value="annually">Yıllık</option>
+                    <option value="semi_annual">Altı Aylık</option>
+                    <option value="annual">Yıllık</option>
                   </select>
                 </div>
 
