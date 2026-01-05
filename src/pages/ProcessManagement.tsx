@@ -100,8 +100,12 @@ export default function ProcessManagement() {
   });
 
   useEffect(() => {
-    if (selectedPlanId) {
-      loadData();
+    if (profile?.organization_id) {
+      if (selectedPlanId) {
+        loadData();
+      } else {
+        loadUnassignedProcesses();
+      }
     }
   }, [profile?.organization_id, selectedPlanId]);
 
@@ -559,7 +563,15 @@ export default function ProcessManagement() {
   if (!hasPlan) {
     return (
       <div className="p-6">
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+        <div className="flex items-center gap-3 mb-6">
+          <Activity className="w-8 h-8 text-blue-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Süreç Yönetimi</h1>
+            <p className="text-sm text-gray-600">Süreç Envanteri ve İş Akış Haritaları</p>
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
           <div className="flex items-center">
             <AlertCircle className="w-6 h-6 text-yellow-600 mr-3" />
             <div>
@@ -570,6 +582,34 @@ export default function ProcessManagement() {
             </div>
           </div>
         </div>
+
+        {unassignedProcesses.length > 0 && (
+          <div className="bg-orange-50 border-l-4 border-orange-400 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="w-6 h-6 text-orange-600 mr-3" />
+                <div>
+                  <h3 className="text-lg font-semibold text-orange-800">
+                    {unassignedProcesses.length} adet plansız süreç bulundu
+                  </h3>
+                  <p className="text-orange-700 mt-1">
+                    Bu süreçler henüz bir İç Kontrol Planına atanmamış. Bir plan seçtikten sonra bu süreçleri plana atayabilirsiniz.
+                  </p>
+                  <div className="mt-2">
+                    <ul className="list-disc list-inside text-orange-700 text-sm">
+                      {unassignedProcesses.slice(0, 5).map(p => (
+                        <li key={p.id}>{p.code} - {p.name}</li>
+                      ))}
+                      {unassignedProcesses.length > 5 && (
+                        <li>... ve {unassignedProcesses.length - 5} süreç daha</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
