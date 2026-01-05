@@ -11,10 +11,12 @@ import {
   AlertTriangle,
   MoreVertical,
   Trash2,
-  Edit
+  Edit,
+  X
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
+import Modal from '../components/ui/Modal';
 
 interface ActionPlan {
   id: string;
@@ -50,6 +52,14 @@ export default function ICActionPlans() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showMenu, setShowMenu] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    start_date: '',
+    end_date: '',
+    status: 'draft'
+  });
 
   useEffect(() => {
     loadActionPlans();
@@ -96,6 +106,40 @@ export default function ICActionPlans() {
     }
   };
 
+  const handleAddPlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.start_date || !formData.end_date) {
+      alert('Lütfen tüm zorunlu alanları doldurun');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ic_action_plans')
+        .insert({
+          ...formData,
+          organization_id: profile?.organization_id
+        });
+
+      if (error) throw error;
+
+      setShowAddModal(false);
+      setFormData({
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        status: 'draft'
+      });
+      await loadActionPlans();
+      alert('Eylem planı başarıyla oluşturuldu');
+    } catch (error) {
+      console.error('Error creating plan:', error);
+      alert('Eylem planı oluşturulurken hata oluştu');
+    }
+  };
+
   const deletePlan = async (id: string) => {
     if (!confirm('Bu eylem planını silmek istediğinizden emin misiniz?')) return;
 
@@ -139,7 +183,7 @@ export default function ICActionPlans() {
           </p>
         </div>
         <Button
-          onClick={() => navigate('/internal-control/action-plans/new')}
+          onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -184,7 +228,7 @@ export default function ICActionPlans() {
           <p className="text-sm text-gray-500 mb-4">
             İç kontrol eylem planı oluşturarak başlayın
           </p>
-          <Button onClick={() => navigate('/internal-control/action-plans/new')}>
+          <Button onClick={() => setShowAddModal(true)}>
             <Plus className="w-4 h-4 mr-2" />
             İlk Planı Oluştur
           </Button>
@@ -308,6 +352,96 @@ export default function ICActionPlans() {
           })}
         </div>
       )}
+
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Yeni Eylem Planı"
+      >
+        <form onSubmit={handleAddPlan} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Plan Adı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Açıklama
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Başlangıç Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bitiş Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formData.end_date}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Durum
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="draft">Taslak</option>
+              <option value="active">Aktif</option>
+              <option value="completed">Tamamlandı</option>
+              <option value="cancelled">İptal Edildi</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowAddModal(false)}
+            >
+              İptal
+            </Button>
+            <Button type="submit">
+              Oluştur
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

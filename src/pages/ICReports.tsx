@@ -48,30 +48,33 @@ export default function ICReports() {
         .eq('organization_id', profile.organization_id)
         .eq('status', 'approved');
 
-      const { data: actions } = await supabase
-        .from('ic_actions')
-        .select('status')
-        .in('action_plan_id',
-          supabase
-            .from('ic_action_plans')
-            .select('id')
-            .eq('organization_id', profile.organization_id)
-        );
+      const { data: actionPlans } = await supabase
+        .from('ic_action_plans')
+        .select('id')
+        .eq('organization_id', profile.organization_id);
+
+      const actionPlanIds = actionPlans?.map(p => p.id) || [];
+
+      const { data: actions } = actionPlanIds.length > 0
+        ? await supabase
+            .from('ic_actions')
+            .select('status')
+            .in('action_plan_id', actionPlanIds)
+        : { data: [] };
 
       const { data: meetings } = await supabase
         .from('ic_ikyk_meetings')
         .select('id')
         .eq('organization_id', profile.organization_id);
 
-      const { data: decisions } = await supabase
-        .from('ic_meeting_decisions')
-        .select('status')
-        .in('meeting_id',
-          supabase
-            .from('ic_ikyk_meetings')
-            .select('id')
-            .eq('organization_id', profile.organization_id)
-        );
+      const meetingIds = meetings?.map(m => m.id) || [];
+
+      const { data: decisions } = meetingIds.length > 0
+        ? await supabase
+            .from('ic_meeting_decisions')
+            .select('status')
+            .in('meeting_id', meetingIds)
+        : { data: [] };
 
       const avgCompliance = assessments && assessments.length > 0
         ? Math.round(assessments.reduce((acc, a) => acc + a.compliance_level, 0) / assessments.length * 20)
