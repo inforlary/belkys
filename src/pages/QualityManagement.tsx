@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { useBudgetPeriod } from '../hooks/useBudgetPeriod';
 import Modal from '../components/ui/Modal';
 import {
   Award,
@@ -59,6 +60,7 @@ interface User {
 
 export default function QualityManagement() {
   const { user, organization } = useAuth();
+  const { currentPeriod } = useBudgetPeriod(organization?.id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'objectives' | 'surveys' | 'standards' | 'indicators'>('overview');
@@ -85,11 +87,11 @@ export default function QualityManagement() {
   const [surveyForm, setSurveyForm] = useState({
     survey_title: '',
     survey_date: '',
-    stakeholder_type: 'customer',
+    stakeholder_type: 'internal',
     satisfaction_score: '',
     total_responses: '',
-    survey_method: '',
-    key_findings: ''
+    analysis: '',
+    improvement_actions: ''
   });
 
   useEffect(() => {
@@ -218,6 +220,11 @@ export default function QualityManagement() {
   const handleCreateSurvey = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!currentPeriod) {
+      alert('Lütfen önce aktif bir bütçe dönemi oluşturun.');
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -225,13 +232,15 @@ export default function QualityManagement() {
         .from('customer_satisfaction_surveys')
         .insert({
           organization_id: organization?.id,
+          budget_period_id: currentPeriod.id,
           survey_title: surveyForm.survey_title,
           survey_date: surveyForm.survey_date,
           stakeholder_type: surveyForm.stakeholder_type,
           satisfaction_score: parseFloat(surveyForm.satisfaction_score),
           total_responses: parseInt(surveyForm.total_responses),
-          survey_method: surveyForm.survey_method,
-          key_findings: surveyForm.key_findings
+          analysis: surveyForm.analysis,
+          improvement_actions: surveyForm.improvement_actions,
+          created_by: user?.id
         });
 
       if (error) throw error;
@@ -240,11 +249,11 @@ export default function QualityManagement() {
       setSurveyForm({
         survey_title: '',
         survey_date: '',
-        stakeholder_type: 'customer',
+        stakeholder_type: 'internal',
         satisfaction_score: '',
         total_responses: '',
-        survey_method: '',
-        key_findings: ''
+        analysis: '',
+        improvement_actions: ''
       });
       fetchData();
       alert('Müşteri memnuniyeti anketi başarıyla oluşturuldu!');
@@ -786,11 +795,10 @@ export default function QualityManagement() {
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               >
-                <option value="customer">Müşteri</option>
-                <option value="employee">Çalışan</option>
-                <option value="supplier">Tedarikçi</option>
-                <option value="partner">İş Ortağı</option>
+                <option value="internal">İç Paydaş (Çalışan)</option>
+                <option value="external">Dış Paydaş (Müşteri/Tedarikçi)</option>
                 <option value="citizen">Vatandaş</option>
+                <option value="business">İşletme</option>
               </select>
             </div>
           </div>
@@ -829,31 +837,27 @@ export default function QualityManagement() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Anket Yöntemi
+              Analiz
             </label>
-            <select
-              value={surveyForm.survey_method}
-              onChange={(e) => setSurveyForm({ ...surveyForm, survey_method: e.target.value })}
+            <textarea
+              value={surveyForm.analysis}
+              onChange={(e) => setSurveyForm({ ...surveyForm, analysis: e.target.value })}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Seçiniz...</option>
-              <option value="online">Online</option>
-              <option value="phone">Telefon</option>
-              <option value="face_to_face">Yüz Yüze</option>
-              <option value="email">E-posta</option>
-            </select>
+              rows={3}
+              placeholder="Anket sonuçlarının analizi..."
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Anahtar Bulgular
+              İyileştirme Aksiyonları
             </label>
             <textarea
-              value={surveyForm.key_findings}
-              onChange={(e) => setSurveyForm({ ...surveyForm, key_findings: e.target.value })}
+              value={surveyForm.improvement_actions}
+              onChange={(e) => setSurveyForm({ ...surveyForm, improvement_actions: e.target.value })}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
               rows={3}
-              placeholder="Anket sonuçlarının özeti ve önemli bulgular..."
+              placeholder="Anket sonuçlarına göre alınacak iyileştirme aksiyonları..."
             />
           </div>
 
