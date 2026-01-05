@@ -57,6 +57,7 @@ import RiskManagement from './pages/RiskManagement';
 import RiskAppetiteManagement from './pages/RiskAppetiteManagement';
 import RiskProfile from './pages/RiskProfile';
 import RiskReports from './pages/RiskReports';
+import RiskDashboard from './pages/RiskDashboard';
 import ControlActivities from './pages/ControlActivities';
 import MonitoringEvaluation from './pages/MonitoringEvaluation';
 import CAPAManagement from './pages/CAPAManagement';
@@ -276,6 +277,8 @@ const renderPage = () => {
         return <OrganizationManagement />;
       case 'process-management':
         return <ProcessManagement />;
+      case 'risks':
+        return <RiskDashboard />;
       case 'risk-management':
         return <RiskManagement />;
       case 'risk-appetite-management':
