@@ -60,6 +60,11 @@ import RiskReports from './pages/RiskReports';
 import RiskDashboard from './pages/RiskDashboard';
 import RiskRegister from './pages/RiskRegister';
 import RiskMatrix from './pages/RiskMatrix';
+import RiskHeatMapPage from './pages/RiskHeatMapPage';
+import RiskIndicators from './pages/RiskIndicators';
+import RiskIndicatorEntry from './pages/RiskIndicatorEntry';
+import RiskTreatments from './pages/RiskTreatments';
+import RiskCategories from './pages/RiskCategories';
 import ControlActivities from './pages/ControlActivities';
 import MonitoringEvaluation from './pages/MonitoringEvaluation';
 import CAPAManagement from './pages/CAPAManagement';
@@ -285,6 +290,16 @@ const renderPage = () => {
         return <RiskRegister />;
       case 'risks/matrix':
         return <RiskMatrix />;
+      case 'risks/heatmap':
+        return <RiskHeatMapPage />;
+      case 'risks/indicators':
+        return <RiskIndicators />;
+      case 'risks/indicators/entry':
+        return <RiskIndicatorEntry />;
+      case 'risks/treatments':
+        return <RiskTreatments />;
+      case 'risks/categories':
+        return <RiskCategories />;
       case 'risk-management':
         return <RiskManagement />;
       case 'risk-appetite-management':
