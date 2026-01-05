@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertCircle, CheckCircle, Clock, ChevronDown, ChevronRight, Save, Send, Check, X, BarChart3 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, ChevronDown, ChevronRight, Save, Send, Check, X, BarChart3, FileText } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import YearEndReports from '../components/reports/YearEndReports';
 
 interface Department {
   id: string;
@@ -89,6 +90,7 @@ export default function StrategicPlanEvaluation() {
   const [expandedIndicators, setExpandedIndicators] = useState<Set<string>>(new Set());
   const [expandedCriteria, setExpandedCriteria] = useState<Set<string>>(new Set());
   const [showDashboard, setShowDashboard] = useState(true);
+  const [activeTab, setActiveTab] = useState<'evaluation' | 'reports'>('evaluation');
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isDirector = profile?.role === 'director';
@@ -555,7 +557,40 @@ export default function StrategicPlanEvaluation() {
         </div>
       </div>
 
-      {showDashboard && canViewDashboard && progress && (
+      <div className="border-b border-gray-200">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('evaluation')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'evaluation'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileText className="w-4 h-4 inline mr-2" />
+            Değerlendirme Girişi
+          </button>
+          {canViewDashboard && (
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'reports'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 inline mr-2" />
+              Raporlar
+            </button>
+          )}
+        </nav>
+      </div>
+
+      {activeTab === 'reports' && canViewDashboard ? (
+        <YearEndReports fiscalYear={evaluationYear} />
+      ) : (
+        <>
+          {showDashboard && canViewDashboard && progress && (
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Değerlendirme İlerlemesi</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -973,6 +1008,8 @@ export default function StrategicPlanEvaluation() {
             )}
           </Card>
         </div>
+      )}
+        </>
       )}
     </div>
   );
