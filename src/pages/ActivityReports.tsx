@@ -1,798 +1,591 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Card, CardBody } from '../components/ui/Card';
+import { useLocation } from '../hooks/useLocation';
+import { Card } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import ReportComments from '../components/activity-reports/ReportComments';
-import DeadlineWarning from '../components/activity-reports/DeadlineWarning';
-import VersionHistory from '../components/activity-reports/VersionHistory';
-import TemplateSelector from '../components/activity-reports/TemplateSelector';
-import EnhancedReportEditor from '../components/activity-reports/EnhancedReportEditor';
-import MarkdownRenderer from '../components/activity-reports/MarkdownRenderer';
-import TableRenderer from '../components/activity-reports/TableRenderer';
+import StatusBadge from '../components/ui/StatusBadge';
 import {
-  Search,
-  Edit2,
   FileText,
   Plus,
-  Send,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Eye,
   Calendar,
-  MessageSquare,
-  History,
-  AlertCircle,
+  Building2,
+  Users,
+  CheckCircle,
+  Clock,
+  Send,
+  Eye,
+  Edit,
+  Trash2,
+  Download,
 } from 'lucide-react';
 
-interface Indicator {
+interface ActivityReport {
   id: string;
-  code: string;
-  name: string;
-  target_value: number | null;
-  unit: string | null;
-}
-
-interface Report {
-  id: string;
-  indicator_id: string;
+  organization_id: string;
+  year: number;
+  type: 'UNIT' | 'INSTITUTION';
+  unit_id: string | null;
   title: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
-  content: any;
-  rejection_reason?: string;
-  rejection_count: number;
-  submitted_at?: string;
-  approved_at?: string;
-  version: number;
-  template_id?: string;
-  period_quarter?: number;
-  period_month?: number;
+  description: string | null;
+  status: 'DRAFT' | 'UNIT_SUBMITTED' | 'CONSOLIDATING' | 'REVIEW' | 'APPROVED' | 'PUBLISHED';
+  prepared_by_id: string | null;
+  submission_deadline: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  published_at: string | null;
+  completion_percentage: number;
+  created_at: string;
+  updated_at: string;
+  departments?: { name: string };
+  prepared_by?: { full_name: string };
 }
 
-interface Deadline {
-  deadline_date: string;
-  period_type: string;
-  period_year: number;
-  period_quarter?: number;
-  period_month?: number;
-}
-
-interface Template {
+interface Department {
   id: string;
   name: string;
-  description: string;
-  sections: any[];
 }
+
+const STATUS_COLORS = {
+  DRAFT: 'gray',
+  UNIT_SUBMITTED: 'blue',
+  CONSOLIDATING: 'purple',
+  REVIEW: 'yellow',
+  APPROVED: 'green',
+  PUBLISHED: 'emerald',
+} as const;
+
+const STATUS_LABELS = {
+  DRAFT: 'Taslak',
+  UNIT_SUBMITTED: 'Birim Teslim',
+  CONSOLIDATING: 'Birleştiriliyor',
+  REVIEW: 'İnceleme',
+  APPROVED: 'Onaylı',
+  PUBLISHED: 'Yayınlandı',
+};
 
 export default function ActivityReports() {
-  const { profile, user } = useAuth();
-  const [indicators, setIndicators] = useState<Indicator[]>([]);
-  const [reports, setReports] = useState<Record<string, Report>>({});
-  const [deadlines, setDeadlines] = useState<Record<string, Deadline>>({});
+  const { profile } = useAuth();
+  const { navigate } = useLocation();
+  const [reports, setReports] = useState<ActivityReport[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIndicator, setSelectedIndicator] = useState<Indicator | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedPeriod, setSelectedPeriod] = useState<'yearly' | 'quarterly' | 'monthly'>('yearly');
-  const [selectedQuarter, setSelectedQuarter] = useState<number | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  const [editData, setEditData] = useState({
-    title: '',
-    content: { text: '', images: [], tables: [] },
+  const [filters, setFilters] = useState({
+    year: new Date().getFullYear(),
+    type: 'all',
+    status: 'all',
+    unitId: 'all',
   });
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const [newReport, setNewReport] = useState({
+    year: new Date().getFullYear(),
+    type: 'INSTITUTION' as 'UNIT' | 'INSTITUTION',
+    unitId: '',
+    title: '',
+    description: '',
+    submissionDeadline: '',
+  });
 
   useEffect(() => {
     if (profile) {
       loadData();
     }
-  }, [profile, selectedYear, selectedPeriod, selectedQuarter, selectedMonth]);
+  }, [profile, filters]);
 
   const loadData = async () => {
-    if (!profile?.organization_id || !profile?.department_id) return;
-
     try {
       setLoading(true);
 
-      // Load indicators
-      let indicatorsQuery = supabase
-        .from('indicators')
-        .select(`
-          id,
-          code,
-          name,
-          target_value,
-          unit,
-          goal:goals!inner(department_id)
-        `)
-        .eq('organization_id', profile.organization_id)
-        .order('code');
-
-      if (profile.role !== 'admin') {
-        indicatorsQuery = indicatorsQuery.eq('goal.department_id', profile.department_id);
-      }
-
-      const { data: indicatorsData } = await indicatorsQuery;
-
-      // Load reports
-      let reportsQuery = supabase
+      let query = supabase
         .from('activity_reports')
-        .select('*')
-        .eq('organization_id', profile.organization_id)
-        .eq('period_year', selectedYear);
+        .select(`
+          *,
+          departments:unit_id(name),
+          prepared_by:prepared_by_id(full_name)
+        `)
+        .eq('organization_id', profile!.organization_id)
+        .order('year', { ascending: false })
+        .order('created_at', { ascending: false });
 
-      if (selectedPeriod === 'quarterly' && selectedQuarter) {
-        reportsQuery = reportsQuery.eq('period_quarter', selectedQuarter);
-      } else if (selectedPeriod === 'monthly' && selectedMonth) {
-        reportsQuery = reportsQuery.eq('period_month', selectedMonth);
+      if (filters.year) {
+        query = query.eq('year', filters.year);
+      }
+      if (filters.type !== 'all') {
+        query = query.eq('type', filters.type);
+      }
+      if (filters.status !== 'all') {
+        query = query.eq('status', filters.status);
+      }
+      if (filters.unitId !== 'all') {
+        query = query.eq('unit_id', filters.unitId);
       }
 
-      if (profile.role !== 'admin') {
-        reportsQuery = reportsQuery.eq('department_id', profile.department_id);
-      }
+      const { data: reportsData, error: reportsError } = await query;
 
-      const { data: reportsData } = await reportsQuery;
+      if (reportsError) throw reportsError;
+      setReports(reportsData || []);
 
-      // Load deadlines
-      let deadlinesQuery = supabase
-        .from('activity_report_deadlines')
-        .select('*')
-        .eq('organization_id', profile.organization_id)
-        .eq('period_year', selectedYear)
-        .eq('period_type', selectedPeriod)
-        .eq('is_active', true);
+      const { data: deptData } = await supabase
+        .from('departments')
+        .select('id, name')
+        .eq('organization_id', profile!.organization_id)
+        .order('name');
 
-      if (selectedPeriod === 'quarterly' && selectedQuarter) {
-        deadlinesQuery = deadlinesQuery.eq('period_quarter', selectedQuarter);
-      } else if (selectedPeriod === 'monthly' && selectedMonth) {
-        deadlinesQuery = deadlinesQuery.eq('period_month', selectedMonth);
-      }
-
-      const { data: deadlinesData } = await deadlinesQuery;
-
-      setIndicators(indicatorsData || []);
-
-      const reportsMap: Record<string, Report> = {};
-      (reportsData || []).forEach((report) => {
-        reportsMap[report.indicator_id] = report;
-      });
-      setReports(reportsMap);
-
-      const deadlinesMap: Record<string, Deadline> = {};
-      (deadlinesData || []).forEach((deadline) => {
-        const key = deadline.department_id || 'all';
-        deadlinesMap[key] = deadline;
-      });
-      setDeadlines(deadlinesMap);
-    } catch (error) {
-      console.error('Veriler yüklenirken hata:', error);
+      setDepartments(deptData || []);
+    } catch (error: any) {
+      console.error('Error loading reports:', error);
+      alert('Raporlar yüklenirken hata oluştu: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (indicator: Indicator) => {
-    const report = reports[indicator.id];
-
-    if (report && report.status !== 'draft' && profile?.role !== 'admin') {
-      alert('Sadece taslak durumundaki raporları düzenleyebilirsiniz');
-      return;
-    }
-
-    setSelectedIndicator(indicator);
-
-    let content = { text: '', images: [], tables: [] };
-    if (report?.content) {
-      if (typeof report.content === 'string') {
-        content = { text: report.content, images: [], tables: [] };
-      } else {
-        content = {
-          text: report.content.text || report.content.description || '',
-          images: report.content.images || [],
-          tables: report.content.tables || []
-        };
-      }
-    }
-
-    setEditData({
-      title: report?.title || `${indicator.code} - ${indicator.name} Raporu`,
-      content,
-    });
-    setIsEditModalOpen(true);
-  };
-
-  const handleView = (indicator: Indicator) => {
-    const report = reports[indicator.id];
-    if (!report) return;
-
-    setSelectedIndicator(indicator);
-
-    let content = { text: '', images: [], tables: [] };
-    if (report.content) {
-      if (typeof report.content === 'string') {
-        content = { text: report.content, images: [], tables: [] };
-      } else {
-        content = {
-          text: report.content.text || report.content.description || '',
-          images: report.content.images || [],
-          tables: report.content.tables || []
-        };
-      }
-    }
-
-    setEditData({
-      title: report.title,
-      content,
-    });
-    setIsViewModalOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!selectedIndicator || !profile) return;
-
+  const handleCreateReport = async () => {
     try {
-      const report = reports[selectedIndicator.id];
-      const content = editData.content;
-
-      if (report) {
-        // Update existing report
-        const { error } = await supabase
-          .from('activity_reports')
-          .update({
-            title: editData.title,
-            content,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', report.id);
-
-        if (error) throw error;
-
-        // Create version
-        await supabase.from('activity_report_versions').insert([{
-          report_id: report.id,
-          version_number: report.version + 1,
-          title: editData.title,
-          content,
-          changed_by: user?.id,
-          change_description: 'Rapor güncellendi',
-        }]);
-
-        // Update version number
-        await supabase
-          .from('activity_reports')
-          .update({ version: report.version + 1 })
-          .eq('id', report.id);
-      } else {
-        // Create new report
-        const { data: newReport, error } = await supabase
-          .from('activity_reports')
-          .insert([{
-            organization_id: profile.organization_id,
-            department_id: profile.department_id,
-            indicator_id: selectedIndicator.id,
-            title: editData.title,
-            period_year: selectedYear,
-            period_quarter: selectedPeriod === 'quarterly' ? selectedQuarter : null,
-            period_month: selectedPeriod === 'monthly' ? selectedMonth : null,
-            content,
-            template_id: selectedTemplate?.id,
-            created_by: user?.id,
-            status: 'draft',
-            version: 1,
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        // Create initial version
-        if (newReport) {
-          await supabase.from('activity_report_versions').insert([{
-            report_id: newReport.id,
-            version_number: 1,
-            title: editData.title,
-            content,
-            changed_by: user?.id,
-            change_description: 'İlk versiyon',
-          }]);
-        }
+      if (!newReport.title.trim()) {
+        alert('Lütfen rapor başlığı girin');
+        return;
       }
 
-      setIsEditModalOpen(false);
-      loadData();
-    } catch (error) {
-      console.error('Kaydetme hatası:', error);
-      alert('Rapor kaydedilirken bir hata oluştu');
+      if (newReport.type === 'UNIT' && !newReport.unitId) {
+        alert('Lütfen birim seçin');
+        return;
+      }
+
+      const reportData: any = {
+        organization_id: profile!.organization_id,
+        year: newReport.year,
+        type: newReport.type,
+        title: newReport.title,
+        description: newReport.description,
+        status: 'DRAFT',
+        prepared_by_id: profile!.id,
+      };
+
+      if (newReport.type === 'UNIT') {
+        reportData.unit_id = newReport.unitId;
+      }
+
+      if (newReport.submissionDeadline) {
+        reportData.submission_deadline = newReport.submissionDeadline;
+      }
+
+      const { data, error } = await supabase
+        .from('activity_reports')
+        .insert([reportData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      alert('Rapor başarıyla oluşturuldu');
+      setIsCreateModalOpen(false);
+      setNewReport({
+        year: new Date().getFullYear(),
+        type: 'INSTITUTION',
+        unitId: '',
+        title: '',
+        description: '',
+        submissionDeadline: '',
+      });
+
+      navigate(`activity-reports/${data.id}/edit`);
+    } catch (error: any) {
+      console.error('Error creating report:', error);
+      alert('Rapor oluşturulurken hata oluştu: ' + error.message);
     }
   };
 
-  const handleSubmit = async (indicatorId: string) => {
-    const report = reports[indicatorId];
-    if (!report) return;
-
-    if (!confirm('Raporu göndermek istediğinizden emin misiniz? Gönderildikten sonra düzenleyemezsiniz.')) {
+  const handleDeleteReport = async (reportId: string) => {
+    if (!confirm('Bu raporu silmek istediğinizden emin misiniz?')) {
       return;
     }
 
     try {
       const { error } = await supabase
         .from('activity_reports')
-        .update({
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-        })
-        .eq('id', report.id);
+        .delete()
+        .eq('id', reportId);
 
       if (error) throw error;
 
-      // Create notification for admins
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('organization_id', profile?.organization_id)
-        .eq('role', 'admin');
-
-      if (admins) {
-        await supabase.from('activity_report_notifications').insert(
-          admins.map(admin => ({
-            organization_id: profile?.organization_id,
-            user_id: admin.id,
-            report_id: report.id,
-            notification_type: 'submitted',
-            title: 'Yeni Rapor Gönderildi',
-            message: `${profile?.full_name} tarafından ${report.title} raporu gönderildi.`,
-          }))
-        );
-      }
-
+      alert('Rapor silindi');
       loadData();
-    } catch (error) {
-      console.error('Gönderme hatası:', error);
-      alert('Rapor gönderilirken bir hata oluştu');
+    } catch (error: any) {
+      console.error('Error deleting report:', error);
+      alert('Rapor silinirken hata oluştu: ' + error.message);
     }
   };
 
-  const handleApprove = async (indicatorId: string) => {
-    const report = reports[indicatorId];
-    if (!report || profile?.role !== 'admin') return;
-
-    if (!confirm('Raporu onaylamak istediğinizden emin misiniz?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('activity_reports')
-        .update({
-          status: 'approved',
-          approved_at: new Date().toISOString(),
-          approved_by: user?.id,
-        })
-        .eq('id', report.id);
-
-      if (error) throw error;
-
-      // Notification
-      await supabase.from('activity_report_notifications').insert([{
-        organization_id: profile.organization_id,
-        user_id: report.created_by,
-        report_id: report.id,
-        notification_type: 'approved',
-        title: 'Rapor Onaylandı',
-        message: `${report.title} raporunuz onaylandı.`,
-      }]);
-
-      loadData();
-    } catch (error) {
-      console.error('Onay hatası:', error);
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'DRAFT':
+        return <Edit className="w-4 h-4" />;
+      case 'UNIT_SUBMITTED':
+        return <Send className="w-4 h-4" />;
+      case 'CONSOLIDATING':
+      case 'REVIEW':
+        return <Clock className="w-4 h-4" />;
+      case 'APPROVED':
+      case 'PUBLISHED':
+        return <CheckCircle className="w-4 h-4" />;
+      default:
+        return <FileText className="w-4 h-4" />;
     }
   };
 
-  const handleReject = async (indicatorId: string, reason: string) => {
-    const report = reports[indicatorId];
-    if (!report || profile?.role !== 'admin') return;
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
 
-    try {
-      const { error } = await supabase
-        .from('activity_reports')
-        .update({
-          status: 'rejected',
-          rejection_reason: reason,
-          rejection_count: report.rejection_count + 1,
-        })
-        .eq('id', report.id);
-
-      if (error) throw error;
-
-      // Notification
-      await supabase.from('activity_report_notifications').insert([{
-        organization_id: profile.organization_id,
-        user_id: report.created_by,
-        report_id: report.id,
-        notification_type: 'rejected',
-        title: 'Rapor Reddedildi',
-        message: `${report.title} raporunuz reddedildi: ${reason}`,
-      }]);
-
-      loadData();
-    } catch (error) {
-      console.error('Red hatası:', error);
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const badges = {
-      draft: { icon: Edit2, text: 'Taslak', class: 'bg-gray-100 text-gray-800' },
-      submitted: { icon: Clock, text: 'Gönderildi', class: 'bg-blue-100 text-blue-800' },
-      approved: { icon: CheckCircle, text: 'Onaylandı', class: 'bg-green-100 text-green-800' },
-      rejected: { icon: XCircle, text: 'Reddedildi', class: 'bg-red-100 text-red-800' },
-    };
-
-    const badge = badges[status as keyof typeof badges];
-    const Icon = badge.icon;
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.class}`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {badge.text}
-      </span>
-    );
-  };
-
-  const filteredIndicators = indicators.filter(indicator => {
-    const matchesSearch = indicator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         indicator.code.toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    const report = reports[indicator.id];
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'pending') return !report || report.status === 'draft';
-    return report?.status === statusFilter;
-  });
-
-  const getDeadline = () => {
-    return deadlines[profile?.department_id || ''] || deadlines['all'] || null;
-  };
+  const canCreateReport = profile?.role === 'admin' || profile?.role === 'vice_president' || profile?.role === 'director';
+  const canDelete = profile?.role === 'admin' || profile?.role === 'vice_president';
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Faaliyet Raporlarım</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Gösterge bazlı faaliyet raporlarınızı oluşturun ve yönetin
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Faaliyet Raporları</h1>
+          <p className="text-gray-600 mt-2">
+            İdare ve birim faaliyet raporlarını oluşturun ve yönetin
+          </p>
+        </div>
+        {canCreateReport && (
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Yeni Rapor
+          </Button>
+        )}
       </div>
 
-      <DeadlineWarning
-        deadline={getDeadline()}
-        hasReport={Object.keys(reports).length > 0}
-        reportStatus={Object.values(reports)[0]?.status}
-      />
-
       <Card>
-        <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="p-6 border-b border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Calendar className="h-4 w-4 inline mr-1" />
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Yıl
               </label>
               <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={filters.year}
+                onChange={(e) => setFilters({ ...filters, year: parseInt(e.target.value) })}
+                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
                 {years.map((year) => (
-                  <option key={year} value={year}>{year}</option>
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Dönem
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Rapor Türü
               </label>
               <select
-                value={selectedPeriod}
-                onChange={(e) => {
-                  setSelectedPeriod(e.target.value as any);
-                  setSelectedQuarter(null);
-                  setSelectedMonth(null);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={filters.type}
+                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
-                <option value="yearly">Yıllık</option>
-                <option value="quarterly">Çeyreklik</option>
-                <option value="monthly">Aylık</option>
+                <option value="all">Tümü</option>
+                <option value="INSTITUTION">İdare Raporu</option>
+                <option value="UNIT">Birim Raporu</option>
               </select>
             </div>
 
-            {selectedPeriod === 'quarterly' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Çeyrek
-                </label>
-                <select
-                  value={selectedQuarter || ''}
-                  onChange={(e) => setSelectedQuarter(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Seçiniz</option>
-                  <option value="1">Q1 (Ocak-Mart)</option>
-                  <option value="2">Q2 (Nisan-Haziran)</option>
-                  <option value="3">Q3 (Temmuz-Eylül)</option>
-                  <option value="4">Q4 (Ekim-Aralık)</option>
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Durum
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="all">Tümü</option>
+                <option value="DRAFT">Taslak</option>
+                <option value="UNIT_SUBMITTED">Birim Teslim</option>
+                <option value="CONSOLIDATING">Birleştiriliyor</option>
+                <option value="REVIEW">İnceleme</option>
+                <option value="APPROVED">Onaylı</option>
+                <option value="PUBLISHED">Yayınlandı</option>
+              </select>
+            </div>
 
-            {selectedPeriod === 'monthly' && (
+            {departments.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ay
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Birim
                 </label>
                 <select
-                  value={selectedMonth || ''}
-                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  value={filters.unitId}
+                  onChange={(e) => setFilters({ ...filters, unitId: e.target.value })}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
-                  <option value="">Seçiniz</option>
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {new Date(2000, i, 1).toLocaleString('tr-TR', { month: 'long' })}
+                  <option value="all">Tümü</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
                     </option>
                   ))}
                 </select>
               </div>
             )}
+          </div>
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Durum
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Tümü</option>
-                <option value="pending">Bekleyen</option>
-                <option value="draft">Taslak</option>
-                <option value="submitted">Gönderildi</option>
-                <option value="approved">Onaylandı</option>
-                <option value="rejected">Reddedildi</option>
-              </select>
+        <div className="p-6">
+          {reports.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Rapor Bulunamadı</h3>
+              <p className="text-gray-500 mb-6">
+                Seçili filtrelere uygun rapor bulunmuyor. Yeni bir rapor oluşturabilirsiniz.
+              </p>
+              {canCreateReport && (
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="w-5 h-5 mr-2" />
+                  İlk Raporunuzu Oluşturun
+                </Button>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              {reports.map((report) => (
+                <div
+                  key={report.id}
+                  className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {report.title}
+                        </h3>
+                        <StatusBadge
+                          status={report.status}
+                          label={STATUS_LABELS[report.status]}
+                          variant={STATUS_COLORS[report.status]}
+                        />
+                        {getStatusIcon(report.status)}
+                      </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Gösterge ara..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </CardBody>
-      </Card>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>{report.year}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {report.type === 'INSTITUTION' ? (
+                            <>
+                              <Building2 className="w-4 h-4" />
+                              <span>İdare Raporu</span>
+                            </>
+                          ) : (
+                            <>
+                              <Users className="w-4 h-4" />
+                              <span>Birim: {report.departments?.name || 'Bilinmiyor'}</span>
+                            </>
+                          )}
+                        </div>
+                        {report.prepared_by?.full_name && (
+                          <div className="flex items-center gap-1">
+                            <span>Hazırlayan: {report.prepared_by.full_name}</span>
+                          </div>
+                        )}
+                      </div>
 
-      <div className="space-y-3">
-        {filteredIndicators.map((indicator) => {
-          const report = reports[indicator.id];
+                      {report.description && (
+                        <p className="text-gray-600 text-sm mb-3">{report.description}</p>
+                      )}
 
-          return (
-            <Card key={indicator.id}>
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="font-mono text-sm font-semibold text-blue-600">
-                        {indicator.code}
-                      </span>
-                      <h3 className="font-semibold text-gray-900">{indicator.name}</h3>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all"
+                            style={{ width: `${report.completion_percentage}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">
+                          %{report.completion_percentage} Tamamlandı
+                        </span>
+                      </div>
+
+                      {report.submission_deadline && (
+                        <div className="mt-3 text-sm text-orange-600">
+                          <Clock className="w-4 h-4 inline mr-1" />
+                          Teslim Tarihi: {new Date(report.submission_deadline).toLocaleDateString('tr-TR')}
+                        </div>
+                      )}
                     </div>
 
-                    {report && (
-                      <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                        {getStatusBadge(report.status)}
-                        <span className="flex items-center">
-                          <History className="h-4 w-4 mr-1" />
-                          v{report.version}
-                        </span>
-                        {report.rejection_count > 0 && (
-                          <span className="text-red-600 flex items-center">
-                            <AlertCircle className="h-4 w-4 mr-1" />
-                            {report.rejection_count}x reddedildi
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {report?.rejection_reason && (
-                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-                        <strong>Red Nedeni:</strong> {report.rejection_reason}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-2 ml-4">
-                    {report ? (
-                      <>
-                        <Button variant="outline" size="sm" onClick={() => handleView(indicator)}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          Görüntüle
-                        </Button>
-
-                        {(report.status === 'draft' || report.status === 'rejected' || profile?.role === 'admin') && (
-                          <Button size="sm" onClick={() => handleEdit(indicator)}>
-                            <Edit2 className="h-4 w-4 mr-1" />
-                            Düzenle
-                          </Button>
-                        )}
-
-                        {report.status === 'draft' && profile?.role !== 'admin' && (
-                          <Button size="sm" onClick={() => handleSubmit(indicator.id)}>
-                            <Send className="h-4 w-4 mr-1" />
-                            Gönder
-                          </Button>
-                        )}
-
-                        {report.status === 'submitted' && profile?.role === 'admin' && (
-                          <>
-                            <Button size="sm" onClick={() => handleApprove(indicator.id)}>
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Onayla
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const reason = prompt('Red nedeni:');
-                                if (reason) handleReject(indicator.id, reason);
-                              }}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reddet
-                            </Button>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <Button size="sm" onClick={() => handleEdit(indicator)}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Rapor Oluştur
+                    <div className="flex items-center gap-2 ml-4">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`activity-reports/${report.id}`)}
+                      >
+                        <Eye className="w-4 h-4" />
                       </Button>
-                    )}
+
+                      {report.status === 'DRAFT' && (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => navigate(`activity-reports/${report.id}/edit`)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+
+                          {canDelete && (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleDeleteReport(report.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+
+                      {report.status === 'PUBLISHED' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`activity-reports/${report.id}/export`)}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </CardBody>
-            </Card>
-          );
-        })}
-
-        {filteredIndicators.length === 0 && (
-          <Card>
-            <CardBody>
-              <p className="text-center text-gray-500 py-8">
-                {searchTerm ? 'Arama sonucu bulunamadı' : 'Gösterge bulunamadı'}
-              </p>
-            </CardBody>
-          </Card>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
 
       <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        title={selectedIndicator ? `${selectedIndicator.code} - Rapor Düzenle` : 'Rapor Düzenle'}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Yeni Faaliyet Raporu Oluştur"
+        size="lg"
       >
         <div className="space-y-4">
-          {!reports[selectedIndicator?.id || ''] && (
-            <TemplateSelector
-              onSelect={setSelectedTemplate}
-              selectedTemplateId={selectedTemplate?.id}
-            />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Yıl <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={newReport.year}
+              onChange={(e) => setNewReport({ ...newReport, year: parseInt(e.target.value) })}
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rapor Türü <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={newReport.type}
+              onChange={(e) => setNewReport({ ...newReport, type: e.target.value as 'UNIT' | 'INSTITUTION' })}
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+              <option value="INSTITUTION">İdare Faaliyet Raporu</option>
+              <option value="UNIT">Birim Faaliyet Raporu</option>
+            </select>
+          </div>
+
+          {newReport.type === 'UNIT' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Birim <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={newReport.unitId}
+                onChange={(e) => setNewReport({ ...newReport, unitId: e.target.value })}
+                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="">Birim Seçin</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Rapor Başlığı
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rapor Başlığı <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={editData.title}
-              onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
+              value={newReport.title}
+              onChange={(e) => setNewReport({ ...newReport, title: e.target.value })}
+              placeholder="Örn: 2024 Yılı Faaliyet Raporu"
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
 
-          <EnhancedReportEditor
-            value={editData.content}
-            onChange={(content) => setEditData({ ...editData, content })}
-            reportId={selectedIndicator ? reports[selectedIndicator.id]?.id : undefined}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Açıklama
+            </label>
+            <textarea
+              value={newReport.description}
+              onChange={(e) => setNewReport({ ...newReport, description: e.target.value })}
+              rows={3}
+              placeholder="Rapor hakkında kısa açıklama..."
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Teslim Tarihi
+            </label>
+            <input
+              type="date"
+              value={newReport.submissionDeadline}
+              onChange={(e) => setNewReport({ ...newReport, submissionDeadline: e.target.value })}
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="secondary" onClick={() => setIsCreateModalOpen(false)}>
               İptal
             </Button>
-            <Button onClick={handleSave}>
-              <FileText className="h-4 w-4 mr-2" />
-              Kaydet
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
-        title={selectedIndicator ? `${selectedIndicator.code} - Rapor Görüntüle` : 'Rapor Görüntüle'}
-      >
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold mb-2">{editData.title}</h3>
-            {selectedIndicator && reports[selectedIndicator.id] && (
-              <div className="flex items-center space-x-3 mb-4">
-                {getStatusBadge(reports[selectedIndicator.id].status)}
-                <VersionHistory reportId={reports[selectedIndicator.id].id} />
-              </div>
-            )}
-          </div>
-
-          {editData.content.images && editData.content.images.length > 0 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Görseller:</h4>
-              <div className="grid grid-cols-2 gap-3">
-                {editData.content.images.map((img: any, idx: number) => (
-                  <div key={idx} className="border rounded-lg overflow-hidden">
-                    <img src={img.url} alt={img.name} className="w-full h-auto" />
-                    <p className="text-xs text-gray-500 p-2">{img.name}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {editData.content.tables && editData.content.tables.length > 0 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Tablolar:</h4>
-              <TableRenderer tables={editData.content.tables} />
-            </div>
-          )}
-
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">İçerik:</h4>
-            <MarkdownRenderer content={editData.content.text || editData.content.description || ''} />
-          </div>
-
-          {selectedIndicator && reports[selectedIndicator.id] && (
-            <ReportComments reportId={reports[selectedIndicator.id].id} />
-          )}
-
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>
-              Kapat
+            <Button onClick={handleCreateReport}>
+              Rapor Oluştur ve Düzenlemeye Başla
             </Button>
           </div>
         </div>
