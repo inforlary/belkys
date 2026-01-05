@@ -146,6 +146,30 @@ export default function ActivityReportEdit() {
 
   const initializeSections = async (reportData: ActivityReport) => {
     try {
+      const { data: existingSections, error: checkError } = await supabase
+        .from('report_sections')
+        .select('id, section_code')
+        .eq('report_id', reportId);
+
+      if (checkError) throw checkError;
+
+      if (existingSections && existingSections.length > 0) {
+        const { data: allSections, error: loadError } = await supabase
+          .from('report_sections')
+          .select('*')
+          .eq('report_id', reportId)
+          .order('order_index');
+
+        if (loadError) throw loadError;
+
+        setSections(allSections || []);
+        if (allSections && allSections.length > 0) {
+          setSelectedSection(allSections[0]);
+          setEditContent(allSections[0].html_content || '');
+        }
+        return;
+      }
+
       const sectionTemplates = reportData.type === 'INSTITUTION' ? INSTITUTION_SECTIONS : UNIT_SECTIONS;
 
       const newSections = sectionTemplates.map(template => ({
