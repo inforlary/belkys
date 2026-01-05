@@ -294,35 +294,61 @@ export default function StrategicPlanEvaluation() {
 
       if (error) throw error;
 
+      const updatedMap = new Map(indicatorEvaluations);
+
       for (const [indicatorId, evaluation] of indicatorEvaluations.entries()) {
+        const dataToSave = {
+          relevance_environment_changes: evaluation.relevance_environment_changes || null,
+          relevance_needs_change: evaluation.relevance_needs_change || null,
+          relevance_target_change_needed: evaluation.relevance_target_change_needed || null,
+          effectiveness_target_achieved: evaluation.effectiveness_target_achieved || null,
+          effectiveness_needs_met: evaluation.effectiveness_needs_met || null,
+          effectiveness_update_needed: evaluation.effectiveness_update_needed || null,
+          effectiveness_contribution: evaluation.effectiveness_contribution || null,
+          efficiency_unexpected_costs: evaluation.efficiency_unexpected_costs || null,
+          efficiency_cost_table_update: evaluation.efficiency_cost_table_update || null,
+          efficiency_target_change_due_cost: evaluation.efficiency_target_change_due_cost || null,
+          sustainability_risks: evaluation.sustainability_risks || null,
+          sustainability_measures: evaluation.sustainability_measures || null,
+          sustainability_risk_changes: evaluation.sustainability_risk_changes || null,
+          sustainability_risk_impact: evaluation.sustainability_risk_impact || null,
+          sustainability_plan_update_needed: evaluation.sustainability_plan_update_needed || null,
+          status: evaluation.status || 'draft'
+        };
+
         if (evaluation.id) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('indicator_year_evaluations')
             .update({
-              ...evaluation,
+              ...dataToSave,
               updated_at: new Date().toISOString()
             })
             .eq('id', evaluation.id);
+
+          if (updateError) {
+            console.error('Update error for indicator', indicatorId, updateError);
+          }
         } else {
-          const { data: insertedData } = await supabase
+          const { data: insertedData, error: insertError } = await supabase
             .from('indicator_year_evaluations')
             .insert({
               year_end_evaluation_id: myEvaluation.id,
               indicator_id: indicatorId,
-              ...evaluation,
+              ...dataToSave,
               created_by: user?.id
             })
             .select()
             .single();
 
-          if (insertedData) {
-            const newMap = new Map(indicatorEvaluations);
-            newMap.set(indicatorId, { ...evaluation, id: insertedData.id });
-            setIndicatorEvaluations(newMap);
+          if (insertError) {
+            console.error('Insert error for indicator', indicatorId, insertError);
+          } else if (insertedData) {
+            updatedMap.set(indicatorId, { ...evaluation, id: insertedData.id });
           }
         }
       }
 
+      setIndicatorEvaluations(updatedMap);
       alert('Değerlendirme kaydedildi.');
     } catch (error: any) {
       console.error('Error saving evaluation:', error);
@@ -582,74 +608,77 @@ export default function StrategicPlanEvaluation() {
           <div className="mt-6">
             <h3 className="font-medium mb-3">Müdürlük Bazında Durum</h3>
             <div className="space-y-2">
-              {allEvaluations.map(evalItem => {
-                console.log('Evaluation item:', {
-                  id: evalItem.id,
-                  status: evalItem.status,
-                  department_id: evalItem.department_id,
-                  profile_department_id: profile?.department_id,
-                  isDirector,
-                  match: evalItem.department_id === profile?.department_id
-                });
-
-                return (
+              {allEvaluations.map(evalItem => (
                 <div key={evalItem.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <div className="font-medium">{evalItem.department?.name}</div>
                   </div>
                   <div className="flex items-center gap-3">
                     {getStatusBadge(evalItem.status)}
-                    {evalItem.status !== 'draft' && evalItem.status !== 'completed' && (
-                      <>
-                        {isDirector && evalItem.status === 'submitted' && evalItem.department_id === profile?.department_id && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => approveEvaluation(evalItem.id, evalItem.status)}
-                              disabled={saving}
-                            >
-                              <Check className="w-4 h-4 mr-1" />
-                              Onayla
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => rejectEvaluation(evalItem.id, evalItem.status)}
-                              disabled={saving}
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              Reddet
-                            </Button>
-                          </div>
-                        )}
-                        {(isAdmin || isVP) && evalItem.status === 'director_approved' && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => approveEvaluation(evalItem.id, evalItem.status)}
-                              disabled={saving}
-                            >
-                              <Check className="w-4 h-4 mr-1" />
-                              Onayla
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => rejectEvaluation(evalItem.id, evalItem.status)}
-                              disabled={saving}
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              Reddet
-                            </Button>
-                          </div>
-                        )}
-                      </>
+                    {(isAdmin || isVP) && evalItem.status === 'director_approved' && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => approveEvaluation(evalItem.id, evalItem.status)}
+                          disabled={saving}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Onayla
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => rejectEvaluation(evalItem.id, evalItem.status)}
+                          disabled={saving}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Reddet
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
-                );
-              })}
+              ))}
             </div>
+          </div>
+        </Card>
+      )}
+
+      {isDirector && allEvaluations.some(e => e.status === 'submitted') && (
+        <Card className="p-6 border-2 border-blue-500">
+          <h2 className="text-lg font-semibold mb-4 text-blue-900">Onay Bekleyen Değerlendirmeler</h2>
+          <div className="space-y-3">
+            {allEvaluations
+              .filter(e => e.status === 'submitted')
+              .map(evalItem => (
+                <div key={evalItem.id} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">{evalItem.department?.name}</div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        Onay bekleniyor - {evalItem.submitted_at ? new Date(evalItem.submitted_at).toLocaleDateString('tr-TR') : ''}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => approveEvaluation(evalItem.id, evalItem.status)}
+                        disabled={saving}
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        Onayla
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => rejectEvaluation(evalItem.id, evalItem.status)}
+                        disabled={saving}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Reddet
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
           </div>
         </Card>
       )}
