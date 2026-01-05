@@ -38,7 +38,8 @@ export default function RiskRegister() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [categories, setCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
-  const [objectives, setObjectives] = useState<any[]>([]);
+  const [allGoals, setAllGoals] = useState<any[]>([]);
+  const [filteredGoals, setFilteredGoals] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
@@ -62,6 +63,21 @@ export default function RiskRegister() {
       loadData();
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (formData.owner_unit_id) {
+      const goalsForDepartment = allGoals.filter(
+        goal => goal.department_id === formData.owner_unit_id
+      );
+      setFilteredGoals(goalsForDepartment);
+      if (formData.goal_id && !goalsForDepartment.find(g => g.id === formData.goal_id)) {
+        setFormData(prev => ({ ...prev, goal_id: '' }));
+      }
+    } else {
+      setFilteredGoals([]);
+      setFormData(prev => ({ ...prev, goal_id: '' }));
+    }
+  }, [formData.owner_unit_id, allGoals]);
 
   const loadData = async () => {
     try {
@@ -115,12 +131,13 @@ export default function RiskRegister() {
   const loadGoals = async () => {
     const { data, error } = await supabase
       .from('goals')
-      .select('id, name')
+      .select('id, name, title, department_id')
       .eq('organization_id', profile?.organization_id)
       .order('name');
 
     if (error) throw error;
-    setObjectives(data || []);
+    setAllGoals(data || []);
+    setFilteredGoals(data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -608,13 +625,25 @@ export default function RiskRegister() {
                   <select
                     value={formData.goal_id}
                     onChange={(e) => setFormData({ ...formData, goal_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!formData.owner_unit_id}
                   >
-                    <option value="">Seçiniz...</option>
-                    {objectives.map(obj => (
-                      <option key={obj.id} value={obj.id}>{obj.name}</option>
+                    <option value="">
+                      {formData.owner_unit_id
+                        ? 'Seçiniz...'
+                        : 'Önce sorumlu birim seçiniz...'}
+                    </option>
+                    {filteredGoals.map(obj => (
+                      <option key={obj.id} value={obj.id}>
+                        {obj.name || obj.title}
+                      </option>
                     ))}
                   </select>
+                  {formData.owner_unit_id && filteredGoals.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Bu birim için tanımlı amaç bulunmuyor
+                    </p>
+                  )}
                 </div>
               </div>
 
