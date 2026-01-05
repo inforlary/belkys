@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import { Search, Plus, Calendar, CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
 
 interface QualityAudit {
@@ -105,8 +104,7 @@ export default function QualityAudits() {
   };
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Kalite Denetimleri</h1>
@@ -269,7 +267,6 @@ export default function QualityAudits() {
             )}
           </div>
         </div>
-      </div>
-    </Layout>
+    </div>
   );
 }

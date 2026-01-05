@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import { FileSearch, Calendar, CheckCircle, AlertTriangle, BarChart3, Users } from 'lucide-react';
 
 interface AuditProgram {
@@ -127,8 +126,7 @@ export default function InternalAuditManagement() {
   };
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">İç Denetim Yönetimi</h1>
@@ -301,7 +299,6 @@ export default function InternalAuditManagement() {
             )}
           </div>
         </div>
-      </div>
-    </Layout>
+    </div>
   );
 }
