@@ -304,19 +304,26 @@ export default function StrategicPlanEvaluation() {
             })
             .eq('id', evaluation.id);
         } else {
-          await supabase
+          const { data: insertedData } = await supabase
             .from('indicator_year_evaluations')
             .insert({
               year_end_evaluation_id: myEvaluation.id,
               indicator_id: indicatorId,
               ...evaluation,
               created_by: user?.id
-            });
+            })
+            .select()
+            .single();
+
+          if (insertedData) {
+            const newMap = new Map(indicatorEvaluations);
+            newMap.set(indicatorId, { ...evaluation, id: insertedData.id });
+            setIndicatorEvaluations(newMap);
+          }
         }
       }
 
       alert('Değerlendirme kaydedildi.');
-      await loadMyEvaluation();
     } catch (error: any) {
       console.error('Error saving evaluation:', error);
       alert('Hata: ' + error.message);
@@ -737,12 +744,6 @@ export default function StrategicPlanEvaluation() {
                   <Save className="w-4 h-4 mr-2" />
                   Kaydet
                 </Button>
-                {myEvaluation.status === 'draft' && (
-                  <Button onClick={submitForApproval} disabled={saving}>
-                    <Send className="w-4 h-4 mr-2" />
-                    {isDirector ? 'Yönetici Onayına Gönder' : 'Müdür Onayına Gönder'}
-                  </Button>
-                )}
               </div>
             )}
           </Card>
@@ -922,6 +923,12 @@ export default function StrategicPlanEvaluation() {
                   <Save className="w-4 h-4 mr-2" />
                   Tümünü Kaydet
                 </Button>
+                {myEvaluation.status === 'draft' && (
+                  <Button onClick={submitForApproval} disabled={saving}>
+                    <Send className="w-4 h-4 mr-2" />
+                    {isDirector ? 'Yönetici Onayına Gönder' : 'Müdür Onayına Gönder'}
+                  </Button>
+                )}
               </div>
             )}
           </Card>
