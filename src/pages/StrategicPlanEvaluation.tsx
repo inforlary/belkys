@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
-import { AlertCircle, CheckCircle, Clock, ChevronDown, ChevronRight, Save, Send, Check, X, BarChart3, FileText, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, ChevronDown, ChevronRight, Save, Send, Check, X, BarChart3, FileText, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import YearEndReports from '../components/reports/YearEndReports';
@@ -496,6 +496,41 @@ export default function StrategicPlanEvaluation() {
     }
   };
 
+  const resetToDraft = async (evaluationId: string) => {
+    if (!confirm('Bu değerlendirmeyi taslak durumuna geri döndürmek istediğinize emin misiniz? Sonrasında değerlendirme silinebilir.')) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('year_end_evaluations')
+        .update({
+          status: 'draft',
+          admin_approved_at: null,
+          admin_approved_by: null,
+          admin_comments: null,
+          director_approved_at: null,
+          director_approved_by: null,
+          director_comments: null,
+          submitted_at: null,
+          submitted_by: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', evaluationId);
+
+      if (error) throw error;
+
+      alert('Değerlendirme taslak durumuna geri döndürüldü. Artık silinebilir.');
+      await loadData();
+    } catch (error: any) {
+      console.error('Error resetting evaluation:', error);
+      alert('Hata: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteEvaluation = async () => {
     if (!myEvaluation?.id) return;
 
@@ -746,6 +781,18 @@ export default function StrategicPlanEvaluation() {
                           Reddet
                         </Button>
                       </div>
+                    )}
+                    {(isAdmin || isVP) && evalItem.status === 'completed' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => resetToDraft(evalItem.id)}
+                        disabled={saving}
+                        title="Taslağa döndürerek silme işlemi yapabilirsiniz"
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        Taslağa Döndür
+                      </Button>
                     )}
                   </div>
                 </div>
