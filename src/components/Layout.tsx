@@ -290,6 +290,19 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       ],
     },
     {
+      label: 'İç Kontrol Modülü',
+      icon: ShieldCheck,
+      items: [
+        { icon: LayoutDashboard, label: 'Ana Sayfa', path: 'ic-module' },
+        { icon: BookOpen, label: 'Standartlar (KOS)', path: 'ic-standards' },
+        { icon: FileText, label: 'Eylem Planları', path: 'ic-action-plans' },
+        { icon: CheckCircle, label: 'Değerlendirmeler', path: 'ic-assessments' },
+        { icon: Users, label: 'İKİYK Toplantıları', path: 'ic-ikyk-meetings', adminOnly: true },
+        { icon: ShieldCheck, label: 'Güvence Beyanları', path: 'ic-assurance-statements', adminOnly: true },
+        { icon: BarChart3, label: 'Raporlar', path: 'ic-reports' },
+      ],
+    },
+    {
       label: 'Veri Talep Sistemi',
       icon: Inbox,
       items: [
