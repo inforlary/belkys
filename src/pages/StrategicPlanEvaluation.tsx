@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from '../hooks/useLocation';
 import { AlertCircle, CheckCircle, Clock, ChevronDown, ChevronRight, Save, Send, Check, X, BarChart3, FileText } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -75,6 +76,7 @@ interface EvaluationProgress {
 
 export default function StrategicPlanEvaluation() {
   const { user, profile } = useAuth();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
@@ -91,6 +93,7 @@ export default function StrategicPlanEvaluation() {
   const [expandedCriteria, setExpandedCriteria] = useState<Set<string>>(new Set());
   const [showDashboard, setShowDashboard] = useState(true);
   const [activeTab, setActiveTab] = useState<'evaluation' | 'reports'>('evaluation');
+  const [editingEvaluationId, setEditingEvaluationId] = useState<string | null>(null);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isDirector = profile?.role === 'director';
@@ -99,8 +102,17 @@ export default function StrategicPlanEvaluation() {
   const canApprove = isAdmin || isDirector || isVP;
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const evaluationId = params.get('evaluation_id');
+    if (evaluationId) {
+      setEditingEvaluationId(evaluationId);
+      setActiveTab('evaluation');
+    }
+  }, [location.search]);
+
+  useEffect(() => {
     loadData();
-  }, [evaluationYear, profile?.organization_id]);
+  }, [evaluationYear, profile?.organization_id, editingEvaluationId]);
 
   const loadData = async () => {
     if (!profile?.organization_id) return;
@@ -170,15 +182,25 @@ export default function StrategicPlanEvaluation() {
   };
 
   const loadMyEvaluation = async () => {
-    if (!profile?.organization_id || !profile?.department_id) return;
+    if (!profile?.organization_id) return;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('year_end_evaluations')
       .select('*')
       .eq('organization_id', profile.organization_id)
-      .eq('fiscal_year', evaluationYear)
-      .eq('department_id', profile.department_id)
-      .maybeSingle();
+      .eq('fiscal_year', evaluationYear);
+
+    if (editingEvaluationId) {
+      query = query.eq('id', editingEvaluationId);
+    } else if (profile.department_id) {
+      query = query.eq('department_id', profile.department_id);
+    } else {
+      setMyEvaluation(null);
+      setIndicatorEvaluations(new Map());
+      return;
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       console.error('Error loading my evaluation:', error);
@@ -197,13 +219,19 @@ export default function StrategicPlanEvaluation() {
   const loadIndicators = async () => {
     if (!profile?.organization_id) return;
 
+    let departmentId = profile.department_id;
+
+    if (editingEvaluationId && myEvaluation) {
+      departmentId = myEvaluation.department_id;
+    }
+
     let query = supabase
       .from('goals')
       .select('id')
       .eq('organization_id', profile.organization_id);
 
-    if (profile.department_id && !isAdmin && !isVP) {
-      query = query.eq('department_id', profile.department_id);
+    if (departmentId && (!isAdmin || editingEvaluationId) && !isVP) {
+      query = query.eq('department_id', departmentId);
     }
 
     const { data: goalsData, error: goalsError } = await query;
