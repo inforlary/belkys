@@ -44,7 +44,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function ICActionPlans() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const { navigate } = useLocation();
   const [actionPlans, setActionPlans] = useState<ActionPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,10 +53,10 @@ export default function ICActionPlans() {
 
   useEffect(() => {
     loadActionPlans();
-  }, [user]);
+  }, [profile]);
 
   const loadActionPlans = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) return;
 
     try {
       let query = supabase
@@ -68,7 +68,7 @@ export default function ICActionPlans() {
             status
           )
         `)
-        .eq('organization_id', user.organizationId)
+        .eq('organization_id', profile.organization_id)
         .order('created_at', { ascending: false });
 
       const { data, error } = await query;

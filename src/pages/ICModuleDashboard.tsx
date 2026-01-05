@@ -49,23 +49,23 @@ interface DashboardStats {
 }
 
 export default function ICModuleDashboard() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const { navigate } = useLocation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardData();
-  }, [user]);
+  }, [profile]);
 
   const loadDashboardData = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) return;
 
     try {
       const { data: actionPlans } = await supabase
         .from('ic_action_plans')
         .select('*')
-        .eq('organization_id', user.organizationId)
+        .eq('organization_id', profile.organization_id)
         .eq('status', 'active');
 
       const { data: actions } = await supabase
@@ -75,7 +75,7 @@ export default function ICModuleDashboard() {
           action_plan:ic_action_plans!inner(organization_id),
           responsible_unit:departments!responsible_unit_id(name)
         `)
-        .eq('action_plan.organization_id', user.organizationId);
+        .eq('action_plan.organization_id', profile.organization_id);
 
       const { data: assessments } = await supabase
         .from('ic_standard_assessments')
@@ -85,7 +85,7 @@ export default function ICModuleDashboard() {
             component:ic_components!inner(code, name, color)
           )
         `)
-        .eq('organization_id', user.organizationId)
+        .eq('organization_id', profile.organization_id)
         .eq('status', 'approved')
         .order('assessment_date', { ascending: false });
 
@@ -153,7 +153,7 @@ export default function ICModuleDashboard() {
       const { data: upcomingMeetings } = await supabase
         .from('ic_ikyk_meetings')
         .select('id, meeting_date')
-        .eq('organization_id', user.organizationId)
+        .eq('organization_id', profile.organization_id)
         .eq('status', 'planned')
         .gte('meeting_date', new Date().toISOString().split('T')[0])
         .lte('meeting_date', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])

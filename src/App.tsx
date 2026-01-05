@@ -47,6 +47,10 @@ import InstitutionalFramework from './pages/InstitutionalFramework';
 import ICModuleDashboard from './pages/ICModuleDashboard';
 import ICStandards from './pages/ICStandards';
 import ICActionPlans from './pages/ICActionPlans';
+import ICAssessments from './pages/ICAssessments';
+import ICIKYKMeetings from './pages/ICIKYKMeetings';
+import ICAssuranceStatements from './pages/ICAssuranceStatements';
+import ICReports from './pages/ICReports';
 import OrganizationManagement from './pages/OrganizationManagement';
 import ProcessManagement from './pages/ProcessManagement';
 import RiskManagement from './pages/RiskManagement';
@@ -260,6 +264,14 @@ const renderPage = () => {
         return <ICStandards />;
       case 'ic-action-plans':
         return <ICActionPlans />;
+      case 'ic-assessments':
+        return <ICAssessments />;
+      case 'ic-ikyk-meetings':
+        return <ICIKYKMeetings />;
+      case 'ic-assurance-statements':
+        return <ICAssuranceStatements />;
+      case 'ic-reports':
+        return <ICReports />;
       case 'organization-management':
         return <OrganizationManagement />;
       case 'process-management':
