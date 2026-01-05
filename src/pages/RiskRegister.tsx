@@ -13,14 +13,15 @@ interface Risk {
   description: string;
   category: any;
   owner_unit: any;
-  objective: any;
+  goal: any;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
   residual_likelihood: number;
   residual_impact: number;
   residual_score: number;
-  risk_level: string;
+  inherent_level: string;
+  residual_level: string;
   risk_response: string;
   status: string;
   is_active: boolean;
@@ -45,7 +46,9 @@ export default function RiskRegister() {
     description: '',
     category_id: '',
     owner_unit_id: '',
-    objective_id: '',
+    goal_id: '',
+    causes: '',
+    consequences: '',
     inherent_likelihood: 3,
     inherent_impact: 3,
     residual_likelihood: 2,
@@ -63,7 +66,7 @@ export default function RiskRegister() {
   const loadData = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadRisks(), loadCategories(), loadDepartments(), loadObjectives()]);
+      await Promise.all([loadRisks(), loadCategories(), loadDepartments(), loadGoals()]);
     } finally {
       setLoading(false);
     }
@@ -76,7 +79,7 @@ export default function RiskRegister() {
         *,
         category:risk_categories(name, color),
         owner_unit:departments(name),
-        objective:objectives(title)
+        goal:goals(name)
       `)
       .eq('organization_id', profile?.organization_id)
       .eq('is_active', true)
@@ -109,12 +112,12 @@ export default function RiskRegister() {
     setDepartments(data || []);
   };
 
-  const loadObjectives = async () => {
+  const loadGoals = async () => {
     const { data, error } = await supabase
-      .from('objectives')
-      .select('id, title')
+      .from('goals')
+      .select('id, name')
       .eq('organization_id', profile?.organization_id)
-      .order('title');
+      .order('name');
 
     if (error) throw error;
     setObjectives(data || []);
@@ -122,6 +125,11 @@ export default function RiskRegister() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.category_id || !formData.owner_unit_id) {
+      alert('Lütfen kategori ve sorumlu birim seçiniz');
+      return;
+    }
 
     const inherentScore = formData.inherent_likelihood * formData.inherent_impact;
     const residualScore = formData.residual_likelihood * formData.residual_impact;
@@ -142,18 +150,26 @@ export default function RiskRegister() {
           code: formData.code,
           name: formData.name,
           description: formData.description,
-          category_id: formData.category_id || null,
-          owner_unit_id: formData.owner_unit_id || null,
-          objective_id: formData.objective_id || null,
+          category_id: formData.category_id,
+          owner_unit_id: formData.owner_unit_id,
+          goal_id: formData.goal_id || null,
+          causes: formData.causes || 'Belirtilmedi',
+          consequences: formData.consequences || 'Belirtilmedi',
+          affected_areas: [],
           inherent_likelihood: formData.inherent_likelihood,
           inherent_impact: formData.inherent_impact,
           inherent_score: inherentScore,
+          inherent_level: getRiskLevel(inherentScore),
           residual_likelihood: formData.residual_likelihood,
           residual_impact: formData.residual_impact,
           residual_score: residualScore,
-          risk_level: getRiskLevel(residualScore),
+          residual_level: getRiskLevel(residualScore),
           risk_response: formData.risk_response,
-          status: formData.status
+          response_rationale: null,
+          monitoring_level: 'medium',
+          review_frequency: 'quarterly',
+          status: formData.status,
+          identified_by_id: profile?.id
         });
 
       if (error) throw error;
@@ -165,7 +181,9 @@ export default function RiskRegister() {
         description: '',
         category_id: '',
         owner_unit_id: '',
-        objective_id: '',
+        goal_id: '',
+        causes: '',
+        consequences: '',
         inherent_likelihood: 3,
         inherent_impact: 3,
         residual_likelihood: 2,
@@ -179,7 +197,7 @@ export default function RiskRegister() {
       if (error.code === '23505') {
         alert('Bu kod zaten kullanılmaktadır');
       } else {
-        alert('Risk eklenemedi');
+        alert('Risk eklenemedi: ' + (error.message || 'Bilinmeyen hata'));
       }
     }
   };
@@ -249,7 +267,7 @@ export default function RiskRegister() {
     const matchesSearch = risk.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          risk.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'all' || risk.category?.id === filterCategory;
-    const matchesLevel = filterLevel === 'all' || risk.risk_level === filterLevel;
+    const matchesLevel = filterLevel === 'all' || risk.residual_level === filterLevel;
     const matchesStatus = filterStatus === 'all' || risk.status === filterStatus;
 
     return matchesSearch && matchesCategory && matchesLevel && matchesStatus;
@@ -389,8 +407,8 @@ export default function RiskRegister() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">{risk.name}</div>
-                      {risk.objective && (
-                        <div className="text-xs text-gray-500 mt-1">Hedef: {risk.objective.title}</div>
+                      {risk.goal && (
+                        <div className="text-xs text-gray-500 mt-1">Hedef: {risk.goal.name}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -420,8 +438,8 @@ export default function RiskRegister() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getRiskLevelColor(risk.risk_level)}`}>
-                        {getRiskLevelLabel(risk.risk_level)}
+                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getRiskLevelColor(risk.residual_level)}`}>
+                        {getRiskLevelLabel(risk.residual_level)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
@@ -494,12 +512,13 @@ export default function RiskRegister() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Risk Kategorisi
+                    Risk Kategorisi <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={formData.category_id}
                     onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    required
                   >
                     <option value="">Seçiniz...</option>
                     {categories.map(cat => (
@@ -539,12 +558,41 @@ export default function RiskRegister() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sorumlu Birim
+                    Risk Nedenleri
+                  </label>
+                  <textarea
+                    value={formData.causes}
+                    onChange={(e) => setFormData({ ...formData, causes: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Riskin oluşma nedenleri..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Risk Sonuçları
+                  </label>
+                  <textarea
+                    value={formData.consequences}
+                    onChange={(e) => setFormData({ ...formData, consequences: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Riskin olası sonuçları..."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sorumlu Birim <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={formData.owner_unit_id}
                     onChange={(e) => setFormData({ ...formData, owner_unit_id: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    required
                   >
                     <option value="">Seçiniz...</option>
                     {departments.map(dept => (
@@ -555,16 +603,16 @@ export default function RiskRegister() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    İlişkili Hedef
+                    İlişkili Amaç
                   </label>
                   <select
-                    value={formData.objective_id}
-                    onChange={(e) => setFormData({ ...formData, objective_id: e.target.value })}
+                    value={formData.goal_id}
+                    onChange={(e) => setFormData({ ...formData, goal_id: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   >
                     <option value="">Seçiniz...</option>
                     {objectives.map(obj => (
-                      <option key={obj.id} value={obj.id}>{obj.title}</option>
+                      <option key={obj.id} value={obj.id}>{obj.name}</option>
                     ))}
                   </select>
                 </div>
