@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
-import { AlertCircle, CheckCircle, Clock, ChevronDown, ChevronRight, Save, Send, Check, X, BarChart3, FileText } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, ChevronDown, ChevronRight, Save, Send, Check, X, BarChart3, FileText, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import YearEndReports from '../components/reports/YearEndReports';
@@ -496,6 +496,54 @@ export default function StrategicPlanEvaluation() {
     }
   };
 
+  const deleteEvaluation = async () => {
+    if (!myEvaluation?.id) return;
+
+    if (myEvaluation.status !== 'draft') {
+      alert('Sadece taslak durumdaki değerlendirmeler silinebilir.');
+      return;
+    }
+
+    const departmentName = allEvaluations.find(e => e.id === myEvaluation.id)?.department?.name || 'Bu';
+
+    if (!confirm(`"${departmentName}" değerlendirmesini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`)) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error: indicatorError } = await supabase
+        .from('indicator_year_evaluations')
+        .delete()
+        .eq('year_end_evaluation_id', myEvaluation.id);
+
+      if (indicatorError) {
+        console.error('Error deleting indicator evaluations:', indicatorError);
+        alert('Gösterge değerlendirmeleri silinirken hata oluştu: ' + indicatorError.message);
+        return;
+      }
+
+      const { error: evaluationError } = await supabase
+        .from('year_end_evaluations')
+        .delete()
+        .eq('id', myEvaluation.id);
+
+      if (evaluationError) {
+        console.error('Error deleting evaluation:', evaluationError);
+        alert('Değerlendirme silinirken hata oluştu: ' + evaluationError.message);
+        return;
+      }
+
+      alert('Değerlendirme başarıyla silindi.');
+      await loadData();
+    } catch (err) {
+      console.error('Exception deleting evaluation:', err);
+      alert('Silme işlemi sırasında bir hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const toggleIndicator = (indicatorId: string) => {
     const newExpanded = new Set(expandedIndicators);
     if (newExpanded.has(indicatorId)) {
@@ -764,7 +812,19 @@ export default function StrategicPlanEvaluation() {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Genel Değerlendirme</h2>
-              {getStatusBadge(myEvaluation.status)}
+              <div className="flex items-center gap-3">
+                {getStatusBadge(myEvaluation.status)}
+                {myEvaluation.status === 'draft' && (
+                  <button
+                    onClick={deleteEvaluation}
+                    disabled={saving}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Değerlendirmeyi Sil"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {(myEvaluation.director_comments || myEvaluation.admin_comments) && (

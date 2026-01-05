@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Download, FileText, BarChart3, TrendingUp, AlertTriangle, Edit2, Trash2 } from 'lucide-react';
+import { Download, FileText, BarChart3, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import * as XLSX from 'xlsx';
@@ -377,7 +377,7 @@ export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReports
         </nav>
       </div>
 
-      {activeTab === 'summary' && <SummaryReport data={summaryData} onRefresh={onRefresh} loadReportData={loadReportData} />}
+      {activeTab === 'summary' && <SummaryReport data={summaryData} onRefresh={onRefresh} />}
       {activeTab === 'indicators' && <IndicatorReport data={indicatorData} />}
       {activeTab === 'criteria' && <CriteriaReport data={criteriaData} />}
       {activeTab === 'comparison' && <ComparisonReport data={comparisonData} />}
@@ -385,7 +385,7 @@ export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReports
   );
 }
 
-function SummaryReport({ data, onRefresh, loadReportData }: { data: EvaluationSummary[], onRefresh: () => void, loadReportData: () => void }) {
+function SummaryReport({ data, onRefresh }: { data: EvaluationSummary[], onRefresh: () => void }) {
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; className: string }> = {
       draft: { label: 'Taslak', className: 'bg-gray-100 text-gray-800' },
@@ -402,46 +402,6 @@ function SummaryReport({ data, onRefresh, loadReportData }: { data: EvaluationSu
     );
   };
 
-  const handleEdit = (evaluationId: string) => {
-    window.location.href = `/strategic-plan-evaluation?evaluation_id=${evaluationId}`;
-  };
-
-  const handleDelete = async (evaluationId: string, departmentName: string) => {
-    if (!confirm(`"${departmentName}" müdürlüğünün yıl sonu değerlendirmesini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`)) {
-      return;
-    }
-
-    try {
-      const { error: indicatorError } = await supabase
-        .from('indicator_year_evaluations')
-        .delete()
-        .eq('year_end_evaluation_id', evaluationId);
-
-      if (indicatorError) {
-        console.error('Error deleting indicator evaluations:', indicatorError);
-        alert('Gösterge değerlendirmeleri silinirken hata oluştu: ' + indicatorError.message);
-        return;
-      }
-
-      const { error: evaluationError } = await supabase
-        .from('year_end_evaluations')
-        .delete()
-        .eq('id', evaluationId);
-
-      if (evaluationError) {
-        console.error('Error deleting evaluation:', evaluationError);
-        alert('Değerlendirme silinirken hata oluştu: ' + evaluationError.message);
-        return;
-      }
-
-      alert('Değerlendirme başarıyla silindi.');
-      await loadReportData();
-      onRefresh();
-    } catch (err) {
-      console.error('Exception deleting evaluation:', err);
-      alert('Silme işlemi sırasında bir hata oluştu.');
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -449,27 +409,7 @@ function SummaryReport({ data, onRefresh, loadReportData }: { data: EvaluationSu
         <Card key={item.department_id} className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">{item.department_name}</h3>
-            <div className="flex items-center gap-2">
-              {getStatusBadge(item.status)}
-              {item.evaluation_id && (
-                <div className="flex gap-2 ml-4">
-                  <button
-                    onClick={() => handleEdit(item.evaluation_id)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Düzenle"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.evaluation_id, item.department_name)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Sil"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
+            {getStatusBadge(item.status)}
           </div>
 
           <div className="grid grid-cols-3 gap-4 mb-4">
