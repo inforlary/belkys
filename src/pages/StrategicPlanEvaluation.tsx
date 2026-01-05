@@ -615,7 +615,7 @@ export default function StrategicPlanEvaluation() {
       </div>
 
       {activeTab === 'reports' && canViewDashboard ? (
-        <YearEndReports fiscalYear={evaluationYear} />
+        <YearEndReports fiscalYear={evaluationYear} onRefresh={loadData} />
       ) : (
         <>
           {showDashboard && canViewDashboard && progress && (

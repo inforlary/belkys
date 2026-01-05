@@ -10,6 +10,7 @@ import autoTable from 'jspdf-autotable';
 
 interface YearEndReportsProps {
   fiscalYear: number;
+  onRefresh: () => void;
 }
 
 interface EvaluationSummary {
@@ -77,7 +78,7 @@ interface DepartmentComparison {
   completion_rate: number;
 }
 
-export default function YearEndReports({ fiscalYear }: YearEndReportsProps) {
+export default function YearEndReports({ fiscalYear, onRefresh }: YearEndReportsProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'summary' | 'indicators' | 'criteria' | 'comparison'>('summary');
@@ -376,7 +377,7 @@ export default function YearEndReports({ fiscalYear }: YearEndReportsProps) {
         </nav>
       </div>
 
-      {activeTab === 'summary' && <SummaryReport data={summaryData} onRefresh={loadData} />}
+      {activeTab === 'summary' && <SummaryReport data={summaryData} onRefresh={onRefresh} loadReportData={loadReportData} />}
       {activeTab === 'indicators' && <IndicatorReport data={indicatorData} />}
       {activeTab === 'criteria' && <CriteriaReport data={criteriaData} />}
       {activeTab === 'comparison' && <ComparisonReport data={comparisonData} />}
@@ -384,7 +385,7 @@ export default function YearEndReports({ fiscalYear }: YearEndReportsProps) {
   );
 }
 
-function SummaryReport({ data, onRefresh }: { data: EvaluationSummary[], onRefresh: () => void }) {
+function SummaryReport({ data, onRefresh, loadReportData }: { data: EvaluationSummary[], onRefresh: () => void, loadReportData: () => void }) {
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; className: string }> = {
       draft: { label: 'Taslak', className: 'bg-gray-100 text-gray-800' },
@@ -434,6 +435,7 @@ function SummaryReport({ data, onRefresh }: { data: EvaluationSummary[], onRefre
       }
 
       alert('Değerlendirme başarıyla silindi.');
+      await loadReportData();
       onRefresh();
     } catch (err) {
       console.error('Exception deleting evaluation:', err);
