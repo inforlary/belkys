@@ -627,31 +627,13 @@ export default function KIKSStandards() {
             })
             .eq('id', editingId);
           if (actionError) throw actionError;
-
-          const { error: planError } = await supabase
-            .from('ic_action_plans')
-            .update({
-              ic_plan_id: selectedPlanId,
-              current_situation: selectedSubStandard.current_status || null,
-              planned_actions: formData.description,
-              output_result: formData.output_result || null,
-              notes: formData.notes || null,
-              responsible_unit_id: formData.responsible_departments?.[0] || null,
-              collaboration_units: formData.collaboration_departments || [],
-              completion_date: formData.target_date || null,
-              status: formData.status === 'not_started' ? 'planned' : formData.status,
-              updated_by: profile.id,
-              updated_at: new Date().toISOString()
-            })
-            .eq('kiks_action_id', editingId);
-          if (planError) console.error('Action plan update error:', planError);
         } else {
           if (!selectedPlanId) {
             alert('Lütfen önce bir İç Kontrol Planı seçiniz.');
             return;
           }
 
-          const { data: actionData, error: actionError } = await supabase
+          const { error: actionError } = await supabase
             .from('ic_kiks_actions')
             .insert({
               organization_id: profile.organization_id,
@@ -668,50 +650,8 @@ export default function KIKSStandards() {
               status: formData.status,
               target_date: formData.target_date || null,
               order_index: selectedSubStandard.actions?.length || 0
-            })
-            .select()
-            .single();
-          if (actionError) throw actionError;
-
-          const planCount = await supabase
-            .from('ic_action_plans')
-            .select('plan_code', { count: 'exact' })
-            .eq('organization_id', profile.organization_id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          let nextPlanCode = 'EP-001';
-          if (planCount.data && planCount.data.length > 0) {
-            const lastCode = planCount.data[0].plan_code;
-            const match = lastCode.match(/EP-(\d+)/);
-            if (match) {
-              const nextNum = parseInt(match[1]) + 1;
-              nextPlanCode = `EP-${String(nextNum).padStart(3, '0')}`;
-            }
-          }
-
-          const { error: planError } = await supabase
-            .from('ic_action_plans')
-            .insert({
-              organization_id: profile.organization_id,
-              ic_plan_id: selectedPlanId,
-              plan_code: nextPlanCode,
-              kiks_action_id: actionData.id,
-              current_situation: selectedSubStandard.current_status || null,
-              planned_actions: formData.description,
-              output_result: formData.output_result || null,
-              notes: formData.notes || null,
-              responsible_unit_id: formData.responsible_departments?.[0] || null,
-              responsible_persons: [],
-              collaboration_units: formData.collaboration_departments || [],
-              completion_date: formData.target_date || null,
-              status: formData.status === 'not_started' ? 'planned' : formData.status,
-              approval_status: 'draft',
-              progress_percentage: 0,
-              created_by: profile.id,
-              updated_by: profile.id
             });
-          if (planError) console.error('Action plan creation error:', planError);
+          if (actionError) throw actionError;
         }
       }
 

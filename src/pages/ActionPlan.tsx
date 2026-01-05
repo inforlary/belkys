@@ -154,36 +154,7 @@ export default function ActionPlan() {
     try {
       setLoading(true);
 
-      const [plansRes, actionsRes, depsRes, profilesRes, subStandardsRes, statusesRes] = await Promise.all([
-        supabase
-          .from('ic_action_plans')
-          .select(`
-            *,
-            departments(name),
-            ic_kiks_actions(
-              code,
-              description,
-              all_departments_responsible,
-              all_departments_collaboration,
-              responsible_departments,
-              collaboration_departments,
-              ic_kiks_sub_standards(
-                code,
-                title,
-                ic_kiks_main_standards(
-                  code,
-                  title,
-                  ic_kiks_categories(
-                    code,
-                    name
-                  )
-                )
-              )
-            )
-          `)
-          .eq('organization_id', profile.organization_id)
-          .eq('ic_plan_id', selectedPlanId)
-          .order('created_at', { ascending: false }),
+      const [actionsRes, depsRes, profilesRes, subStandardsRes, statusesRes] = await Promise.all([
         supabase
           .from('ic_kiks_actions')
           .select(`
@@ -193,7 +164,11 @@ export default function ActionPlan() {
               title,
               ic_kiks_main_standards(
                 code,
-                title
+                title,
+                ic_kiks_categories(
+                  code,
+                  name
+                )
               )
             )
           `)
@@ -234,11 +209,38 @@ export default function ActionPlan() {
           .eq('ic_plan_id', selectedPlanId)
       ]);
 
-      if (plansRes.error) console.error('Plans fetch error:', plansRes.error);
-      else setActionPlans(plansRes.data || []);
-
       if (actionsRes.error) console.error('Actions fetch error:', actionsRes.error);
-      else setAllActions(actionsRes.data || []);
+      else {
+        const mappedPlans = (actionsRes.data || []).map((action: any) => ({
+          id: action.id,
+          plan_code: action.code,
+          kiks_action_id: action.id,
+          current_situation: statusesRes.data?.find((s: any) => s.sub_standard_id === action.sub_standard_id)?.current_status || '',
+          planned_actions: action.description,
+          responsible_unit_id: action.responsible_departments?.[0] || '',
+          responsible_persons: [],
+          collaboration_units: action.collaboration_departments || [],
+          all_departments_collaboration: action.all_departments_collaboration,
+          output_result: action.output_result || '',
+          completion_date: action.target_date || '',
+          status: action.status,
+          notes: action.notes || '',
+          approval_status: 'approved',
+          progress_percentage: action.status === 'completed' ? 100 : action.status === 'in_progress' ? 50 : 0,
+          created_at: action.created_at,
+          ic_kiks_actions: {
+            code: action.code,
+            description: action.description,
+            all_departments_responsible: action.all_departments_responsible,
+            all_departments_collaboration: action.all_departments_collaboration,
+            responsible_departments: action.responsible_departments,
+            collaboration_departments: action.collaboration_departments,
+            ic_kiks_sub_standards: action.ic_kiks_sub_standards
+          }
+        }));
+        setActionPlans(mappedPlans);
+        setAllActions(actionsRes.data || []);
+      }
 
       if (depsRes.error) console.error('Departments fetch error:', depsRes.error);
       else setDepartments(depsRes.data || []);
@@ -670,19 +672,19 @@ export default function ActionPlan() {
   };
 
   const handleDelete = async (planId: string) => {
-    if (!confirm('Bu eylem planını silmek istediğinizden emin misiniz?')) {
+    if (!confirm('Bu eylemi silmek istediğinizden emin misiniz?')) {
       return;
     }
 
     try {
       const { error } = await supabase
-        .from('ic_action_plans')
+        .from('ic_kiks_actions')
         .delete()
         .eq('id', planId);
 
       if (error) throw error;
 
-      alert('Eylem planı başarıyla silindi.');
+      alert('Eylem başarıyla silindi.');
       fetchData();
     } catch (error: any) {
       console.error('Silme hatası:', error);
