@@ -133,14 +133,9 @@ export default function ProcessManagement() {
   };
 
   const loadUnassignedProcesses = async () => {
-    if (!profile?.organization_id) {
-      console.log('Organization ID bulunamadı');
-      return;
-    }
+    if (!profile?.organization_id) return;
 
     try {
-      console.log('Plansız süreçler yükleniyor, organization:', profile.organization_id);
-
       const { data, error } = await supabase
         .from('ic_processes')
         .select(`
@@ -153,12 +148,7 @@ export default function ProcessManagement() {
         .is('ic_plan_id', null)
         .order('code', { ascending: true });
 
-      if (error) {
-        console.error('Süreç yükleme hatası:', error);
-        throw error;
-      }
-
-      console.log('Yüklenen plansız süreçler:', data?.length || 0, 'adet');
+      if (error) throw error;
 
       const processesData = (data || []).map(process => ({
         ...process,
@@ -175,7 +165,6 @@ export default function ProcessManagement() {
       setUnassignedProcesses(processesData);
 
       if (!selectedPlanId) {
-        console.log('Plan seçili değil, süreçler ana listeye ekleniyor:', processesData.length);
         setProcesses(processesData);
       }
     } catch (error) {

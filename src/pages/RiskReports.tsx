@@ -121,7 +121,7 @@ export default function RiskReports() {
   const [matrixType, setMatrixType] = useState<'inherent' | 'residual'>('residual');
 
   useEffect(() => {
-    if (profile?.organization_id && selectedPlanId) {
+    if (profile?.organization_id) {
       loadReportData();
     }
   }, [profile?.organization_id, selectedPlanId, reportType]);
@@ -157,7 +157,7 @@ export default function RiskReports() {
   const loadStatistics = async () => {
     const { data, error } = await supabase.rpc('get_risk_statistics', {
       p_organization_id: profile?.organization_id,
-      p_plan_id: selectedPlanId
+      p_plan_id: selectedPlanId || null
     });
 
     if (error) throw error;
@@ -167,7 +167,7 @@ export default function RiskReports() {
   const loadMatrixData = async () => {
     const { data, error } = await supabase.rpc('get_risk_matrix_data', {
       p_organization_id: profile?.organization_id,
-      p_plan_id: selectedPlanId,
+      p_plan_id: selectedPlanId || null,
       p_risk_type: matrixType
     });
 
@@ -176,24 +176,35 @@ export default function RiskReports() {
   };
 
   const loadCategoryStats = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('v_risk_category_stats')
       .select('*')
-      .eq('organization_id', profile?.organization_id)
-      .eq('ic_plan_id', selectedPlanId);
+      .eq('organization_id', profile?.organization_id);
 
+    if (selectedPlanId) {
+      query = query.eq('ic_plan_id', selectedPlanId);
+    } else {
+      query = query.is('ic_plan_id', null);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     setCategoryStats(data || []);
   };
 
   const loadOwnerStats = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('v_risk_owner_stats')
       .select('*')
-      .eq('organization_id', profile?.organization_id)
-      .eq('ic_plan_id', selectedPlanId)
-      .order('total_risks', { ascending: false });
+      .eq('organization_id', profile?.organization_id);
 
+    if (selectedPlanId) {
+      query = query.eq('ic_plan_id', selectedPlanId);
+    } else {
+      query = query.is('ic_plan_id', null);
+    }
+
+    const { data, error } = await query.order('total_risks', { ascending: false });
     if (error) throw error;
     setOwnerStats(data || []);
   };
@@ -201,7 +212,7 @@ export default function RiskReports() {
   const loadTrendData = async () => {
     const { data, error } = await supabase.rpc('get_risk_trend_data', {
       p_organization_id: profile?.organization_id,
-      p_plan_id: selectedPlanId,
+      p_plan_id: selectedPlanId || null,
       p_months: 12
     });
 
