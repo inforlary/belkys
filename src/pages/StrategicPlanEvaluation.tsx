@@ -330,17 +330,10 @@ export default function StrategicPlanEvaluation() {
       await saveEvaluation();
 
       const updateFields: any = {
+        status: 'submitted',
         submitted_at: new Date().toISOString(),
         submitted_by: user.id
       };
-
-      if (isDirector) {
-        updateFields.status = 'director_approved';
-        updateFields.director_approved_at = new Date().toISOString();
-        updateFields.director_approved_by = user.id;
-      } else {
-        updateFields.status = 'submitted';
-      }
 
       const { error } = await supabase
         .from('year_end_evaluations')
@@ -349,7 +342,7 @@ export default function StrategicPlanEvaluation() {
 
       if (error) throw error;
 
-      alert(isDirector ? 'Değerlendirme yönetici onayına gönderildi.' : 'Değerlendirme müdür onayına gönderildi.');
+      alert('Değerlendirme müdür onayına gönderildi.');
       await loadData();
     } catch (error: any) {
       console.error('Error submitting evaluation:', error);
