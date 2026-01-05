@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
-import { Plus, Edit2, Trash2, Calendar, CheckCircle, Clock, FileText, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, CheckCircle, Clock, FileText, Check, X } from 'lucide-react';
 
 interface ICPlan {
   id: string;
@@ -17,7 +17,7 @@ interface ICPlan {
 
 export default function InternalControlPlans() {
   const { user, profile } = useAuth();
-  const { selectedPlanId, refreshPlan } = useICPlan();
+  const { selectedPlanId, refreshPlan, clearPlan } = useICPlan();
   const [plans, setPlans] = useState<ICPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -219,9 +219,22 @@ export default function InternalControlPlans() {
               >
                 <div className="p-6">
                   {isSelected && (
-                    <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                      <Check className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-900">Seçili Plan</span>
+                    <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-900">Seçili Plan</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearPlan();
+                          alert('Plan seçimi kaldırıldı.');
+                        }}
+                        className="p-1 hover:bg-blue-100 rounded transition-colors"
+                        title="Seçimi Kaldır"
+                      >
+                        <X className="w-4 h-4 text-blue-600" />
+                      </button>
                     </div>
                   )}
 

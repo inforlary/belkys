@@ -54,11 +54,18 @@ export function useICPlan() {
     }
   };
 
+  const clearPlan = () => {
+    localStorage.removeItem('selectedICPlan');
+    setSelectedPlanId(null);
+    setSelectedPlan(null);
+  };
+
   return {
     selectedPlanId,
     selectedPlan,
     loading,
     refreshPlan,
+    clearPlan,
     hasPlan: !!selectedPlanId
   };
 }
