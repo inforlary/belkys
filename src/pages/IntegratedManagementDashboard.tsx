@@ -54,18 +54,39 @@ interface ModuleStatus {
   details: string;
 }
 
+interface Organization {
+  id: string;
+  name: string;
+}
+
 export default function IntegratedManagementDashboard() {
-  const { user, organization } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [healthData, setHealthData] = useState<SystemHealthData | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('current');
+  const [organization, setOrganization] = useState<Organization | null>(null);
 
   useEffect(() => {
-    if (organization?.id) {
+    if (profile?.organization_id) {
+      loadOrganization();
       fetchSystemHealth();
     }
-  }, [organization?.id, selectedPeriod]);
+  }, [profile?.organization_id, selectedPeriod]);
+
+  const loadOrganization = async () => {
+    if (!profile?.organization_id) return;
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('id, name')
+      .eq('id', profile.organization_id)
+      .maybeSingle();
+
+    if (!error && data) {
+      setOrganization(data);
+    }
+  };
 
   const fetchSystemHealth = async () => {
     try {
