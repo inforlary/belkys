@@ -119,7 +119,8 @@ export default function ICActionPlans() {
         .from('ic_action_plans')
         .insert({
           ...formData,
-          organization_id: profile?.organization_id
+          organization_id: profile?.organization_id,
+          created_by: profile?.id
         });
 
       if (error) throw error;
