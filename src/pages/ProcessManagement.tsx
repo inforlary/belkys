@@ -108,7 +108,8 @@ export default function ProcessManagement() {
         Promise.all([
           loadUnassignedProcesses(),
           loadDepartments(),
-          loadUsers()
+          loadUsers(),
+          loadKiksStandards()
         ]).then(() => setLoading(false));
       }
     }
@@ -259,10 +260,10 @@ export default function ProcessManagement() {
   };
 
   const loadKiksStandards = async () => {
-    if (!profile?.organization_id || !selectedPlanId) return;
+    if (!profile?.organization_id) return;
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('ic_kiks_sub_standards')
         .select(`
           id,
@@ -274,9 +275,15 @@ export default function ProcessManagement() {
             ic_kiks_categories(name)
           )
         `)
-        .or(`ic_plan_id.is.null,ic_plan_id.eq.${selectedPlanId}`)
-        .eq('is_active', true)
-        .order('code', { ascending: true });
+        .eq('is_active', true);
+
+      if (selectedPlanId) {
+        query = query.or(`ic_plan_id.is.null,ic_plan_id.eq.${selectedPlanId}`);
+      } else {
+        query = query.is('ic_plan_id', null);
+      }
+
+      const { data, error } = await query.order('code', { ascending: true });
 
       if (error) throw error;
 
@@ -571,60 +578,6 @@ export default function ProcessManagement() {
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'vice_president';
   const canEdit = isAdmin || profile?.department_id;
-
-  if (!hasPlan) {
-    return (
-      <div className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Activity className="w-8 h-8 text-blue-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Süreç Yönetimi</h1>
-            <p className="text-sm text-gray-600">Süreç Envanteri ve İş Akış Haritaları</p>
-          </div>
-        </div>
-
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-          <div className="flex items-center">
-            <AlertCircle className="w-6 h-6 text-yellow-600 mr-3" />
-            <div>
-              <h3 className="text-lg font-semibold text-yellow-800">İç Kontrol Planı Seçilmedi</h3>
-              <p className="text-yellow-700 mt-1">
-                Süreç Yönetimi modülünü kullanmak için lütfen önce bir İç Kontrol Planı seçin.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {unassignedProcesses.length > 0 && (
-          <div className="bg-orange-50 border-l-4 border-orange-400 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <AlertCircle className="w-6 h-6 text-orange-600 mr-3" />
-                <div>
-                  <h3 className="text-lg font-semibold text-orange-800">
-                    {unassignedProcesses.length} adet plansız süreç bulundu
-                  </h3>
-                  <p className="text-orange-700 mt-1">
-                    Bu süreçler henüz bir İç Kontrol Planına atanmamış. Bir plan seçtikten sonra bu süreçleri plana atayabilirsiniz.
-                  </p>
-                  <div className="mt-2">
-                    <ul className="list-disc list-inside text-orange-700 text-sm">
-                      {unassignedProcesses.slice(0, 5).map(p => (
-                        <li key={p.id}>{p.code} - {p.name}</li>
-                      ))}
-                      {unassignedProcesses.length > 5 && (
-                        <li>... ve {unassignedProcesses.length - 5} süreç daha</li>
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="p-6">
