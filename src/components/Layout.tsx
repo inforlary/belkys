@@ -313,6 +313,20 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       ],
     },
     {
+      label: 'Risk Yönetimi',
+      icon: AlertTriangle,
+      items: [
+        { icon: LayoutDashboard, label: 'Dashboard', path: 'risks' },
+        { icon: Database, label: 'Risk Kaydı', path: 'risks/register' },
+        { icon: Grid, label: 'Risk Matrisi', path: 'risks/matrix' },
+        { icon: TrendingUp, label: 'Isı Haritası', path: 'risks/heatmap' },
+        { icon: Activity, label: 'Risk Göstergeleri', path: 'risks/indicators' },
+        { icon: Inbox, label: 'Gösterge Girişi', path: 'risks/indicators/entry', requiresDepartment: true },
+        { icon: ClipboardCheck, label: 'Risk Faaliyetleri', path: 'risks/treatments' },
+        { icon: FolderOpen, label: 'Kategori Yönetimi', path: 'risks/categories', adminOnly: true },
+      ],
+    },
+    {
       label: 'Kalite Yönetimi',
       icon: Award,
       items: [
