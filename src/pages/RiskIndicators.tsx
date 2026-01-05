@@ -62,17 +62,27 @@ export default function RiskIndicators() {
   };
 
   const loadIndicators = async () => {
+    const { data: riskIds, error: riskError } = await supabase
+      .from('risks')
+      .select('id')
+      .eq('organization_id', profile?.organization_id);
+
+    if (riskError) throw riskError;
+
+    const riskIdArray = riskIds?.map(r => r.id) || [];
+
+    if (riskIdArray.length === 0) {
+      setIndicators([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('risk_indicators')
       .select(`
         *,
         risk:risks(code, name)
       `)
-      .in('risk_id', supabase
-        .from('risks')
-        .select('id')
-        .eq('organization_id', profile?.organization_id)
-      )
+      .in('risk_id', riskIdArray)
       .eq('is_active', true)
       .order('code');
 

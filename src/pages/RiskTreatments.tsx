@@ -78,7 +78,6 @@ export default function RiskTreatments() {
         responsible_unit:departments(name)
       `)
       .in('risk_id', risks.map(r => r.id))
-      .eq('is_active', true)
       .order('planned_end_date', { ascending: true });
 
     if (error) throw error;
@@ -112,9 +111,27 @@ export default function RiskTreatments() {
     e.preventDefault();
 
     try {
+      const { data: existingTreatments } = await supabase
+        .from('risk_treatments')
+        .select('code')
+        .eq('risk_id', formData.risk_id)
+        .order('code', { ascending: false })
+        .limit(1);
+
+      const selectedRisk = risks.find(r => r.id === formData.risk_id);
+      const riskCode = selectedRisk?.code || 'RT';
+      const nextNumber = existingTreatments && existingTreatments.length > 0
+        ? parseInt(existingTreatments[0].code.split('-').pop() || '0') + 1
+        : 1;
+      const newCode = `${riskCode}-T${nextNumber.toString().padStart(3, '0')}`;
+
       const { error } = await supabase
         .from('risk_treatments')
-        .insert(formData);
+        .insert({
+          ...formData,
+          code: newCode,
+          organization_id: profile?.organization_id
+        });
 
       if (error) throw error;
 
@@ -142,7 +159,7 @@ export default function RiskTreatments() {
     try {
       const { error } = await supabase
         .from('risk_treatments')
-        .update({ is_active: false })
+        .delete()
         .eq('id', id);
 
       if (error) throw error;

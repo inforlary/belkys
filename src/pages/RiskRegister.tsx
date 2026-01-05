@@ -96,7 +96,7 @@ export default function RiskRegister() {
         *,
         category:risk_categories(name, color),
         owner_unit:departments(name),
-        goal:goals(name)
+        goal:goals(title)
       `)
       .eq('organization_id', profile?.organization_id)
       .eq('is_active', true)
@@ -132,9 +132,9 @@ export default function RiskRegister() {
   const loadGoals = async () => {
     const { data, error } = await supabase
       .from('goals')
-      .select('id, name, title, department_id')
+      .select('id, title, department_id')
       .eq('organization_id', profile?.organization_id)
-      .order('name');
+      .order('title');
 
     if (error) throw error;
     setAllGoals(data || []);
@@ -427,7 +427,7 @@ export default function RiskRegister() {
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">{risk.name}</div>
                       {risk.goal && (
-                        <div className="text-xs text-gray-500 mt-1">Hedef: {risk.goal.name}</div>
+                        <div className="text-xs text-gray-500 mt-1">Hedef: {risk.goal.title}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -637,7 +637,7 @@ export default function RiskRegister() {
                     </option>
                     {filteredGoals.map(obj => (
                       <option key={obj.id} value={obj.id}>
-                        {obj.name || obj.title}
+                        {obj.title}
                       </option>
                     ))}
                   </select>

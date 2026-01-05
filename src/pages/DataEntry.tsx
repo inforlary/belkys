@@ -17,6 +17,7 @@ interface Indicator {
   goal?: {
     title: string;
     code: string;
+    department_id: string;
   };
 }
 
@@ -137,7 +138,8 @@ export default function DataEntry() {
         ...ind,
         goal: ind.goals ? {
           title: ind.goals.title,
-          code: ind.goals.code
+          code: ind.goals.code,
+          department_id: ind.goals.department_id
         } : undefined
       })) || [];
 
@@ -302,7 +304,10 @@ export default function DataEntry() {
       const isAdmin = profile?.role === 'admin';
       const departmentId = profile?.department_id;
 
-      if (!departmentId) {
+      const indicator = indicators.find(ind => ind.id === indicatorId);
+      const indicatorDepartmentId = indicator?.goal?.department_id;
+
+      if (!departmentId && !isAdmin) {
         alert('Departman bilginiz bulunamadı. Lütfen yöneticinizle iletişime geçin.');
         return;
       }
@@ -310,7 +315,7 @@ export default function DataEntry() {
       const entryData: any = {
         indicator_id: indicatorId,
         organization_id: profile?.organization_id,
-        department_id: departmentId,
+        department_id: isAdmin ? indicatorDepartmentId : departmentId,
         entered_by: profile?.id,
         value: numValue,
         entry_date: new Date().toISOString().split('T')[0],
