@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, AlertCircle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Inbox, Send, ClipboardList, CheckCircle, Clock, Workflow } from 'lucide-react';
+import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, AlertCircle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Inbox, Send, ClipboardList, CheckCircle, Clock, Workflow, Award, FileSearch, Scale, Lightbulb, BookOpen } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
@@ -297,6 +297,31 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: Send, label: 'Talep Oluştur', path: 'data-request-management', adminOnly: true },
         { icon: Inbox, label: 'Taleplerim', path: 'my-data-requests', requiresDepartment: true },
         { icon: CheckCircle, label: 'Cevapları Takip Et', path: 'data-request-tracking', adminOnly: true },
+      ],
+    },
+    {
+      label: 'Kalite Yönetimi',
+      icon: Award,
+      items: [
+        { icon: Award, label: 'Kalite Yönetimi', path: 'quality-management' },
+        { icon: Search, label: 'Kalite Denetimleri', path: 'quality-audits' },
+        { icon: Lightbulb, label: 'İyileştirme Önerileri', path: 'improvement-suggestions' },
+      ],
+    },
+    {
+      label: 'Denetim ve Uyumluluk',
+      icon: FileSearch,
+      items: [
+        { icon: FileSearch, label: 'İç Denetim', path: 'internal-audit-management' },
+        { icon: Building2, label: 'Dış Denetim', path: 'external-audit-management' },
+        { icon: Scale, label: 'Yasal Uyumluluk', path: 'legal-compliance' },
+      ],
+    },
+    {
+      label: 'Sürekli İyileştirme',
+      icon: TrendingUp,
+      items: [
+        { icon: BookOpen, label: 'Öğrenilen Dersler', path: 'lessons-learned' },
       ],
     },
   ];

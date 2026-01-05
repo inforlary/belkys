@@ -92,6 +92,13 @@ import DataRequestTracking from './pages/DataRequestTracking';
 import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
 import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
+import QualityManagement from './pages/QualityManagement';
+import QualityAudits from './pages/QualityAudits';
+import ImprovementSuggestions from './pages/ImprovementSuggestions';
+import InternalAuditManagement from './pages/InternalAuditManagement';
+import ExternalAuditManagement from './pages/ExternalAuditManagement';
+import LegalCompliance from './pages/LegalCompliance';
+import LessonsLearned from './pages/LessonsLearned';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -309,6 +316,20 @@ const renderPage = () => {
         return <DataRequestTracking />;
       case 'strategic-plan-evaluation':
         return <StrategicPlanEvaluation />;
+      case 'quality-management':
+        return <QualityManagement />;
+      case 'quality-audits':
+        return <QualityAudits />;
+      case 'improvement-suggestions':
+        return <ImprovementSuggestions />;
+      case 'internal-audit-management':
+        return <InternalAuditManagement />;
+      case 'external-audit-management':
+        return <ExternalAuditManagement />;
+      case 'legal-compliance':
+        return <LegalCompliance />;
+      case 'lessons-learned':
+        return <LessonsLearned />;
       default:
         console.log('[App.tsx] No match found for currentPath, returning Dashboard');
         return profile?.is_super_admin ? <SuperAdmin /> : <Dashboard />;
