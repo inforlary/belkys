@@ -57,6 +57,7 @@ export default function ProcessManagement() {
   const { profile } = useAuth();
   const { selectedPlanId, selectedPlan, hasPlan } = useICPlan();
   const [processes, setProcesses] = useState<Process[]>([]);
+  const [unassignedProcesses, setUnassignedProcesses] = useState<Process[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [kiksStandards, setKiksStandards] = useState<any[]>([]);
@@ -64,6 +65,7 @@ export default function ProcessManagement() {
   const [showForm, setShowForm] = useState(false);
   const [showStepsModal, setShowStepsModal] = useState(false);
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
+  const [showUnassignedModal, setShowUnassignedModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
   const [processSteps, setProcessSteps] = useState<ProcessStep[]>([]);
@@ -110,12 +112,46 @@ export default function ProcessManagement() {
       setLoading(true);
       await Promise.all([
         loadProcesses(),
+        loadUnassignedProcesses(),
         loadDepartments(),
         loadUsers(),
         loadKiksStandards()
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUnassignedProcesses = async () => {
+    if (!profile?.organization_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('ic_processes')
+        .select(`
+          *,
+          departments(name),
+          profiles!ic_processes_owner_user_id_fkey(full_name),
+          ic_kiks_main_standards(code, title)
+        `)
+        .eq('organization_id', profile.organization_id)
+        .is('ic_plan_id', null)
+        .order('code', { ascending: true });
+
+      if (error) throw error;
+
+      const processesData = (data || []).map(process => ({
+        ...process,
+        department_name: process.departments?.name,
+        owner_name: process.profiles?.full_name,
+        kiks_standard_title: process.ic_kiks_main_standards
+          ? `${process.ic_kiks_main_standards.code} - ${process.ic_kiks_main_standards.title}`
+          : undefined
+      }));
+
+      setUnassignedProcesses(processesData);
+    } catch (error) {
+      console.error('Plansız süreçler yüklenirken hata:', error);
     }
   };
 
@@ -449,6 +485,37 @@ export default function ProcessManagement() {
     setShowForm(false);
   };
 
+  const assignProcessesToPlan = async () => {
+    if (!selectedPlanId || unassignedProcesses.length === 0) return;
+
+    if (!confirm(`${unassignedProcesses.length} adet plansız süreci "${selectedPlan?.name}" planına atamak istediğinizden emin misiniz?`)) {
+      return;
+    }
+
+    try {
+      const processIds = unassignedProcesses.map(p => p.id);
+
+      const { error } = await supabase
+        .from('ic_processes')
+        .update({ ic_plan_id: selectedPlanId })
+        .in('id', processIds);
+
+      if (error) throw error;
+
+      await supabase
+        .from('ic_process_steps')
+        .update({ ic_plan_id: selectedPlanId })
+        .in('process_id', processIds);
+
+      alert('Süreçler başarıyla plana atandı!');
+      setShowUnassignedModal(false);
+      loadData();
+    } catch (error: any) {
+      console.error('Süreçler plana atanırken hata:', error);
+      alert(error.message || 'Bir hata oluştu');
+    }
+  };
+
   const resetStepForm = () => {
     setStepFormData({
       step_number: processSteps.length + 1,
@@ -531,6 +598,31 @@ export default function ProcessManagement() {
           </button>
         )}
       </div>
+
+      {/* Plansız Süreçler Uyarısı */}
+      {unassignedProcesses.length > 0 && (
+        <div className="bg-orange-50 border-l-4 border-orange-400 p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertCircle className="w-6 h-6 text-orange-600 mr-3" />
+              <div>
+                <h3 className="text-lg font-semibold text-orange-800">
+                  {unassignedProcesses.length} adet plansız süreç bulundu
+                </h3>
+                <p className="text-orange-700 mt-1">
+                  Bu süreçler henüz bir İç Kontrol Planına atanmamış. Lütfen bu süreçleri bir plana atayın.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowUnassignedModal(true)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 whitespace-nowrap"
+            >
+              Süreçleri Görüntüle
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* İstatistikler */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
@@ -1124,6 +1216,97 @@ export default function ProcessManagement() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Plansız Süreçler Modal */}
+      {showUnassignedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Plansız Süreçler</h2>
+                  <p className="text-sm text-gray-600">Bu süreçler henüz bir İç Kontrol Planına atanmamış</p>
+                </div>
+                <button
+                  onClick={() => setShowUnassignedModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {unassignedProcesses.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Plansız süreç bulunamadı
+                </div>
+              ) : (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Not:</strong> Aşağıdaki {unassignedProcesses.length} süreç "{selectedPlan?.name}" planına atanacaktır.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 mb-6">
+                    {unassignedProcesses.map((process) => (
+                      <div
+                        key={process.id}
+                        className="bg-gray-50 border border-gray-200 rounded-lg p-4"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-gray-900">{process.code}</span>
+                              <span className="text-gray-600">-</span>
+                              <span className="text-gray-900">{process.name}</span>
+                              {process.is_critical && (
+                                <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded">
+                                  Kritik
+                                </span>
+                              )}
+                              <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLORS[process.status]}`}>
+                                {STATUS_LABELS[process.status]}
+                              </span>
+                            </div>
+                            <div className="flex gap-4 text-sm text-gray-600">
+                              {process.department_name && (
+                                <span>Müdürlük: {process.department_name}</span>
+                              )}
+                              {process.owner_name && <span>Sahip: {process.owner_name}</span>}
+                              {process.process_category && (
+                                <span>Kategori: {process.process_category}</span>
+                              )}
+                            </div>
+                            {process.description && (
+                              <p className="text-sm text-gray-600 mt-2">{process.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4 border-t">
+                    <button
+                      onClick={() => setShowUnassignedModal(false)}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      İptal
+                    </button>
+                    <button
+                      onClick={assignProcessesToPlan}
+                      className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center gap-2"
+                    >
+                      <LinkIcon className="w-5 h-5" />
+                      Plana Ata
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
