@@ -139,15 +139,20 @@ export default function StrategicPlanEvaluation() {
   const loadAllEvaluations = async () => {
     if (!profile?.organization_id) return;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('year_end_evaluations')
       .select(`
         *,
         department:departments(id, name)
       `)
       .eq('organization_id', profile.organization_id)
-      .eq('fiscal_year', evaluationYear)
-      .order('department(name)');
+      .eq('fiscal_year', evaluationYear);
+
+    if (isDirector && profile?.department_id) {
+      query = query.eq('department_id', profile.department_id);
+    }
+
+    const { data, error } = await query.order('department(name)');
 
     if (error) {
       console.error('Error loading evaluations:', error);
