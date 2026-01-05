@@ -35,7 +35,10 @@ interface YearEndEvaluation {
   admin_approved_at: string | null;
   admin_approved_by: string | null;
   admin_comments: string | null;
-  department?: Department;
+  department?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface IndicatorEvaluation {
@@ -90,6 +93,7 @@ export default function StrategicPlanEvaluation() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isDirector = profile?.role === 'director';
   const isVP = profile?.role === 'vice_president';
+  const canViewDashboard = isAdmin || isVP;
   const canApprove = isAdmin || isDirector || isVP;
 
   useEffect(() => {
@@ -494,7 +498,7 @@ export default function StrategicPlanEvaluation() {
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
-          {(isAdmin || isVP) && (
+          {canViewDashboard && (
             <Button
               onClick={() => setShowDashboard(!showDashboard)}
               variant="secondary"
@@ -506,7 +510,7 @@ export default function StrategicPlanEvaluation() {
         </div>
       </div>
 
-      {showDashboard && (isAdmin || isVP) && progress && (
+      {showDashboard && canViewDashboard && progress && (
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Değerlendirme İlerlemesi</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -566,24 +570,51 @@ export default function StrategicPlanEvaluation() {
                   </div>
                   <div className="flex items-center gap-3">
                     {getStatusBadge(evalItem.status)}
-                    {canApprove && evalItem.status !== 'draft' && evalItem.status !== 'completed' && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => approveEvaluation(evalItem.id, evalItem.status)}
-                          disabled={saving}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => rejectEvaluation(evalItem.id, evalItem.status)}
-                          disabled={saving}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    {evalItem.status !== 'draft' && evalItem.status !== 'completed' && (
+                      <>
+                        {isDirector && evalItem.status === 'submitted' && evalItem.department_id === profile?.department_id && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => approveEvaluation(evalItem.id, evalItem.status)}
+                              disabled={saving}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              Onayla
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => rejectEvaluation(evalItem.id, evalItem.status)}
+                              disabled={saving}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Reddet
+                            </Button>
+                          </div>
+                        )}
+                        {(isAdmin || isVP) && evalItem.status === 'director_approved' && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => approveEvaluation(evalItem.id, evalItem.status)}
+                              disabled={saving}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              Onayla
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => rejectEvaluation(evalItem.id, evalItem.status)}
+                              disabled={saving}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Reddet
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -641,7 +672,7 @@ export default function StrategicPlanEvaluation() {
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="Yıl içinde genel performansı özetleyiniz..."
-                  disabled={myEvaluation.status !== 'draft'}
+                  disabled={myEvaluation.status !== 'draft' && !isDirector}
                 />
               </div>
 
@@ -655,7 +686,7 @@ export default function StrategicPlanEvaluation() {
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="Neler iyi gitti? Hangi hedeflere ulaşıldı?..."
-                  disabled={myEvaluation.status !== 'draft'}
+                  disabled={myEvaluation.status !== 'draft' && !isDirector}
                 />
               </div>
 
@@ -669,7 +700,7 @@ export default function StrategicPlanEvaluation() {
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="Hangi engeller ve zorluklar yaşandı?..."
-                  disabled={myEvaluation.status !== 'draft'}
+                  disabled={myEvaluation.status !== 'draft' && !isDirector}
                 />
               </div>
 
@@ -683,21 +714,23 @@ export default function StrategicPlanEvaluation() {
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="Gelecek yıl için önerileriniz ve odak alanlarınız..."
-                  disabled={myEvaluation.status !== 'draft'}
+                  disabled={myEvaluation.status !== 'draft' && !isDirector}
                 />
               </div>
             </div>
 
-            {myEvaluation.status === 'draft' && (
+            {(myEvaluation.status === 'draft' || (isDirector && myEvaluation.status !== 'completed')) && (
               <div className="flex gap-3 mt-6">
                 <Button onClick={saveEvaluation} disabled={saving} variant="secondary">
                   <Save className="w-4 h-4 mr-2" />
                   Kaydet
                 </Button>
-                <Button onClick={submitForApproval} disabled={saving}>
-                  <Send className="w-4 h-4 mr-2" />
-                  Onaya Gönder
-                </Button>
+                {myEvaluation.status === 'draft' && (
+                  <Button onClick={submitForApproval} disabled={saving}>
+                    <Send className="w-4 h-4 mr-2" />
+                    {isDirector ? 'Müdür Onayına Gönder' : 'Onaya Gönder'}
+                  </Button>
+                )}
               </div>
             )}
           </Card>
@@ -744,25 +777,25 @@ export default function StrategicPlanEvaluation() {
                           criteriaKey={`${indicator.id}-relevance`}
                           expanded={expandedCriteria}
                           toggleExpanded={toggleCriteria}
-                          disabled={myEvaluation.status !== 'draft'}
+                          disabled={myEvaluation.status !== 'draft' && !isDirector}
                         >
                           <QuestionField
                             label="Planın başlangıç döneminden itibaren iç ve dış çevrede ciddi değişiklikler meydana geldi mi?"
                             value={evaluation?.relevance_environment_changes || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'relevance_environment_changes', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Bu değişiklikler tespitler ve ihtiyaçları ne ölçüde değiştirdi?"
                             value={evaluation?.relevance_needs_change || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'relevance_needs_change', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Tespitler ve ihtiyaçlardaki değişim hedef ve performans göstergelerinde bir değişiklik ihtiyacı doğurdu mu?"
                             value={evaluation?.relevance_target_change_needed || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'relevance_target_change_needed', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                         </CriteriaSection>
 
@@ -771,31 +804,31 @@ export default function StrategicPlanEvaluation() {
                           criteriaKey={`${indicator.id}-effectiveness`}
                           expanded={expandedCriteria}
                           toggleExpanded={toggleCriteria}
-                          disabled={myEvaluation.status !== 'draft'}
+                          disabled={myEvaluation.status !== 'draft' && !isDirector}
                         >
                           <QuestionField
                             label="Performans göstergesi değerlerine ulaşıldı mı?"
                             value={evaluation?.effectiveness_target_achieved || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'effectiveness_target_achieved', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Performans göstergesine ulaşma düzeyiyle tespit edilen ihtiyaçlar karşılandı mı?"
                             value={evaluation?.effectiveness_needs_met || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'effectiveness_needs_met', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Performans göstergelerinde istenilen düzeye ulaşılmadıysa güncelleme ihtiyacı var mı?"
                             value={evaluation?.effectiveness_update_needed || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'effectiveness_update_needed', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Performans göstergesi gerçekleşmelerinin kalkınma planına katkısı ne oldu?"
                             value={evaluation?.effectiveness_contribution || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'effectiveness_contribution', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                         </CriteriaSection>
 
@@ -804,25 +837,25 @@ export default function StrategicPlanEvaluation() {
                           criteriaKey={`${indicator.id}-efficiency`}
                           expanded={expandedCriteria}
                           toggleExpanded={toggleCriteria}
-                          disabled={myEvaluation.status !== 'draft'}
+                          disabled={myEvaluation.status !== 'draft' && !isDirector}
                         >
                           <QuestionField
                             label="Performans gösterge değerlerine ulaşılırken öngörülemeyen maliyetler ortaya çıktı mı?"
                             value={evaluation?.efficiency_unexpected_costs || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'efficiency_unexpected_costs', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Tahmini maliyet tablosunda değişiklik ihtiyacı var mı?"
                             value={evaluation?.efficiency_cost_table_update || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'efficiency_cost_table_update', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Yüksek maliyetlerin ortaya çıkması durumunda hedefte ve performans göstergesi değerlerinde değişiklik ihtiyacı oluştu mu?"
                             value={evaluation?.efficiency_target_change_due_cost || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'efficiency_target_change_due_cost', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                         </CriteriaSection>
 
@@ -831,37 +864,37 @@ export default function StrategicPlanEvaluation() {
                           criteriaKey={`${indicator.id}-sustainability`}
                           expanded={expandedCriteria}
                           toggleExpanded={toggleCriteria}
-                          disabled={myEvaluation.status !== 'draft'}
+                          disabled={myEvaluation.status !== 'draft' && !isDirector}
                         >
                           <QuestionField
                             label="Performans göstergelerinin devam ettirilmesinde kurumsal, yasal, çevresel vb. unsurlar açısından riskler nelerdir?"
                             value={evaluation?.sustainability_risks || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'sustainability_risks', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Bu riskleri ortadan kaldırmak ve sürdürülebilirliği sağlamak için hangi tedbirlerin alınması gerekir?"
                             value={evaluation?.sustainability_measures || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'sustainability_measures', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Hedef bazında belirlenen risklerde bir değişiklik oldu mu?"
                             value={evaluation?.sustainability_risk_changes || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'sustainability_risk_changes', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Gerçekleşen riskler hedeflere ulaşılamamasına neden olabilir mi?"
                             value={evaluation?.sustainability_risk_impact || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'sustainability_risk_impact', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                           <QuestionField
                             label="Gerçekleşen riskler ya da öngörülemeyen ancak maruz kalınan ilave riskler, stratejik planın güncellenmesini gerektirir mi?"
                             value={evaluation?.sustainability_plan_update_needed || ''}
                             onChange={(value) => updateIndicatorEvaluation(indicator.id, 'sustainability_plan_update_needed', value)}
-                            disabled={myEvaluation.status !== 'draft'}
+                            disabled={myEvaluation.status !== 'draft' && !isDirector}
                           />
                         </CriteriaSection>
                       </div>
@@ -871,7 +904,7 @@ export default function StrategicPlanEvaluation() {
               })}
             </div>
 
-            {myEvaluation.status === 'draft' && (
+            {(myEvaluation.status === 'draft' || (isDirector && myEvaluation.status !== 'completed')) && (
               <div className="flex gap-3 mt-6">
                 <Button onClick={saveEvaluation} disabled={saving} variant="secondary">
                   <Save className="w-4 h-4 mr-2" />
@@ -892,10 +925,9 @@ interface CriteriaSectionProps {
   expanded: Set<string>;
   toggleExpanded: (key: string) => void;
   children: React.ReactNode;
-  disabled?: boolean;
 }
 
-function CriteriaSection({ title, criteriaKey, expanded, toggleExpanded, children, disabled }: CriteriaSectionProps) {
+function CriteriaSection({ title, criteriaKey, expanded, toggleExpanded, children }: CriteriaSectionProps) {
   const isExpanded = expanded.has(criteriaKey);
 
   return (
@@ -903,7 +935,6 @@ function CriteriaSection({ title, criteriaKey, expanded, toggleExpanded, childre
       <button
         onClick={() => toggleExpanded(criteriaKey)}
         className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-        disabled={disabled}
       >
         <span className="font-medium text-gray-900">{title}</span>
         {isExpanded ? (
