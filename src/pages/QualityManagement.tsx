@@ -679,11 +679,18 @@ export default function QualityManagement() {
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
-              <option value="">Seçiniz...</option>
+              <option value="">
+                {users.length === 0 ? 'Kullanıcı yükleniyor...' : 'Seçiniz...'}
+              </option>
               {users.map(u => (
                 <option key={u.id} value={u.id}>{u.full_name}</option>
               ))}
             </select>
+            {users.length === 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                Kullanıcılar yükleniyor... Eğer liste boş kalırsa, lütfen sayfayı yenileyin.
+              </p>
+            )}
           </div>
 
           <div>
