@@ -110,60 +110,84 @@ export default function YearEndReports({ fiscalYear }: YearEndReportsProps) {
   };
 
   const loadSummaryReport = async () => {
-    const { data, error } = await supabase.rpc('get_year_end_evaluation_summary', {
-      p_organization_id: profile!.organization_id,
-      p_fiscal_year: fiscalYear
-    });
+    try {
+      const { data, error } = await supabase.rpc('get_year_end_evaluation_summary', {
+        p_organization_id: profile!.organization_id,
+        p_fiscal_year: fiscalYear
+      });
 
-    if (error) {
-      console.error('Error loading summary report:', error);
-      return;
+      if (error) {
+        console.error('Error loading summary report:', error);
+        alert('Özet raporu yüklenirken hata oluştu: ' + error.message);
+        return;
+      }
+
+      console.log('Summary data loaded:', data);
+      setSummaryData(data || []);
+    } catch (err) {
+      console.error('Exception loading summary report:', err);
     }
-
-    setSummaryData(data || []);
   };
 
   const loadIndicatorReport = async () => {
-    const { data, error } = await supabase.rpc('get_indicator_evaluations_report', {
-      p_organization_id: profile!.organization_id,
-      p_fiscal_year: fiscalYear,
-      p_department_id: null
-    });
+    try {
+      const { data, error } = await supabase.rpc('get_indicator_evaluations_report', {
+        p_organization_id: profile!.organization_id,
+        p_fiscal_year: fiscalYear,
+        p_department_id: null
+      });
 
-    if (error) {
-      console.error('Error loading indicator report:', error);
-      return;
+      if (error) {
+        console.error('Error loading indicator report:', error);
+        alert('Gösterge raporu yüklenirken hata oluştu: ' + error.message);
+        return;
+      }
+
+      console.log('Indicator data loaded:', data);
+      setIndicatorData(data || []);
+    } catch (err) {
+      console.error('Exception loading indicator report:', err);
     }
-
-    setIndicatorData(data || []);
   };
 
   const loadCriteriaReport = async () => {
-    const { data, error } = await supabase.rpc('get_criteria_analysis_report', {
-      p_organization_id: profile!.organization_id,
-      p_fiscal_year: fiscalYear
-    });
+    try {
+      const { data, error } = await supabase.rpc('get_criteria_analysis_report', {
+        p_organization_id: profile!.organization_id,
+        p_fiscal_year: fiscalYear
+      });
 
-    if (error) {
-      console.error('Error loading criteria report:', error);
-      return;
+      if (error) {
+        console.error('Error loading criteria report:', error);
+        alert('Kriter analizi yüklenirken hata oluştu: ' + error.message);
+        return;
+      }
+
+      console.log('Criteria data loaded:', data);
+      setCriteriaData(data || []);
+    } catch (err) {
+      console.error('Exception loading criteria report:', err);
     }
-
-    setCriteriaData(data || []);
   };
 
   const loadComparisonReport = async () => {
-    const { data, error } = await supabase.rpc('get_department_evaluation_comparison', {
-      p_organization_id: profile!.organization_id,
-      p_fiscal_year: fiscalYear
-    });
+    try {
+      const { data, error } = await supabase.rpc('get_department_evaluation_comparison', {
+        p_organization_id: profile!.organization_id,
+        p_fiscal_year: fiscalYear
+      });
 
-    if (error) {
-      console.error('Error loading comparison report:', error);
-      return;
+      if (error) {
+        console.error('Error loading comparison report:', error);
+        alert('Karşılaştırma raporu yüklenirken hata oluştu: ' + error.message);
+        return;
+      }
+
+      console.log('Comparison data loaded:', data);
+      setComparisonData(data || []);
+    } catch (err) {
+      console.error('Exception loading comparison report:', err);
     }
-
-    setComparisonData(data || []);
   };
 
   const exportToExcel = () => {
@@ -451,6 +475,18 @@ function IndicatorReport({ data }: { data: IndicatorEvaluation[] }) {
     if (filterNeedsUpdate && !item.needs_update) return false;
     return true;
   });
+
+  if (data.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-gray-500">
+          Henüz gösterge verisi bulunmamaktadır.
+          <br />
+          Önce göstergeler tanımlanmalı ve yıl sonu değerlendirmeleri girilmelidir.
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
