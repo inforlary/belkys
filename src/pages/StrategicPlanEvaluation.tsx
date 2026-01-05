@@ -139,6 +139,8 @@ export default function StrategicPlanEvaluation() {
   const loadAllEvaluations = async () => {
     if (!profile?.organization_id) return;
 
+    console.log('Loading evaluations - isDirector:', isDirector, 'department_id:', profile?.department_id);
+
     let query = supabase
       .from('year_end_evaluations')
       .select(`
@@ -149,10 +151,13 @@ export default function StrategicPlanEvaluation() {
       .eq('fiscal_year', evaluationYear);
 
     if (isDirector && profile?.department_id) {
+      console.log('Adding department filter for director');
       query = query.eq('department_id', profile.department_id);
     }
 
-    const { data, error } = await query.order('department(name)');
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    console.log('Evaluations loaded:', data?.length || 0, 'error:', error);
 
     if (error) {
       console.error('Error loading evaluations:', error);
