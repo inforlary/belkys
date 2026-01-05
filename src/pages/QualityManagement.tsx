@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
+import Modal from '../components/ui/Modal';
 import {
   Award,
   Plus,
@@ -12,7 +13,8 @@ import {
   AlertCircle,
   BarChart3,
   Target,
-  Star
+  Star,
+  X
 } from 'lucide-react';
 
 interface QualityObjective {
@@ -51,24 +53,67 @@ interface QualityIndicator {
   measurement_frequency: string;
 }
 
+interface User {
+  id: string;
+  full_name: string;
+}
+
 export default function QualityManagement() {
   const { user, organization } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'objectives' | 'surveys' | 'standards' | 'indicators'>('overview');
 
   const [objectives, setObjectives] = useState<QualityObjective[]>([]);
   const [surveys, setSurveys] = useState<CustomerSurvey[]>([]);
   const [standards, setStandards] = useState<ISOStandard[]>([]);
   const [indicators, setIndicators] = useState<QualityIndicator[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
   const [showObjectiveModal, setShowObjectiveModal] = useState(false);
   const [showSurveyModal, setShowSurveyModal] = useState(false);
 
+  const [objectiveForm, setObjectiveForm] = useState({
+    title: '',
+    description: '',
+    target_value: '',
+    measurement_unit: '',
+    responsible_user_id: '',
+    target_date: '',
+    status: 'planned'
+  });
+
+  const [surveyForm, setSurveyForm] = useState({
+    survey_title: '',
+    survey_date: '',
+    stakeholder_type: 'customer',
+    satisfaction_score: '',
+    total_responses: '',
+    survey_method: '',
+    key_findings: ''
+  });
+
   useEffect(() => {
     if (organization?.id) {
       fetchData();
+      fetchUsers();
     }
   }, [organization?.id, activeTab]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('organization_id', organization?.id)
+        .order('full_name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -126,6 +171,89 @@ export default function QualityManagement() {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateObjective = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setSaving(true);
+
+      const { error } = await supabase
+        .from('quality_objectives')
+        .insert({
+          organization_id: organization?.id,
+          title: objectiveForm.title,
+          description: objectiveForm.description,
+          target_value: parseFloat(objectiveForm.target_value),
+          measurement_unit: objectiveForm.measurement_unit,
+          responsible_user_id: objectiveForm.responsible_user_id,
+          target_date: objectiveForm.target_date,
+          status: objectiveForm.status,
+          achievement_percentage: 0
+        });
+
+      if (error) throw error;
+
+      setShowObjectiveModal(false);
+      setObjectiveForm({
+        title: '',
+        description: '',
+        target_value: '',
+        measurement_unit: '',
+        responsible_user_id: '',
+        target_date: '',
+        status: 'planned'
+      });
+      fetchData();
+      alert('Kalite hedefi başarıyla oluşturuldu!');
+    } catch (error) {
+      console.error('Error creating objective:', error);
+      alert('Kalite hedefi oluşturulurken hata oluştu!');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateSurvey = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setSaving(true);
+
+      const { error } = await supabase
+        .from('customer_satisfaction_surveys')
+        .insert({
+          organization_id: organization?.id,
+          survey_title: surveyForm.survey_title,
+          survey_date: surveyForm.survey_date,
+          stakeholder_type: surveyForm.stakeholder_type,
+          satisfaction_score: parseFloat(surveyForm.satisfaction_score),
+          total_responses: parseInt(surveyForm.total_responses),
+          survey_method: surveyForm.survey_method,
+          key_findings: surveyForm.key_findings
+        });
+
+      if (error) throw error;
+
+      setShowSurveyModal(false);
+      setSurveyForm({
+        survey_title: '',
+        survey_date: '',
+        stakeholder_type: 'customer',
+        satisfaction_score: '',
+        total_responses: '',
+        survey_method: '',
+        key_findings: ''
+      });
+      fetchData();
+      alert('Müşteri memnuniyeti anketi başarıyla oluşturuldu!');
+    } catch (error) {
+      console.error('Error creating survey:', error);
+      alert('Anket oluşturulurken hata oluştu!');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -478,6 +606,265 @@ export default function QualityManagement() {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={showObjectiveModal}
+        onClose={() => setShowObjectiveModal(false)}
+        title="Yeni Kalite Hedefi"
+      >
+        <form onSubmit={handleCreateObjective} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hedef Başlığı *
+            </label>
+            <input
+              type="text"
+              value={objectiveForm.title}
+              onChange={(e) => setObjectiveForm({ ...objectiveForm, title: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Açıklama
+            </label>
+            <textarea
+              value={objectiveForm.description}
+              onChange={(e) => setObjectiveForm({ ...objectiveForm, description: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              rows={3}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Hedef Değer *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={objectiveForm.target_value}
+                onChange={(e) => setObjectiveForm({ ...objectiveForm, target_value: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ölçüm Birimi *
+              </label>
+              <input
+                type="text"
+                value={objectiveForm.measurement_unit}
+                onChange={(e) => setObjectiveForm({ ...objectiveForm, measurement_unit: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="%, adet, gün..."
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sorumlu Kişi *
+            </label>
+            <select
+              value={objectiveForm.responsible_user_id}
+              onChange={(e) => setObjectiveForm({ ...objectiveForm, responsible_user_id: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Seçiniz...</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.full_name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hedef Tarihi *
+            </label>
+            <input
+              type="date"
+              value={objectiveForm.target_date}
+              onChange={(e) => setObjectiveForm({ ...objectiveForm, target_date: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Durum *
+            </label>
+            <select
+              value={objectiveForm.status}
+              onChange={(e) => setObjectiveForm({ ...objectiveForm, status: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="planned">Planlandı</option>
+              <option value="in_progress">Devam Ediyor</option>
+              <option value="achieved">Başarıldı</option>
+              <option value="not_achieved">Başarılamadı</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowObjectiveModal(false)}
+              className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={showSurveyModal}
+        onClose={() => setShowSurveyModal(false)}
+        title="Yeni Müşteri Memnuniyeti Anketi"
+      >
+        <form onSubmit={handleCreateSurvey} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Anket Başlığı *
+            </label>
+            <input
+              type="text"
+              value={surveyForm.survey_title}
+              onChange={(e) => setSurveyForm({ ...surveyForm, survey_title: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Anket Tarihi *
+              </label>
+              <input
+                type="date"
+                value={surveyForm.survey_date}
+                onChange={(e) => setSurveyForm({ ...surveyForm, survey_date: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Paydaş Tipi *
+              </label>
+              <select
+                value={surveyForm.stakeholder_type}
+                onChange={(e) => setSurveyForm({ ...surveyForm, stakeholder_type: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="customer">Müşteri</option>
+                <option value="employee">Çalışan</option>
+                <option value="supplier">Tedarikçi</option>
+                <option value="partner">İş Ortağı</option>
+                <option value="citizen">Vatandaş</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Memnuniyet Skoru (1-10) *
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                step="0.1"
+                value={surveyForm.satisfaction_score}
+                onChange={(e) => setSurveyForm({ ...surveyForm, satisfaction_score: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Toplam Yanıt *
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={surveyForm.total_responses}
+                onChange={(e) => setSurveyForm({ ...surveyForm, total_responses: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Anket Yöntemi
+            </label>
+            <select
+              value={surveyForm.survey_method}
+              onChange={(e) => setSurveyForm({ ...surveyForm, survey_method: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seçiniz...</option>
+              <option value="online">Online</option>
+              <option value="phone">Telefon</option>
+              <option value="face_to_face">Yüz Yüze</option>
+              <option value="email">E-posta</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Anahtar Bulgular
+            </label>
+            <textarea
+              value={surveyForm.key_findings}
+              onChange={(e) => setSurveyForm({ ...surveyForm, key_findings: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              rows={3}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowSurveyModal(false)}
+              className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </Layout>
   );
 }
