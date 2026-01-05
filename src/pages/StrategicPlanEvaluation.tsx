@@ -324,18 +324,27 @@ export default function StrategicPlanEvaluation() {
     try {
       await saveEvaluation();
 
+      const updateFields: any = {
+        submitted_at: new Date().toISOString(),
+        submitted_by: user.id
+      };
+
+      if (isDirector) {
+        updateFields.status = 'director_approved';
+        updateFields.director_approved_at = new Date().toISOString();
+        updateFields.director_approved_by = user.id;
+      } else {
+        updateFields.status = 'submitted';
+      }
+
       const { error } = await supabase
         .from('year_end_evaluations')
-        .update({
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-          submitted_by: user.id
-        })
+        .update(updateFields)
         .eq('id', myEvaluation.id);
 
       if (error) throw error;
 
-      alert('Değerlendirme onaya gönderildi.');
+      alert(isDirector ? 'Değerlendirme yönetici onayına gönderildi.' : 'Değerlendirme müdür onayına gönderildi.');
       await loadData();
     } catch (error: any) {
       console.error('Error submitting evaluation:', error);
@@ -728,7 +737,7 @@ export default function StrategicPlanEvaluation() {
                 {myEvaluation.status === 'draft' && (
                   <Button onClick={submitForApproval} disabled={saving}>
                     <Send className="w-4 h-4 mr-2" />
-                    {isDirector ? 'Müdür Onayına Gönder' : 'Onaya Gönder'}
+                    {isDirector ? 'Yönetici Onayına Gönder' : 'Müdür Onayına Gönder'}
                   </Button>
                 )}
               </div>
