@@ -104,7 +104,12 @@ export default function ProcessManagement() {
       if (selectedPlanId) {
         loadData();
       } else {
-        loadUnassignedProcesses();
+        setLoading(true);
+        Promise.all([
+          loadUnassignedProcesses(),
+          loadDepartments(),
+          loadUsers()
+        ]).then(() => setLoading(false));
       }
     }
   }, [profile?.organization_id, selectedPlanId]);
@@ -150,10 +155,17 @@ export default function ProcessManagement() {
         owner_name: process.profiles?.full_name,
         kiks_standard_title: process.ic_kiks_main_standards
           ? `${process.ic_kiks_main_standards.code} - ${process.ic_kiks_main_standards.title}`
-          : undefined
+          : undefined,
+        step_count: 0,
+        activity_count: 0,
+        risk_count: 0
       }));
 
       setUnassignedProcesses(processesData);
+
+      if (!selectedPlanId) {
+        setProcesses(processesData);
+      }
     } catch (error) {
       console.error('Plansız süreçler yüklenirken hata:', error);
     }
