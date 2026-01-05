@@ -80,7 +80,8 @@ const STATUS_LABELS = {
 export default function ActivityReportDetail() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
-  const reportId = window.location.hash.split('/')[2];
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const reportId = hash.split('/')[1];
 
   const [report, setReport] = useState<ActivityReport | null>(null);
   const [sections, setSections] = useState<ReportSection[]>([]);

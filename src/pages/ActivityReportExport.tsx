@@ -25,7 +25,8 @@ interface ReportSection {
 export default function ActivityReportExport() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
-  const reportId = window.location.hash.split('/')[2];
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const reportId = hash.split('/')[1];
   const previewRef = useRef<HTMLDivElement>(null);
 
   const [report, setReport] = useState<ActivityReport | null>(null);
