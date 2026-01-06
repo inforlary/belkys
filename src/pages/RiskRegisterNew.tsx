@@ -11,6 +11,8 @@ export default function RiskRegisterNew() {
   const [categories, setCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [objectives, setObjectives] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
+  const [filteredGoals, setFilteredGoals] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -19,6 +21,7 @@ export default function RiskRegisterNew() {
     category_id: '',
     owner_department_id: '',
     objective_id: '',
+    goal_id: '',
     causes: '',
     consequences: '',
     inherent_likelihood: 3,
@@ -33,10 +36,24 @@ export default function RiskRegisterNew() {
     if (profile?.organization_id) {
       loadCategories();
       loadDepartments();
-      loadObjectives();
+      loadGoals();
       generateNextCode();
     }
   }, [profile?.organization_id]);
+
+  useEffect(() => {
+    if (formData.owner_department_id) {
+      const filtered = goals.filter(
+        (goal) => goal.department_id === formData.owner_department_id
+      );
+      setFilteredGoals(filtered);
+      if (!filtered.find((g) => g.id === formData.goal_id)) {
+        setFormData((prev) => ({ ...prev, goal_id: '', objective_id: '' }));
+      }
+    } else {
+      setFilteredGoals(goals);
+    }
+  }, [formData.owner_department_id, goals]);
 
   const generateNextCode = async () => {
     try {
@@ -96,18 +113,19 @@ export default function RiskRegisterNew() {
     }
   };
 
-  const loadObjectives = async () => {
+  const loadGoals = async () => {
     try {
       const { data, error } = await supabase
-        .from('objectives')
-        .select('id, title')
+        .from('goals')
+        .select('id, title, code, department_id, objective_id')
         .eq('organization_id', profile?.organization_id)
-        .order('title');
+        .order('code');
 
       if (error) throw error;
-      setObjectives(data || []);
+      setGoals(data || []);
+      setFilteredGoals(data || []);
     } catch (error) {
-      console.error('Amaçlar yüklenirken hata:', error);
+      console.error('Hedefler yüklenirken hata:', error);
     }
   };
 
@@ -279,16 +297,31 @@ export default function RiskRegisterNew() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   İlişkili Hedef (Opsiyonel)
+                  {formData.owner_department_id && (
+                    <span className="text-xs text-slate-500 ml-2">
+                      (Seçilen birime ait hedefler gösteriliyor)
+                    </span>
+                  )}
                 </label>
                 <select
-                  value={formData.objective_id}
-                  onChange={(e) => setFormData({ ...formData, objective_id: e.target.value })}
+                  value={formData.goal_id}
+                  onChange={(e) => {
+                    const selectedGoal = goals.find(g => g.id === e.target.value);
+                    setFormData({
+                      ...formData,
+                      goal_id: e.target.value,
+                      objective_id: selectedGoal?.objective_id || ''
+                    });
+                  }}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={!formData.owner_department_id}
                 >
-                  <option value="">Seçiniz</option>
-                  {objectives.map((obj) => (
-                    <option key={obj.id} value={obj.id}>
-                      {obj.title}
+                  <option value="">
+                    {formData.owner_department_id ? 'Seçiniz' : 'Önce sorumlu birim seçiniz'}
+                  </option>
+                  {filteredGoals.map((goal) => (
+                    <option key={goal.id} value={goal.id}>
+                      {goal.code} - {goal.title}
                     </option>
                   ))}
                 </select>
