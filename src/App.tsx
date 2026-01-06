@@ -72,6 +72,7 @@ import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
 import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
 import RiskManagement from './pages/RiskManagement';
 import RiskRegister from './pages/RiskRegister';
+import RiskRegisterNew from './pages/RiskRegisterNew';
 import RiskMatrix from './pages/RiskMatrix';
 import RiskIndicators from './pages/RiskIndicators';
 import RiskTreatments from './pages/RiskTreatments';
@@ -278,6 +279,8 @@ const renderPage = () => {
         return <RiskManagement />;
       case 'risks/register':
         return <RiskRegister />;
+      case 'risks/register/new':
+        return <RiskRegisterNew />;
       case 'risks/matrix':
         return <RiskMatrix />;
       case 'risks/indicators':

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { useLocation } from '../hooks/useLocation';
 import { AlertTriangle, Plus, Search, Filter } from 'lucide-react';
 
 export default function RiskRegister() {
   const { profile } = useAuth();
+  const { navigate } = useLocation();
   const [risks, setRisks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,7 +75,10 @@ export default function RiskRegister() {
           </h1>
           <p className="text-slate-600 mt-2">Kurumsal riskleri kaydedin ve yönetin</p>
         </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+        <button
+          onClick={() => navigate('risks/register/new')}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+        >
           <Plus className="w-5 h-5" />
           Yeni Risk Ekle
         </button>
