@@ -100,9 +100,9 @@ export default function RiskRegisterNew() {
     try {
       const { data, error } = await supabase
         .from('objectives')
-        .select('id, name')
+        .select('id, title')
         .eq('organization_id', profile?.organization_id)
-        .order('name');
+        .order('title');
 
       if (error) throw error;
       setObjectives(data || []);
@@ -145,10 +145,8 @@ export default function RiskRegisterNew() {
           consequences: formData.consequences,
           inherent_likelihood: formData.inherent_likelihood,
           inherent_impact: formData.inherent_impact,
-          inherent_score: inherentScore,
           residual_likelihood: formData.residual_likelihood,
           residual_impact: formData.residual_impact,
-          residual_score: residualScore,
           risk_level: getRiskLevel(residualScore),
           risk_response: formData.risk_response,
           response_rationale: formData.response_rationale,
@@ -290,7 +288,7 @@ export default function RiskRegisterNew() {
                   <option value="">Seçiniz</option>
                   {objectives.map((obj) => (
                     <option key={obj.id} value={obj.id}>
-                      {obj.name}
+                      {obj.title}
                     </option>
                   ))}
                 </select>
