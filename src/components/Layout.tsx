@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, AlertCircle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Clock, Workflow, Award, FileSearch, Scale, Lightbulb, BookOpen } from 'lucide-react';
+import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X, LogOut, User, Users, Building, Calendar, Lock, MessageSquare, CheckSquare, FileText, Network, File as FileEdit, CreditCard, Archive, ChevronDown, ChevronRight, DollarSign, Coins, TrendingUp, TrendingDown, Layers, FileBarChart, Settings, Wind, Grid2x2 as Grid, Shield, ShieldAlert, ShieldCheck, Activity, AlertTriangle, AlertCircle, ClipboardCheck, FileWarning, Search, Bell, FolderOpen, GitMerge, Database, Hash, Eye, GitBranch, Clock, Workflow, Award, FileSearch, Scale, Lightbulb, BookOpen, Package, Mail, Key, Download, UserCog } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
@@ -288,6 +288,35 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: Scale, label: 'Değerlendirmeler', path: 'internal-control/assessments' },
         { icon: Users, label: 'İKİYK Toplantıları', path: 'internal-control/ikyk', adminOnly: true },
         { icon: Award, label: 'Güvence Beyanları', path: 'internal-control/assurance', adminOnly: true },
+      ],
+    },
+    {
+      label: 'Ayarlar',
+      icon: Settings,
+      items: [
+        { icon: Settings, label: 'Ayarlar', path: 'settings', adminOnly: true },
+        { icon: Settings, label: 'Genel Ayarlar', path: 'settings/general', adminOnly: true },
+        { icon: Building, label: 'Kurum Bilgileri', path: 'settings/organization', adminOnly: true },
+        { icon: Shield, label: 'Güvenlik', path: 'settings/security', adminOnly: true },
+        { icon: Mail, label: 'E-posta', path: 'settings/email', adminOnly: true },
+        { icon: Package, label: 'Modüller', path: 'settings/modules', adminOnly: true },
+        { icon: Key, label: 'API Anahtarları', path: 'settings/api-keys', adminOnly: true },
+        { icon: Database, label: 'Yedekleme', path: 'settings/backups', adminOnly: true },
+        { icon: Clock, label: 'Zamanlanmış Görevler', path: 'settings/scheduled-jobs', adminOnly: true },
+        { icon: Bell, label: 'Duyurular', path: 'settings/announcements', adminOnly: true },
+      ],
+    },
+    {
+      label: 'Yönetim',
+      icon: ShieldAlert,
+      items: [
+        { icon: LayoutDashboard, label: 'Yönetim Paneli', path: 'admin/dashboard', strictAdminOnly: true },
+        { icon: UserCog, label: 'Roller ve Yetkiler', path: 'admin/roles', strictAdminOnly: true },
+        { icon: FileSearch, label: 'Denetim Logları', path: 'admin/audit-logs', strictAdminOnly: true },
+        { icon: Shield, label: 'Giriş Denemeleri', path: 'admin/login-attempts', strictAdminOnly: true },
+        { icon: Activity, label: 'Aktif Oturumlar', path: 'admin/sessions', strictAdminOnly: true },
+        { icon: TrendingUp, label: 'Sistem Sağlığı', path: 'admin/system-health', strictAdminOnly: true },
+        { icon: Download, label: 'Güncellemeler', path: 'admin/updates', strictAdminOnly: true },
       ],
     },
   ];

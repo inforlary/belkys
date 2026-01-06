@@ -82,6 +82,23 @@ import ICActionPlans from './pages/ICActionPlans';
 import ICAssessments from './pages/ICAssessments';
 import ICMeetings from './pages/ICMeetings';
 import ICAssuranceStatements from './pages/ICAssuranceStatements';
+import Settings from './pages/Settings';
+import GeneralSettings from './pages/GeneralSettings';
+import OrganizationSettings from './pages/OrganizationSettings';
+import SecuritySettings from './pages/SecuritySettings';
+import EmailSettings from './pages/EmailSettings';
+import ModuleManagement from './pages/ModuleManagement';
+import ApiKeysManagement from './pages/ApiKeysManagement';
+import BackupManagement from './pages/BackupManagement';
+import ScheduledJobsManagement from './pages/ScheduledJobsManagement';
+import SystemAnnouncements from './pages/SystemAnnouncements';
+import AdminDashboard from './pages/AdminDashboard';
+import RoleManagement from './pages/RoleManagement';
+import AuditLogs from './pages/AuditLogs';
+import LoginAttemptsLog from './pages/LoginAttemptsLog';
+import ActiveSessions from './pages/ActiveSessions';
+import SystemHealth from './pages/SystemHealth';
+import SystemUpdates from './pages/SystemUpdates';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -281,6 +298,40 @@ const renderPage = () => {
         return <ICMeetings />;
       case 'internal-control/assurance':
         return <ICAssuranceStatements />;
+      case 'settings':
+        return <Settings />;
+      case 'settings/general':
+        return <GeneralSettings />;
+      case 'settings/organization':
+        return <OrganizationSettings />;
+      case 'settings/security':
+        return <SecuritySettings />;
+      case 'settings/email':
+        return <EmailSettings />;
+      case 'settings/modules':
+        return <ModuleManagement />;
+      case 'settings/api-keys':
+        return <ApiKeysManagement />;
+      case 'settings/backups':
+        return <BackupManagement />;
+      case 'settings/scheduled-jobs':
+        return <ScheduledJobsManagement />;
+      case 'settings/announcements':
+        return <SystemAnnouncements />;
+      case 'admin/dashboard':
+        return <AdminDashboard />;
+      case 'admin/roles':
+        return <RoleManagement />;
+      case 'admin/audit-logs':
+        return <AuditLogs />;
+      case 'admin/login-attempts':
+        return <LoginAttemptsLog />;
+      case 'admin/sessions':
+        return <ActiveSessions />;
+      case 'admin/system-health':
+        return <SystemHealth />;
+      case 'admin/updates':
+        return <SystemUpdates />;
       default:
         console.log('[App.tsx] No match found for currentPath, returning Dashboard');
         return profile?.is_super_admin ? <SuperAdmin /> : <Dashboard />;
