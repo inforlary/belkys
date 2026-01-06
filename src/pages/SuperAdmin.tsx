@@ -13,7 +13,6 @@ import StandardExpenseCodesManager from '../components/superadmin/StandardExpens
 import StandardRevenueCodesManager from '../components/superadmin/StandardRevenueCodesManager';
 import StandardProgramsManager from '../components/superadmin/StandardProgramsManager';
 import OrganizationLicenseManager from '../components/superadmin/OrganizationLicenseManager';
-import KIKSStandards from './KIKSStandards';
 
 interface Organization {
   id: string;
@@ -40,7 +39,7 @@ interface OrganizationStats {
   indicatorCount: number;
 }
 
-type TabType = 'organizations' | 'standard-codes' | 'kiks-standards' | 'organization-licenses';
+type TabType = 'organizations' | 'standard-codes' | 'organization-licenses';
 type StandardCodeTab = 'expense' | 'revenue' | 'financing' | 'programs';
 
 export default function SuperAdmin() {
@@ -285,19 +284,6 @@ export default function SuperAdmin() {
             <div className="flex items-center gap-2">
               <Settings className="w-5 h-5" />
               Standart Kodlar
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab('kiks-standards')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'kiks-standards'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5" />
-              KİKS Standartları
             </div>
           </button>
           <button
@@ -642,10 +628,6 @@ export default function SuperAdmin() {
             )}
           </div>
         </Card>
-      )}
-
-      {activeTab === 'kiks-standards' && (
-        <KIKSStandards />
       )}
 
       {activeTab === 'organization-licenses' && (

@@ -42,42 +42,10 @@ import PESTLEAnalysis from './pages/PESTLEAnalysis';
 import SWOTAnalysis from './pages/SWOTAnalysis';
 import StrategicAnalysisReport from './pages/StrategicAnalysisReport';
 import ReportManagement from './pages/ReportManagement';
-import InternalControlDashboard from './pages/InternalControlDashboard';
-import InternalControlAdminDashboard from './pages/InternalControlAdminDashboard';
-import InternalControlSelfAssessment from './pages/InternalControlSelfAssessment';
-import InternalControlPlans from './pages/InternalControlPlans';
-import KIKSStandards from './pages/KIKSStandards';
-import InstitutionalFramework from './pages/InstitutionalFramework';
-import ICModuleDashboard from './pages/ICModuleDashboard';
-import ICStandards from './pages/ICStandards';
-import ICActionPlans from './pages/ICActionPlans';
-import ICAssessments from './pages/ICAssessments';
-import ICIKYKMeetings from './pages/ICIKYKMeetings';
-import ICAssuranceStatements from './pages/ICAssuranceStatements';
-import ICReports from './pages/ICReports';
-import OrganizationManagement from './pages/OrganizationManagement';
-import ProcessManagement from './pages/ProcessManagement';
-import RiskManagement from './pages/RiskManagement';
-import RiskAppetiteManagement from './pages/RiskAppetiteManagement';
-import RiskProfile from './pages/RiskProfile';
-import RiskReports from './pages/RiskReports';
-import RiskDashboard from './pages/RiskDashboard';
-import RiskRegister from './pages/RiskRegister';
-import RiskMatrix from './pages/RiskMatrix';
-import RiskHeatMapPage from './pages/RiskHeatMapPage';
-import RiskIndicators from './pages/RiskIndicators';
-import RiskIndicatorEntry from './pages/RiskIndicatorEntry';
-import RiskTreatments from './pages/RiskTreatments';
-import RiskCategories from './pages/RiskCategories';
-import ControlActivities from './pages/ControlActivities';
-import MonitoringEvaluation from './pages/MonitoringEvaluation';
-import CAPAManagement from './pages/CAPAManagement';
-import InternalControlReports from './pages/InternalControlReports';
 import ActivityLogs from './pages/ActivityLogs';
 import NotificationCenter from './pages/NotificationCenter';
 import DocumentLibrary from './pages/DocumentLibrary';
 import EnhancedDashboard from './pages/EnhancedDashboard';
-import RemindersManagement from './pages/RemindersManagement';
 import UserProfile from './pages/UserProfile';
 import ActivitiesOptimized from './pages/ActivitiesOptimized';
 import FiscalYearManagement from './pages/FiscalYearManagement';
@@ -94,11 +62,6 @@ import BudgetExpenseItems from './pages/BudgetExpenseItems';
 import ProgramActivityMapping from './pages/ProgramActivityMapping';
 import MappedEconomicCodeEntry from './pages/MappedEconomicCodeEntry';
 import SubProgramActivities from './pages/SubProgramActivities';
-import ActionPlan from './pages/ActionPlan';
-import ActionPlanWorkflowEnhanced from './pages/ActionPlanWorkflowEnhanced';
-import FindingsManagement from './pages/FindingsManagement';
-import ICRoleManagement from './pages/ICRoleManagement';
-import IntegratedRiskReport from './pages/IntegratedRiskReport';
 import BudgetPerformanceJustification from './pages/BudgetPerformanceJustification';
 import BudgetPerformanceInformation from './pages/BudgetPerformanceInformation';
 import ProgramMapping from './pages/ProgramMapping';
@@ -111,30 +74,6 @@ import DataRequestTracking from './pages/DataRequestTracking';
 import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
 import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
-import QualityManagement from './pages/QualityManagement';
-import QualityAudits from './pages/QualityAudits';
-import ImprovementSuggestions from './pages/ImprovementSuggestions';
-import InternalAuditManagement from './pages/InternalAuditManagement';
-import ExternalAuditManagement from './pages/ExternalAuditManagement';
-import LegalCompliance from './pages/LegalCompliance';
-import LessonsLearned from './pages/LessonsLearned';
-import RiskCalendar from './pages/RiskCalendar';
-import MeetingPlans from './pages/MeetingPlans';
-import SensitiveTasks from './pages/SensitiveTasks';
-import EthicsManagement from './pages/EthicsManagement';
-import StrategicIntegration from './pages/StrategicIntegration';
-import StandardsCompliance from './pages/StandardsCompliance';
-import RiskToleranceAnalysis from './pages/RiskToleranceAnalysis';
-import VarianceAnalysis from './pages/VarianceAnalysis';
-import WorkshopManagement from './pages/WorkshopManagement';
-import ControlRiskMapping from './pages/ControlRiskMapping';
-import ControlTesting from './pages/ControlTesting';
-import ProcedureManagement from './pages/ProcedureManagement';
-import SegregationOfDuties from './pages/SegregationOfDuties';
-import ContinuousMonitoring from './pages/ContinuousMonitoring';
-import ActionTracking from './pages/ActionTracking';
-import WhistleblowerSystem from './pages/WhistleblowerSystem';
-import DocumentTemplates from './pages/DocumentTemplates';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -159,9 +98,6 @@ function AppContent() {
 const renderPage = () => {
     console.log('[App.tsx] renderPage called with currentPath:', currentPath);
 
-    if (currentPath.startsWith('risk-profile/')) {
-      return <RiskProfile />;
-    }
     if (currentPath.startsWith('budget-proposals/') && currentPath.includes('/edit')) {
       return <BudgetProposalEdit />;
     }
@@ -286,76 +222,6 @@ const renderPage = () => {
         return <StrategicAnalysisReport />;
       case 'report-management':
         return <ReportManagement />;
-      case 'internal-control-dashboard':
-        return <InternalControlDashboard />;
-      case 'internal-control-plans':
-        return <InternalControlPlans />;
-      case 'internal-control-admin-dashboard':
-        return <InternalControlAdminDashboard />;
-      case 'internal-control-self-assessment':
-        return <InternalControlSelfAssessment />;
-      case 'kiks-standards':
-        return <KIKSStandards />;
-      case 'institutional-framework':
-        return <InstitutionalFramework />;
-      case 'ic-module':
-        return <ICModuleDashboard />;
-      case 'ic-standards':
-        return <ICStandards />;
-      case 'ic-action-plans':
-        return <ICActionPlans />;
-      case 'ic-assessments':
-        return <ICAssessments />;
-      case 'ic-ikyk-meetings':
-        return <ICIKYKMeetings />;
-      case 'ic-assurance-statements':
-        return <ICAssuranceStatements />;
-      case 'ic-reports':
-        return <ICReports />;
-      case 'organization-management':
-        return <OrganizationManagement />;
-      case 'process-management':
-        return <ProcessManagement />;
-      case 'risks':
-        return <RiskDashboard />;
-      case 'risks/register':
-        return <RiskRegister />;
-      case 'risks/matrix':
-        return <RiskMatrix />;
-      case 'risks/heatmap':
-        return <RiskHeatMapPage />;
-      case 'risks/indicators':
-        return <RiskIndicators />;
-      case 'risks/indicators/entry':
-        return <RiskIndicatorEntry />;
-      case 'risks/treatments':
-        return <RiskTreatments />;
-      case 'risks/categories':
-        return <RiskCategories />;
-      case 'risk-management':
-        return <RiskManagement />;
-      case 'risk-appetite-management':
-        return <RiskAppetiteManagement />;
-      case 'risk-reports':
-        return <RiskReports />;
-      case 'control-activities':
-        return <ControlActivities />;
-      case 'monitoring-evaluation':
-        return <MonitoringEvaluation />;
-      case 'capa-management':
-        return <CAPAManagement />;
-      case 'action-plan':
-        return <ActionPlan />;
-      case 'action-plan-workflow-enhanced':
-        return <ActionPlanWorkflowEnhanced />;
-      case 'findings-management':
-        return <FindingsManagement />;
-      case 'ic-role-management':
-        return <ICRoleManagement />;
-      case 'internal-control-reports':
-        return <InternalControlReports />;
-      case 'integrated-risk-report':
-        return <IntegratedRiskReport />;
       case 'activity-logs':
         return <ActivityLogs />;
       case 'notification-center':
@@ -364,8 +230,6 @@ const renderPage = () => {
         return <DocumentLibrary />;
       case 'enhanced-dashboard':
         return <EnhancedDashboard />;
-      case 'reminders':
-        return <RemindersManagement />;
       case 'user-profile':
         return <UserProfile />;
       case 'activities-optimized':
@@ -393,54 +257,6 @@ const renderPage = () => {
         return <DataRequestTracking />;
       case 'strategic-plan-evaluation':
         return <StrategicPlanEvaluation />;
-      case 'quality-management':
-        return <QualityManagement />;
-      case 'quality-audits':
-        return <QualityAudits />;
-      case 'improvement-suggestions':
-        return <ImprovementSuggestions />;
-      case 'internal-audit-management':
-        return <InternalAuditManagement />;
-      case 'external-audit-management':
-        return <ExternalAuditManagement />;
-      case 'legal-compliance':
-        return <LegalCompliance />;
-      case 'lessons-learned':
-        return <LessonsLearned />;
-      case 'risk-calendar':
-        return <RiskCalendar />;
-      case 'meeting-plans':
-        return <MeetingPlans />;
-      case 'sensitive-tasks':
-        return <SensitiveTasks />;
-      case 'ethics-management':
-        return <EthicsManagement />;
-      case 'strategic-integration':
-        return <StrategicIntegration />;
-      case 'standards-compliance':
-        return <StandardsCompliance />;
-      case 'risk-tolerance-analysis':
-        return <RiskToleranceAnalysis />;
-      case 'variance-analysis':
-        return <VarianceAnalysis />;
-      case 'workshop-management':
-        return <WorkshopManagement />;
-      case 'control-risk-mapping':
-        return <ControlRiskMapping />;
-      case 'control-testing':
-        return <ControlTesting />;
-      case 'procedure-management':
-        return <ProcedureManagement />;
-      case 'segregation-of-duties':
-        return <SegregationOfDuties />;
-      case 'continuous-monitoring':
-        return <ContinuousMonitoring />;
-      case 'action-tracking':
-        return <ActionTracking />;
-      case 'whistleblower-system':
-        return <WhistleblowerSystem />;
-      case 'document-templates':
-        return <DocumentTemplates />;
       default:
         console.log('[App.tsx] No match found for currentPath, returning Dashboard');
         return profile?.is_super_admin ? <SuperAdmin /> : <Dashboard />;
