@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
-import { Plus, Edit2, Trash2, Calendar, CheckCircle, Clock, FileText, Check, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, CheckCircle, Clock } from 'lucide-react';
 
 interface ICPlan {
   id: string;
@@ -10,14 +10,14 @@ interface ICPlan {
   start_year: number;
   end_year: number;
   description: string | null;
-  status: 'active' | 'draft' | 'completed';
+  status: 'active' | 'completed';
   created_at: string;
   created_by: string;
 }
 
 export default function InternalControlPlans() {
   const { user, profile } = useAuth();
-  const { selectedPlanId, refreshPlan, clearPlan } = useICPlan();
+  const { selectedPlanId, refreshPlan } = useICPlan();
   const [plans, setPlans] = useState<ICPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -27,7 +27,7 @@ export default function InternalControlPlans() {
     start_year: new Date().getFullYear(),
     end_year: new Date().getFullYear() + 2,
     description: '',
-    status: 'draft' as 'active' | 'draft' | 'completed',
+    status: 'active' as 'active' | 'completed',
   });
 
   useEffect(() => {
@@ -92,9 +92,10 @@ export default function InternalControlPlans() {
         start_year: new Date().getFullYear(),
         end_year: new Date().getFullYear() + 2,
         description: '',
-        status: 'draft',
+        status: 'active',
       });
       fetchPlans();
+      refreshPlan();
     } catch (error) {
       console.error('Error saving IC plan:', error);
       alert('Kaydetme sırasında hata oluştu');
@@ -121,28 +122,17 @@ export default function InternalControlPlans() {
 
       if (error) throw error;
 
-      if (selectedPlanId === id) {
-        localStorage.removeItem('selectedICPlan');
-        refreshPlan();
-      }
-
       fetchPlans();
+      refreshPlan();
     } catch (error) {
       console.error('Error deleting IC plan:', error);
       alert('Silme sırasında hata oluştu');
     }
   };
 
-  const handleSelectPlan = (planId: string) => {
-    localStorage.setItem('selectedICPlan', planId);
-    refreshPlan();
-    alert('Plan başarıyla seçildi! Tüm İç Kontrol sayfaları bu plana göre filtrelenecek.');
-  };
-
   const getStatusBadge = (status: string) => {
     const badges = {
       active: { label: 'Aktif', className: 'bg-green-100 text-green-800', icon: CheckCircle },
-      draft: { label: 'Taslak', className: 'bg-gray-100 text-gray-800', icon: FileText },
       completed: { label: 'Tamamlandı', className: 'bg-blue-100 text-blue-800', icon: Clock },
     };
     const badge = badges[status as keyof typeof badges];
@@ -169,7 +159,7 @@ export default function InternalControlPlans() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">İç Kontrol Planları</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Dönemsel iç kontrol planlarını yönetin
+            Dönemsel iç kontrol planlarını yönetin. Aktif plan otomatik olarak tüm sayfalarda kullanılır.
           </p>
         </div>
         <button
@@ -180,7 +170,7 @@ export default function InternalControlPlans() {
               start_year: new Date().getFullYear(),
               end_year: new Date().getFullYear() + 2,
               description: '',
-              status: 'draft',
+              status: 'active',
             });
             setShowModal(true);
           }}
@@ -209,35 +199,15 @@ export default function InternalControlPlans() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {plans.map((plan) => {
-            const isSelected = selectedPlanId === plan.id;
+            const isActive = plan.status === 'active';
             return (
               <div
                 key={plan.id}
                 className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all ${
-                  isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+                  isActive ? 'ring-2 ring-green-500 ring-offset-2' : ''
                 }`}
               >
                 <div className="p-6">
-                  {isSelected && (
-                    <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-900">Seçili Plan</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearPlan();
-                          alert('Plan seçimi kaldırıldı.');
-                        }}
-                        className="p-1 hover:bg-blue-100 rounded transition-colors"
-                        title="Seçimi Kaldır"
-                      >
-                        <X className="w-4 h-4 text-blue-600" />
-                      </button>
-                    </div>
-                  )}
-
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-900 mb-1">{plan.name}</h3>
@@ -255,33 +225,21 @@ export default function InternalControlPlans() {
                     <p className="text-sm text-gray-600 mb-4 line-clamp-3">{plan.description}</p>
                   )}
 
-                  <div className="flex flex-col gap-2 pt-4 border-t border-gray-200">
-                    {!isSelected && (
-                      <button
-                        onClick={() => handleSelectPlan(plan.id)}
-                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                      >
-                        <Check className="w-4 h-4" />
-                        Bu Planı Seç
-                      </button>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEdit(plan)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        Düzenle
-                      </button>
-                      <button
-                        onClick={() => handleDelete(plan.id)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-700 bg-white hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Sil
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => handleEdit(plan)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Düzenle
+                    </button>
+                    <button
+                      onClick={() => handleDelete(plan.id)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-700 bg-white hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Sil
+                    </button>
                   </div>
                 </div>
               </div>
@@ -349,12 +307,11 @@ export default function InternalControlPlans() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      status: e.target.value as 'active' | 'draft' | 'completed',
+                      status: e.target.value as 'active' | 'completed',
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="draft">Taslak</option>
                   <option value="active">Aktif</option>
                   <option value="completed">Tamamlandı</option>
                 </select>

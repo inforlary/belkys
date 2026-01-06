@@ -7,7 +7,7 @@ interface ICPlan {
   start_year: number;
   end_year: number;
   description: string | null;
-  status: 'active' | 'draft' | 'completed';
+  status: 'active' | 'completed';
   organization_id: string;
   created_at: string;
   created_by: string;
@@ -19,45 +19,52 @@ export function useICPlan() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const planId = localStorage.getItem('selectedICPlan');
-    setSelectedPlanId(planId);
-
-    if (planId) {
-      fetchPlanDetails(planId);
-    } else {
-      setLoading(false);
-    }
+    fetchActivePlan();
   }, []);
 
-  const fetchPlanDetails = async (planId: string) => {
+  const fetchActivePlan = async () => {
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', userData.user.id)
+        .maybeSingle();
+
+      if (!profileData?.organization_id) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('ic_plans')
         .select('*')
-        .eq('id', planId)
+        .eq('organization_id', profileData.organization_id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
-      setSelectedPlan(data);
+
+      if (data) {
+        setSelectedPlan(data);
+        setSelectedPlanId(data.id);
+      }
     } catch (error) {
-      console.error('Error fetching plan details:', error);
+      console.error('Error fetching active plan:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const refreshPlan = () => {
-    const planId = localStorage.getItem('selectedICPlan');
-    setSelectedPlanId(planId);
-    if (planId) {
-      fetchPlanDetails(planId);
-    }
-  };
-
-  const clearPlan = () => {
-    localStorage.removeItem('selectedICPlan');
-    setSelectedPlanId(null);
-    setSelectedPlan(null);
+    fetchActivePlan();
   };
 
   return {
@@ -65,7 +72,6 @@ export function useICPlan() {
     selectedPlan,
     loading,
     refreshPlan,
-    clearPlan,
     hasPlan: !!selectedPlanId
   };
 }
