@@ -81,6 +81,7 @@ import RiskCategories from './pages/RiskCategories';
 import InternalControl from './pages/InternalControl';
 import ICStandards from './pages/ICStandards';
 import ICActionPlans from './pages/ICActionPlans';
+import ICActionPlanDetail from './pages/ICActionPlanDetail';
 import ICAssessments from './pages/ICAssessments';
 import ICMeetings from './pages/ICMeetings';
 import ICAssuranceStatements from './pages/ICAssuranceStatements';
@@ -142,6 +143,9 @@ const renderPage = () => {
     }
     if (currentPath.startsWith('risks/treatments/') && currentPath !== 'risks/treatments') {
       return <RiskTreatmentDetail />;
+    }
+    if (currentPath.startsWith('internal-control/action-plans/') && currentPath !== 'internal-control/action-plans') {
+      return <ICActionPlanDetail />;
     }
 
     console.log('[App.tsx] === ROUTING DEBUG ===');
