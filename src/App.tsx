@@ -76,6 +76,7 @@ import RiskRegisterNew from './pages/RiskRegisterNew';
 import RiskMatrix from './pages/RiskMatrix';
 import RiskIndicators from './pages/RiskIndicators';
 import RiskTreatments from './pages/RiskTreatments';
+import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
 import RiskCategories from './pages/RiskCategories';
 import InternalControl from './pages/InternalControl';
 import ICStandards from './pages/ICStandards';
@@ -138,6 +139,9 @@ const renderPage = () => {
     }
     if (currentPath.startsWith('activity-reports/') && !currentPath.includes('/edit') && !currentPath.includes('/export') && !currentPath.includes('/unit-submissions')) {
       return <ActivityReportDetail />;
+    }
+    if (currentPath.startsWith('risks/treatments/') && currentPath !== 'risks/treatments') {
+      return <RiskTreatmentDetail />;
     }
 
     console.log('[App.tsx] === ROUTING DEBUG ===');
