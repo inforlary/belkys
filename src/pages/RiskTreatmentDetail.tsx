@@ -187,7 +187,11 @@ export default function RiskTreatmentDetail() {
           <div>
             <div className="text-sm text-slate-500">İlgili Risk</div>
             <div className="text-sm font-medium text-slate-900">
-              {treatment.risk.code} - {treatment.risk.name}
+              {treatment.risk ? (
+                `${treatment.risk.code} - ${treatment.risk.name}`
+              ) : (
+                <span className="text-red-600">Risk bilgisi eksik!</span>
+              )}
             </div>
           </div>
 

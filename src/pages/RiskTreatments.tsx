@@ -497,20 +497,31 @@ export default function RiskTreatments() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => navigate(`risks/register/${treatment.risk_id}`)}
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          {treatment.risk?.code}
-                        </button>
+                        {treatment.risk ? (
+                          <button
+                            onClick={() => navigate(`risks/register/${treatment.risk_id}`)}
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                          >
+                            {treatment.risk.code}
+                          </button>
+                        ) : (
+                          <span className="text-sm text-red-600">Risk eksik!</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                           {treatmentTypeLabels[treatment.treatment_type] || treatment.treatment_type}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {treatment.responsible_department?.name || '-'}
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-700">
+                          <div className="font-medium">
+                            {treatment.responsible_department?.name || <span className="text-red-600">Birim belirlenmemiş</span>}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {treatment.responsible_person?.full_name || <span className="text-red-600">Sorumlu belirlenmemiş</span>}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {treatment.planned_end_date ? new Date(treatment.planned_end_date).toLocaleDateString('tr-TR') : '-'}

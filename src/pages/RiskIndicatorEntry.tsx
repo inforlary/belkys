@@ -257,7 +257,11 @@ export default function RiskIndicatorEntry() {
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-900">{indicator.name}</div>
                           <div className="text-xs text-gray-600">
-                            Risk: {indicator.risk?.code} - {indicator.risk?.name}
+                            {indicator.risk ? (
+                              <>Risk: {indicator.risk.code} - {indicator.risk.name}</>
+                            ) : (
+                              <span className="text-red-600">Risk bilgisi eksik!</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-700">{indicator.unit_of_measure}</td>
