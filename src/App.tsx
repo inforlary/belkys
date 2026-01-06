@@ -118,6 +118,23 @@ import InternalAuditManagement from './pages/InternalAuditManagement';
 import ExternalAuditManagement from './pages/ExternalAuditManagement';
 import LegalCompliance from './pages/LegalCompliance';
 import LessonsLearned from './pages/LessonsLearned';
+import RiskCalendar from './pages/RiskCalendar';
+import MeetingPlans from './pages/MeetingPlans';
+import SensitiveTasks from './pages/SensitiveTasks';
+import EthicsManagement from './pages/EthicsManagement';
+import StrategicIntegration from './pages/StrategicIntegration';
+import StandardsCompliance from './pages/StandardsCompliance';
+import RiskToleranceAnalysis from './pages/RiskToleranceAnalysis';
+import VarianceAnalysis from './pages/VarianceAnalysis';
+import WorkshopManagement from './pages/WorkshopManagement';
+import ControlRiskMapping from './pages/ControlRiskMapping';
+import ControlTesting from './pages/ControlTesting';
+import ProcedureManagement from './pages/ProcedureManagement';
+import SegregationOfDuties from './pages/SegregationOfDuties';
+import ContinuousMonitoring from './pages/ContinuousMonitoring';
+import ActionTracking from './pages/ActionTracking';
+import WhistleblowerSystem from './pages/WhistleblowerSystem';
+import DocumentTemplates from './pages/DocumentTemplates';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -390,6 +407,40 @@ const renderPage = () => {
         return <LegalCompliance />;
       case 'lessons-learned':
         return <LessonsLearned />;
+      case 'risk-calendar':
+        return <RiskCalendar />;
+      case 'meeting-plans':
+        return <MeetingPlans />;
+      case 'sensitive-tasks':
+        return <SensitiveTasks />;
+      case 'ethics-management':
+        return <EthicsManagement />;
+      case 'strategic-integration':
+        return <StrategicIntegration />;
+      case 'standards-compliance':
+        return <StandardsCompliance />;
+      case 'risk-tolerance-analysis':
+        return <RiskToleranceAnalysis />;
+      case 'variance-analysis':
+        return <VarianceAnalysis />;
+      case 'workshop-management':
+        return <WorkshopManagement />;
+      case 'control-risk-mapping':
+        return <ControlRiskMapping />;
+      case 'control-testing':
+        return <ControlTesting />;
+      case 'procedure-management':
+        return <ProcedureManagement />;
+      case 'segregation-of-duties':
+        return <SegregationOfDuties />;
+      case 'continuous-monitoring':
+        return <ContinuousMonitoring />;
+      case 'action-tracking':
+        return <ActionTracking />;
+      case 'whistleblower-system':
+        return <WhistleblowerSystem />;
+      case 'document-templates':
+        return <DocumentTemplates />;
       default:
         console.log('[App.tsx] No match found for currentPath, returning Dashboard');
         return profile?.is_super_admin ? <SuperAdmin /> : <Dashboard />;
