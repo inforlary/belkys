@@ -67,10 +67,6 @@ import BudgetPerformanceInformation from './pages/BudgetPerformanceInformation';
 import ProgramMapping from './pages/ProgramMapping';
 import DepartmentProgramMappingView from './pages/DepartmentProgramMappingView';
 import PerformanceCards from './pages/PerformanceCards';
-import DataRequestTemplates from './pages/DataRequestTemplates';
-import DataRequestManagement from './pages/DataRequestManagement';
-import MyDataRequests from './pages/MyDataRequests';
-import DataRequestTracking from './pages/DataRequestTracking';
 import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
 import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
@@ -247,14 +243,6 @@ const renderPage = () => {
         return <DepartmentProgramMappingView />;
       case 'performance-cards':
         return <PerformanceCards />;
-      case 'data-request-templates':
-        return <DataRequestTemplates />;
-      case 'data-request-management':
-        return <DataRequestManagement />;
-      case 'my-data-requests':
-        return <MyDataRequests />;
-      case 'data-request-tracking':
-        return <DataRequestTracking />;
       case 'strategic-plan-evaluation':
         return <StrategicPlanEvaluation />;
       default:
