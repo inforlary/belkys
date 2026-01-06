@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useICPlan } from '../hooks/useICPlan';
-import { Plus, Edit2, Trash2, Calendar, CheckCircle, Clock } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Calendar, CheckCircle, Clock } from 'lucide-react';
 
 interface ICPlan {
   id: string;
