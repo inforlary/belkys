@@ -70,6 +70,18 @@ import PerformanceCards from './pages/PerformanceCards';
 import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
 import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
+import RiskManagement from './pages/RiskManagement';
+import RiskRegister from './pages/RiskRegister';
+import RiskMatrix from './pages/RiskMatrix';
+import RiskIndicators from './pages/RiskIndicators';
+import RiskTreatments from './pages/RiskTreatments';
+import RiskCategories from './pages/RiskCategories';
+import InternalControl from './pages/InternalControl';
+import ICStandards from './pages/ICStandards';
+import ICActionPlans from './pages/ICActionPlans';
+import ICAssessments from './pages/ICAssessments';
+import ICMeetings from './pages/ICMeetings';
+import ICAssuranceStatements from './pages/ICAssuranceStatements';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -245,6 +257,30 @@ const renderPage = () => {
         return <PerformanceCards />;
       case 'strategic-plan-evaluation':
         return <StrategicPlanEvaluation />;
+      case 'risks':
+        return <RiskManagement />;
+      case 'risks/register':
+        return <RiskRegister />;
+      case 'risks/matrix':
+        return <RiskMatrix />;
+      case 'risks/indicators':
+        return <RiskIndicators />;
+      case 'risks/treatments':
+        return <RiskTreatments />;
+      case 'risks/categories':
+        return <RiskCategories />;
+      case 'internal-control':
+        return <InternalControl />;
+      case 'internal-control/standards':
+        return <ICStandards />;
+      case 'internal-control/action-plans':
+        return <ICActionPlans />;
+      case 'internal-control/assessments':
+        return <ICAssessments />;
+      case 'internal-control/ikyk':
+        return <ICMeetings />;
+      case 'internal-control/assurance':
+        return <ICAssuranceStatements />;
       default:
         console.log('[App.tsx] No match found for currentPath, returning Dashboard');
         return profile?.is_super_admin ? <SuperAdmin /> : <Dashboard />;

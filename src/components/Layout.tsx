@@ -266,6 +266,30 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: FileBarChart, label: 'Performans Kartları', path: 'performance-cards', adminOnly: true },
       ],
     },
+    {
+      label: 'Risk Yönetimi',
+      icon: AlertTriangle,
+      items: [
+        { icon: LayoutDashboard, label: 'Dashboard', path: 'risks' },
+        { icon: FileWarning, label: 'Risk Kaydı', path: 'risks/register' },
+        { icon: Grid, label: 'Risk Matrisi', path: 'risks/matrix' },
+        { icon: BarChart3, label: 'Göstergeler', path: 'risks/indicators' },
+        { icon: CheckSquare, label: 'Faaliyetler', path: 'risks/treatments' },
+        { icon: Layers, label: 'Kategoriler', path: 'risks/categories', adminOnly: true },
+      ],
+    },
+    {
+      label: 'İç Kontrol',
+      icon: ShieldCheck,
+      items: [
+        { icon: LayoutDashboard, label: 'Dashboard', path: 'internal-control' },
+        { icon: BookOpen, label: 'Standartlar', path: 'internal-control/standards' },
+        { icon: ClipboardCheck, label: 'Eylem Planları', path: 'internal-control/action-plans' },
+        { icon: Scale, label: 'Değerlendirmeler', path: 'internal-control/assessments' },
+        { icon: Users, label: 'İKİYK Toplantıları', path: 'internal-control/ikyk', adminOnly: true },
+        { icon: Award, label: 'Güvence Beyanları', path: 'internal-control/assurance', adminOnly: true },
+      ],
+    },
   ];
 
   const bottomMenuItems: MenuItem[] = [
@@ -308,6 +332,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     if (section.label === 'Bütçe Yönetimi') return moduleAccess.budget_performance;
     if (section.label === 'Bütçe ve Performans') return moduleAccess.budget_performance;
     if (section.label === 'İç Kontrol') return moduleAccess.internal_control;
+    if (section.label === 'Risk Yönetimi') return true;
 
     return true;
   };
