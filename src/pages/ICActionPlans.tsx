@@ -163,9 +163,10 @@ export default function ICActionPlans() {
         source_plan_id: ''
       });
       loadActionPlans();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Eylem planı oluşturulurken hata:', error);
-      alert('Eylem planı oluşturulurken bir hata oluştu');
+      console.error('Error details:', error?.message, error?.details, error?.hint);
+      alert(`Eylem planı oluşturulurken bir hata oluştu: ${error?.message || error}`);
     } finally {
       setSaving(false);
     }

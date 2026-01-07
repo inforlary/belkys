@@ -183,10 +183,22 @@ export default function ICActionPlanDetail() {
 
       if (planRes.error) {
         console.error('[ICActionPlanDetail] Error loading plan:', planRes.error);
+        console.error('[ICActionPlanDetail] Plan error details:', {
+          message: planRes.error.message,
+          details: planRes.error.details,
+          hint: planRes.error.hint,
+          code: planRes.error.code
+        });
         throw planRes.error;
       }
       if (actionsRes.error) {
         console.error('[ICActionPlanDetail] Error loading actions:', actionsRes.error);
+        console.error('[ICActionPlanDetail] Actions error details:', {
+          message: actionsRes.error.message,
+          details: actionsRes.error.details,
+          hint: actionsRes.error.hint,
+          code: actionsRes.error.code
+        });
         throw actionsRes.error;
       }
 
