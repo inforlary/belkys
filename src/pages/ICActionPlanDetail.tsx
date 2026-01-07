@@ -63,6 +63,12 @@ interface Department {
   name: string;
 }
 
+interface User {
+  id: string;
+  full_name: string;
+  department_id: string;
+}
+
 interface Standard {
   id: string;
   code: string;
@@ -84,6 +90,7 @@ export default function ICActionPlanDetail() {
   const [plan, setPlan] = useState<ActionPlan | null>(null);
   const [actions, setActions] = useState<Action[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [standards, setStandards] = useState<Standard[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
@@ -110,10 +117,10 @@ export default function ICActionPlanDetail() {
     description: '',
     is_continuous: false,
     applies_to_all_units: false,
-    responsible_department_id: '',
+    responsible_departments: [] as string[],
+    responsible_coordinators: {} as {[key: string]: string},
     related_departments: [] as string[],
-    special_responsible_type: '',
-    special_responsible: '',
+    related_coordinators: {} as {[key: string]: string},
     start_date: '',
     target_date: '',
     monitoring_period: 'CONTINUOUS',
@@ -144,7 +151,7 @@ export default function ICActionPlanDetail() {
   const loadData = async () => {
     try {
       console.log('[ICActionPlanDetail] Loading data for planId:', planId);
-      const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
+      const [planRes, actionsRes, departmentsRes, usersRes, standardsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
         supabase
           .from('ic_action_plans')
           .select('*')
@@ -164,6 +171,11 @@ export default function ICActionPlanDetail() {
           .select('id, name')
           .eq('organization_id', profile?.organization_id)
           .order('name'),
+        supabase
+          .from('profiles')
+          .select('id, full_name, department_id')
+          .eq('organization_id', profile?.organization_id)
+          .order('full_name'),
         supabase
           .from('ic_standards')
           .select('id, code, name, component_id')
@@ -228,6 +240,7 @@ export default function ICActionPlanDetail() {
       setPlan(planRes.data);
       setActions(actionsRes.data || []);
       setDepartments(departmentsRes.data || []);
+      setUsers(usersRes.data || []);
       setStandards(standardsRes.data || []);
       setComponents(componentsRes.data || []);
       setGoals(goalsRes.data || []);
@@ -274,10 +287,10 @@ export default function ICActionPlanDetail() {
           description: actionForm.description,
           is_continuous: actionForm.is_continuous,
           applies_to_all_units: actionForm.applies_to_all_units,
-          responsible_department_id: actionForm.applies_to_all_units ? null : (actionForm.responsible_department_id || null),
+          responsible_department_ids: actionForm.applies_to_all_units ? null : (actionForm.responsible_departments.length > 0 ? actionForm.responsible_departments : null),
+          responsible_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.responsible_coordinators).length > 0 ? actionForm.responsible_coordinators : null),
           related_department_ids: actionForm.applies_to_all_units ? null : (actionForm.related_departments.length > 0 ? actionForm.related_departments : null),
-          special_responsible_type: actionForm.special_responsible_type || null,
-          special_responsible: actionForm.special_responsible_type === 'OTHER' ? actionForm.special_responsible : null,
+          related_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.related_coordinators).length > 0 ? actionForm.related_coordinators : null),
           start_date: actionForm.start_date || null,
           target_date: actionForm.is_continuous ? null : actionForm.target_date,
           monitoring_period: actionForm.is_continuous ? actionForm.monitoring_period : null,
@@ -304,10 +317,10 @@ export default function ICActionPlanDetail() {
         description: '',
         is_continuous: false,
         applies_to_all_units: false,
-        responsible_department_id: '',
+        responsible_departments: [],
+        responsible_coordinators: {},
         related_departments: [],
-        special_responsible_type: '',
-        special_responsible: '',
+        related_coordinators: {},
         start_date: '',
         target_date: '',
         monitoring_period: 'CONTINUOUS',
@@ -1506,7 +1519,7 @@ export default function ICActionPlanDetail() {
                       type="radio"
                       name="scope"
                       checked={actionForm.applies_to_all_units}
-                      onChange={() => setActionForm({ ...actionForm, applies_to_all_units: true, responsible_department_id: '', related_departments: [] })}
+                      onChange={() => setActionForm({ ...actionForm, applies_to_all_units: true, responsible_departments: [], responsible_coordinators: {}, related_departments: [], related_coordinators: {} })}
                       className="w-4 h-4 text-green-600"
                     />
                     <span className="text-sm font-medium">Tüm Birimler</span>
@@ -1516,135 +1529,200 @@ export default function ICActionPlanDetail() {
 
               {!actionForm.applies_to_all_units && (
                 <>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Sorumlu Birim <span className="text-red-500">*</span>
+                  <div className="border border-green-200 rounded-lg p-4 mb-4 bg-green-50">
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      Sorumlu Birim/Birimler <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      required={!actionForm.applies_to_all_units}
-                      value={actionForm.responsible_department_id}
-                      onChange={(e) => setActionForm({ ...actionForm, responsible_department_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    >
-                      <option value="">Seçiniz</option>
-                      {departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      İlgili Birimler
-                    </label>
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      {actionForm.related_departments.map((deptId) => {
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {actionForm.responsible_departments.map((deptId) => {
                         const dept = departments.find(d => d.id === deptId);
+                        const deptUsers = users.filter(u => u.department_id === deptId);
+                        const selectedCoordinator = actionForm.responsible_coordinators[deptId];
+
                         return (
                           <div
                             key={deptId}
-                            className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                            className="w-full border border-green-300 rounded-lg p-3 bg-white"
                           >
-                            <span>{dept?.name}</span>
-                            <button
-                              type="button"
-                          onClick={() => {
-                            setActionForm({
-                              ...actionForm,
-                              related_departments: actionForm.related_departments.filter(id => id !== deptId)
-                            });
-                          }}
-                          className="hover:text-blue-900"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value && !actionForm.related_departments.includes(e.target.value)) {
-                      setActionForm({
-                        ...actionForm,
-                        related_departments: [...actionForm.related_departments, e.target.value]
-                      });
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">+ Birim Ekle</option>
-                  {departments
-                    .filter(d => d.id !== actionForm.responsible_department_id && !actionForm.related_departments.includes(d.id))
-                    .map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-                </>
-              )}
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-sm text-slate-900">{dept?.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newResponsibleDepts = actionForm.responsible_departments.filter(id => id !== deptId);
+                                  const newResponsibleCoords = { ...actionForm.responsible_coordinators };
+                                  delete newResponsibleCoords[deptId];
+                                  setActionForm({
+                                    ...actionForm,
+                                    responsible_departments: newResponsibleDepts,
+                                    responsible_coordinators: newResponsibleCoords
+                                  });
+                                }}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                              >
+                                Kaldır
+                              </button>
+                            </div>
 
-              <div className="border-t border-slate-200 pt-4 mt-4">
-                <label className="block text-sm font-medium text-slate-700 mb-3">
-                  Özel Sorumlu/Koordinatör <span className="text-slate-500">(Opsiyonel)</span>
-                </label>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-2">
-                      Sorumlu Türü
-                    </label>
-                    <div className="space-y-2">
-                      {[
-                        { value: '', label: 'Yok / Belirlenmedi' },
-                        { value: 'TOP_MANAGEMENT', label: 'Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)' },
-                        { value: 'INTERNAL_AUDITOR', label: 'İç Denetçi / İç Denetim Birimi' },
-                        { value: 'ETHICS_COMMITTEE', label: 'Etik Komisyonu' },
-                        { value: 'IT_COORDINATOR', label: 'Bilgi Teknolojileri Koordinatörü' },
-                        { value: 'HR_COORDINATOR', label: 'İnsan Kaynakları Koordinatörü' },
-                        { value: 'QUALITY_MANAGER', label: 'Kalite Yönetim Temsilcisi' },
-                        { value: 'RISK_COORDINATOR', label: 'Risk Koordinatörü' },
-                        { value: 'STRATEGY_COORDINATOR', label: 'Strateji Geliştirme Koordinatörü' },
-                        { value: 'OTHER', label: 'Diğer' }
-                      ].map((type) => (
-                        <label key={type.value} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
-                          <input
-                            type="radio"
-                            name="special_responsible_type"
-                            value={type.value}
-                            checked={actionForm.special_responsible_type === type.value}
-                            onChange={(e) => setActionForm({ ...actionForm, special_responsible_type: e.target.value, special_responsible: '' })}
-                            className="w-4 h-4 text-green-600"
-                          />
-                          <span className="text-sm">{type.label}</span>
-                        </label>
-                      ))}
+                            <div className="mt-2">
+                              <label className="block text-xs font-medium text-slate-600 mb-1">
+                                Özel Sorumlu/Koordinatör (Opsiyonel)
+                              </label>
+                              <select
+                                value={selectedCoordinator || ''}
+                                onChange={(e) => {
+                                  const newCoords = { ...actionForm.responsible_coordinators };
+                                  if (e.target.value) {
+                                    newCoords[deptId] = e.target.value;
+                                  } else {
+                                    delete newCoords[deptId];
+                                  }
+                                  setActionForm({
+                                    ...actionForm,
+                                    responsible_coordinators: newCoords
+                                  });
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                              >
+                                <option value="">Seçiniz (Tüm Birim Personeli)</option>
+                                {deptUsers.map((user) => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.full_name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value && !actionForm.responsible_departments.includes(e.target.value)) {
+                          setActionForm({
+                            ...actionForm,
+                            responsible_departments: [...actionForm.responsible_departments, e.target.value]
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">+ Sorumlu Birim Ekle</option>
+                      {departments
+                        .filter(d => !actionForm.responsible_departments.includes(d.id) && !actionForm.related_departments.includes(d.id))
+                        .map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                    </select>
                   </div>
 
-                  {actionForm.special_responsible_type === 'OTHER' && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Sorumlu Adı/Unvanı <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required={actionForm.special_responsible_type === 'OTHER'}
-                        value={actionForm.special_responsible}
-                        onChange={(e) => setActionForm({ ...actionForm, special_responsible: e.target.value })}
-                        placeholder="Örn: Veri Koruma Görevlisi (DPO)"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      />
+                  <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      İlgili Birim/Birimler
+                    </label>
+
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {actionForm.related_departments.map((deptId) => {
+                        const dept = departments.find(d => d.id === deptId);
+                        const deptUsers = users.filter(u => u.department_id === deptId);
+                        const selectedCoordinator = actionForm.related_coordinators[deptId];
+
+                        return (
+                          <div
+                            key={deptId}
+                            className="w-full border border-blue-300 rounded-lg p-3 bg-white"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-sm text-slate-900">{dept?.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newRelatedDepts = actionForm.related_departments.filter(id => id !== deptId);
+                                  const newRelatedCoords = { ...actionForm.related_coordinators };
+                                  delete newRelatedCoords[deptId];
+                                  setActionForm({
+                                    ...actionForm,
+                                    related_departments: newRelatedDepts,
+                                    related_coordinators: newRelatedCoords
+                                  });
+                                }}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                              >
+                                Kaldır
+                              </button>
+                            </div>
+
+                            <div className="mt-2">
+                              <label className="block text-xs font-medium text-slate-600 mb-1">
+                                Özel Sorumlu/Koordinatör (Opsiyonel)
+                              </label>
+                              <select
+                                value={selectedCoordinator || ''}
+                                onChange={(e) => {
+                                  const newCoords = { ...actionForm.related_coordinators };
+                                  if (e.target.value) {
+                                    newCoords[deptId] = e.target.value;
+                                  } else {
+                                    delete newCoords[deptId];
+                                  }
+                                  setActionForm({
+                                    ...actionForm,
+                                    related_coordinators: newCoords
+                                  });
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="">Seçiniz (Tüm Birim Personeli)</option>
+                                {deptUsers.map((user) => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.full_name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              </div>
+
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value && !actionForm.related_departments.includes(e.target.value)) {
+                          setActionForm({
+                            ...actionForm,
+                            related_departments: [...actionForm.related_departments, e.target.value]
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">+ İlgili Birim Ekle</option>
+                      {departments
+                        .filter(d => !actionForm.responsible_departments.includes(d.id) && !actionForm.related_departments.includes(d.id))
+                        .map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </>
+          )}
+
+          {formStep === 2 && !actionForm.applies_to_all_units && actionForm.responsible_departments.length === 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-yellow-800">
+                En az bir sorumlu birim seçmelisiniz.
+              </p>
+            </div>
           )}
 
           {formStep === 3 && (
