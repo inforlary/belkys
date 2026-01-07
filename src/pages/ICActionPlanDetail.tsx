@@ -283,16 +283,30 @@ export default function ICActionPlanDetail() {
     }
   };
 
-  const generateActionCode = (subStandardId: string) => {
-    if (!subStandardId) return '';
+  const generateActionCode = (subStandardId: string, mainStandardId?: string) => {
+    if (subStandardId) {
+      const subStandard = kiksSubStandards.find(s => s.id === subStandardId);
+      if (!subStandard) return '';
 
-    const subStandard = kiksSubStandards.find(s => s.id === subStandardId);
-    if (!subStandard) return '';
+      const actionsForSubStandard = actions.filter(a => a.sub_standard_id === subStandardId);
+      const nextNumber = actionsForSubStandard.length + 1;
 
-    const actionsForSubStandard = actions.filter(a => a.sub_standard_id === subStandardId);
-    const nextNumber = actionsForSubStandard.length + 1;
+      return `${subStandard.code}.${nextNumber}`;
+    }
 
-    return `${subStandard.code}.${nextNumber}`;
+    if (mainStandardId) {
+      const mainStandard = kiksMainStandards.find(s => s.id === mainStandardId);
+      if (!mainStandard) return '';
+
+      const actionsForMainStandard = actions.filter(a =>
+        a.ic_kiks_sub_standards?.main_standard_id === mainStandardId && !a.sub_standard_id
+      );
+      const nextNumber = actionsForMainStandard.length + 1;
+
+      return `${mainStandard.code}.${nextNumber}`;
+    }
+
+    return '';
   };
 
   const handleSubmitAction = async (e: React.FormEvent) => {
@@ -310,7 +324,8 @@ export default function ICActionPlanDetail() {
         .from('ic_actions')
         .insert({
           action_plan_id: planId,
-          code: actionForm.code || generateActionCode(actionForm.sub_standard_id),
+          code: actionForm.code || generateActionCode(actionForm.sub_standard_id, actionForm.main_standard_id),
+          main_standard_id: actionForm.sub_standard_id ? null : (actionForm.main_standard_id || null),
           sub_standard_id: actionForm.sub_standard_id || null,
           title: actionForm.title,
           description: actionForm.description,
@@ -1401,11 +1416,12 @@ export default function ICActionPlanDetail() {
                         required
                         value={actionForm.main_standard_id}
                         onChange={(e) => {
+                          const mainStdId = e.target.value;
                           setActionForm({
                             ...actionForm,
-                            main_standard_id: e.target.value,
+                            main_standard_id: mainStdId,
                             sub_standard_id: '',
-                            code: ''
+                            code: mainStdId ? generateActionCode('', mainStdId) : ''
                           });
                         }}
                         className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -1425,22 +1441,21 @@ export default function ICActionPlanDetail() {
                   {actionForm.main_standard_id && (
                     <div>
                       <label className="block text-xs font-medium text-blue-800 mb-1">
-                        3. Alt Standart Seçin (Genel Şart Detayı) <span className="text-red-500">*</span>
+                        3. Alt Standart Seçin (Opsiyonel - Genel Şart Detayı)
                       </label>
                       <select
-                        required
                         value={actionForm.sub_standard_id}
                         onChange={(e) => {
                           const subStdId = e.target.value;
                           setActionForm({
                             ...actionForm,
                             sub_standard_id: subStdId,
-                            code: subStdId ? generateActionCode(subStdId) : ''
+                            code: subStdId ? generateActionCode(subStdId) : generateActionCode('', actionForm.main_standard_id)
                           });
                         }}
                         className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       >
-                        <option value="">Alt standart seçiniz</option>
+                        <option value="">Doğrudan ana standarta eylem ekle</option>
                         {kiksSubStandards
                           .filter(ss => ss.main_standard_id === actionForm.main_standard_id)
                           .map((subStd) => (
@@ -1453,10 +1468,24 @@ export default function ICActionPlanDetail() {
                   )}
                 </div>
 
+                {actionForm.main_standard_id && !actionForm.sub_standard_id && (
+                  <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-300">
+                    <div className="text-xs font-medium text-green-900">
+                      ✓ Ana Standart: {kiksMainStandards.find(s => s.id === actionForm.main_standard_id)?.code}
+                    </div>
+                    <div className="text-xs text-green-700 mt-1">
+                      {kiksMainStandards.find(s => s.id === actionForm.main_standard_id)?.title}
+                    </div>
+                    <div className="text-xs text-green-600 mt-1">
+                      Bu eylem doğrudan ana standarta atanacak
+                    </div>
+                  </div>
+                )}
+
                 {actionForm.sub_standard_id && (
                   <div className="mt-3 p-3 bg-blue-100 rounded-lg border border-blue-300">
                     <div className="text-xs font-medium text-blue-900">
-                      ✓ Seçilen: {kiksSubStandards.find(s => s.id === actionForm.sub_standard_id)?.code}
+                      ✓ Alt Standart: {kiksSubStandards.find(s => s.id === actionForm.sub_standard_id)?.code}
                     </div>
                     <div className="text-xs text-blue-700 mt-1">
                       {kiksSubStandards.find(s => s.id === actionForm.sub_standard_id)?.title}
@@ -1475,14 +1504,17 @@ export default function ICActionPlanDetail() {
                     required
                     value={actionForm.code}
                     onChange={(e) => setActionForm({ ...actionForm, code: e.target.value })}
-                    placeholder="KOS 1.1.1"
-                    disabled={!actionForm.sub_standard_id}
+                    placeholder="KOS.01.1"
+                    disabled={!actionForm.main_standard_id}
                     className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-slate-100 disabled:text-slate-500"
                   />
                   <button
                     type="button"
-                    disabled={!actionForm.sub_standard_id}
-                    onClick={() => setActionForm({ ...actionForm, code: generateActionCode(actionForm.sub_standard_id) })}
+                    disabled={!actionForm.main_standard_id}
+                    onClick={() => setActionForm({
+                      ...actionForm,
+                      code: generateActionCode(actionForm.sub_standard_id, actionForm.main_standard_id)
+                    })}
                     className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Otomatik
