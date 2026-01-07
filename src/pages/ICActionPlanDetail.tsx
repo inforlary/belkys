@@ -107,10 +107,16 @@ export default function ICActionPlanDetail() {
     standard_id: '',
     title: '',
     description: '',
+    is_continuous: false,
+    applies_to_all_units: false,
     responsible_department_id: '',
     related_departments: [] as string[],
+    has_special_responsible: false,
+    special_responsible_type: '',
+    special_responsible: '',
     start_date: '',
     target_date: '',
+    monitoring_period: 'CONTINUOUS',
     priority: 'MEDIUM',
     expected_output: '',
     required_resources: '',
@@ -262,12 +268,17 @@ export default function ICActionPlanDetail() {
           standard_id: actionForm.standard_id || null,
           title: actionForm.title,
           description: actionForm.description,
-          responsible_department_id: actionForm.responsible_department_id || null,
-          related_department_ids: actionForm.related_departments.length > 0 ? actionForm.related_departments : null,
+          is_continuous: actionForm.is_continuous,
+          applies_to_all_units: actionForm.applies_to_all_units,
+          responsible_department_id: actionForm.applies_to_all_units ? null : (actionForm.responsible_department_id || null),
+          related_department_ids: actionForm.applies_to_all_units ? null : (actionForm.related_departments.length > 0 ? actionForm.related_departments : null),
+          special_responsible_type: actionForm.has_special_responsible ? actionForm.special_responsible_type : null,
+          special_responsible: actionForm.has_special_responsible && actionForm.special_responsible_type === 'OTHER' ? actionForm.special_responsible : null,
           start_date: actionForm.start_date || null,
-          target_date: actionForm.target_date,
+          target_date: actionForm.is_continuous ? null : actionForm.target_date,
+          monitoring_period: actionForm.is_continuous ? actionForm.monitoring_period : null,
           priority: actionForm.priority,
-          status: 'NOT_STARTED',
+          status: actionForm.is_continuous ? 'ONGOING' : 'NOT_STARTED',
           progress_percent: 0,
           expected_outputs: actionForm.expected_output || null,
           required_resources: actionForm.required_resources || null,
@@ -286,10 +297,16 @@ export default function ICActionPlanDetail() {
         standard_id: '',
         title: '',
         description: '',
+        is_continuous: false,
+        applies_to_all_units: false,
         responsible_department_id: '',
         related_departments: [],
+        has_special_responsible: false,
+        special_responsible_type: '',
+        special_responsible: '',
         start_date: '',
         target_date: '',
+        monitoring_period: 'CONTINUOUS',
         priority: 'MEDIUM',
         expected_output: '',
         required_resources: '',
@@ -318,6 +335,7 @@ export default function ICActionPlanDetail() {
     const badges: Record<string, string> = {
       NOT_STARTED: 'bg-slate-100 text-slate-800',
       IN_PROGRESS: 'bg-blue-100 text-blue-800',
+      ONGOING: 'bg-purple-100 text-purple-800',
       COMPLETED: 'bg-green-100 text-green-800',
       DELAYED: 'bg-red-100 text-red-800',
       ON_HOLD: 'bg-yellow-100 text-yellow-800',
@@ -330,6 +348,7 @@ export default function ICActionPlanDetail() {
     const labels: Record<string, string> = {
       NOT_STARTED: 'Başlamadı',
       IN_PROGRESS: 'Devam Ediyor',
+      ONGOING: 'Sürekli Devam',
       COMPLETED: 'Tamamlandı',
       DELAYED: 'Gecikmiş',
       ON_HOLD: 'Beklemede',
@@ -684,11 +703,46 @@ export default function ICActionPlanDetail() {
                           <div className="text-xs text-slate-500 mt-1 line-clamp-1">{action.description}</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {action.departments?.name}
+                      <td className="px-4 py-3">
+                        <div className="space-y-1">
+                          {action.applies_to_all_units ? (
+                            <div className="text-sm text-slate-900 font-medium">
+                              🏢 Tüm Birimler
+                            </div>
+                          ) : action.departments?.name ? (
+                            <div className="text-sm text-slate-900">
+                              🏢 {action.departments.name}
+                            </div>
+                          ) : null}
+                          {action.special_responsible_type && (
+                            <div className="text-xs text-slate-600">
+                              👤 {
+                                action.special_responsible_type === 'TOP_MANAGEMENT' ? 'Üst Yönetim' :
+                                action.special_responsible_type === 'INTERNAL_AUDITOR' ? 'İç Denetçi' :
+                                action.special_responsible_type === 'ETHICS_COMMITTEE' ? 'Etik Komisyonu' :
+                                action.special_responsible_type === 'IT_COORDINATOR' ? 'BT Koordinatörü' :
+                                action.special_responsible_type === 'HR_COORDINATOR' ? 'İK Koordinatörü' :
+                                action.special_responsible_type === 'QUALITY_MANAGER' ? 'Kalite Yöneticisi' :
+                                action.special_responsible_type === 'RISK_COORDINATOR' ? 'Risk Koordinatörü' :
+                                action.special_responsible_type === 'STRATEGY_COORDINATOR' ? 'Strateji Koordinatörü' :
+                                action.special_responsible_type === 'OTHER' ? action.special_responsible :
+                                action.special_responsible_type
+                              }
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600">
-                        {new Date(action.target_date).toLocaleDateString('tr-TR')}
+                        {action.is_continuous ? (
+                          <div className="flex items-center gap-1">
+                            <span>♾️</span>
+                            <span className="text-xs">Sürekli</span>
+                          </div>
+                        ) : action.target_date ? (
+                          new Date(action.target_date).toLocaleDateString('tr-TR')
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -1376,40 +1430,70 @@ export default function ICActionPlanDetail() {
 
           {formStep === 2 && (
             <>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Sorumlu Birim <span className="text-red-500">*</span>
+              <div className="border-b border-slate-200 pb-4 mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Sorumluluk Kapsamı <span className="text-red-500">*</span>
                 </label>
-                <select
-                  required
-                  value={actionForm.responsible_department_id}
-                  onChange={(e) => setActionForm({ ...actionForm, responsible_department_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Seçiniz</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="scope"
+                      checked={!actionForm.applies_to_all_units}
+                      onChange={() => setActionForm({ ...actionForm, applies_to_all_units: false })}
+                      className="w-4 h-4 text-green-600"
+                    />
+                    <span className="text-sm font-medium">Belirli Birim(ler)</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="scope"
+                      checked={actionForm.applies_to_all_units}
+                      onChange={() => setActionForm({ ...actionForm, applies_to_all_units: true, responsible_department_id: '', related_departments: [] })}
+                      className="w-4 h-4 text-green-600"
+                    />
+                    <span className="text-sm font-medium">Tüm Birimler</span>
+                  </label>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  İlgili Birimler
-                </label>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {actionForm.related_departments.map((deptId) => {
-                    const dept = departments.find(d => d.id === deptId);
-                    return (
-                      <div
-                        key={deptId}
-                        className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
-                      >
-                        <span>{dept?.name}</span>
-                        <button
-                          type="button"
+              {!actionForm.applies_to_all_units && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Sorumlu Birim <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required={!actionForm.applies_to_all_units}
+                      value={actionForm.responsible_department_id}
+                      onChange={(e) => setActionForm({ ...actionForm, responsible_department_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">Seçiniz</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      İlgili Birimler
+                    </label>
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {actionForm.related_departments.map((deptId) => {
+                        const dept = departments.find(d => d.id === deptId);
+                        return (
+                          <div
+                            key={deptId}
+                            className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                          >
+                            <span>{dept?.name}</span>
+                            <button
+                              type="button"
                           onClick={() => {
                             setActionForm({
                               ...actionForm,
@@ -1446,55 +1530,195 @@ export default function ICActionPlanDetail() {
                     ))}
                 </select>
               </div>
+                </>
+              )}
+
+              <div className="border-t border-slate-200 pt-4 mt-4">
+                <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={actionForm.has_special_responsible}
+                    onChange={(e) => setActionForm({ ...actionForm, has_special_responsible: e.target.checked, special_responsible_type: '', special_responsible: '' })}
+                    className="w-4 h-4 text-green-600 rounded"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Özel sorumlu/koordinatör ekle</span>
+                </label>
+
+                {actionForm.has_special_responsible && (
+                  <div className="space-y-3 ml-6">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Sorumlu Türü <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'TOP_MANAGEMENT', label: 'Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)' },
+                          { value: 'INTERNAL_AUDITOR', label: 'İç Denetçi / İç Denetim Birimi' },
+                          { value: 'ETHICS_COMMITTEE', label: 'Etik Komisyonu' },
+                          { value: 'IT_COORDINATOR', label: 'Bilgi Teknolojileri Koordinatörü' },
+                          { value: 'HR_COORDINATOR', label: 'İnsan Kaynakları Koordinatörü' },
+                          { value: 'QUALITY_MANAGER', label: 'Kalite Yönetim Temsilcisi' },
+                          { value: 'RISK_COORDINATOR', label: 'Risk Koordinatörü' },
+                          { value: 'STRATEGY_COORDINATOR', label: 'Strateji Geliştirme Koordinatörü' },
+                          { value: 'OTHER', label: 'Diğer' }
+                        ].map((type) => (
+                          <label key={type.value} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                            <input
+                              type="radio"
+                              name="special_responsible_type"
+                              value={type.value}
+                              checked={actionForm.special_responsible_type === type.value}
+                              onChange={(e) => setActionForm({ ...actionForm, special_responsible_type: e.target.value, special_responsible: '' })}
+                              className="w-4 h-4 text-green-600"
+                            />
+                            <span className="text-sm">{type.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {actionForm.special_responsible_type === 'OTHER' && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                          Sorumlu Adı/Unvanı <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required={actionForm.special_responsible_type === 'OTHER'}
+                          value={actionForm.special_responsible}
+                          onChange={(e) => setActionForm({ ...actionForm, special_responsible: e.target.value })}
+                          placeholder="Örn: Veri Koruma Görevlisi (DPO)"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
 
           {formStep === 3 && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Başlangıç Tarihi
+              <div className="border-b border-slate-200 pb-4 mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Eylem Türü <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="action_type"
+                      checked={!actionForm.is_continuous}
+                      onChange={() => setActionForm({ ...actionForm, is_continuous: false, target_date: '' })}
+                      className="w-4 h-4 text-green-600 mt-0.5"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Süreli Eylem</span>
+                      <p className="text-xs text-slate-600 mt-1">Belirli tarih aralığında tamamlanacak</p>
+                    </div>
                   </label>
-                  <input
-                    type="date"
-                    value={actionForm.start_date}
-                    onChange={(e) => setActionForm({ ...actionForm, start_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Hedef Bitiş Tarihi <span className="text-red-500">*</span>
+                  <label className="flex items-start gap-3 p-3 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="action_type"
+                      checked={actionForm.is_continuous}
+                      onChange={() => setActionForm({ ...actionForm, is_continuous: true, target_date: '' })}
+                      className="w-4 h-4 text-green-600 mt-0.5"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Sürekli Eylem</span>
+                      <p className="text-xs text-slate-600 mt-1">Devamlı uygulanacak, bitiş tarihi yok</p>
+                    </div>
                   </label>
-                  <input
-                    type="date"
-                    required
-                    value={actionForm.target_date}
-                    onChange={(e) => setActionForm({ ...actionForm, target_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
                 </div>
               </div>
+
+              {!actionForm.is_continuous ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Başlangıç Tarihi
+                    </label>
+                    <input
+                      type="date"
+                      value={actionForm.start_date}
+                      onChange={(e) => setActionForm({ ...actionForm, start_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Hedef Bitiş Tarihi <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required={!actionForm.is_continuous}
+                      value={actionForm.target_date}
+                      onChange={(e) => setActionForm({ ...actionForm, target_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        Yürürlük Başlangıcı
+                      </label>
+                      <input
+                        type="date"
+                        value={actionForm.start_date}
+                        onChange={(e) => setActionForm({ ...actionForm, start_date: e.target.value })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        İzleme Periyodu
+                      </label>
+                      <select
+                        value={actionForm.monitoring_period}
+                        onChange={(e) => setActionForm({ ...actionForm, monitoring_period: e.target.value })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="CONTINUOUS">Sürekli</option>
+                        <option value="MONTHLY">Aylık</option>
+                        <option value="QUARTERLY">Çeyreklik</option>
+                        <option value="YEARLY">Yıllık</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
+                    <span className="text-blue-600 flex-shrink-0">ℹ️</span>
+                    <p className="text-xs text-blue-800">
+                      Bu eylem sürekli olarak uygulanacak ve belirtilen periyotlarda ilerleme raporu istenecektir.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Öncelik <span className="text-red-500">*</span>
                 </label>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: 'LOW', label: 'Düşük', desc: 'Rutin eylem', color: 'border-slate-300 hover:border-slate-400' },
-                    { value: 'MEDIUM', label: 'Orta', desc: 'Normal öncelikli', color: 'border-blue-300 hover:border-blue-400' },
-                    { value: 'HIGH', label: 'Yüksek', desc: 'Önemli eylem', color: 'border-orange-300 hover:border-orange-400' },
-                    { value: 'CRITICAL', label: 'Kritik', desc: 'Acil müdahale gerekli', color: 'border-red-300 hover:border-red-400' }
+                    { value: 'LOW', label: 'Düşük' },
+                    { value: 'MEDIUM', label: 'Orta' },
+                    { value: 'HIGH', label: 'Yüksek' },
+                    { value: 'CRITICAL', label: 'Kritik' }
                   ].map((priority) => (
                     <label
                       key={priority.value}
-                      className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer ${
+                      className={`flex items-center justify-center gap-2 p-3 border-2 rounded-lg cursor-pointer ${
                         actionForm.priority === priority.value
                           ? 'bg-green-50 border-green-500'
-                          : priority.color
+                          : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <input
@@ -1503,12 +1727,9 @@ export default function ICActionPlanDetail() {
                         value={priority.value}
                         checked={actionForm.priority === priority.value}
                         onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}
-                        className="text-green-600 focus:ring-green-500"
+                        className="text-green-600"
                       />
-                      <div className="flex-1">
-                        <div className="font-medium text-slate-900">{priority.label}</div>
-                        <div className="text-xs text-slate-600">{priority.desc}</div>
-                      </div>
+                      <span className="text-sm font-medium">{priority.label}</span>
                     </label>
                   ))}
                 </div>
