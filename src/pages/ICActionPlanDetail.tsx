@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   FileText,
   Filter,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 
@@ -33,7 +34,15 @@ interface Action {
   description: string;
   standard_id: string;
   responsible_department_id: string;
+  responsible_department_ids?: string[];
+  responsible_department_coordinators?: {[key: string]: string};
   related_department_ids?: string[];
+  related_department_coordinators?: {[key: string]: string};
+  is_continuous?: boolean;
+  applies_to_all_units?: boolean;
+  monitoring_period?: string;
+  special_responsible_type?: string;
+  special_responsible?: string;
   start_date: string;
   target_date: string;
   completed_date: string | null;
@@ -99,6 +108,7 @@ export default function ICActionPlanDetail() {
   const [riskActivities, setRiskActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showActionModal, setShowActionModal] = useState(false);
+  const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'actions' | 'gantt' | 'components' | 'departments' | 'summary'>('actions');
 
@@ -277,37 +287,50 @@ export default function ICActionPlanDetail() {
     setSaving(true);
 
     try {
-      const { error } = await supabase
-        .from('ic_actions')
-        .insert({
-          action_plan_id: planId,
-          code: actionForm.code || generateActionCode(actionForm.standard_id),
-          standard_id: actionForm.standard_id || null,
-          title: actionForm.title,
-          description: actionForm.description,
-          is_continuous: actionForm.is_continuous,
-          applies_to_all_units: actionForm.applies_to_all_units,
-          responsible_department_ids: actionForm.applies_to_all_units ? null : (actionForm.responsible_departments.length > 0 ? actionForm.responsible_departments : null),
-          responsible_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.responsible_coordinators).length > 0 ? actionForm.responsible_coordinators : null),
-          related_department_ids: actionForm.applies_to_all_units ? null : (actionForm.related_departments.length > 0 ? actionForm.related_departments : null),
-          related_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.related_coordinators).length > 0 ? actionForm.related_coordinators : null),
-          start_date: actionForm.start_date || null,
-          target_date: actionForm.is_continuous ? null : actionForm.target_date,
-          monitoring_period: actionForm.is_continuous ? actionForm.monitoring_period : null,
-          priority: actionForm.priority,
-          status: actionForm.is_continuous ? 'ONGOING' : 'NOT_STARTED',
-          progress_percent: 0,
-          expected_outputs: actionForm.expected_output || null,
-          required_resources: actionForm.required_resources || null,
-          related_risk_id: actionForm.link_risk && actionForm.risk_id ? actionForm.risk_id : null,
-          related_risk_control_id: actionForm.link_control && actionForm.control_id ? actionForm.control_id : null,
-          related_risk_treatment_id: actionForm.link_activity && actionForm.activity_id ? actionForm.activity_id : null,
-          related_objective_id: actionForm.link_goal && actionForm.goal_id ? actionForm.goal_id : null
-        });
+      const actionData = {
+        action_plan_id: planId,
+        code: actionForm.code || generateActionCode(actionForm.standard_id),
+        standard_id: actionForm.standard_id || null,
+        title: actionForm.title,
+        description: actionForm.description,
+        is_continuous: actionForm.is_continuous,
+        applies_to_all_units: actionForm.applies_to_all_units,
+        responsible_department_ids: actionForm.applies_to_all_units ? null : (actionForm.responsible_departments.length > 0 ? actionForm.responsible_departments : null),
+        responsible_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.responsible_coordinators).length > 0 ? actionForm.responsible_coordinators : null),
+        related_department_ids: actionForm.applies_to_all_units ? null : (actionForm.related_departments.length > 0 ? actionForm.related_departments : null),
+        related_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.related_coordinators).length > 0 ? actionForm.related_coordinators : null),
+        start_date: actionForm.start_date || null,
+        target_date: actionForm.is_continuous ? null : actionForm.target_date,
+        monitoring_period: actionForm.is_continuous ? actionForm.monitoring_period : null,
+        priority: actionForm.priority,
+        status: editingAction ? editingAction.status : (actionForm.is_continuous ? 'ONGOING' : 'NOT_STARTED'),
+        progress_percent: editingAction ? editingAction.progress_percent : 0,
+        expected_outputs: actionForm.expected_output || null,
+        required_resources: actionForm.required_resources || null,
+        related_risk_id: actionForm.link_risk && actionForm.risk_id ? actionForm.risk_id : null,
+        related_risk_control_id: actionForm.link_control && actionForm.control_id ? actionForm.control_id : null,
+        related_risk_treatment_id: actionForm.link_activity && actionForm.activity_id ? actionForm.activity_id : null,
+        related_objective_id: actionForm.link_goal && actionForm.goal_id ? actionForm.goal_id : null
+      };
+
+      let error;
+      if (editingAction) {
+        const result = await supabase
+          .from('ic_actions')
+          .update(actionData)
+          .eq('id', editingAction.id);
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from('ic_actions')
+          .insert(actionData);
+        error = result.error;
+      }
 
       if (error) throw error;
 
       setShowActionModal(false);
+      setEditingAction(null);
       setFormStep(1);
       setActionForm({
         code: '',
@@ -338,13 +361,66 @@ export default function ICActionPlanDetail() {
       });
       loadData();
     } catch (error: any) {
-      console.error('Eylem eklenirken hata:', error);
+      console.error('Eylem kaydedilirken hata:', error);
       const errorMessage = error?.message || 'Bilinmeyen hata';
       const errorDetails = error?.details || '';
       const errorHint = error?.hint || '';
-      alert(`Eylem eklenirken hata:\n${errorMessage}\n${errorDetails}\n${errorHint}`);
+      alert(`Eylem kaydedilirken hata:\n${errorMessage}\n${errorDetails}\n${errorHint}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEditAction = (action: Action) => {
+    setEditingAction(action);
+    setActionForm({
+      code: action.code,
+      component_id: action.ic_standards?.component_id || '',
+      standard_id: action.standard_id || '',
+      title: action.title,
+      description: action.description || '',
+      is_continuous: action.is_continuous || false,
+      applies_to_all_units: action.applies_to_all_units || false,
+      responsible_departments: action.responsible_department_ids || [],
+      responsible_coordinators: action.responsible_department_coordinators || {},
+      related_departments: action.related_department_ids || [],
+      related_coordinators: action.related_department_coordinators || {},
+      start_date: action.start_date || '',
+      target_date: action.target_date || '',
+      monitoring_period: action.monitoring_period || 'CONTINUOUS',
+      priority: action.priority || 'MEDIUM',
+      expected_output: action.expected_outputs || '',
+      required_resources: action.required_resources || '',
+      risk_id: action.related_risk_id || '',
+      control_id: action.related_risk_control_id || '',
+      activity_id: action.related_risk_treatment_id || '',
+      goal_id: action.related_objective_id || '',
+      link_risk: !!action.related_risk_id,
+      link_control: !!action.related_risk_control_id,
+      link_activity: !!action.related_risk_treatment_id,
+      link_goal: !!action.related_objective_id
+    });
+    setFormStep(1);
+    setShowActionModal(true);
+  };
+
+  const handleDeleteAction = async (action: Action) => {
+    if (!confirm(`"${action.title}" eylemini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ic_actions')
+        .delete()
+        .eq('id', action.id);
+
+      if (error) throw error;
+
+      loadData();
+    } catch (error) {
+      console.error('Eylem silinirken hata:', error);
+      alert('Eylem silinirken bir hata oluştu');
     }
   };
 
@@ -667,7 +743,10 @@ export default function ICActionPlanDetail() {
 
               <div className="ml-auto">
                 <button
-                  onClick={() => setShowActionModal(true)}
+                  onClick={() => {
+                    setEditingAction(null);
+                    setShowActionModal(true);
+                  }}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   <Plus className="w-5 h-5" />
@@ -777,16 +856,42 @@ export default function ICActionPlanDetail() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`internal-control/actions/${action.id}`);
-                          }}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-800"
-                        >
-                          <Eye className="w-3 h-3" />
-                          Detay
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`internal-control/actions/${action.id}`);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            <Eye className="w-3 h-3" />
+                            Detay
+                          </button>
+                          {(profile?.role === 'admin' || profile?.role === 'director' || profile?.role === 'super_admin') && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditAction(action);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs text-slate-600 hover:text-slate-800"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                Düzenle
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteAction(action);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Sil
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1291,9 +1396,10 @@ export default function ICActionPlanDetail() {
         isOpen={showActionModal}
         onClose={() => {
           setShowActionModal(false);
+          setEditingAction(null);
           setFormStep(1);
         }}
-        title={`Yeni Eylem Ekle - Adım ${formStep}/4`}
+        title={editingAction ? `Eylem Düzenle - Adım ${formStep}/4` : `Yeni Eylem Ekle - Adım ${formStep}/4`}
       >
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
@@ -1992,6 +2098,7 @@ export default function ICActionPlanDetail() {
               onClick={() => {
                 if (formStep === 1) {
                   setShowActionModal(false);
+                  setEditingAction(null);
                   setFormStep(1);
                 } else {
                   setFormStep(formStep - 1);

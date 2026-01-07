@@ -12,7 +12,8 @@ import {
   Clock,
   AlertTriangle,
   Edit2,
-  BarChart3
+  BarChart3,
+  Trash2
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 
@@ -223,6 +224,26 @@ export default function ICActionPlans() {
     }
   };
 
+  const handleDelete = async (plan: ActionPlan) => {
+    if (!confirm(`"${plan.name}" planını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve plandaki tüm eylemler de silinecektir.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ic_action_plans')
+        .delete()
+        .eq('id', plan.id);
+
+      if (error) throw error;
+
+      loadActionPlans();
+    } catch (error) {
+      console.error('Eylem planı silinirken hata:', error);
+      alert('Eylem planı silinirken bir hata oluştu');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, string> = {
       DRAFT: 'bg-slate-100 text-slate-800',
@@ -396,6 +417,18 @@ export default function ICActionPlans() {
                       <Edit2 className="w-4 h-4" />
                       Düzenle
                     </button>
+                    {(profile?.role === 'admin' || profile?.role === 'director' || profile?.role === 'super_admin') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(plan);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Sil
+                      </button>
+                    )}
                   </div>
                 </div>
 
