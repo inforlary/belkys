@@ -17,6 +17,7 @@ import {
   Trash2
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import * as XLSX from 'xlsx';
 
 interface ActionPlan {
   id: string;
@@ -278,6 +279,120 @@ export default function ICActionPlanDetail() {
     const nextNumber = actionsForStandard.length + 1;
 
     return `${standard.code}.${nextNumber}`;
+  };
+
+  const handleExportReport = () => {
+    if (!plan) return;
+
+    const getStatusLabel = (status: string) => {
+      const labels: Record<string, string> = {
+        NOT_STARTED: 'Başlamadı',
+        IN_PROGRESS: 'Devam Ediyor',
+        ONGOING: 'Sürekli Devam',
+        COMPLETED: 'Tamamlandı',
+        DELAYED: 'Gecikmiş',
+        ON_HOLD: 'Beklemede',
+        CANCELLED: 'İptal Edildi'
+      };
+      return labels[status] || status;
+    };
+
+    const getPriorityLabel = (priority: string) => {
+      const labels: Record<string, string> = {
+        LOW: 'Düşük',
+        MEDIUM: 'Orta',
+        HIGH: 'Yüksek',
+        CRITICAL: 'Kritik'
+      };
+      return labels[priority] || priority;
+    };
+
+    const getSpecialResponsibleLabel = (type: string) => {
+      const labels: Record<string, string> = {
+        TOP_MANAGEMENT: 'Üst Yönetim',
+        INTERNAL_AUDITOR: 'İç Denetçi',
+        ETHICS_COMMITTEE: 'Etik Komisyonu',
+        IT_COORDINATOR: 'BT Koordinatörü',
+        HR_COORDINATOR: 'İK Koordinatörü',
+        QUALITY_MANAGER: 'Kalite Yöneticisi',
+        RISK_COORDINATOR: 'Risk Koordinatörü',
+        STRATEGY_COORDINATOR: 'Strateji Koordinatörü'
+      };
+      return labels[type] || type;
+    };
+
+    const reportData = actions.map((action) => {
+      const responsibleDepts = action.responsible_department_ids?.map(deptId => {
+        const dept = departments.find(d => d.id === deptId);
+        return dept?.name || '';
+      }).join(', ') || action.departments?.name || '-';
+
+      const relatedDepts = action.related_department_ids?.map(deptId => {
+        const dept = departments.find(d => d.id === deptId);
+        return dept?.name || '';
+      }).join(', ') || '-';
+
+      const specialResponsible = action.special_responsible_type
+        ? (action.special_responsible_type === 'OTHER'
+          ? action.special_responsible
+          : getSpecialResponsibleLabel(action.special_responsible_type))
+        : '-';
+
+      return {
+        'Kod': action.code,
+        'Standart': action.ic_standards?.code || '-',
+        'Başlık': action.title,
+        'Açıklama': action.description || '-',
+        'Sorumlu Birimler': responsibleDepts,
+        'Özel Sorumlu': specialResponsible,
+        'İlgili Birimler': relatedDepts,
+        'Başlangıç Tarihi': action.start_date ? new Date(action.start_date).toLocaleDateString('tr-TR') : '-',
+        'Hedef Tarihi': action.is_continuous ? 'Sürekli' : (action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-'),
+        'Öncelik': getPriorityLabel(action.priority),
+        'Durum': getStatusLabel(action.status),
+        'İlerleme (%)': action.progress_percent || 0,
+        'Beklenen Çıktılar': action.expected_outputs || '-',
+        'Gerekli Kaynaklar': action.required_resources || '-'
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(reportData);
+
+    const colWidths = [
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 40 },
+      { wch: 50 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 40 },
+      { wch: 40 }
+    ];
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Eylemler');
+
+    const statsData = [
+      { 'Metrik': 'Toplam Eylem', 'Değer': stats.total },
+      { 'Metrik': 'Tamamlanan', 'Değer': stats.completed },
+      { 'Metrik': 'Devam Eden', 'Değer': stats.inProgress },
+      { 'Metrik': 'Geciken', 'Değer': stats.delayed },
+      { 'Metrik': 'Başlamadı', 'Değer': stats.notStarted },
+      { 'Metrik': 'Tamamlanma Oranı (%)', 'Değer': stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0 }
+    ];
+
+    const statsWs = XLSX.utils.json_to_sheet(statsData);
+    statsWs['!cols'] = [{ wch: 30 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, statsWs, 'Özet İstatistikler');
+
+    XLSX.writeFile(wb, `${plan.name}_Eylem_Plani_Raporu_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '_')}.xlsx`);
   };
 
   const handleSubmitAction = async (e: React.FormEvent) => {
@@ -558,7 +673,10 @@ export default function ICActionPlanDetail() {
                 <Edit2 className="w-4 h-4" />
                 Düzenle
               </button>
-              <button className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2">
+              <button
+                onClick={handleExportReport}
+                className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2"
+              >
                 <Download className="w-4 h-4" />
                 Rapor Al
               </button>
