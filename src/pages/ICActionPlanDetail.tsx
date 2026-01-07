@@ -80,6 +80,10 @@ export default function ICActionPlanDetail() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [standards, setStandards] = useState<Standard[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
+  const [risks, setRisks] = useState<any[]>([]);
+  const [controls, setControls] = useState<any[]>([]);
+  const [riskActivities, setRiskActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showActionModal, setShowActionModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -91,16 +95,27 @@ export default function ICActionPlanDetail() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
 
+  const [formStep, setFormStep] = useState(1);
   const [actionForm, setActionForm] = useState({
+    code: '',
     standard_id: '',
     title: '',
     description: '',
     responsible_department_id: '',
+    related_departments: [] as string[],
     start_date: '',
     target_date: '',
     priority: 'MEDIUM',
     expected_output: '',
-    required_resources: ''
+    required_resources: '',
+    risk_id: '',
+    control_id: '',
+    activity_id: '',
+    goal_id: '',
+    link_risk: false,
+    link_control: false,
+    link_activity: false,
+    link_goal: false
   });
 
   useEffect(() => {
@@ -111,7 +126,7 @@ export default function ICActionPlanDetail() {
 
   const loadData = async () => {
     try {
-      const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes] = await Promise.all([
+      const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
         supabase
           .from('ic_action_plans')
           .select('*')
@@ -138,7 +153,27 @@ export default function ICActionPlanDetail() {
         supabase
           .from('ic_components')
           .select('id, code, name')
-          .order('order_index')
+          .order('order_index'),
+        supabase
+          .from('goals')
+          .select('id, code, title')
+          .eq('organization_id', profile?.organization_id)
+          .order('code'),
+        supabase
+          .from('risk_register')
+          .select('id, code, title')
+          .eq('organization_id', profile?.organization_id)
+          .order('code'),
+        supabase
+          .from('ic_controls')
+          .select('id, code, title')
+          .eq('organization_id', profile?.organization_id)
+          .order('code'),
+        supabase
+          .from('risk_treatments')
+          .select('id, code, title')
+          .eq('organization_id', profile?.organization_id)
+          .order('code')
       ]);
 
       if (planRes.error) throw planRes.error;
@@ -149,6 +184,10 @@ export default function ICActionPlanDetail() {
       setDepartments(departmentsRes.data || []);
       setStandards(standardsRes.data || []);
       setComponents(componentsRes.data || []);
+      setGoals(goalsRes.data || []);
+      setRisks(risksRes.data || []);
+      setControls(controlsRes.data || []);
+      setRiskActivities(riskActivitiesRes.data || []);
     } catch (error) {
       console.error('Veriler yüklenirken hata:', error);
     } finally {
@@ -173,7 +212,7 @@ export default function ICActionPlanDetail() {
         .from('ic_actions')
         .insert({
           action_plan_id: planId,
-          code: generateActionCode(),
+          code: actionForm.code || generateActionCode(),
           standard_id: actionForm.standard_id,
           title: actionForm.title,
           description: actionForm.description,
@@ -184,22 +223,40 @@ export default function ICActionPlanDetail() {
           status: 'NOT_STARTED',
           progress_percent: 0,
           expected_output: actionForm.expected_output,
-          required_resources: actionForm.required_resources
+          required_resources: actionForm.required_resources,
+          metadata: {
+            related_departments: actionForm.related_departments,
+            linked_risk_id: actionForm.link_risk ? actionForm.risk_id : null,
+            linked_control_id: actionForm.link_control ? actionForm.control_id : null,
+            linked_activity_id: actionForm.link_activity ? actionForm.activity_id : null,
+            linked_goal_id: actionForm.link_goal ? actionForm.goal_id : null
+          }
         });
 
       if (error) throw error;
 
       setShowActionModal(false);
+      setFormStep(1);
       setActionForm({
+        code: '',
         standard_id: '',
         title: '',
         description: '',
         responsible_department_id: '',
+        related_departments: [],
         start_date: '',
         target_date: '',
         priority: 'MEDIUM',
         expected_output: '',
-        required_resources: ''
+        required_resources: '',
+        risk_id: '',
+        control_id: '',
+        activity_id: '',
+        goal_id: '',
+        link_risk: false,
+        link_control: false,
+        link_activity: false,
+        link_goal: false
       });
       loadData();
     } catch (error) {
@@ -531,7 +588,10 @@ export default function ICActionPlanDetail() {
 
               <div className="ml-auto">
                 <button
-                  onClick={() => setShowActionModal(true)}
+                  onClick={() => {
+                    setActionForm({ ...actionForm, code: generateActionCode() });
+                    setShowActionModal(true);
+                  }}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   <Plus className="w-5 h-5" />
@@ -1111,161 +1171,455 @@ export default function ICActionPlanDetail() {
 
       <Modal
         isOpen={showActionModal}
-        onClose={() => setShowActionModal(false)}
-        title="Yeni Eylem Ekle"
+        onClose={() => {
+          setShowActionModal(false);
+          setFormStep(1);
+        }}
+        title={`Yeni Eylem Ekle - Adım ${formStep}/4`}
       >
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            {[1, 2, 3, 4].map((step) => (
+              <div key={step} className="flex items-center flex-1">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step < formStep
+                      ? 'bg-green-600 text-white'
+                      : step === formStep
+                      ? 'bg-green-100 text-green-600 border-2 border-green-600'
+                      : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  {step}
+                </div>
+                {step < 4 && (
+                  <div
+                    className={`flex-1 h-1 mx-2 ${
+                      step < formStep ? 'bg-green-600' : 'bg-slate-200'
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="text-xs text-slate-600 text-center">
+            {formStep === 1 && 'Temel Bilgiler'}
+            {formStep === 2 && 'Sorumluluk'}
+            {formStep === 3 && 'Zamanlama ve Öncelik'}
+            {formStep === 4 && 'İlişkilendirmeler (Opsiyonel)'}
+          </div>
+        </div>
+
         <form onSubmit={handleSubmitAction} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              İlişkili Standart <span className="text-red-500">*</span>
-            </label>
-            <select
-              required
-              value={actionForm.standard_id}
-              onChange={(e) => setActionForm({ ...actionForm, standard_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              <option value="">Seçiniz</option>
-              {standards.map((standard) => (
-                <option key={standard.id} value={standard.id}>
-                  {standard.code} - {standard.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {formStep === 1 && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Eylem Kodu <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={actionForm.code}
+                    onChange={(e) => setActionForm({ ...actionForm, code: e.target.value })}
+                    placeholder="E16"
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setActionForm({ ...actionForm, code: generateActionCode() })}
+                    className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm"
+                  >
+                    Otomatik
+                  </button>
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Eylem Başlığı <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={actionForm.title}
-              onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })}
-              placeholder="Eylem başlığını girin"
-              maxLength={500}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Eylem Başlığı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={actionForm.title}
+                  onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })}
+                  placeholder="Eylem başlığını girin"
+                  maxLength={500}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+                <div className="text-xs text-slate-500 mt-1">
+                  {actionForm.title.length}/500 karakter
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Açıklama
-            </label>
-            <textarea
-              value={actionForm.description}
-              onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
-              rows={3}
-              placeholder="Eylem detaylarını açıklayın"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Açıklama
+                </label>
+                <textarea
+                  value={actionForm.description}
+                  onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
+                  rows={3}
+                  placeholder="Eylem detaylarını açıklayın"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Sorumlu Birim <span className="text-red-500">*</span>
-            </label>
-            <select
-              required
-              value={actionForm.responsible_department_id}
-              onChange={(e) => setActionForm({ ...actionForm, responsible_department_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              <option value="">Seçiniz</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  İlişkili Standart <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={actionForm.standard_id}
+                  onChange={(e) => setActionForm({ ...actionForm, standard_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Seçiniz</option>
+                  {standards.map((standard) => (
+                    <option key={standard.id} value={standard.id}>
+                      {standard.code} - {standard.name}
+                    </option>
+                  ))}
+                </select>
+                {actionForm.standard_id && standards.find(s => s.id === actionForm.standard_id) && (
+                  <div className="mt-2 p-3 bg-green-50 rounded-lg">
+                    <div className="text-xs font-medium text-green-900">
+                      {standards.find(s => s.id === actionForm.standard_id)?.name}
+                    </div>
+                    <div className="text-xs text-green-700 mt-1">
+                      Bileşen: {components.find(c => c.id === standards.find(s => s.id === actionForm.standard_id)?.ic_component_id)?.name}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Başlangıç Tarihi
-              </label>
-              <input
-                type="date"
-                value={actionForm.start_date}
-                onChange={(e) => setActionForm({ ...actionForm, start_date: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Beklenen Çıktılar
+                </label>
+                <textarea
+                  value={actionForm.expected_output}
+                  onChange={(e) => setActionForm({ ...actionForm, expected_output: e.target.value })}
+                  rows={2}
+                  placeholder="Bu eylemden beklenen sonuçlar..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Hedef Bitiş Tarihi <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                required
-                value={actionForm.target_date}
-                onChange={(e) => setActionForm({ ...actionForm, target_date: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Gerekli Kaynaklar
+                </label>
+                <textarea
+                  value={actionForm.required_resources}
+                  onChange={(e) => setActionForm({ ...actionForm, required_resources: e.target.value })}
+                  rows={2}
+                  placeholder="Bütçe, personel, ekipman vb..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+            </>
+          )}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Öncelik <span className="text-red-500">*</span>
-            </label>
-            <select
-              required
-              value={actionForm.priority}
-              onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              <option value="LOW">Düşük - Rutin eylem</option>
-              <option value="MEDIUM">Orta - Normal öncelikli</option>
-              <option value="HIGH">Yüksek - Önemli eylem</option>
-              <option value="CRITICAL">Kritik - Acil müdahale gerekli</option>
-            </select>
-          </div>
+          {formStep === 2 && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Sorumlu Birim <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={actionForm.responsible_department_id}
+                  onChange={(e) => setActionForm({ ...actionForm, responsible_department_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Seçiniz</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Beklenen Çıktılar
-            </label>
-            <textarea
-              value={actionForm.expected_output}
-              onChange={(e) => setActionForm({ ...actionForm, expected_output: e.target.value })}
-              rows={2}
-              placeholder="Bu eylemden beklenen sonuçlar..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  İlgili Birimler
+                </label>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {actionForm.related_departments.map((deptId) => {
+                    const dept = departments.find(d => d.id === deptId);
+                    return (
+                      <div
+                        key={deptId}
+                        className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                      >
+                        <span>{dept?.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionForm({
+                              ...actionForm,
+                              related_departments: actionForm.related_departments.filter(id => id !== deptId)
+                            });
+                          }}
+                          className="hover:text-blue-900"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value && !actionForm.related_departments.includes(e.target.value)) {
+                      setActionForm({
+                        ...actionForm,
+                        related_departments: [...actionForm.related_departments, e.target.value]
+                      });
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">+ Birim Ekle</option>
+                  {departments
+                    .filter(d => d.id !== actionForm.responsible_department_id && !actionForm.related_departments.includes(d.id))
+                    .map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </>
+          )}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Gerekli Kaynaklar
-            </label>
-            <textarea
-              value={actionForm.required_resources}
-              onChange={(e) => setActionForm({ ...actionForm, required_resources: e.target.value })}
-              rows={2}
-              placeholder="Bütçe, personel, ekipman vb..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
+          {formStep === 3 && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Başlangıç Tarihi
+                  </label>
+                  <input
+                    type="date"
+                    value={actionForm.start_date}
+                    onChange={(e) => setActionForm({ ...actionForm, start_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Hedef Bitiş Tarihi <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={actionForm.target_date}
+                    onChange={(e) => setActionForm({ ...actionForm, target_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Öncelik <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { value: 'LOW', label: 'Düşük', desc: 'Rutin eylem', color: 'border-slate-300 hover:border-slate-400' },
+                    { value: 'MEDIUM', label: 'Orta', desc: 'Normal öncelikli', color: 'border-blue-300 hover:border-blue-400' },
+                    { value: 'HIGH', label: 'Yüksek', desc: 'Önemli eylem', color: 'border-orange-300 hover:border-orange-400' },
+                    { value: 'CRITICAL', label: 'Kritik', desc: 'Acil müdahale gerekli', color: 'border-red-300 hover:border-red-400' }
+                  ].map((priority) => (
+                    <label
+                      key={priority.value}
+                      className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer ${
+                        actionForm.priority === priority.value
+                          ? 'bg-green-50 border-green-500'
+                          : priority.color
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="priority"
+                        value={priority.value}
+                        checked={actionForm.priority === priority.value}
+                        onChange={(e) => setActionForm({ ...actionForm, priority: e.target.value })}
+                        className="text-green-600 focus:ring-green-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-slate-900">{priority.label}</div>
+                        <div className="text-xs text-slate-600">{priority.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {formStep === 4 && (
+            <>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="link_risk"
+                    checked={actionForm.link_risk}
+                    onChange={(e) => setActionForm({ ...actionForm, link_risk: e.target.checked })}
+                    className="mt-1 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="link_risk" className="font-medium text-slate-900 cursor-pointer">
+                      Risk ile İlişkilendir
+                    </label>
+                    {actionForm.link_risk && (
+                      <select
+                        value={actionForm.risk_id}
+                        onChange={(e) => setActionForm({ ...actionForm, risk_id: e.target.value })}
+                        className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Risk Seçiniz</option>
+                        {risks.map((risk) => (
+                          <option key={risk.id} value={risk.id}>
+                            {risk.code} - {risk.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="link_control"
+                    checked={actionForm.link_control}
+                    onChange={(e) => setActionForm({ ...actionForm, link_control: e.target.checked })}
+                    className="mt-1 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="link_control" className="font-medium text-slate-900 cursor-pointer">
+                      Risk Kontrolü ile İlişkilendir
+                    </label>
+                    {actionForm.link_control && (
+                      <select
+                        value={actionForm.control_id}
+                        onChange={(e) => setActionForm({ ...actionForm, control_id: e.target.value })}
+                        className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Kontrol Seçiniz</option>
+                        {controls.map((control) => (
+                          <option key={control.id} value={control.id}>
+                            {control.code} - {control.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="link_activity"
+                    checked={actionForm.link_activity}
+                    onChange={(e) => setActionForm({ ...actionForm, link_activity: e.target.checked })}
+                    className="mt-1 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="link_activity" className="font-medium text-slate-900 cursor-pointer">
+                      Risk Faaliyeti ile İlişkilendir
+                    </label>
+                    {actionForm.link_activity && (
+                      <select
+                        value={actionForm.activity_id}
+                        onChange={(e) => setActionForm({ ...actionForm, activity_id: e.target.value })}
+                        className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Faaliyet Seçiniz</option>
+                        {riskActivities.map((activity) => (
+                          <option key={activity.id} value={activity.id}>
+                            {activity.code} - {activity.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="link_goal"
+                    checked={actionForm.link_goal}
+                    onChange={(e) => setActionForm({ ...actionForm, link_goal: e.target.checked })}
+                    className="mt-1 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="link_goal" className="font-medium text-slate-900 cursor-pointer">
+                      Stratejik Hedef ile İlişkilendir
+                    </label>
+                    {actionForm.link_goal && (
+                      <select
+                        value={actionForm.goal_id}
+                        onChange={(e) => setActionForm({ ...actionForm, goal_id: e.target.value })}
+                        className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Hedef Seçiniz</option>
+                        {goals.map((goal) => (
+                          <option key={goal.id} value={goal.id}>
+                            {goal.code} - {goal.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-between gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
-              onClick={() => setShowActionModal(false)}
+              onClick={() => {
+                if (formStep === 1) {
+                  setShowActionModal(false);
+                  setFormStep(1);
+                } else {
+                  setFormStep(formStep - 1);
+                }
+              }}
               className="px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
             >
-              İptal
+              {formStep === 1 ? 'İptal' : 'Geri'}
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-            >
-              {saving ? 'Kaydediliyor...' : 'Kaydet'}
-            </button>
+            {formStep < 4 ? (
+              <button
+                type="button"
+                onClick={() => setFormStep(formStep + 1)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                İleri
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {saving ? 'Kaydediliyor...' : 'Kaydet'}
+              </button>
+            )}
           </div>
         </form>
       </Modal>
