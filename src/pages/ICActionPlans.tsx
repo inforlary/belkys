@@ -119,7 +119,7 @@ export default function ICActionPlans() {
           start_date: formData.start_date,
           end_date: formData.end_date,
           status: 'DRAFT',
-          created_by: profile?.id
+          prepared_by_id: profile?.id
         })
         .select()
         .single();
