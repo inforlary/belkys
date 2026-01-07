@@ -283,30 +283,16 @@ export default function ICActionPlanDetail() {
     }
   };
 
-  const generateActionCode = (subStandardId: string, mainStandardId?: string) => {
-    if (subStandardId) {
-      const subStandard = kiksSubStandards.find(s => s.id === subStandardId);
-      if (!subStandard) return '';
+  const generateActionCode = (mainStandardId: string) => {
+    if (!mainStandardId) return '';
 
-      const actionsForSubStandard = actions.filter(a => a.sub_standard_id === subStandardId);
-      const nextNumber = actionsForSubStandard.length + 1;
+    const mainStandard = kiksMainStandards.find(s => s.id === mainStandardId);
+    if (!mainStandard) return '';
 
-      return `${subStandard.code}.${nextNumber}`;
-    }
+    const actionsForMainStandard = actions.filter(a => a.main_standard_id === mainStandardId);
+    const nextNumber = actionsForMainStandard.length + 1;
 
-    if (mainStandardId) {
-      const mainStandard = kiksMainStandards.find(s => s.id === mainStandardId);
-      if (!mainStandard) return '';
-
-      const actionsForMainStandard = actions.filter(a =>
-        a.ic_kiks_sub_standards?.main_standard_id === mainStandardId && !a.sub_standard_id
-      );
-      const nextNumber = actionsForMainStandard.length + 1;
-
-      return `${mainStandard.code}.${nextNumber}`;
-    }
-
-    return '';
+    return `${mainStandard.code}.${nextNumber}`;
   };
 
   const handleSubmitAction = async (e: React.FormEvent) => {
@@ -324,9 +310,9 @@ export default function ICActionPlanDetail() {
         .from('ic_actions')
         .insert({
           action_plan_id: planId,
-          code: actionForm.code || generateActionCode(actionForm.sub_standard_id, actionForm.main_standard_id),
-          main_standard_id: actionForm.sub_standard_id ? null : (actionForm.main_standard_id || null),
-          sub_standard_id: actionForm.sub_standard_id || null,
+          code: actionForm.code || generateActionCode(actionForm.main_standard_id),
+          main_standard_id: actionForm.main_standard_id || null,
+          sub_standard_id: null,
           title: actionForm.title,
           description: actionForm.description,
           is_continuous: actionForm.is_continuous,
@@ -1382,7 +1368,7 @@ export default function ICActionPlanDetail() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-blue-800 mb-1">
-                      1. Kategori Seçin <span className="text-red-500">*</span>
+                      Kategori Seçin <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
@@ -1410,7 +1396,7 @@ export default function ICActionPlanDetail() {
                   {actionForm.category_id && (
                     <div>
                       <label className="block text-xs font-medium text-blue-800 mb-1">
-                        2. Ana Standart Seçin (Genel Şart) <span className="text-red-500">*</span>
+                        Genel Şart Seçin <span className="text-red-500">*</span>
                       </label>
                       <select
                         required
@@ -1421,7 +1407,7 @@ export default function ICActionPlanDetail() {
                             ...actionForm,
                             main_standard_id: mainStdId,
                             sub_standard_id: '',
-                            code: mainStdId ? generateActionCode('', mainStdId) : ''
+                            code: mainStdId ? generateActionCode(mainStdId) : ''
                           });
                         }}
                         className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -1438,57 +1424,15 @@ export default function ICActionPlanDetail() {
                     </div>
                   )}
 
-                  {actionForm.main_standard_id && (
-                    <div>
-                      <label className="block text-xs font-medium text-blue-800 mb-1">
-                        3. Alt Standart Seçin (Opsiyonel - Genel Şart Detayı)
-                      </label>
-                      <select
-                        value={actionForm.sub_standard_id}
-                        onChange={(e) => {
-                          const subStdId = e.target.value;
-                          setActionForm({
-                            ...actionForm,
-                            sub_standard_id: subStdId,
-                            code: subStdId ? generateActionCode(subStdId) : generateActionCode('', actionForm.main_standard_id)
-                          });
-                        }}
-                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      >
-                        <option value="">Doğrudan ana standarta eylem ekle</option>
-                        {kiksSubStandards
-                          .filter(ss => ss.main_standard_id === actionForm.main_standard_id)
-                          .map((subStd) => (
-                            <option key={subStd.id} value={subStd.id}>
-                              {subStd.code} - {subStd.title}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
                 </div>
 
-                {actionForm.main_standard_id && !actionForm.sub_standard_id && (
+                {actionForm.main_standard_id && (
                   <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-300">
                     <div className="text-xs font-medium text-green-900">
-                      ✓ Ana Standart: {kiksMainStandards.find(s => s.id === actionForm.main_standard_id)?.code}
+                      ✓ Seçilen: {kiksMainStandards.find(s => s.id === actionForm.main_standard_id)?.code}
                     </div>
                     <div className="text-xs text-green-700 mt-1">
                       {kiksMainStandards.find(s => s.id === actionForm.main_standard_id)?.title}
-                    </div>
-                    <div className="text-xs text-green-600 mt-1">
-                      Bu eylem doğrudan ana standarta atanacak
-                    </div>
-                  </div>
-                )}
-
-                {actionForm.sub_standard_id && (
-                  <div className="mt-3 p-3 bg-blue-100 rounded-lg border border-blue-300">
-                    <div className="text-xs font-medium text-blue-900">
-                      ✓ Alt Standart: {kiksSubStandards.find(s => s.id === actionForm.sub_standard_id)?.code}
-                    </div>
-                    <div className="text-xs text-blue-700 mt-1">
-                      {kiksSubStandards.find(s => s.id === actionForm.sub_standard_id)?.title}
                     </div>
                   </div>
                 )}
@@ -1513,7 +1457,7 @@ export default function ICActionPlanDetail() {
                     disabled={!actionForm.main_standard_id}
                     onClick={() => setActionForm({
                       ...actionForm,
-                      code: generateActionCode(actionForm.sub_standard_id, actionForm.main_standard_id)
+                      code: generateActionCode(actionForm.main_standard_id)
                     })}
                     className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -1522,7 +1466,7 @@ export default function ICActionPlanDetail() {
                 </div>
                 {actionForm.code && (
                   <div className="text-xs text-slate-500 mt-1">
-                    Bu genel şarta ait {actions.filter(a => a.sub_standard_id === actionForm.sub_standard_id).length + 1}. eylem
+                    Bu genel şarta ait {actions.filter(a => a.main_standard_id === actionForm.main_standard_id).length + 1}. eylem
                   </div>
                 )}
               </div>
