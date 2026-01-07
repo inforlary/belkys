@@ -84,13 +84,15 @@ export default function ICActionDetail() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const [progressForm, setProgressForm] = useState({
     new_progress: 0,
     new_status: '',
     description: '',
     challenges: '',
-    next_steps: ''
+    next_steps: '',
+    attachment: null as File | null
   });
 
   const [uploadForm, setUploadForm] = useState({
@@ -103,6 +105,15 @@ export default function ICActionDetail() {
       loadData();
     }
   }, [profile?.organization_id, actionId]);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const loadData = async () => {
     try {
@@ -199,6 +210,20 @@ export default function ICActionDetail() {
     setSaving(true);
 
     try {
+      let attachmentUrl = null;
+
+      if (progressForm.attachment) {
+        const fileExt = progressForm.attachment.name.split('.').pop();
+        const fileName = `${actionId}/progress/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('ic-action-documents')
+          .upload(fileName, progressForm.attachment);
+
+        if (uploadError) throw uploadError;
+        attachmentUrl = fileName;
+      }
+
       const { error: progressError } = await supabase
         .from('ic_action_progress')
         .insert({
@@ -216,12 +241,42 @@ export default function ICActionDetail() {
 
       if (progressError) throw progressError;
 
+      if (attachmentUrl) {
+        await supabase
+          .from('ic_action_documents')
+          .insert({
+            action_id: actionId,
+            name: progressForm.attachment!.name,
+            file_url: attachmentUrl,
+            file_size: progressForm.attachment!.size,
+            file_type: 'progress_attachment',
+            uploaded_by_id: profile?.id
+          });
+      }
+
+      const updateData: any = {
+        progress_percent: progressForm.new_progress,
+        status: progressForm.new_status
+      };
+
+      if (progressForm.new_status === 'COMPLETED' && !action?.metadata?.completed_date) {
+        updateData.metadata = {
+          ...action?.metadata,
+          completed_date: new Date().toISOString()
+        };
+      }
+
+      if (action?.target_date) {
+        const targetDate = new Date(action.target_date);
+        const today = new Date();
+        if (targetDate < today && progressForm.new_status !== 'COMPLETED') {
+          updateData.status = 'DELAYED';
+        }
+      }
+
       const { error: updateError } = await supabase
         .from('ic_actions')
-        .update({
-          progress_percent: progressForm.new_progress,
-          status: progressForm.new_status
-        })
+        .update(updateData)
         .eq('id', actionId);
 
       if (updateError) throw updateError;
@@ -232,12 +287,14 @@ export default function ICActionDetail() {
         new_status: '',
         description: '',
         challenges: '',
-        next_steps: ''
+        next_steps: '',
+        attachment: null
       });
+      setToast({ message: 'İlerleme başarıyla kaydedildi', type: 'success' });
       loadData();
     } catch (error) {
       console.error('İlerleme kaydedilirken hata:', error);
-      alert('İlerleme kaydedilirken bir hata oluştu');
+      setToast({ message: 'İlerleme kaydedilirken bir hata oluştu', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -342,7 +399,8 @@ export default function ICActionDetail() {
       IN_PROGRESS: 'bg-blue-100 text-blue-800',
       COMPLETED: 'bg-green-100 text-green-800',
       DELAYED: 'bg-red-100 text-red-800',
-      ON_HOLD: 'bg-yellow-100 text-yellow-800'
+      ON_HOLD: 'bg-yellow-100 text-yellow-800',
+      CANCELLED: 'bg-slate-200 text-slate-700'
     };
     return badges[status] || 'bg-slate-100 text-slate-800';
   };
@@ -353,7 +411,8 @@ export default function ICActionDetail() {
       IN_PROGRESS: 'Devam Ediyor',
       COMPLETED: 'Tamamlandı',
       DELAYED: 'Gecikmiş',
-      ON_HOLD: 'Beklemede'
+      ON_HOLD: 'Beklemede',
+      CANCELLED: 'İptal Edildi'
     };
     return labels[status] || status;
   };
@@ -774,40 +833,66 @@ export default function ICActionDetail() {
         title="İlerleme Ekle"
       >
         <form onSubmit={handleSubmitProgress} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Yeni İlerleme (%) <span className="text-red-500">*</span>
-              </label>
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4">
+            <div className="text-sm">
+              <div className="font-semibold text-slate-900 mb-2">
+                {action?.code} - {action?.title}
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-xs text-slate-600">
+                <div>Mevcut İlerleme: <span className="font-medium text-slate-900">{action?.progress_percent || 0}%</span></div>
+                <div>Mevcut Durum: <span className="font-medium text-slate-900">{getStatusLabel(action?.status || '')}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Yeni İlerleme (%) <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-2">
               <input
-                type="number"
+                type="range"
                 required
                 min="0"
                 max="100"
                 value={progressForm.new_progress}
                 onChange={(e) => setProgressForm({ ...progressForm, new_progress: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-green-600"
               />
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>0</span>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  max="100"
+                  value={progressForm.new_progress}
+                  onChange={(e) => setProgressForm({ ...progressForm, new_progress: parseInt(e.target.value) || 0 })}
+                  className="w-20 px-2 py-1 text-center border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+                <span>100</span>
+              </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Yeni Durum <span className="text-red-500">*</span>
-              </label>
-              <select
-                required
-                value={progressForm.new_status}
-                onChange={(e) => setProgressForm({ ...progressForm, new_status: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Seçiniz</option>
-                <option value="NOT_STARTED">Başlamadı</option>
-                <option value="IN_PROGRESS">Devam Ediyor</option>
-                <option value="COMPLETED">Tamamlandı</option>
-                <option value="DELAYED">Gecikmiş</option>
-                <option value="ON_HOLD">Beklemede</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Yeni Durum <span className="text-red-500">*</span>
+            </label>
+            <select
+              required
+              value={progressForm.new_status}
+              onChange={(e) => setProgressForm({ ...progressForm, new_status: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              <option value="">Seçiniz</option>
+              <option value="NOT_STARTED">Başlamadı</option>
+              <option value="IN_PROGRESS">Devam Ediyor</option>
+              <option value="COMPLETED">Tamamlandı</option>
+              <option value="DELAYED">Gecikmiş</option>
+              <option value="ON_HOLD">Beklemede</option>
+              <option value="CANCELLED">İptal Edildi</option>
+            </select>
           </div>
 
           <div>
@@ -848,6 +933,22 @@ export default function ICActionDetail() {
               placeholder="Planlanan sonraki adımlar..."
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Belge Ekle
+            </label>
+            <input
+              type="file"
+              onChange={(e) => setProgressForm({ ...progressForm, attachment: e.target.files?.[0] || null })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+            />
+            {progressForm.attachment && (
+              <div className="mt-2 text-xs text-slate-600">
+                Seçilen dosya: {progressForm.attachment.name} ({formatFileSize(progressForm.attachment.size)})
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
@@ -934,6 +1035,39 @@ export default function ICActionDetail() {
           </div>
         </form>
       </Modal>
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+          <div
+            className={`px-6 py-4 rounded-lg shadow-lg border ${
+              toast.type === 'success'
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {toast.type === 'success' ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+              <span className="font-medium">{toast.message}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
