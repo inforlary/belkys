@@ -40,6 +40,8 @@ export default function ICActionPlans() {
   const [actionPlans, setActionPlans] = useState<ActionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<ActionPlan | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -168,6 +170,60 @@ export default function ICActionPlans() {
     } catch (error) {
       console.error('Eylem planı oluşturulurken hata:', error);
       alert('Eylem planı oluşturulurken bir hata oluştu');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEdit = (plan: ActionPlan) => {
+    setEditingPlan(plan);
+    setFormData({
+      name: plan.name,
+      description: plan.description || '',
+      start_date: plan.start_date,
+      end_date: plan.end_date,
+      version: plan.version || '1.0',
+      import_from_plan: false,
+      source_plan_id: ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlan) return;
+
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('ic_action_plans')
+        .update({
+          name: formData.name,
+          description: formData.description,
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+          version: formData.version
+        })
+        .eq('id', editingPlan.id);
+
+      if (error) throw error;
+
+      setShowEditModal(false);
+      setEditingPlan(null);
+      setFormData({
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        version: '1.0',
+        import_from_plan: false,
+        source_plan_id: ''
+      });
+      loadActionPlans();
+    } catch (error) {
+      console.error('Eylem planı güncellenirken hata:', error);
+      alert('Eylem planı güncellenirken bir hata oluştu');
     } finally {
       setSaving(false);
     }
@@ -331,13 +387,22 @@ export default function ICActionPlans() {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => navigate(`/internal-control/action-plans/${plan.id}`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/internal-control/action-plans/${plan.id}`);
+                      }}
                       className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     >
                       <Eye className="w-4 h-4" />
                       Görüntüle
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(plan);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                    >
                       <Edit2 className="w-4 h-4" />
                       Düzenle
                     </button>
@@ -406,7 +471,18 @@ export default function ICActionPlans() {
 
       <Modal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false);
+          setFormData({
+            name: '',
+            description: '',
+            start_date: '',
+            end_date: '',
+            version: '1.0',
+            import_from_plan: false,
+            source_plan_id: ''
+          });
+        }}
         title="Yeni Eylem Planı Oluştur"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -528,6 +604,114 @@ export default function ICActionPlans() {
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               {saving ? 'Oluşturuluyor...' : 'Oluştur'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingPlan(null);
+          setFormData({
+            name: '',
+            description: '',
+            start_date: '',
+            end_date: '',
+            version: '1.0',
+            import_from_plan: false,
+            source_plan_id: ''
+          });
+        }}
+        title="Eylem Planını Düzenle"
+      >
+        <form onSubmit={handleUpdate} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Plan Adı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Örn: 2024-2026 İç Kontrol Eylem Planı"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Açıklama
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              placeholder="Plan hakkında kısa açıklama..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Başlangıç Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Bitiş Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.end_date}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Versiyon
+            </label>
+            <input
+              type="text"
+              value={formData.version}
+              onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+              placeholder="1.0"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                setShowEditModal(false);
+                setEditingPlan(null);
+              }}
+              className="px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {saving ? 'Güncelleniyor...' : 'Güncelle'}
             </button>
           </div>
         </form>
