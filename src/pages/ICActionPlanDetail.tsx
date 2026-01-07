@@ -245,6 +245,12 @@ export default function ICActionPlanDetail() {
 
   const handleSubmitAction = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formStep < 4) {
+      setFormStep(formStep + 1);
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -1644,23 +1650,13 @@ export default function ICActionPlanDetail() {
             >
               {formStep === 1 ? 'İptal' : 'Geri'}
             </button>
-            {formStep < 4 ? (
-              <button
-                type="button"
-                onClick={() => setFormStep(formStep + 1)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                İleri
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {saving ? 'Kaydediliyor...' : 'Kaydet'}
-              </button>
-            )}
+            <button
+              type="submit"
+              disabled={saving && formStep === 4}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {formStep < 4 ? 'İleri' : (saving ? 'Kaydediliyor...' : 'Kaydet')}
+            </button>
           </div>
         </form>
       </Modal>
