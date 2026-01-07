@@ -24,7 +24,6 @@ interface ActionPlan {
   start_date: string;
   end_date: string;
   status: string;
-  version: string;
 }
 
 interface Action {
@@ -72,8 +71,8 @@ interface Component {
 
 export default function ICActionPlanDetail() {
   const { profile } = useAuth();
-  const navigate = useLocation();
-  const planId = window.location.pathname.split('/').pop();
+  const { navigate, currentPath } = useLocation();
+  const planId = currentPath.split('/').pop() || '';
 
   const [plan, setPlan] = useState<ActionPlan | null>(null);
   const [actions, setActions] = useState<Action[]>([]);
@@ -126,6 +125,7 @@ export default function ICActionPlanDetail() {
 
   const loadData = async () => {
     try {
+      console.log('[ICActionPlanDetail] Loading data for planId:', planId);
       const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
         supabase
           .from('ic_action_plans')
@@ -176,9 +176,16 @@ export default function ICActionPlanDetail() {
           .order('code')
       ]);
 
-      if (planRes.error) throw planRes.error;
-      if (actionsRes.error) throw actionsRes.error;
+      if (planRes.error) {
+        console.error('[ICActionPlanDetail] Error loading plan:', planRes.error);
+        throw planRes.error;
+      }
+      if (actionsRes.error) {
+        console.error('[ICActionPlanDetail] Error loading actions:', actionsRes.error);
+        throw actionsRes.error;
+      }
 
+      console.log('[ICActionPlanDetail] Plan loaded successfully:', planRes.data);
       setPlan(planRes.data);
       setActions(actionsRes.data || []);
       setDepartments(departmentsRes.data || []);
@@ -189,7 +196,7 @@ export default function ICActionPlanDetail() {
       setControls(controlsRes.data || []);
       setRiskActivities(riskActivitiesRes.data || []);
     } catch (error) {
-      console.error('Veriler yüklenirken hata:', error);
+      console.error('[ICActionPlanDetail] Error in loadData:', error);
     } finally {
       setLoading(false);
     }
@@ -358,7 +365,7 @@ export default function ICActionPlanDetail() {
     <div className="space-y-6">
       <div>
         <button
-          onClick={() => navigate('/internal-control/action-plans')}
+          onClick={() => navigate('internal-control/action-plans')}
           className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -378,10 +385,6 @@ export default function ICActionPlanDetail() {
                   <span className="font-medium text-slate-900">
                     {new Date(plan.start_date).toLocaleDateString('tr-TR')} - {new Date(plan.end_date).toLocaleDateString('tr-TR')}
                   </span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Versiyon: </span>
-                  <span className="font-medium text-slate-900">{plan.version || '1.0'}</span>
                 </div>
               </div>
             </div>
@@ -627,7 +630,7 @@ export default function ICActionPlanDetail() {
                     <tr
                       key={action.id}
                       className={`${getRowBgColor(action)} cursor-pointer`}
-                      onClick={() => navigate(`/internal-control/action-plans/${planId}/actions/${action.id}`)}
+                      onClick={() => navigate(`internal-control/actions/${action.id}`)}
                     >
                       <td className="px-4 py-3 text-sm font-medium text-green-600 hover:text-green-700">
                         {action.code}
@@ -667,7 +670,10 @@ export default function ICActionPlanDetail() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={() => navigate(`/internal-control/action-plans/${planId}/actions/${action.id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`internal-control/actions/${action.id}`);
+                          }}
                           className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-800"
                         >
                           <Eye className="w-3 h-3" />
