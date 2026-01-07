@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from '../hooks/useLocation';
 import { supabase } from '../lib/supabase';
 import {
   Shield,
@@ -53,6 +54,7 @@ interface Stats {
 
 export default function ICStandards() {
   const { profile } = useAuth();
+  const { navigate } = useLocation();
   const [components, setComponents] = useState<ComponentWithStandards[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -491,10 +493,22 @@ export default function ICStandards() {
               >
                 Kapat
               </button>
-              <button className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors">
+              <button
+                onClick={() => {
+                  closeModal();
+                  navigate('internal-control/assessments');
+                }}
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+              >
                 Değerlendirme Yap
               </button>
-              <button className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors">
+              <button
+                onClick={() => {
+                  closeModal();
+                  navigate('internal-control/action-plans');
+                }}
+                className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors"
+              >
                 Eylem Planına Git
               </button>
             </div>
