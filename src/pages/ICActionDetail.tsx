@@ -12,6 +12,8 @@ interface Action {
   description: string;
   standard_id: string;
   responsible_department_id: string;
+  special_responsible_type?: string;
+  special_responsible?: string;
   start_date: string;
   target_date: string;
   priority: string;
@@ -603,11 +605,30 @@ export default function ICActionDetail() {
 
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-3">Sorumluluklar</h3>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-600 font-medium">Sorumlu Birim:</span>
-                    <span className="text-slate-900">{action.departments?.name}</span>
+                    <span className="text-slate-900">{action.departments?.name || '-'}</span>
                   </div>
+                  {action.special_responsible_type && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-600 font-medium">Özel Sorumlu:</span>
+                      <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium">
+                        {
+                          action.special_responsible_type === 'TOP_MANAGEMENT' ? 'Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)' :
+                          action.special_responsible_type === 'INTERNAL_AUDITOR' ? 'İç Denetçi / İç Denetim Birimi' :
+                          action.special_responsible_type === 'ETHICS_COMMITTEE' ? 'Etik Komisyonu' :
+                          action.special_responsible_type === 'IT_COORDINATOR' ? 'Bilgi Teknolojileri Koordinatörü' :
+                          action.special_responsible_type === 'HR_COORDINATOR' ? 'İnsan Kaynakları Koordinatörü' :
+                          action.special_responsible_type === 'QUALITY_MANAGER' ? 'Kalite Yönetim Temsilcisi' :
+                          action.special_responsible_type === 'RISK_COORDINATOR' ? 'Risk Koordinatörü' :
+                          action.special_responsible_type === 'STRATEGY_COORDINATOR' ? 'Strateji Geliştirme Koordinatörü' :
+                          action.special_responsible_type === 'OTHER' ? action.special_responsible :
+                          action.special_responsible_type
+                        }
+                      </span>
+                    </div>
+                  )}
                   {relatedDepartments.length > 0 && (
                     <div className="flex items-start gap-2">
                       <span className="text-slate-600 font-medium">İlgili Birimler:</span>
@@ -615,6 +636,28 @@ export default function ICActionDetail() {
                         {relatedDepartments.map((dept) => (
                           <span key={dept.id} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">
                             {dept.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {action.metadata?.related_special_responsible_types && action.metadata.related_special_responsible_types.length > 0 && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-600 font-medium">İlgili Özel Roller:</span>
+                      <div className="flex flex-wrap gap-2">
+                        {action.metadata.related_special_responsible_types.map((roleType: string) => (
+                          <span key={roleType} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">
+                            {
+                              roleType === 'TOP_MANAGEMENT' ? 'Üst Yönetim' :
+                              roleType === 'INTERNAL_AUDITOR' ? 'İç Denetçi' :
+                              roleType === 'ETHICS_COMMITTEE' ? 'Etik Komisyonu' :
+                              roleType === 'IT_COORDINATOR' ? 'BT Koordinatörü' :
+                              roleType === 'HR_COORDINATOR' ? 'İK Koordinatörü' :
+                              roleType === 'QUALITY_MANAGER' ? 'Kalite Yöneticisi' :
+                              roleType === 'RISK_COORDINATOR' ? 'Risk Koordinatörü' :
+                              roleType === 'STRATEGY_COORDINATOR' ? 'Strateji Koordinatörü' :
+                              roleType
+                            }
                           </span>
                         ))}
                       </div>
