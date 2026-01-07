@@ -11,7 +11,10 @@ import {
   Eye,
   FileText,
   TrendingUp,
-  X
+  X,
+  Edit,
+  Trash2,
+  Plus
 } from 'lucide-react';
 
 interface ICComponent {
@@ -61,6 +64,11 @@ export default function ICStandards() {
   const [expandedComponents, setExpandedComponents] = useState<Set<string>>(new Set());
   const [selectedStandard, setSelectedStandard] = useState<ICStandard | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showEditComponentModal, setShowEditComponentModal] = useState(false);
+  const [showEditStandardModal, setShowEditStandardModal] = useState(false);
+  const [editingComponent, setEditingComponent] = useState<ICComponent | null>(null);
+  const [editingStandard, setEditingStandard] = useState<ICStandard | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadComponentsWithStandards();
@@ -186,6 +194,111 @@ export default function ICStandards() {
   const closeModal = () => {
     setShowModal(false);
     setSelectedStandard(null);
+  };
+
+  const handleEditComponent = (component: ICComponent) => {
+    setEditingComponent(component);
+    setShowEditComponentModal(true);
+  };
+
+  const handleEditStandard = (standard: ICStandard) => {
+    setEditingStandard(standard);
+    setShowEditStandardModal(true);
+  };
+
+  const handleSaveComponent = async () => {
+    if (!editingComponent) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('ic_components')
+        .update({
+          code: editingComponent.code,
+          name: editingComponent.name,
+          description: editingComponent.description,
+          order_index: editingComponent.order_index,
+          color: editingComponent.color,
+          icon: editingComponent.icon
+        })
+        .eq('id', editingComponent.id);
+
+      if (error) throw error;
+
+      setShowEditComponentModal(false);
+      setEditingComponent(null);
+      await loadComponentsWithStandards();
+    } catch (error: any) {
+      alert('Hata: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveStandard = async () => {
+    if (!editingStandard) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('ic_standards')
+        .update({
+          code: editingStandard.code,
+          name: editingStandard.name,
+          description: editingStandard.description,
+          general_conditions: editingStandard.general_conditions,
+          order_index: editingStandard.order_index
+        })
+        .eq('id', editingStandard.id);
+
+      if (error) throw error;
+
+      setShowEditStandardModal(false);
+      setEditingStandard(null);
+      await loadComponentsWithStandards();
+    } catch (error: any) {
+      alert('Hata: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteComponent = async (componentId: string) => {
+    if (!confirm('Bu bileşeni silmek istediğinizden emin misiniz? İlişkili tüm standartlar da silinecektir.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ic_components')
+        .delete()
+        .eq('id', componentId);
+
+      if (error) throw error;
+
+      await loadComponentsWithStandards();
+    } catch (error: any) {
+      alert('Hata: ' + error.message);
+    }
+  };
+
+  const handleDeleteStandard = async (standardId: string) => {
+    if (!confirm('Bu standardı silmek istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ic_standards')
+        .delete()
+        .eq('id', standardId);
+
+      if (error) throw error;
+
+      await loadComponentsWithStandards();
+    } catch (error: any) {
+      alert('Hata: ' + error.message);
+    }
   };
 
   function getComplianceColor(level?: number): string {
@@ -346,6 +459,30 @@ export default function ICStandards() {
                     </div>
                   </div>
                   {getProgressBar(component.compliance_avg)}
+                  {(profile?.role === 'super_admin' || profile?.role === 'admin') && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditComponent(component);
+                        }}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Düzenle"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteComponent(component.id);
+                        }}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Sil"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                   <ChevronDown
                     className={`h-5 w-5 text-gray-400 transition-transform ${
                       isExpanded ? 'transform rotate-180' : ''
@@ -389,6 +526,24 @@ export default function ICStandards() {
                           >
                             Detay
                           </button>
+                          {(profile?.role === 'super_admin' || profile?.role === 'admin') && (
+                            <>
+                              <button
+                                onClick={() => handleEditStandard(standard)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Düzenle"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStandard(standard.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Sil"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -510,6 +665,210 @@ export default function ICStandards() {
                 className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors"
               >
                 Eylem Planına Git
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditComponentModal && editingComponent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Bileşen Düzenle</h2>
+              <button
+                onClick={() => {
+                  setShowEditComponentModal(false);
+                  setEditingComponent(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="px-6 py-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kod <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingComponent.code}
+                  onChange={(e) => setEditingComponent({ ...editingComponent, code: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  İsim <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingComponent.name}
+                  onChange={(e) => setEditingComponent({ ...editingComponent, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Açıklama <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={editingComponent.description}
+                  onChange={(e) => setEditingComponent({ ...editingComponent, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Sıra No <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={editingComponent.order_index}
+                  onChange={(e) => setEditingComponent({ ...editingComponent, order_index: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Renk (Hex) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingComponent.color}
+                  onChange={(e) => setEditingComponent({ ...editingComponent, color: e.target.value })}
+                  placeholder="#3B82F6"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEditComponentModal(false);
+                  setEditingComponent(null);
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                disabled={saving}
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveComponent}
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? 'Kaydediliyor...' : 'Kaydet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditStandardModal && editingStandard && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Standart Düzenle</h2>
+              <button
+                onClick={() => {
+                  setShowEditStandardModal(false);
+                  setEditingStandard(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="px-6 py-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kod <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingStandard.code}
+                  onChange={(e) => setEditingStandard({ ...editingStandard, code: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  İsim <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingStandard.name}
+                  onChange={(e) => setEditingStandard({ ...editingStandard, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Açıklama <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={editingStandard.description}
+                  onChange={(e) => setEditingStandard({ ...editingStandard, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Genel Şartlar <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={editingStandard.general_conditions}
+                  onChange={(e) => setEditingStandard({ ...editingStandard, general_conditions: e.target.value })}
+                  rows={8}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Her satıra bir genel şart yazın"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Sıra No <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={editingStandard.order_index}
+                  onChange={(e) => setEditingStandard({ ...editingStandard, order_index: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEditStandardModal(false);
+                  setEditingStandard(null);
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                disabled={saving}
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveStandard}
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? 'Kaydediliyor...' : 'Kaydet'}
               </button>
             </div>
           </div>

@@ -67,33 +67,13 @@ interface Standard {
   id: string;
   code: string;
   name: string;
-  ic_component_id: string;
+  component_id: string;
 }
 
 interface Component {
   id: string;
   code: string;
   name: string;
-}
-
-interface KiksCategory {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface KiksMainStandard {
-  id: string;
-  category_id: string;
-  code: string;
-  title: string;
-}
-
-interface KiksSubStandard {
-  id: string;
-  main_standard_id: string;
-  code: string;
-  title: string;
 }
 
 export default function ICActionPlanDetail() {
@@ -106,9 +86,6 @@ export default function ICActionPlanDetail() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [standards, setStandards] = useState<Standard[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
-  const [kiksCategories, setKiksCategories] = useState<KiksCategory[]>([]);
-  const [kiksMainStandards, setKiksMainStandards] = useState<KiksMainStandard[]>([]);
-  const [kiksSubStandards, setKiksSubStandards] = useState<KiksSubStandard[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
   const [risks, setRisks] = useState<any[]>([]);
   const [controls, setControls] = useState<any[]>([]);
@@ -127,9 +104,8 @@ export default function ICActionPlanDetail() {
   const [formStep, setFormStep] = useState(1);
   const [actionForm, setActionForm] = useState({
     code: '',
-    category_id: '',
-    main_standard_id: '',
-    sub_standard_id: '',
+    component_id: '',
+    standard_id: '',
     title: '',
     description: '',
     is_continuous: false,
@@ -168,7 +144,7 @@ export default function ICActionPlanDetail() {
   const loadData = async () => {
     try {
       console.log('[ICActionPlanDetail] Loading data for planId:', planId);
-      const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes, kiksCategoriesRes, kiksMainStandardsRes, kiksSubStandardsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
+      const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
         supabase
           .from('ic_action_plans')
           .select('*')
@@ -195,21 +171,6 @@ export default function ICActionPlanDetail() {
         supabase
           .from('ic_components')
           .select('id, code, name')
-          .order('order_index'),
-        supabase
-          .from('ic_kiks_categories')
-          .select('id, code, name')
-          .is('organization_id', null)
-          .order('order_index'),
-        supabase
-          .from('ic_kiks_main_standards')
-          .select('id, category_id, code, title')
-          .is('organization_id', null)
-          .order('order_index'),
-        supabase
-          .from('ic_kiks_sub_standards')
-          .select('id, main_standard_id, code, title')
-          .is('organization_id', null)
           .order('order_index'),
         supabase
           .from('goals')
@@ -269,9 +230,6 @@ export default function ICActionPlanDetail() {
       setDepartments(departmentsRes.data || []);
       setStandards(standardsRes.data || []);
       setComponents(componentsRes.data || []);
-      setKiksCategories(kiksCategoriesRes.data || []);
-      setKiksMainStandards(kiksMainStandardsRes.data || []);
-      setKiksSubStandards(kiksSubStandardsRes.data || []);
       setGoals(goalsRes.data || []);
       setRisks(risksRes.data || []);
       setControls(controlsRes.data || []);
@@ -283,16 +241,16 @@ export default function ICActionPlanDetail() {
     }
   };
 
-  const generateActionCode = (mainStandardId: string) => {
-    if (!mainStandardId) return '';
+  const generateActionCode = (standardId: string) => {
+    if (!standardId) return '';
 
-    const mainStandard = kiksMainStandards.find(s => s.id === mainStandardId);
-    if (!mainStandard) return '';
+    const standard = standards.find(s => s.id === standardId);
+    if (!standard) return '';
 
-    const actionsForMainStandard = actions.filter(a => a.main_standard_id === mainStandardId);
-    const nextNumber = actionsForMainStandard.length + 1;
+    const actionsForStandard = actions.filter(a => a.standard_id === standardId);
+    const nextNumber = actionsForStandard.length + 1;
 
-    return `${mainStandard.code}.${nextNumber}`;
+    return `${standard.code}.${nextNumber}`;
   };
 
   const handleSubmitAction = async (e: React.FormEvent) => {
@@ -310,9 +268,8 @@ export default function ICActionPlanDetail() {
         .from('ic_actions')
         .insert({
           action_plan_id: planId,
-          code: actionForm.code || generateActionCode(actionForm.main_standard_id),
-          main_standard_id: actionForm.main_standard_id || null,
-          sub_standard_id: null,
+          code: actionForm.code || generateActionCode(actionForm.standard_id),
+          standard_id: actionForm.standard_id || null,
           title: actionForm.title,
           description: actionForm.description,
           is_continuous: actionForm.is_continuous,
@@ -341,9 +298,8 @@ export default function ICActionPlanDetail() {
       setFormStep(1);
       setActionForm({
         code: '',
-        category_id: '',
-        main_standard_id: '',
-        sub_standard_id: '',
+        component_id: '',
+        standard_id: '',
         title: '',
         description: '',
         is_continuous: false,
@@ -1368,56 +1324,54 @@ export default function ICActionPlanDetail() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-blue-800 mb-1">
-                      Kategori Seçin <span className="text-red-500">*</span>
+                      Bileşen Seçin <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
-                      value={actionForm.category_id}
+                      value={actionForm.component_id}
                       onChange={(e) => {
                         setActionForm({
                           ...actionForm,
-                          category_id: e.target.value,
-                          main_standard_id: '',
-                          sub_standard_id: '',
+                          component_id: e.target.value,
+                          standard_id: '',
                           code: ''
                         });
                       }}
                       className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     >
-                      <option value="">Kategori seçiniz</option>
-                      {kiksCategories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.code} - {cat.name}
+                      <option value="">Bileşen seçiniz</option>
+                      {components.map((comp) => (
+                        <option key={comp.id} value={comp.id}>
+                          {comp.code} - {comp.name}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  {actionForm.category_id && (
+                  {actionForm.component_id && (
                     <div>
                       <label className="block text-xs font-medium text-blue-800 mb-1">
-                        Genel Şart Seçin <span className="text-red-500">*</span>
+                        Standart Seçin <span className="text-red-500">*</span>
                       </label>
                       <select
                         required
-                        value={actionForm.main_standard_id}
+                        value={actionForm.standard_id}
                         onChange={(e) => {
-                          const mainStdId = e.target.value;
+                          const stdId = e.target.value;
                           setActionForm({
                             ...actionForm,
-                            main_standard_id: mainStdId,
-                            sub_standard_id: '',
-                            code: mainStdId ? generateActionCode(mainStdId) : ''
+                            standard_id: stdId,
+                            code: stdId ? generateActionCode(stdId) : ''
                           });
                         }}
                         className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       >
-                        <option value="">Ana standart seçiniz</option>
-                        {kiksMainStandards
-                          .filter(ms => ms.category_id === actionForm.category_id)
-                          .map((mainStd) => (
-                            <option key={mainStd.id} value={mainStd.id}>
-                              {mainStd.code} - {mainStd.title}
+                        <option value="">Standart seçiniz</option>
+                        {standards
+                          .filter(std => std.component_id === actionForm.component_id)
+                          .map((std) => (
+                            <option key={std.id} value={std.id}>
+                              {std.code} - {std.name}
                             </option>
                           ))}
                       </select>
@@ -1426,13 +1380,13 @@ export default function ICActionPlanDetail() {
 
                 </div>
 
-                {actionForm.main_standard_id && (
+                {actionForm.standard_id && (
                   <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-300">
                     <div className="text-xs font-medium text-green-900">
-                      ✓ Seçilen: {kiksMainStandards.find(s => s.id === actionForm.main_standard_id)?.code}
+                      ✓ Seçilen: {standards.find(s => s.id === actionForm.standard_id)?.code}
                     </div>
                     <div className="text-xs text-green-700 mt-1">
-                      {kiksMainStandards.find(s => s.id === actionForm.main_standard_id)?.title}
+                      {standards.find(s => s.id === actionForm.standard_id)?.name}
                     </div>
                   </div>
                 )}
@@ -1449,15 +1403,15 @@ export default function ICActionPlanDetail() {
                     value={actionForm.code}
                     onChange={(e) => setActionForm({ ...actionForm, code: e.target.value })}
                     placeholder="KOS.01.1"
-                    disabled={!actionForm.main_standard_id}
+                    disabled={!actionForm.standard_id}
                     className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-slate-100 disabled:text-slate-500"
                   />
                   <button
                     type="button"
-                    disabled={!actionForm.main_standard_id}
+                    disabled={!actionForm.standard_id}
                     onClick={() => setActionForm({
                       ...actionForm,
-                      code: generateActionCode(actionForm.main_standard_id)
+                      code: generateActionCode(actionForm.standard_id)
                     })}
                     className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -1466,7 +1420,7 @@ export default function ICActionPlanDetail() {
                 </div>
                 {actionForm.code && (
                   <div className="text-xs text-slate-500 mt-1">
-                    Bu genel şarta ait {actions.filter(a => a.main_standard_id === actionForm.main_standard_id).length + 1}. eylem
+                    Bu standarda ait {actions.filter(a => a.standard_id === actionForm.standard_id).length + 1}. eylem
                   </div>
                 )}
               </div>
