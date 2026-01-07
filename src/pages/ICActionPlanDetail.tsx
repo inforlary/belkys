@@ -118,6 +118,11 @@ export default function ICActionPlanDetail() {
   });
 
   useEffect(() => {
+    console.log('[ICActionPlanDetail] Effect triggered:', {
+      hasOrgId: !!profile?.organization_id,
+      planId,
+      currentPath
+    });
     if (profile?.organization_id && planId) {
       loadData();
     }

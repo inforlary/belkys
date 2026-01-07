@@ -117,7 +117,7 @@ export default function ICActionPlans() {
           description: formData.description,
           start_date: formData.start_date,
           end_date: formData.end_date,
-          status: 'draft',
+          status: 'DRAFT',
           created_by: profile?.id
         })
         .select()
