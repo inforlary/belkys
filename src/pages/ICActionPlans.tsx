@@ -23,7 +23,6 @@ interface ActionPlan {
   start_date: string;
   end_date: string;
   status: string;
-  version: string;
   action_count?: number;
   completion_percentage?: number;
   completed_count?: number;
@@ -36,7 +35,7 @@ interface ActionPlan {
 
 export default function ICActionPlans() {
   const { profile } = useAuth();
-  const navigate = useLocation();
+  const { navigate } = useLocation();
   const [actionPlans, setActionPlans] = useState<ActionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -53,7 +52,6 @@ export default function ICActionPlans() {
     description: '',
     start_date: '',
     end_date: '',
-    version: '1.0',
     import_from_plan: false,
     source_plan_id: ''
   });
@@ -119,9 +117,8 @@ export default function ICActionPlans() {
           description: formData.description,
           start_date: formData.start_date,
           end_date: formData.end_date,
-          version: formData.version,
-          status: 'DRAFT',
-          prepared_by_id: profile?.id
+          status: 'draft',
+          created_by: profile?.id
         })
         .select()
         .single();
@@ -162,7 +159,6 @@ export default function ICActionPlans() {
         description: '',
         start_date: '',
         end_date: '',
-        version: '1.0',
         import_from_plan: false,
         source_plan_id: ''
       });
@@ -182,7 +178,6 @@ export default function ICActionPlans() {
       description: plan.description || '',
       start_date: plan.start_date,
       end_date: plan.end_date,
-      version: plan.version || '1.0',
       import_from_plan: false,
       source_plan_id: ''
     });
@@ -202,8 +197,7 @@ export default function ICActionPlans() {
           name: formData.name,
           description: formData.description,
           start_date: formData.start_date,
-          end_date: formData.end_date,
-          version: formData.version
+          end_date: formData.end_date
         })
         .eq('id', editingPlan.id);
 
@@ -216,7 +210,6 @@ export default function ICActionPlans() {
         description: '',
         start_date: '',
         end_date: '',
-        version: '1.0',
         import_from_plan: false,
         source_plan_id: ''
       });
@@ -376,10 +369,6 @@ export default function ICActionPlans() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        <span>Versiyon: {plan.version || '1.0'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4" />
                         <span>Son Güncelleme: {new Date(plan.updated_at || plan.created_at).toLocaleDateString('tr-TR')}</span>
                       </div>
@@ -389,7 +378,7 @@ export default function ICActionPlans() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/internal-control/action-plans/${plan.id}`);
+                        navigate(`internal-control/action-plans/${plan.id}`);
                       }}
                       className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     >
@@ -478,7 +467,6 @@ export default function ICActionPlans() {
             description: '',
             start_date: '',
             end_date: '',
-            version: '1.0',
             import_from_plan: false,
             source_plan_id: ''
           });
@@ -539,19 +527,6 @@ export default function ICActionPlans() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Versiyon
-            </label>
-            <input
-              type="text"
-              value={formData.version}
-              onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-              placeholder="1.0"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
           </div>
 
           {actionPlans.length > 0 && (
@@ -619,7 +594,6 @@ export default function ICActionPlans() {
             description: '',
             start_date: '',
             end_date: '',
-            version: '1.0',
             import_from_plan: false,
             source_plan_id: ''
           });
@@ -680,19 +654,6 @@ export default function ICActionPlans() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Versiyon
-            </label>
-            <input
-              type="text"
-              value={formData.version}
-              onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-              placeholder="1.0"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
