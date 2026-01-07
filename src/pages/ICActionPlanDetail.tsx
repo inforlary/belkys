@@ -33,14 +33,21 @@ interface Action {
   description: string;
   standard_id: string;
   responsible_department_id: string;
+  related_department_ids?: string[];
   start_date: string;
   target_date: string;
   completed_date: string | null;
   status: string;
   priority: string;
   progress_percent: number;
-  expected_output: string;
-  required_resources: string;
+  expected_outputs?: string;
+  outputs?: string;
+  required_resources?: string;
+  resources?: string;
+  related_risk_id?: string;
+  related_risk_control_id?: string;
+  related_risk_treatment_id?: string;
+  related_objective_id?: string;
   ic_standards?: {
     code: string;
     name: string;
@@ -246,24 +253,22 @@ export default function ICActionPlanDetail() {
         .insert({
           action_plan_id: planId,
           code: actionForm.code || generateActionCode(),
-          standard_id: actionForm.standard_id,
+          standard_id: actionForm.standard_id || null,
           title: actionForm.title,
           description: actionForm.description,
-          responsible_department_id: actionForm.responsible_department_id,
+          responsible_department_id: actionForm.responsible_department_id || null,
+          related_department_ids: actionForm.related_departments.length > 0 ? actionForm.related_departments : null,
           start_date: actionForm.start_date || null,
           target_date: actionForm.target_date,
           priority: actionForm.priority,
           status: 'NOT_STARTED',
           progress_percent: 0,
-          expected_output: actionForm.expected_output,
-          required_resources: actionForm.required_resources,
-          metadata: {
-            related_departments: actionForm.related_departments,
-            linked_risk_id: actionForm.link_risk ? actionForm.risk_id : null,
-            linked_control_id: actionForm.link_control ? actionForm.control_id : null,
-            linked_activity_id: actionForm.link_activity ? actionForm.activity_id : null,
-            linked_goal_id: actionForm.link_goal ? actionForm.goal_id : null
-          }
+          expected_outputs: actionForm.expected_output || null,
+          required_resources: actionForm.required_resources || null,
+          related_risk_id: actionForm.link_risk && actionForm.risk_id ? actionForm.risk_id : null,
+          related_risk_control_id: actionForm.link_control && actionForm.control_id ? actionForm.control_id : null,
+          related_risk_treatment_id: actionForm.link_activity && actionForm.activity_id ? actionForm.activity_id : null,
+          related_objective_id: actionForm.link_goal && actionForm.goal_id ? actionForm.goal_id : null
         });
 
       if (error) throw error;
