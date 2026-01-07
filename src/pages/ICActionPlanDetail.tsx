@@ -76,6 +76,26 @@ interface Component {
   name: string;
 }
 
+interface KiksCategory {
+  id: string;
+  code: string;
+  name: string;
+}
+
+interface KiksMainStandard {
+  id: string;
+  category_id: string;
+  code: string;
+  title: string;
+}
+
+interface KiksSubStandard {
+  id: string;
+  main_standard_id: string;
+  code: string;
+  title: string;
+}
+
 export default function ICActionPlanDetail() {
   const { profile } = useAuth();
   const { navigate, currentPath } = useLocation();
@@ -86,6 +106,9 @@ export default function ICActionPlanDetail() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [standards, setStandards] = useState<Standard[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
+  const [kiksCategories, setKiksCategories] = useState<KiksCategory[]>([]);
+  const [kiksMainStandards, setKiksMainStandards] = useState<KiksMainStandard[]>([]);
+  const [kiksSubStandards, setKiksSubStandards] = useState<KiksSubStandard[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
   const [risks, setRisks] = useState<any[]>([]);
   const [controls, setControls] = useState<any[]>([]);
@@ -104,14 +127,15 @@ export default function ICActionPlanDetail() {
   const [formStep, setFormStep] = useState(1);
   const [actionForm, setActionForm] = useState({
     code: '',
-    standard_id: '',
+    category_id: '',
+    main_standard_id: '',
+    sub_standard_id: '',
     title: '',
     description: '',
     is_continuous: false,
     applies_to_all_units: false,
     responsible_department_id: '',
     related_departments: [] as string[],
-    has_special_responsible: false,
     special_responsible_type: '',
     special_responsible: '',
     start_date: '',
@@ -144,7 +168,7 @@ export default function ICActionPlanDetail() {
   const loadData = async () => {
     try {
       console.log('[ICActionPlanDetail] Loading data for planId:', planId);
-      const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
+      const [planRes, actionsRes, departmentsRes, standardsRes, componentsRes, kiksCategoriesRes, kiksMainStandardsRes, kiksSubStandardsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
         supabase
           .from('ic_action_plans')
           .select('*')
@@ -171,6 +195,21 @@ export default function ICActionPlanDetail() {
         supabase
           .from('ic_components')
           .select('id, code, name')
+          .order('order_index'),
+        supabase
+          .from('ic_kiks_categories')
+          .select('id, code, name')
+          .eq('organization_id', profile?.organization_id)
+          .order('order_index'),
+        supabase
+          .from('ic_kiks_main_standards')
+          .select('id, category_id, code, title')
+          .eq('organization_id', profile?.organization_id)
+          .order('order_index'),
+        supabase
+          .from('ic_kiks_sub_standards')
+          .select('id, main_standard_id, code, title')
+          .eq('organization_id', profile?.organization_id)
           .order('order_index'),
         supabase
           .from('goals')
@@ -230,6 +269,9 @@ export default function ICActionPlanDetail() {
       setDepartments(departmentsRes.data || []);
       setStandards(standardsRes.data || []);
       setComponents(componentsRes.data || []);
+      setKiksCategories(kiksCategoriesRes.data || []);
+      setKiksMainStandards(kiksMainStandardsRes.data || []);
+      setKiksSubStandards(kiksSubStandardsRes.data || []);
       setGoals(goalsRes.data || []);
       setRisks(risksRes.data || []);
       setControls(controlsRes.data || []);
@@ -241,12 +283,16 @@ export default function ICActionPlanDetail() {
     }
   };
 
-  const generateActionCode = () => {
-    const maxCode = actions.reduce((max, action) => {
-      const num = parseInt(action.code.replace(/\D/g, ''));
-      return num > max ? num : max;
-    }, 0);
-    return `E${maxCode + 1}`;
+  const generateActionCode = (subStandardId: string) => {
+    if (!subStandardId) return '';
+
+    const subStandard = kiksSubStandards.find(s => s.id === subStandardId);
+    if (!subStandard) return '';
+
+    const actionsForSubStandard = actions.filter(a => a.sub_standard_id === subStandardId);
+    const nextNumber = actionsForSubStandard.length + 1;
+
+    return `${subStandard.code}.${nextNumber}`;
   };
 
   const handleSubmitAction = async (e: React.FormEvent) => {
@@ -264,16 +310,16 @@ export default function ICActionPlanDetail() {
         .from('ic_actions')
         .insert({
           action_plan_id: planId,
-          code: actionForm.code || generateActionCode(),
-          standard_id: actionForm.standard_id || null,
+          code: actionForm.code || generateActionCode(actionForm.sub_standard_id),
+          sub_standard_id: actionForm.sub_standard_id || null,
           title: actionForm.title,
           description: actionForm.description,
           is_continuous: actionForm.is_continuous,
           applies_to_all_units: actionForm.applies_to_all_units,
           responsible_department_id: actionForm.applies_to_all_units ? null : (actionForm.responsible_department_id || null),
           related_department_ids: actionForm.applies_to_all_units ? null : (actionForm.related_departments.length > 0 ? actionForm.related_departments : null),
-          special_responsible_type: actionForm.has_special_responsible ? actionForm.special_responsible_type : null,
-          special_responsible: actionForm.has_special_responsible && actionForm.special_responsible_type === 'OTHER' ? actionForm.special_responsible : null,
+          special_responsible_type: actionForm.special_responsible_type || null,
+          special_responsible: actionForm.special_responsible_type === 'OTHER' ? actionForm.special_responsible : null,
           start_date: actionForm.start_date || null,
           target_date: actionForm.is_continuous ? null : actionForm.target_date,
           monitoring_period: actionForm.is_continuous ? actionForm.monitoring_period : null,
@@ -294,14 +340,15 @@ export default function ICActionPlanDetail() {
       setFormStep(1);
       setActionForm({
         code: '',
-        standard_id: '',
+        category_id: '',
+        main_standard_id: '',
+        sub_standard_id: '',
         title: '',
         description: '',
         is_continuous: false,
         applies_to_all_units: false,
         responsible_department_id: '',
         related_departments: [],
-        has_special_responsible: false,
         special_responsible_type: '',
         special_responsible: '',
         start_date: '',
@@ -650,10 +697,7 @@ export default function ICActionPlanDetail() {
 
               <div className="ml-auto">
                 <button
-                  onClick={() => {
-                    setActionForm({ ...actionForm, code: generateActionCode() });
-                    setShowActionModal(true);
-                  }}
+                  onClick={() => setShowActionModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   <Plus className="w-5 h-5" />
@@ -1317,6 +1361,110 @@ export default function ICActionPlanDetail() {
         <form onSubmit={handleSubmitAction} className="space-y-4">
           {formStep === 1 && (
             <>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h4 className="text-sm font-medium text-blue-900 mb-3">KİKS Standardı Seçimi</h4>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-blue-800 mb-1">
+                      1. Kategori Seçin <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={actionForm.category_id}
+                      onChange={(e) => {
+                        setActionForm({
+                          ...actionForm,
+                          category_id: e.target.value,
+                          main_standard_id: '',
+                          sub_standard_id: '',
+                          code: ''
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="">Kategori seçiniz</option>
+                      {kiksCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.code} - {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {actionForm.category_id && (
+                    <div>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">
+                        2. Ana Standart Seçin (Genel Şart) <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={actionForm.main_standard_id}
+                        onChange={(e) => {
+                          setActionForm({
+                            ...actionForm,
+                            main_standard_id: e.target.value,
+                            sub_standard_id: '',
+                            code: ''
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Ana standart seçiniz</option>
+                        {kiksMainStandards
+                          .filter(ms => ms.category_id === actionForm.category_id)
+                          .map((mainStd) => (
+                            <option key={mainStd.id} value={mainStd.id}>
+                              {mainStd.code} - {mainStd.title}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {actionForm.main_standard_id && (
+                    <div>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">
+                        3. Alt Standart Seçin (Genel Şart Detayı) <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={actionForm.sub_standard_id}
+                        onChange={(e) => {
+                          const subStdId = e.target.value;
+                          setActionForm({
+                            ...actionForm,
+                            sub_standard_id: subStdId,
+                            code: subStdId ? generateActionCode(subStdId) : ''
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Alt standart seçiniz</option>
+                        {kiksSubStandards
+                          .filter(ss => ss.main_standard_id === actionForm.main_standard_id)
+                          .map((subStd) => (
+                            <option key={subStd.id} value={subStd.id}>
+                              {subStd.code} - {subStd.title}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {actionForm.sub_standard_id && (
+                  <div className="mt-3 p-3 bg-blue-100 rounded-lg border border-blue-300">
+                    <div className="text-xs font-medium text-blue-900">
+                      ✓ Seçilen: {kiksSubStandards.find(s => s.id === actionForm.sub_standard_id)?.code}
+                    </div>
+                    <div className="text-xs text-blue-700 mt-1">
+                      {kiksSubStandards.find(s => s.id === actionForm.sub_standard_id)?.title}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Eylem Kodu <span className="text-red-500">*</span>
@@ -1327,17 +1475,24 @@ export default function ICActionPlanDetail() {
                     required
                     value={actionForm.code}
                     onChange={(e) => setActionForm({ ...actionForm, code: e.target.value })}
-                    placeholder="E16"
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="KOS 1.1.1"
+                    disabled={!actionForm.sub_standard_id}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-slate-100 disabled:text-slate-500"
                   />
                   <button
                     type="button"
-                    onClick={() => setActionForm({ ...actionForm, code: generateActionCode() })}
-                    className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm"
+                    disabled={!actionForm.sub_standard_id}
+                    onClick={() => setActionForm({ ...actionForm, code: generateActionCode(actionForm.sub_standard_id) })}
+                    className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Otomatik
                   </button>
                 </div>
+                {actionForm.code && (
+                  <div className="text-xs text-slate-500 mt-1">
+                    Bu genel şarta ait {actions.filter(a => a.sub_standard_id === actionForm.sub_standard_id).length + 1}. eylem
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1369,35 +1524,6 @@ export default function ICActionPlanDetail() {
                   placeholder="Eylem detaylarını açıklayın"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  İlişkili Standart <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={actionForm.standard_id}
-                  onChange={(e) => setActionForm({ ...actionForm, standard_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Seçiniz</option>
-                  {standards.map((standard) => (
-                    <option key={standard.id} value={standard.id}>
-                      {standard.code} - {standard.name}
-                    </option>
-                  ))}
-                </select>
-                {actionForm.standard_id && standards.find(s => s.id === actionForm.standard_id) && (
-                  <div className="mt-2 p-3 bg-green-50 rounded-lg">
-                    <div className="text-xs font-medium text-green-900">
-                      {standards.find(s => s.id === actionForm.standard_id)?.name}
-                    </div>
-                    <div className="text-xs text-green-700 mt-1">
-                      Bileşen: {components.find(c => c.id === standards.find(s => s.id === actionForm.standard_id)?.ic_component_id)?.name}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -1534,66 +1660,59 @@ export default function ICActionPlanDetail() {
               )}
 
               <div className="border-t border-slate-200 pt-4 mt-4">
-                <label className="flex items-center gap-2 mb-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={actionForm.has_special_responsible}
-                    onChange={(e) => setActionForm({ ...actionForm, has_special_responsible: e.target.checked, special_responsible_type: '', special_responsible: '' })}
-                    className="w-4 h-4 text-green-600 rounded"
-                  />
-                  <span className="text-sm font-medium text-slate-700">Özel sorumlu/koordinatör ekle</span>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Özel Sorumlu/Koordinatör <span className="text-slate-500">(Opsiyonel)</span>
                 </label>
 
-                {actionForm.has_special_responsible && (
-                  <div className="space-y-3 ml-6">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Sorumlu Türü <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        {[
-                          { value: 'TOP_MANAGEMENT', label: 'Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)' },
-                          { value: 'INTERNAL_AUDITOR', label: 'İç Denetçi / İç Denetim Birimi' },
-                          { value: 'ETHICS_COMMITTEE', label: 'Etik Komisyonu' },
-                          { value: 'IT_COORDINATOR', label: 'Bilgi Teknolojileri Koordinatörü' },
-                          { value: 'HR_COORDINATOR', label: 'İnsan Kaynakları Koordinatörü' },
-                          { value: 'QUALITY_MANAGER', label: 'Kalite Yönetim Temsilcisi' },
-                          { value: 'RISK_COORDINATOR', label: 'Risk Koordinatörü' },
-                          { value: 'STRATEGY_COORDINATOR', label: 'Strateji Geliştirme Koordinatörü' },
-                          { value: 'OTHER', label: 'Diğer' }
-                        ].map((type) => (
-                          <label key={type.value} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
-                            <input
-                              type="radio"
-                              name="special_responsible_type"
-                              value={type.value}
-                              checked={actionForm.special_responsible_type === type.value}
-                              onChange={(e) => setActionForm({ ...actionForm, special_responsible_type: e.target.value, special_responsible: '' })}
-                              className="w-4 h-4 text-green-600"
-                            />
-                            <span className="text-sm">{type.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {actionForm.special_responsible_type === 'OTHER' && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                          Sorumlu Adı/Unvanı <span className="text-red-500">*</span>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-2">
+                      Sorumlu Türü
+                    </label>
+                    <div className="space-y-2">
+                      {[
+                        { value: '', label: 'Yok / Belirlenmedi' },
+                        { value: 'TOP_MANAGEMENT', label: 'Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)' },
+                        { value: 'INTERNAL_AUDITOR', label: 'İç Denetçi / İç Denetim Birimi' },
+                        { value: 'ETHICS_COMMITTEE', label: 'Etik Komisyonu' },
+                        { value: 'IT_COORDINATOR', label: 'Bilgi Teknolojileri Koordinatörü' },
+                        { value: 'HR_COORDINATOR', label: 'İnsan Kaynakları Koordinatörü' },
+                        { value: 'QUALITY_MANAGER', label: 'Kalite Yönetim Temsilcisi' },
+                        { value: 'RISK_COORDINATOR', label: 'Risk Koordinatörü' },
+                        { value: 'STRATEGY_COORDINATOR', label: 'Strateji Geliştirme Koordinatörü' },
+                        { value: 'OTHER', label: 'Diğer' }
+                      ].map((type) => (
+                        <label key={type.value} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                          <input
+                            type="radio"
+                            name="special_responsible_type"
+                            value={type.value}
+                            checked={actionForm.special_responsible_type === type.value}
+                            onChange={(e) => setActionForm({ ...actionForm, special_responsible_type: e.target.value, special_responsible: '' })}
+                            className="w-4 h-4 text-green-600"
+                          />
+                          <span className="text-sm">{type.label}</span>
                         </label>
-                        <input
-                          type="text"
-                          required={actionForm.special_responsible_type === 'OTHER'}
-                          value={actionForm.special_responsible}
-                          onChange={(e) => setActionForm({ ...actionForm, special_responsible: e.target.value })}
-                          placeholder="Örn: Veri Koruma Görevlisi (DPO)"
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        />
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                )}
+
+                  {actionForm.special_responsible_type === 'OTHER' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        Sorumlu Adı/Unvanı <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required={actionForm.special_responsible_type === 'OTHER'}
+                        value={actionForm.special_responsible}
+                        onChange={(e) => setActionForm({ ...actionForm, special_responsible: e.target.value })}
+                        placeholder="Örn: Veri Koruma Görevlisi (DPO)"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
