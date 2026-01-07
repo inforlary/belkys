@@ -236,18 +236,24 @@ export default function IntegratedManagementDashboard() {
 
   const calculateInternalControlScore = async () => {
     const { data: controls } = await supabase
-      .from('ic_controls')
-      .select('id, effectiveness_rating')
-      .eq('organization_id', organization?.id);
+      .from('risk_controls')
+      .select(`
+        id,
+        design_effectiveness,
+        operating_effectiveness,
+        risks!inner(organization_id)
+      `)
+      .eq('risks.organization_id', organization?.id);
 
     const { data: kiksStatuses } = await supabase
       .from('kiks_sub_standard_organization_statuses')
       .select('current_status')
       .eq('organization_id', organization?.id);
 
-    const effectiveControls = controls?.filter(c =>
-      c.effectiveness_rating === 'effective' || c.effectiveness_rating === 'highly_effective'
-    ).length || 0;
+    const effectiveControls = controls?.filter(c => {
+      const avgEffectiveness = ((c.design_effectiveness || 0) + (c.operating_effectiveness || 0)) / 2;
+      return avgEffectiveness >= 4;
+    }).length || 0;
     const controlsTotal = controls?.length || 1;
 
     const kiksCompliant = kiksStatuses?.filter(k =>

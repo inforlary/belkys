@@ -44,7 +44,7 @@ interface Action {
   ic_standards?: {
     code: string;
     name: string;
-    ic_component_id: string;
+    component_id: string;
   };
   departments?: {
     name: string;
@@ -141,7 +141,7 @@ export default function ICActionPlanDetail() {
           .from('ic_actions')
           .select(`
             *,
-            ic_standards(code, name, ic_component_id),
+            ic_standards(code, name, component_id),
             departments(name)
           `)
           .eq('action_plan_id', planId)
@@ -153,7 +153,7 @@ export default function ICActionPlanDetail() {
           .order('name'),
         supabase
           .from('ic_standards')
-          .select('id, code, name, ic_component_id')
+          .select('id, code, name, component_id')
           .order('order_index'),
         supabase
           .from('ic_components')
@@ -165,19 +165,28 @@ export default function ICActionPlanDetail() {
           .eq('organization_id', profile?.organization_id)
           .order('code'),
         supabase
-          .from('risk_register')
-          .select('id, code, title')
+          .from('risks')
+          .select('id, code, name')
           .eq('organization_id', profile?.organization_id)
           .order('code'),
         supabase
-          .from('ic_controls')
-          .select('id, code, title')
-          .eq('organization_id', profile?.organization_id)
-          .order('code'),
+          .from('risk_controls')
+          .select(`
+            id,
+            name,
+            risks!inner(organization_id)
+          `)
+          .eq('risks.organization_id', profile?.organization_id)
+          .order('name'),
         supabase
           .from('risk_treatments')
-          .select('id, code, title')
-          .eq('organization_id', profile?.organization_id)
+          .select(`
+            id,
+            code,
+            title,
+            risks!inner(organization_id)
+          `)
+          .eq('risks.organization_id', profile?.organization_id)
           .order('code')
       ]);
 
@@ -1517,7 +1526,7 @@ export default function ICActionPlanDetail() {
                         <option value="">Risk Seçiniz</option>
                         {risks.map((risk) => (
                           <option key={risk.id} value={risk.id}>
-                            {risk.code} - {risk.title}
+                            {risk.code} - {risk.name}
                           </option>
                         ))}
                       </select>
@@ -1546,7 +1555,7 @@ export default function ICActionPlanDetail() {
                         <option value="">Kontrol Seçiniz</option>
                         {controls.map((control) => (
                           <option key={control.id} value={control.id}>
-                            {control.code} - {control.title}
+                            {control.name}
                           </option>
                         ))}
                       </select>

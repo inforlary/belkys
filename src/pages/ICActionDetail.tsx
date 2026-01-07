@@ -158,8 +158,8 @@ export default function ICActionDetail() {
 
         if (metadata.linked_risk_id) {
           const { data: risk } = await supabase
-            .from('risk_register')
-            .select('id, code, title')
+            .from('risks')
+            .select('id, code, name')
             .eq('id', metadata.linked_risk_id)
             .single();
           setLinkedRisk(risk);
@@ -176,8 +176,8 @@ export default function ICActionDetail() {
 
         if (metadata.linked_control_id) {
           const { data: control } = await supabase
-            .from('ic_controls')
-            .select('id, code, title')
+            .from('risk_controls')
+            .select('id, name')
             .eq('id', metadata.linked_control_id)
             .single();
           setLinkedControl(control);
@@ -754,7 +754,7 @@ export default function ICActionDetail() {
                   <h3 className="text-sm font-semibold text-slate-900 mb-2">İlişkili Risk:</h3>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <span className="text-sm text-slate-700">
-                      {linkedRisk.code} - {linkedRisk.title}
+                      {linkedRisk.code} - {linkedRisk.name}
                     </span>
                     <button
                       onClick={() => navigate(`/risk-management/register/${linkedRisk.id}`)}
@@ -771,7 +771,7 @@ export default function ICActionDetail() {
                   <h3 className="text-sm font-semibold text-slate-900 mb-2">İlişkili Risk Kontrolü:</h3>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <span className="text-sm text-slate-700">
-                      {linkedControl.code} - {linkedControl.title}
+                      {linkedControl.name}
                     </span>
                     <button
                       onClick={() => navigate(`/internal-control/controls/${linkedControl.id}`)}
