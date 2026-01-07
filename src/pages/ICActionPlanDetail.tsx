@@ -624,15 +624,19 @@ export default function ICActionPlanDetail() {
                   </tr>
                 ) : (
                   filteredActions.map((action) => (
-                    <tr key={action.id} className={getRowBgColor(action)}>
-                      <td className="px-4 py-3 text-sm font-medium text-slate-900">
+                    <tr
+                      key={action.id}
+                      className={`${getRowBgColor(action)} cursor-pointer`}
+                      onClick={() => navigate(`/internal-control/action-plans/${planId}/actions/${action.id}`)}
+                    >
+                      <td className="px-4 py-3 text-sm font-medium text-green-600 hover:text-green-700">
                         {action.code}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600">
                         {action.ic_standards?.code}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900 text-sm">{action.title}</div>
+                        <div className="font-medium text-slate-900 text-sm hover:text-green-600">{action.title}</div>
                         {action.description && (
                           <div className="text-xs text-slate-500 mt-1 line-clamp-1">{action.description}</div>
                         )}
