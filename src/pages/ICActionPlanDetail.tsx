@@ -303,9 +303,12 @@ export default function ICActionPlanDetail() {
         link_goal: false
       });
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Eylem eklenirken hata:', error);
-      alert('Eylem eklenirken bir hata oluştu');
+      const errorMessage = error?.message || 'Bilinmeyen hata';
+      const errorDetails = error?.details || '';
+      const errorHint = error?.hint || '';
+      alert(`Eylem eklenirken hata:\n${errorMessage}\n${errorDetails}\n${errorHint}`);
     } finally {
       setSaving(false);
     }
