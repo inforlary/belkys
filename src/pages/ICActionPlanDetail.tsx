@@ -297,16 +297,6 @@ export default function ICActionPlanDetail() {
       return labels[status] || status;
     };
 
-    const getPriorityLabel = (priority: string) => {
-      const labels: Record<string, string> = {
-        LOW: 'Düşük',
-        MEDIUM: 'Orta',
-        HIGH: 'Yüksek',
-        CRITICAL: 'Kritik'
-      };
-      return labels[priority] || priority;
-    };
-
     const getSpecialResponsibleLabel = (type: string) => {
       const labels: Record<string, string> = {
         TOP_MANAGEMENT: 'Üst Yönetim',
@@ -321,78 +311,146 @@ export default function ICActionPlanDetail() {
       return labels[type] || type;
     };
 
-    const reportData = actions.map((action) => {
-      const responsibleDepts = action.responsible_department_ids?.map(deptId => {
-        const dept = departments.find(d => d.id === deptId);
-        return dept?.name || '';
-      }).join(', ') || action.departments?.name || '-';
+    const reportData: any[] = [];
 
-      const relatedDepts = action.related_department_ids?.map(deptId => {
-        const dept = departments.find(d => d.id === deptId);
-        return dept?.name || '';
-      }).join(', ') || '-';
+    components.forEach(component => {
+      const componentStandards = standards.filter(s => s.component_id === component.id);
 
-      const specialResponsible = action.special_responsible_type
-        ? (action.special_responsible_type === 'OTHER'
-          ? action.special_responsible
-          : getSpecialResponsibleLabel(action.special_responsible_type))
-        : '-';
+      componentStandards.forEach(standard => {
+        const standardActions = actions.filter(a => a.standard_id === standard.id);
 
-      return {
-        'Kod': action.code,
-        'Standart': action.ic_standards?.code || '-',
-        'Başlık': action.title,
-        'Açıklama': action.description || '-',
-        'Sorumlu Birimler': responsibleDepts,
-        'Özel Sorumlu': specialResponsible,
-        'İlgili Birimler': relatedDepts,
-        'Başlangıç Tarihi': action.start_date ? new Date(action.start_date).toLocaleDateString('tr-TR') : '-',
-        'Hedef Tarihi': action.is_continuous ? 'Sürekli' : (action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-'),
-        'Öncelik': getPriorityLabel(action.priority),
-        'Durum': getStatusLabel(action.status),
-        'İlerleme (%)': action.progress_percent || 0,
-        'Beklenen Çıktılar': action.expected_outputs || '-',
-        'Gerekli Kaynaklar': action.required_resources || '-'
-      };
+        if (standardActions.length > 0) {
+          standardActions.forEach((action, index) => {
+            const responsibleDepts = action.responsible_department_ids?.map(deptId => {
+              const dept = departments.find(d => d.id === deptId);
+              return dept?.name || '';
+            }).filter(Boolean).join(', ') || action.departments?.name || '';
+
+            const specialResponsible = action.special_responsible_type
+              ? (action.special_responsible_type === 'OTHER'
+                ? action.special_responsible
+                : getSpecialResponsibleLabel(action.special_responsible_type))
+              : '';
+
+            const allResponsibles = [responsibleDepts, specialResponsible].filter(Boolean).join(', ') || '-';
+
+            const relatedDepts = action.related_department_ids?.map(deptId => {
+              const dept = departments.find(d => d.id === deptId);
+              return dept?.name || '';
+            }).filter(Boolean).join(', ') || '';
+
+            const relatedSpecialRoles = action.related_special_responsible_types?.map((roleType: string) =>
+              getSpecialResponsibleLabel(roleType)
+            ).filter(Boolean).join(', ') || '';
+
+            const allRelated = [relatedDepts, relatedSpecialRoles].filter(Boolean).join(', ') || '-';
+
+            reportData.push({
+              'Standart Kod': index === 0 ? standard.code : '',
+              'Kamu İç Kontrol Standardı ve Genel Şartı': index === 0 ? standard.name : '',
+              'Mevcut Durum': action.description || '-',
+              'K.Kod-Sayı': action.code,
+              'Öngörülen Eylemler': action.title,
+              'Sorumlu Birimler': allResponsibles,
+              'İşbirliği Yapılacak Birim': allRelated,
+              'Çıktı/Sonuç': action.expected_outputs || '-',
+              'Tamamlanma Tarihi': action.is_continuous
+                ? 'Sürekli'
+                : (action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-'),
+              'Durum': getStatusLabel(action.status),
+              'İlerleme (%)': action.progress_percent || 0,
+              'Açıklama': action.required_resources ? `Gerekli Kaynaklar: ${action.required_resources}` : ''
+            });
+          });
+        }
+      });
     });
+
+    const actionsWithoutStandard = actions.filter(a => !a.standard_id);
+    if (actionsWithoutStandard.length > 0) {
+      actionsWithoutStandard.forEach((action) => {
+        const responsibleDepts = action.responsible_department_ids?.map(deptId => {
+          const dept = departments.find(d => d.id === deptId);
+          return dept?.name || '';
+        }).filter(Boolean).join(', ') || action.departments?.name || '';
+
+        const specialResponsible = action.special_responsible_type
+          ? (action.special_responsible_type === 'OTHER'
+            ? action.special_responsible
+            : getSpecialResponsibleLabel(action.special_responsible_type))
+          : '';
+
+        const allResponsibles = [responsibleDepts, specialResponsible].filter(Boolean).join(', ') || '-';
+
+        const relatedDepts = action.related_department_ids?.map(deptId => {
+          const dept = departments.find(d => d.id === deptId);
+          return dept?.name || '';
+        }).filter(Boolean).join(', ') || '';
+
+        const relatedSpecialRoles = action.related_special_responsible_types?.map((roleType: string) =>
+          getSpecialResponsibleLabel(roleType)
+        ).filter(Boolean).join(', ') || '';
+
+        const allRelated = [relatedDepts, relatedSpecialRoles].filter(Boolean).join(', ') || '-';
+
+        reportData.push({
+          'Standart Kod': '-',
+          'Kamu İç Kontrol Standardı ve Genel Şartı': 'Standart Dışı Eylem',
+          'Mevcut Durum': action.description || '-',
+          'K.Kod-Sayı': action.code,
+          'Öngörülen Eylemler': action.title,
+          'Sorumlu Birimler': allResponsibles,
+          'İşbirliği Yapılacak Birim': allRelated,
+          'Çıktı/Sonuç': action.expected_outputs || '-',
+          'Tamamlanma Tarihi': action.is_continuous
+            ? 'Sürekli'
+            : (action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-'),
+          'Durum': getStatusLabel(action.status),
+          'İlerleme (%)': action.progress_percent || 0,
+          'Açıklama': action.required_resources ? `Gerekli Kaynaklar: ${action.required_resources}` : ''
+        });
+      });
+    }
 
     const ws = XLSX.utils.json_to_sheet(reportData);
 
     const colWidths = [
       { wch: 12 },
-      { wch: 12 },
-      { wch: 40 },
+      { wch: 45 },
       { wch: 50 },
-      { wch: 25 },
-      { wch: 25 },
-      { wch: 25 },
-      { wch: 15 },
-      { wch: 15 },
       { wch: 12 },
-      { wch: 15 },
-      { wch: 12 },
+      { wch: 50 },
+      { wch: 30 },
+      { wch: 30 },
       { wch: 40 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 },
       { wch: 40 }
     ];
     ws['!cols'] = colWidths;
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Eylemler');
+    XLSX.utils.book_append_sheet(wb, ws, 'İç Kontrol Eylem Planı');
 
     const statsData = [
+      { 'Metrik': 'Plan Adı', 'Değer': plan.name },
+      { 'Metrik': 'Plan Dönemi', 'Değer': `${new Date(plan.start_date).toLocaleDateString('tr-TR')} - ${new Date(plan.end_date).toLocaleDateString('tr-TR')}` },
+      { 'Metrik': '', 'Değer': '' },
       { 'Metrik': 'Toplam Eylem', 'Değer': stats.total },
       { 'Metrik': 'Tamamlanan', 'Değer': stats.completed },
       { 'Metrik': 'Devam Eden', 'Değer': stats.inProgress },
       { 'Metrik': 'Geciken', 'Değer': stats.delayed },
       { 'Metrik': 'Başlamadı', 'Değer': stats.notStarted },
+      { 'Metrik': '', 'Değer': '' },
       { 'Metrik': 'Tamamlanma Oranı (%)', 'Değer': stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0 }
     ];
 
     const statsWs = XLSX.utils.json_to_sheet(statsData);
-    statsWs['!cols'] = [{ wch: 30 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, statsWs, 'Özet İstatistikler');
+    statsWs['!cols'] = [{ wch: 30 }, { wch: 50 }];
+    XLSX.utils.book_append_sheet(wb, statsWs, 'Özet Bilgiler');
 
-    XLSX.writeFile(wb, `${plan.name}_Eylem_Plani_Raporu_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '_')}.xlsx`);
+    XLSX.writeFile(wb, `IC_Eylem_Plani_${plan.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '_')}.xlsx`);
   };
 
   const handleSubmitAction = async (e: React.FormEvent) => {
