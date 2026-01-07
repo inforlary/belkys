@@ -83,7 +83,7 @@ export default function ICActionPlanDetail() {
   const [loading, setLoading] = useState(true);
   const [showActionModal, setShowActionModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'actions' | 'components' | 'departments' | 'summary'>('actions');
+  const [activeTab, setActiveTab] = useState<'actions' | 'gantt' | 'components' | 'departments' | 'summary'>('actions');
 
   const [filterStandard, setFilterStandard] = useState<string>('all');
   const [filterComponent, setFilterComponent] = useState<string>('all');
@@ -425,6 +425,16 @@ export default function ICActionPlanDetail() {
             Eylemler
           </button>
           <button
+            onClick={() => setActiveTab('gantt')}
+            className={`px-4 py-2 border-b-2 font-medium transition-colors ${
+              activeTab === 'gantt'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Gantt Görünümü
+          </button>
+          <button
             onClick={() => setActiveTab('components')}
             className={`px-4 py-2 border-b-2 font-medium transition-colors ${
               activeTab === 'components'
@@ -609,46 +619,219 @@ export default function ICActionPlanDetail() {
         </>
       )}
 
+      {activeTab === 'gantt' && (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-6">Gantt Zaman Çizelgesi</h3>
+          <div className="overflow-x-auto">
+            <div className="min-w-[1200px]">
+              <div className="flex border-b border-slate-200 mb-4">
+                <div className="w-64 flex-shrink-0 px-4 py-2 font-medium text-slate-700">Eylem</div>
+                <div className="flex-1 relative">
+                  <div className="flex">
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const month = new Date(plan.start_date);
+                      month.setMonth(month.getMonth() + i);
+                      return (
+                        <div key={i} className="flex-1 text-center text-xs font-medium text-slate-600 py-2 border-l border-slate-200">
+                          {month.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {actions.slice(0, 15).map((action) => {
+                  const planStart = new Date(plan.start_date);
+                  const planEnd = new Date(plan.end_date);
+                  const actionStart = action.start_date ? new Date(action.start_date) : new Date(action.target_date);
+                  const actionEnd = new Date(action.target_date);
+
+                  const planDuration = planEnd.getTime() - planStart.getTime();
+                  const actionStartOffset = actionStart.getTime() - planStart.getTime();
+                  const actionDuration = actionEnd.getTime() - actionStart.getTime();
+
+                  const startPercent = (actionStartOffset / planDuration) * 100;
+                  const widthPercent = (actionDuration / planDuration) * 100;
+
+                  const today = new Date();
+                  const isDelayed = actionEnd < today && action.status !== 'COMPLETED';
+                  const isCompleted = action.status === 'COMPLETED';
+
+                  return (
+                    <div key={action.id} className="flex items-center hover:bg-slate-50 rounded">
+                      <div className="w-64 flex-shrink-0 px-4 py-2">
+                        <div className="text-sm font-medium text-slate-900 truncate">{action.code}</div>
+                        <div className="text-xs text-slate-500 truncate">{action.title}</div>
+                      </div>
+                      <div className="flex-1 relative h-12">
+                        <div
+                          className={`absolute top-2 h-8 rounded ${
+                            isCompleted
+                              ? 'bg-green-500'
+                              : isDelayed
+                              ? 'bg-red-500'
+                              : action.status === 'IN_PROGRESS'
+                              ? 'bg-blue-500'
+                              : 'bg-slate-300'
+                          }`}
+                          style={{
+                            left: `${Math.max(0, startPercent)}%`,
+                            width: `${Math.min(100 - Math.max(0, startPercent), widthPercent)}%`,
+                          }}
+                        >
+                          {action.progress_percent > 0 && (
+                            <div
+                              className="absolute inset-y-0 left-0 bg-opacity-50 bg-slate-900 rounded-l"
+                              style={{ width: `${action.progress_percent}%` }}
+                            />
+                          )}
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-medium">
+                            {action.progress_percent}%
+                          </div>
+                        </div>
+                        {today >= planStart && today <= planEnd && (
+                          <div
+                            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+                            style={{
+                              left: `${((today.getTime() - planStart.getTime()) / planDuration) * 100}%`,
+                            }}
+                          >
+                            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-red-500 rounded-full" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {actions.length > 15 && (
+                <div className="mt-4 text-center text-sm text-slate-500">
+                  İlk 15 eylem gösteriliyor. Tüm eylemleri görmek için Eylemler sekmesini kullanın.
+                </div>
+              )}
+
+              <div className="mt-6 flex items-center gap-6 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-500 rounded" />
+                  <span>Tamamlandı</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-blue-500 rounded" />
+                  <span>Devam Ediyor</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-slate-300 rounded" />
+                  <span>Başlamadı</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-500 rounded" />
+                  <span>Gecikmiş</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-0.5 h-4 bg-red-500" />
+                  <span>Bugün</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'components' && (
         <div className="space-y-4">
           {components.map(component => {
             const componentActions = actions.filter(a => a.ic_standards?.ic_component_id === component.id);
+            const componentStandards = standards.filter(s => s.ic_component_id === component.id);
             const completed = componentActions.filter(a => a.status === 'COMPLETED').length;
             const inProgress = componentActions.filter(a => a.status === 'IN_PROGRESS').length;
             const delayed = componentActions.filter(a => a.status === 'DELAYED').length;
+            const notStarted = componentActions.filter(a => a.status === 'NOT_STARTED').length;
             const progress = componentActions.length > 0 ? Math.round((completed / componentActions.length) * 100) : 0;
 
+            if (componentActions.length === 0) return null;
+
             return (
-              <div key={component.id} className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">{component.name}</h3>
-                <div className="grid grid-cols-4 gap-4 mb-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-slate-900">{componentActions.length}</div>
-                    <div className="text-sm text-slate-600">Toplam</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{completed}</div>
-                    <div className="text-sm text-slate-600">Tamamlanan</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
-                    <div className="text-sm text-slate-600">Devam Eden</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{delayed}</div>
-                    <div className="text-sm text-slate-600">Geciken</div>
-                  </div>
+              <div key={component.id} className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-slate-200">
+                  <h3 className="text-lg font-bold text-slate-900">{component.code} - {component.name}</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {componentStandards.length} standart kapsamında {componentActions.length} eylem
+                  </p>
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-700">İlerleme</span>
-                    <span className="text-sm font-bold text-slate-900">{progress}%</span>
+                <div className="p-6">
+                  <div className="grid grid-cols-5 gap-4 mb-4">
+                    <div className="text-center bg-slate-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-slate-900">{componentActions.length}</div>
+                      <div className="text-xs text-slate-600 mt-1">Toplam Eylem</div>
+                    </div>
+                    <div className="text-center bg-green-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-green-600">{completed}</div>
+                      <div className="text-xs text-green-700 mt-1">
+                        Tamamlanan ({componentActions.length > 0 ? Math.round((completed / componentActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
+                    <div className="text-center bg-blue-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
+                      <div className="text-xs text-blue-700 mt-1">
+                        Devam Eden ({componentActions.length > 0 ? Math.round((inProgress / componentActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
+                    <div className="text-center bg-red-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-red-600">{delayed}</div>
+                      <div className="text-xs text-red-700 mt-1">
+                        Geciken ({componentActions.length > 0 ? Math.round((delayed / componentActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
+                    <div className="text-center bg-slate-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-slate-600">{notStarted}</div>
+                      <div className="text-xs text-slate-700 mt-1">
+                        Başlamadı ({componentActions.length > 0 ? Math.round((notStarted / componentActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-green-600 h-full rounded-full"
-                      style={{ width: `${progress}%` }}
-                    />
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-700">Tamamlanma Oranı</span>
+                      <span className="text-sm font-bold text-slate-900">{progress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-green-500 to-green-600 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Standartlar:</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {componentStandards.map(standard => {
+                        const standardActions = componentActions.filter(a => a.standard_id === standard.id);
+                        const standardCompleted = standardActions.filter(a => a.status === 'COMPLETED').length;
+                        const standardProgress = standardActions.length > 0 ? Math.round((standardCompleted / standardActions.length) * 100) : 0;
+
+                        return (
+                          <div key={standard.id} className="bg-slate-50 rounded-lg p-3">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="text-xs font-medium text-slate-900">{standard.code}</div>
+                                <div className="text-xs text-slate-600 line-clamp-2">{standard.name}</div>
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 ml-2">{standardActions.length}</div>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-green-600 h-full rounded-full"
+                                style={{ width: `${standardProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -664,41 +847,100 @@ export default function ICActionPlanDetail() {
             const completed = deptActions.filter(a => a.status === 'COMPLETED').length;
             const inProgress = deptActions.filter(a => a.status === 'IN_PROGRESS').length;
             const delayed = deptActions.filter(a => a.status === 'DELAYED').length;
+            const notStarted = deptActions.filter(a => a.status === 'NOT_STARTED').length;
             const progress = deptActions.length > 0 ? Math.round((completed / deptActions.length) * 100) : 0;
 
             if (deptActions.length === 0) return null;
 
             return (
-              <div key={department.id} className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">{department.name}</h3>
-                <div className="grid grid-cols-4 gap-4 mb-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-slate-900">{deptActions.length}</div>
-                    <div className="text-sm text-slate-600">Toplam</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{completed}</div>
-                    <div className="text-sm text-slate-600">Tamamlanan</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
-                    <div className="text-sm text-slate-600">Devam Eden</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{delayed}</div>
-                    <div className="text-sm text-slate-600">Geciken</div>
-                  </div>
+              <div key={department.id} className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-50 to-sky-50 px-6 py-4 border-b border-slate-200">
+                  <h3 className="text-lg font-bold text-slate-900">{department.name}</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {deptActions.length} sorumlu eylem
+                  </p>
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-700">İlerleme</span>
-                    <span className="text-sm font-bold text-slate-900">{progress}%</span>
+                <div className="p-6">
+                  <div className="grid grid-cols-5 gap-4 mb-4">
+                    <div className="text-center bg-slate-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-slate-900">{deptActions.length}</div>
+                      <div className="text-xs text-slate-600 mt-1">Toplam Eylem</div>
+                    </div>
+                    <div className="text-center bg-green-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-green-600">{completed}</div>
+                      <div className="text-xs text-green-700 mt-1">
+                        Tamamlanan ({deptActions.length > 0 ? Math.round((completed / deptActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
+                    <div className="text-center bg-blue-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
+                      <div className="text-xs text-blue-700 mt-1">
+                        Devam Eden ({deptActions.length > 0 ? Math.round((inProgress / deptActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
+                    <div className="text-center bg-red-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-red-600">{delayed}</div>
+                      <div className="text-xs text-red-700 mt-1">
+                        Geciken ({deptActions.length > 0 ? Math.round((delayed / deptActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
+                    <div className="text-center bg-slate-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-slate-600">{notStarted}</div>
+                      <div className="text-xs text-slate-700 mt-1">
+                        Başlamadı ({deptActions.length > 0 ? Math.round((notStarted / deptActions.length) * 100) : 0}%)
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-green-600 h-full rounded-full"
-                      style={{ width: `${progress}%` }}
-                    />
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-700">Tamamlanma Oranı</span>
+                      <span className="text-sm font-bold text-slate-900">{progress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {delayed > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-red-800">
+                        <AlertTriangle className="w-5 h-5" />
+                        <span className="font-medium">Dikkat: {delayed} eylem gecikmiş durumda</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="border-t border-slate-200 pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Öncelik Dağılımı:</h4>
+                    <div className="grid grid-cols-4 gap-3">
+                      {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(priority => {
+                        const priorityActions = deptActions.filter(a => a.priority === priority);
+                        const priorityLabels: Record<string, string> = {
+                          CRITICAL: 'Kritik',
+                          HIGH: 'Yüksek',
+                          MEDIUM: 'Orta',
+                          LOW: 'Düşük'
+                        };
+                        const priorityColors: Record<string, string> = {
+                          CRITICAL: 'bg-red-100 text-red-700',
+                          HIGH: 'bg-orange-100 text-orange-700',
+                          MEDIUM: 'bg-blue-100 text-blue-700',
+                          LOW: 'bg-slate-100 text-slate-700'
+                        };
+
+                        if (priorityActions.length === 0) return null;
+
+                        return (
+                          <div key={priority} className={`${priorityColors[priority]} rounded-lg p-3 text-center`}>
+                            <div className="text-2xl font-bold">{priorityActions.length}</div>
+                            <div className="text-xs font-medium mt-1">{priorityLabels[priority]}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -708,18 +950,161 @@ export default function ICActionPlanDetail() {
       )}
 
       {activeTab === 'summary' && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">Plan Özet Raporu</h3>
-          <div className="prose prose-sm max-w-none">
-            <p className="text-slate-600">
-              <strong>{plan.name}</strong> kapsamında toplam <strong>{stats.total}</strong> eylem planlanmıştır.
-            </p>
-            <ul className="text-slate-600">
-              <li><strong>{stats.completed}</strong> eylem tamamlanmıştır (%{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0})</li>
-              <li><strong>{stats.inProgress}</strong> eylem devam etmektedir (%{stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0})</li>
-              <li><strong>{stats.delayed}</strong> eylem gecikme durumundadır (%{stats.total > 0 ? Math.round((stats.delayed / stats.total) * 100) : 0})</li>
-              <li><strong>{stats.notStarted}</strong> eylem henüz başlamamıştır (%{stats.total > 0 ? Math.round((stats.notStarted / stats.total) * 100) : 0})</li>
-            </ul>
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Plan Özet Raporu</h3>
+            <div className="prose prose-sm max-w-none">
+              <p className="text-slate-700 leading-relaxed">
+                <strong className="text-green-700">{plan.name}</strong> kapsamında toplam{' '}
+                <strong className="text-slate-900">{stats.total}</strong> eylem planlanmıştır.
+              </p>
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <span className="text-slate-700">
+                    <strong className="text-green-700">{stats.completed}</strong> eylem tamamlanmıştır
+                    <span className="text-green-600 font-medium ml-2">
+                      (%{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0})
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                  <span className="text-slate-700">
+                    <strong className="text-blue-700">{stats.inProgress}</strong> eylem devam etmektedir
+                    <span className="text-blue-600 font-medium ml-2">
+                      (%{stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0})
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  <span className="text-slate-700">
+                    <strong className="text-red-700">{stats.delayed}</strong> eylem gecikme durumundadır
+                    <span className="text-red-600 font-medium ml-2">
+                      (%{stats.total > 0 ? Math.round((stats.delayed / stats.total) * 100) : 0})
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <Clock className="w-5 h-5 text-slate-600 flex-shrink-0" />
+                  <span className="text-slate-700">
+                    <strong className="text-slate-700">{stats.notStarted}</strong> eylem henüz başlamamıştır
+                    <span className="text-slate-600 font-medium ml-2">
+                      (%{stats.total > 0 ? Math.round((stats.notStarted / stats.total) * 100) : 0})
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+              <h4 className="text-base font-bold text-slate-900 mb-4">Bileşen Dağılımı</h4>
+              <div className="space-y-3">
+                {components.map(component => {
+                  const componentActions = actions.filter(a => a.ic_standards?.ic_component_id === component.id);
+                  const componentCompleted = componentActions.filter(a => a.status === 'COMPLETED').length;
+                  const componentProgress = componentActions.length > 0 ? Math.round((componentCompleted / componentActions.length) * 100) : 0;
+
+                  if (componentActions.length === 0) return null;
+
+                  return (
+                    <div key={component.id}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-700">{component.name}</span>
+                        <span className="text-sm font-medium text-slate-900">
+                          {componentActions.length} eylem
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-green-600 h-full rounded-full"
+                          style={{ width: `${componentProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+              <h4 className="text-base font-bold text-slate-900 mb-4">Öncelik Dağılımı</h4>
+              <div className="space-y-3">
+                {[
+                  { key: 'CRITICAL', label: 'Kritik', color: 'bg-red-600' },
+                  { key: 'HIGH', label: 'Yüksek', color: 'bg-orange-600' },
+                  { key: 'MEDIUM', label: 'Orta', color: 'bg-blue-600' },
+                  { key: 'LOW', label: 'Düşük', color: 'bg-slate-600' }
+                ].map(priority => {
+                  const priorityActions = actions.filter(a => a.priority === priority.key);
+                  const priorityCompleted = priorityActions.filter(a => a.status === 'COMPLETED').length;
+                  const priorityProgress = priorityActions.length > 0 ? Math.round((priorityCompleted / priorityActions.length) * 100) : 0;
+
+                  return (
+                    <div key={priority.key}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-700">{priority.label}</span>
+                        <span className="text-sm font-medium text-slate-900">
+                          {priorityActions.length} eylem
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`${priority.color} h-full rounded-full`}
+                          style={{ width: `${priorityProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h4 className="text-base font-bold text-slate-900 mb-4">En Yüksek Performans Gösteren Birimler</h4>
+            <div className="space-y-2">
+              {departments
+                .map(dept => {
+                  const deptActions = actions.filter(a => a.responsible_department_id === dept.id);
+                  const deptCompleted = deptActions.filter(a => a.status === 'COMPLETED').length;
+                  const deptProgress = deptActions.length > 0 ? Math.round((deptCompleted / deptActions.length) * 100) : 0;
+                  return { ...dept, actionCount: deptActions.length, progress: deptProgress };
+                })
+                .filter(d => d.actionCount > 0)
+                .sort((a, b) => b.progress - a.progress)
+                .slice(0, 5)
+                .map((dept, index) => (
+                  <div key={dept.id} className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                      index === 0 ? 'bg-yellow-500 text-white' :
+                      index === 1 ? 'bg-slate-400 text-white' :
+                      index === 2 ? 'bg-orange-600 text-white' :
+                      'bg-slate-300 text-slate-700'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-slate-900">{dept.name}</span>
+                        <span className="text-sm text-slate-600">{dept.actionCount} eylem</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-green-600 h-full rounded-full"
+                          style={{ width: `${dept.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-lg font-bold text-green-600 w-12 text-right">
+                      {dept.progress}%
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
         </div>
       )}
