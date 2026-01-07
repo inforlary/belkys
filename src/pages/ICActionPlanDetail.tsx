@@ -199,17 +199,17 @@ export default function ICActionPlanDetail() {
         supabase
           .from('ic_kiks_categories')
           .select('id, code, name')
-          .eq('organization_id', profile?.organization_id)
+          .is('organization_id', null)
           .order('order_index'),
         supabase
           .from('ic_kiks_main_standards')
           .select('id, category_id, code, title')
-          .eq('organization_id', profile?.organization_id)
+          .is('organization_id', null)
           .order('order_index'),
         supabase
           .from('ic_kiks_sub_standards')
           .select('id, main_standard_id, code, title')
-          .eq('organization_id', profile?.organization_id)
+          .is('organization_id', null)
           .order('order_index'),
         supabase
           .from('goals')
