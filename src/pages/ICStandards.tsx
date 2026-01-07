@@ -36,6 +36,8 @@ interface ICStandard {
   general_conditions: string;
   order_index: number;
   compliance_level?: number;
+  current_situation_description?: string;
+  current_status_satisfied?: boolean;
   action_count?: {
     active: number;
     completed: number;
@@ -247,7 +249,9 @@ export default function ICStandards() {
           name: editingStandard.name,
           description: editingStandard.description,
           general_conditions: editingStandard.general_conditions,
-          order_index: editingStandard.order_index
+          order_index: editingStandard.order_index,
+          current_situation_description: editingStandard.current_situation_description,
+          current_status_satisfied: editingStandard.current_status_satisfied
         })
         .eq('id', editingStandard.id);
 
@@ -849,6 +853,42 @@ export default function ICStandards() {
                   onChange={(e) => setEditingStandard({ ...editingStandard, order_index: parseInt(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              <div className="col-span-2 border-t border-gray-200 pt-4 mt-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Mevcut Durum Bilgisi</h4>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mevcut Durum Açıklaması
+                  </label>
+                  <textarea
+                    value={editingStandard.current_situation_description || ''}
+                    onChange={(e) => setEditingStandard({ ...editingStandard, current_situation_description: e.target.value })}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Bu standardın kurumdaki mevcut durumunu açıklayın..."
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bu standardın kurumunuzda şu anda nasıl uygulandığını veya mevcut durumunu açıklayın.
+                  </p>
+                </div>
+
+                <div className="flex items-start">
+                  <input
+                    type="checkbox"
+                    id="current_status_satisfied"
+                    checked={editingStandard.current_status_satisfied || false}
+                    onChange={(e) => setEditingStandard({ ...editingStandard, current_status_satisfied: e.target.checked })}
+                    className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="current_status_satisfied" className="ml-2 block text-sm text-gray-700">
+                    <span className="font-medium">Mevcut Durum Sağlanıyor</span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Bu standart zaten karşılanıyorsa işaretleyin. İşaretlenirse, bu standart için eylem planı oluşturulmasına gerek kalmaz.
+                    </p>
+                  </label>
+                </div>
               </div>
             </div>
 

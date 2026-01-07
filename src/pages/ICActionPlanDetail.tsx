@@ -85,6 +85,8 @@ interface Standard {
   code: string;
   name: string;
   component_id: string;
+  current_situation_description?: string;
+  current_status_satisfied?: boolean;
 }
 
 interface Component {
@@ -193,7 +195,7 @@ export default function ICActionPlanDetail() {
           .order('full_name'),
         supabase
           .from('ic_standards')
-          .select('id, code, name, component_id')
+          .select('id, code, name, component_id, current_situation_description, current_status_satisfied')
           .order('order_index'),
         supabase
           .from('ic_components')
@@ -345,10 +347,12 @@ export default function ICActionPlanDetail() {
 
             const allRelated = [relatedDepts, relatedSpecialRoles].filter(Boolean).join(', ') || '-';
 
+            const mevcutDurum = standard.current_situation_description || action.description || '-';
+
             reportData.push({
               'Standart Kod': index === 0 ? standard.code : '',
               'Kamu İç Kontrol Standardı ve Genel Şartı': index === 0 ? standard.name : '',
-              'Mevcut Durum': action.description || '-',
+              'Mevcut Durum': mevcutDurum,
               'K.Kod-Sayı': action.code,
               'Öngörülen Eylemler': action.title,
               'Sorumlu Birimler': allResponsibles,
@@ -361,6 +365,21 @@ export default function ICActionPlanDetail() {
               'İlerleme (%)': action.progress_percent || 0,
               'Açıklama': action.required_resources ? `Gerekli Kaynaklar: ${action.required_resources}` : ''
             });
+          });
+        } else if (standard.current_status_satisfied) {
+          reportData.push({
+            'Standart Kod': standard.code,
+            'Kamu İç Kontrol Standardı ve Genel Şartı': standard.name,
+            'Mevcut Durum': standard.current_situation_description || '-',
+            'K.Kod-Sayı': '-',
+            'Öngörülen Eylemler': 'Mevcut Durum Sağlanıyor',
+            'Sorumlu Birimler': '-',
+            'İşbirliği Yapılacak Birim': '-',
+            'Çıktı/Sonuç': '-',
+            'Tamamlanma Tarihi': '-',
+            'Durum': 'Tamamlandı',
+            'İlerleme (%)': 100,
+            'Açıklama': 'Standart için eylem gerekmemektedir.'
           });
         }
       });
@@ -1304,6 +1323,17 @@ export default function ICActionPlanDetail() {
                               <div className="flex-1">
                                 <div className="text-xs font-medium text-slate-900">{standard.code}</div>
                                 <div className="text-xs text-slate-600 line-clamp-2">{standard.name}</div>
+                                {standard.current_status_satisfied && (
+                                  <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Mevcut Durum Sağlanıyor
+                                  </div>
+                                )}
+                                {standard.current_situation_description && (
+                                  <div className="mt-1 text-xs text-slate-500 line-clamp-2">
+                                    <span className="font-medium">Mevcut Durum:</span> {standard.current_situation_description}
+                                  </div>
+                                )}
                               </div>
                               <div className="text-xs font-bold text-slate-900 ml-2">{standardActions.length}</div>
                             </div>
