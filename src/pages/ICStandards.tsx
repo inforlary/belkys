@@ -34,6 +34,7 @@ interface ICGeneralCondition {
   current_situation_description?: string;
   current_status_satisfied: boolean;
   order_index: number;
+  organization_id?: string | null;
 }
 
 interface ICStandard {
@@ -221,7 +222,11 @@ export default function ICStandards() {
   };
 
   const handleEditStandard = (standard: ICStandard) => {
-    setEditingStandard(standard);
+    const orgConditions = standard.conditions?.filter(c => c.organization_id === profile?.organization_id) || [];
+    setEditingStandard({
+      ...standard,
+      conditions: orgConditions
+    });
     setShowEditStandardModal(true);
   };
 
@@ -318,11 +323,14 @@ export default function ICStandards() {
         .delete()
         .eq('id', componentId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Component delete error:', error);
+        throw error;
+      }
 
       await loadComponentsWithStandards();
     } catch (error: any) {
-      alert('Hata: ' + error.message);
+      alert('Bileşen silinirken hata: ' + (error.message || error.hint || 'Bilinmeyen hata'));
     }
   };
 
@@ -337,11 +345,14 @@ export default function ICStandards() {
         .delete()
         .eq('id', standardId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Standard delete error:', error);
+        throw error;
+      }
 
       await loadComponentsWithStandards();
     } catch (error: any) {
-      alert('Hata: ' + error.message);
+      alert('Standart silinirken hata: ' + (error.message || error.hint || 'Bilinmeyen hata'));
     }
   };
 
