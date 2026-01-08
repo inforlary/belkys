@@ -37,6 +37,7 @@ interface Action {
   responsible_department_id: string;
   responsible_department_ids?: string[];
   responsible_department_coordinators?: {[key: string]: string};
+  collaborating_departments_ids?: string[];
   related_department_ids?: string[];
   related_department_coordinators?: {[key: string]: string};
   is_continuous?: boolean;
@@ -141,6 +142,7 @@ export default function ICActionPlanDetail() {
     applies_to_all_units: false,
     responsible_departments: [] as string[],
     responsible_coordinators: {} as {[key: string]: string},
+    collaborating_departments: [] as string[],
     special_responsible_types: [] as string[],
     other_responsible_description: '',
     related_departments: [] as string[],
@@ -362,6 +364,11 @@ export default function ICActionPlanDetail() {
               getSpecialResponsibleLabel(roleType)
             ).filter(Boolean).join(', ') || '';
 
+            const collaboratingDepts = action.collaborating_departments_ids?.map(deptId => {
+              const dept = departments.find(d => d.id === deptId);
+              return dept?.name || '';
+            }).filter(Boolean).join(', ') || '-';
+
             const allRelated = [relatedDepts, relatedSpecialRoles].filter(Boolean).join(', ') || '-';
 
             const mevcutDurum = standard.current_situation_description || action.description || '-';
@@ -373,7 +380,8 @@ export default function ICActionPlanDetail() {
               'K.Kod-Sayı': action.code,
               'Öngörülen Eylemler': action.title,
               'Sorumlu Birimler': allResponsibles,
-              'İşbirliği Yapılacak Birim': allRelated,
+              'İşbirliği Yapılacak Birim': collaboratingDepts,
+              'İlgili Birimler': allRelated,
               'Çıktı/Sonuç': action.expected_outputs || '-',
               'Tamamlanma Tarihi': action.is_continuous
                 ? 'Sürekli'
@@ -425,6 +433,11 @@ export default function ICActionPlanDetail() {
           getSpecialResponsibleLabel(roleType)
         ).filter(Boolean).join(', ') || '';
 
+        const collaboratingDepts = action.collaborating_departments_ids?.map(deptId => {
+          const dept = departments.find(d => d.id === deptId);
+          return dept?.name || '';
+        }).filter(Boolean).join(', ') || '-';
+
         const allRelated = [relatedDepts, relatedSpecialRoles].filter(Boolean).join(', ') || '-';
 
         reportData.push({
@@ -434,7 +447,8 @@ export default function ICActionPlanDetail() {
           'K.Kod-Sayı': action.code,
           'Öngörülen Eylemler': action.title,
           'Sorumlu Birimler': allResponsibles,
-          'İşbirliği Yapılacak Birim': allRelated,
+          'İşbirliği Yapılacak Birim': collaboratingDepts,
+          'İlgili Birimler': allRelated,
           'Çıktı/Sonuç': action.expected_outputs || '-',
           'Tamamlanma Tarihi': action.is_continuous
             ? 'Sürekli'
@@ -508,6 +522,7 @@ export default function ICActionPlanDetail() {
         applies_to_all_units: actionForm.applies_to_all_units,
         responsible_department_ids: actionForm.applies_to_all_units ? null : (actionForm.responsible_departments.length > 0 ? actionForm.responsible_departments : null),
         responsible_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.responsible_coordinators).length > 0 ? actionForm.responsible_coordinators : null),
+        collaborating_departments_ids: actionForm.collaborating_departments.length > 0 ? actionForm.collaborating_departments : null,
         special_responsible_types: actionForm.special_responsible_types.length > 0 ? actionForm.special_responsible_types : null,
         other_responsible_description: actionForm.special_responsible_types.includes('OTHER') ? actionForm.other_responsible_description : null,
         related_department_ids: actionForm.applies_to_all_units ? null : (actionForm.related_departments.length > 0 ? actionForm.related_departments : null),
@@ -556,6 +571,7 @@ export default function ICActionPlanDetail() {
         applies_to_all_units: false,
         responsible_departments: [],
         responsible_coordinators: {},
+        collaborating_departments: [],
         special_responsible_types: [],
         other_responsible_description: '',
         related_departments: [],
@@ -600,6 +616,7 @@ export default function ICActionPlanDetail() {
       applies_to_all_units: action.applies_to_all_units || false,
       responsible_departments: action.responsible_department_ids || [],
       responsible_coordinators: action.responsible_department_coordinators || {},
+      collaborating_departments: action.collaborating_departments_ids || [],
       special_responsible_types: action.special_responsible_types || [],
       other_responsible_description: action.other_responsible_description || '',
       related_departments: action.related_department_ids || [],
@@ -987,6 +1004,7 @@ export default function ICActionPlanDetail() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Standart</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Eylem Başlığı</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Sorumlu Birim</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">İşbirliği Yapılacak Birim</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Hedef Tarih</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">İlerleme</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Durum</th>
@@ -996,7 +1014,7 @@ export default function ICActionPlanDetail() {
               <tbody className="divide-y divide-slate-200">
                 {filteredActions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                       {actions.length === 0 ? 'Henüz eylem eklenmemiş' : 'Filtreye uygun eylem bulunamadı'}
                     </td>
                   </tr>
@@ -1020,9 +1038,9 @@ export default function ICActionPlanDetail() {
                         )}
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="space-y-1">
+                        <div className="flex flex-wrap gap-1">
                           {action.applies_to_all_units ? (
-                            <div className="text-sm text-slate-900 font-medium">
+                            <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500 text-white rounded text-xs font-medium">
                               🏢 Tüm Birimler
                             </div>
                           ) : (
@@ -1031,13 +1049,13 @@ export default function ICActionPlanDetail() {
                                 action.responsible_department_ids.map((deptId: string) => {
                                   const dept = departments.find(d => d.id === deptId);
                                   return dept ? (
-                                    <div key={deptId} className="text-sm text-slate-900">
+                                    <div key={deptId} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
                                       🏢 {dept.name}
                                     </div>
                                   ) : null;
                                 })
                               ) : action.departments?.name ? (
-                                <div className="text-sm text-slate-900">
+                                <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
                                   🏢 {action.departments.name}
                                 </div>
                               ) : null}
@@ -1048,23 +1066,39 @@ export default function ICActionPlanDetail() {
                               {action.special_responsible_types.map((roleType: string) => {
                                 const roleLabel =
                                   roleType === 'TOP_MANAGEMENT' ? 'Üst Yönetim' :
-                                  roleType === 'INTERNAL_AUDITOR' ? 'İç Denetçi / İç Denetim Birimi' :
+                                  roleType === 'INTERNAL_AUDITOR' ? 'İç Denetçi' :
                                   roleType === 'ETHICS_COMMITTEE' ? 'Etik Komisyonu' :
-                                  roleType === 'IT_COORDINATOR' ? 'Bilgi Teknolojileri Koordinatörü' :
-                                  roleType === 'HR_COORDINATOR' ? 'İnsan Kaynakları Koordinatörü' :
-                                  roleType === 'QUALITY_MANAGER' ? 'Kalite Yönetim Temsilcisi' :
+                                  roleType === 'IT_COORDINATOR' ? 'BT Koordinatörü' :
+                                  roleType === 'HR_COORDINATOR' ? 'İK Koordinatörü' :
+                                  roleType === 'QUALITY_MANAGER' ? 'Kalite Yöneticisi' :
                                   roleType === 'RISK_COORDINATOR' ? 'Risk Koordinatörü' :
-                                  roleType === 'STRATEGY_COORDINATOR' ? 'Strateji Geliştirme Koordinatörü' :
+                                  roleType === 'STRATEGY_COORDINATOR' ? 'Strateji Koordinatörü' :
                                   roleType === 'OTHER' ? action.other_responsible_description :
                                   roleType;
 
                                 return (
-                                  <div key={roleType} className="text-sm text-blue-700 font-medium">
+                                  <div key={roleType} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
                                     👤 {roleLabel}
                                   </div>
                                 );
                               })}
                             </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="space-y-1">
+                          {action.collaborating_departments_ids && action.collaborating_departments_ids.length > 0 ? (
+                            action.collaborating_departments_ids.map((deptId: string) => {
+                              const dept = departments.find(d => d.id === deptId);
+                              return dept ? (
+                                <div key={deptId} className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs mr-1 mb-1">
+                                  🤝 {dept.name}
+                                </div>
+                              ) : null;
+                            })
+                          ) : (
+                            <span className="text-xs text-slate-400">-</span>
                           )}
                         </div>
                       </td>
@@ -1970,6 +2004,64 @@ export default function ICActionPlanDetail() {
                       <option value="">+ Sorumlu Birim Ekle</option>
                       {departments
                         .filter(d => !actionForm.responsible_departments.includes(d.id) && !actionForm.related_departments.includes(d.id))
+                        .map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="border border-orange-200 rounded-lg p-4 mb-4 bg-orange-50">
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      İşbirliği Yapılacak Birim/Birimler
+                    </label>
+                    <p className="text-xs text-slate-600 mb-3">
+                      Bu eylemde işbirliği yapacak birimleri seçin.
+                    </p>
+
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {actionForm.collaborating_departments.map((deptId) => {
+                        const dept = departments.find(d => d.id === deptId);
+                        return (
+                          <div
+                            key={deptId}
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-orange-300 rounded-lg text-sm font-medium"
+                          >
+                            <span>🤝 {dept?.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newCollabDepts = actionForm.collaborating_departments.filter(id => id !== deptId);
+                                setActionForm({
+                                  ...actionForm,
+                                  collaborating_departments: newCollabDepts
+                                });
+                              }}
+                              className="text-orange-600 hover:text-orange-800"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value && !actionForm.collaborating_departments.includes(e.target.value)) {
+                          setActionForm({
+                            ...actionForm,
+                            collaborating_departments: [...actionForm.collaborating_departments, e.target.value]
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    >
+                      <option value="">+ İşbirliği Yapılacak Birim Ekle</option>
+                      {departments
+                        .filter(d => !actionForm.collaborating_departments.includes(d.id))
                         .map((dept) => (
                           <option key={dept.id} value={dept.id}>
                             {dept.name}
