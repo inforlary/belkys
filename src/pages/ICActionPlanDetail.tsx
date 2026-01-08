@@ -42,8 +42,8 @@ interface Action {
   is_continuous?: boolean;
   applies_to_all_units?: boolean;
   monitoring_period?: string;
-  special_responsible_type?: string;
-  special_responsible?: string;
+  special_responsible_types?: string[];
+  other_responsible_description?: string;
   related_special_responsible_types?: string[];
   start_date: string;
   target_date: string;
@@ -133,10 +133,10 @@ export default function ICActionPlanDetail() {
     applies_to_all_units: false,
     responsible_departments: [] as string[],
     responsible_coordinators: {} as {[key: string]: string},
+    special_responsible_types: [] as string[],
+    other_responsible_description: '',
     related_departments: [] as string[],
     related_coordinators: {} as {[key: string]: string},
-    special_responsible_type: '',
-    special_responsible: '',
     related_special_responsible_types: [] as string[],
     start_date: '',
     target_date: '',
@@ -328,13 +328,11 @@ export default function ICActionPlanDetail() {
               return dept?.name || '';
             }).filter(Boolean).join(', ') || action.departments?.name || '';
 
-            const specialResponsible = action.special_responsible_type
-              ? (action.special_responsible_type === 'OTHER'
-                ? action.special_responsible
-                : getSpecialResponsibleLabel(action.special_responsible_type))
-              : '';
+            const specialResponsibles = action.special_responsible_types?.map((roleType: string) =>
+              roleType === 'OTHER' ? action.other_responsible_description : getSpecialResponsibleLabel(roleType)
+            ).filter(Boolean).join(', ') || '';
 
-            const allResponsibles = [responsibleDepts, specialResponsible].filter(Boolean).join(', ') || '-';
+            const allResponsibles = [responsibleDepts, specialResponsibles].filter(Boolean).join(', ') || '-';
 
             const relatedDepts = action.related_department_ids?.map(deptId => {
               const dept = departments.find(d => d.id === deptId);
@@ -393,13 +391,11 @@ export default function ICActionPlanDetail() {
           return dept?.name || '';
         }).filter(Boolean).join(', ') || action.departments?.name || '';
 
-        const specialResponsible = action.special_responsible_type
-          ? (action.special_responsible_type === 'OTHER'
-            ? action.special_responsible
-            : getSpecialResponsibleLabel(action.special_responsible_type))
-          : '';
+        const specialResponsibles = action.special_responsible_types?.map((roleType: string) =>
+          roleType === 'OTHER' ? action.other_responsible_description : getSpecialResponsibleLabel(roleType)
+        ).filter(Boolean).join(', ') || '';
 
-        const allResponsibles = [responsibleDepts, specialResponsible].filter(Boolean).join(', ') || '-';
+        const allResponsibles = [responsibleDepts, specialResponsibles].filter(Boolean).join(', ') || '-';
 
         const relatedDepts = action.related_department_ids?.map(deptId => {
           const dept = departments.find(d => d.id === deptId);
@@ -493,10 +489,10 @@ export default function ICActionPlanDetail() {
         applies_to_all_units: actionForm.applies_to_all_units,
         responsible_department_ids: actionForm.applies_to_all_units ? null : (actionForm.responsible_departments.length > 0 ? actionForm.responsible_departments : null),
         responsible_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.responsible_coordinators).length > 0 ? actionForm.responsible_coordinators : null),
+        special_responsible_types: actionForm.special_responsible_types.length > 0 ? actionForm.special_responsible_types : null,
+        other_responsible_description: actionForm.special_responsible_types.includes('OTHER') ? actionForm.other_responsible_description : null,
         related_department_ids: actionForm.applies_to_all_units ? null : (actionForm.related_departments.length > 0 ? actionForm.related_departments : null),
         related_department_coordinators: actionForm.applies_to_all_units ? null : (Object.keys(actionForm.related_coordinators).length > 0 ? actionForm.related_coordinators : null),
-        special_responsible_type: actionForm.special_responsible_type || null,
-        special_responsible: actionForm.special_responsible_type === 'OTHER' ? actionForm.special_responsible : null,
         related_special_responsible_types: actionForm.related_special_responsible_types.length > 0 ? actionForm.related_special_responsible_types : null,
         start_date: actionForm.start_date || null,
         target_date: actionForm.is_continuous ? null : actionForm.target_date,
@@ -541,10 +537,10 @@ export default function ICActionPlanDetail() {
         applies_to_all_units: false,
         responsible_departments: [],
         responsible_coordinators: {},
+        special_responsible_types: [],
+        other_responsible_description: '',
         related_departments: [],
         related_coordinators: {},
-        special_responsible_type: '',
-        special_responsible: '',
         related_special_responsible_types: [],
         start_date: '',
         target_date: '',
@@ -585,10 +581,10 @@ export default function ICActionPlanDetail() {
       applies_to_all_units: action.applies_to_all_units || false,
       responsible_departments: action.responsible_department_ids || [],
       responsible_coordinators: action.responsible_department_coordinators || {},
+      special_responsible_types: action.special_responsible_types || [],
+      other_responsible_description: action.other_responsible_description || '',
       related_departments: action.related_department_ids || [],
       related_coordinators: action.related_department_coordinators || {},
-      special_responsible_type: action.special_responsible_type || '',
-      special_responsible: action.special_responsible || '',
       related_special_responsible_types: action.related_special_responsible_types || [],
       start_date: action.start_date || '',
       target_date: action.target_date || '',
@@ -1028,21 +1024,28 @@ export default function ICActionPlanDetail() {
                               ) : null}
                             </>
                           )}
-                          {action.special_responsible_type && (
-                            <div className="text-sm text-blue-700 font-medium">
-                              👤 {
-                                action.special_responsible_type === 'TOP_MANAGEMENT' ? 'Üst Yönetim' :
-                                action.special_responsible_type === 'INTERNAL_AUDITOR' ? 'İç Denetçi / İç Denetim Birimi' :
-                                action.special_responsible_type === 'ETHICS_COMMITTEE' ? 'Etik Komisyonu' :
-                                action.special_responsible_type === 'IT_COORDINATOR' ? 'Bilgi Teknolojileri Koordinatörü' :
-                                action.special_responsible_type === 'HR_COORDINATOR' ? 'İnsan Kaynakları Koordinatörü' :
-                                action.special_responsible_type === 'QUALITY_MANAGER' ? 'Kalite Yönetim Temsilcisi' :
-                                action.special_responsible_type === 'RISK_COORDINATOR' ? 'Risk Koordinatörü' :
-                                action.special_responsible_type === 'STRATEGY_COORDINATOR' ? 'Strateji Geliştirme Koordinatörü' :
-                                action.special_responsible_type === 'OTHER' ? action.special_responsible :
-                                action.special_responsible_type
-                              }
-                            </div>
+                          {action.special_responsible_types && action.special_responsible_types.length > 0 && (
+                            <>
+                              {action.special_responsible_types.map((roleType: string) => {
+                                const roleLabel =
+                                  roleType === 'TOP_MANAGEMENT' ? 'Üst Yönetim' :
+                                  roleType === 'INTERNAL_AUDITOR' ? 'İç Denetçi / İç Denetim Birimi' :
+                                  roleType === 'ETHICS_COMMITTEE' ? 'Etik Komisyonu' :
+                                  roleType === 'IT_COORDINATOR' ? 'Bilgi Teknolojileri Koordinatörü' :
+                                  roleType === 'HR_COORDINATOR' ? 'İnsan Kaynakları Koordinatörü' :
+                                  roleType === 'QUALITY_MANAGER' ? 'Kalite Yönetim Temsilcisi' :
+                                  roleType === 'RISK_COORDINATOR' ? 'Risk Koordinatörü' :
+                                  roleType === 'STRATEGY_COORDINATOR' ? 'Strateji Geliştirme Koordinatörü' :
+                                  roleType === 'OTHER' ? action.other_responsible_description :
+                                  roleType;
+
+                                return (
+                                  <div key={roleType} className="text-sm text-blue-700 font-medium">
+                                    👤 {roleLabel}
+                                  </div>
+                                );
+                              })}
+                            </>
                           )}
                         </div>
                       </td>
@@ -1961,33 +1964,97 @@ export default function ICActionPlanDetail() {
 
                   <div className="border border-purple-200 rounded-lg p-4 mb-4 bg-purple-50">
                     <label className="block text-sm font-medium text-slate-700 mb-3">
-                      Özel Sorumlu Rol
+                      Özel Sorumlu Roller
                     </label>
 
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {actionForm.special_responsible_types.map((roleType) => {
+                        const roleLabels: Record<string, string> = {
+                          TOP_MANAGEMENT: 'Üst Yönetim',
+                          INTERNAL_AUDITOR: 'İç Denetçi',
+                          ETHICS_COMMITTEE: 'Etik Komisyonu',
+                          IT_COORDINATOR: 'BT Koordinatörü',
+                          HR_COORDINATOR: 'İK Koordinatörü',
+                          QUALITY_MANAGER: 'Kalite Yöneticisi',
+                          RISK_COORDINATOR: 'Risk Koordinatörü',
+                          STRATEGY_COORDINATOR: 'Strateji Koordinatörü',
+                          OTHER: 'Diğer'
+                        };
+
+                        return (
+                          <div
+                            key={roleType}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-sm font-medium"
+                          >
+                            <span>👤 {roleLabels[roleType] || roleType}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newRoles = actionForm.special_responsible_types.filter(r => r !== roleType);
+                                setActionForm({
+                                  ...actionForm,
+                                  special_responsible_types: newRoles,
+                                  other_responsible_description: roleType === 'OTHER' ? '' : actionForm.other_responsible_description
+                                });
+                              }}
+                              className="text-purple-600 hover:text-purple-800"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
                     <select
-                      value={actionForm.special_responsible_type}
-                      onChange={(e) => setActionForm({ ...actionForm, special_responsible_type: e.target.value, special_responsible: '' })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent mb-3"
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value && !actionForm.special_responsible_types.includes(e.target.value)) {
+                          setActionForm({
+                            ...actionForm,
+                            special_responsible_types: [...actionForm.special_responsible_types, e.target.value]
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
-                      <option value="">Seçiniz (Opsiyonel)</option>
-                      <option value="TOP_MANAGEMENT">Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)</option>
-                      <option value="INTERNAL_AUDITOR">İç Denetçi / İç Denetim Birimi</option>
-                      <option value="ETHICS_COMMITTEE">Etik Komisyonu</option>
-                      <option value="IT_COORDINATOR">Bilgi Teknolojileri Koordinatörü</option>
-                      <option value="HR_COORDINATOR">İnsan Kaynakları Koordinatörü</option>
-                      <option value="QUALITY_MANAGER">Kalite Yönetim Temsilcisi</option>
-                      <option value="RISK_COORDINATOR">Risk Koordinatörü</option>
-                      <option value="STRATEGY_COORDINATOR">Strateji Geliştirme Koordinatörü</option>
-                      <option value="OTHER">Diğer (Manuel Giriş)</option>
+                      <option value="">+ Özel Sorumlu Rol Ekle</option>
+                      {!actionForm.special_responsible_types.includes('TOP_MANAGEMENT') && (
+                        <option value="TOP_MANAGEMENT">Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('INTERNAL_AUDITOR') && (
+                        <option value="INTERNAL_AUDITOR">İç Denetçi / İç Denetim Birimi</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('ETHICS_COMMITTEE') && (
+                        <option value="ETHICS_COMMITTEE">Etik Komisyonu</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('IT_COORDINATOR') && (
+                        <option value="IT_COORDINATOR">Bilgi Teknolojileri Koordinatörü</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('HR_COORDINATOR') && (
+                        <option value="HR_COORDINATOR">İnsan Kaynakları Koordinatörü</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('QUALITY_MANAGER') && (
+                        <option value="QUALITY_MANAGER">Kalite Yönetim Temsilcisi</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('RISK_COORDINATOR') && (
+                        <option value="RISK_COORDINATOR">Risk Koordinatörü</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('STRATEGY_COORDINATOR') && (
+                        <option value="STRATEGY_COORDINATOR">Strateji Geliştirme Koordinatörü</option>
+                      )}
+                      {!actionForm.special_responsible_types.includes('OTHER') && (
+                        <option value="OTHER">Diğer (Manuel Giriş)</option>
+                      )}
                     </select>
 
-                    {actionForm.special_responsible_type === 'OTHER' && (
+                    {actionForm.special_responsible_types.includes('OTHER') && (
                       <input
                         type="text"
-                        value={actionForm.special_responsible}
-                        onChange={(e) => setActionForm({ ...actionForm, special_responsible: e.target.value })}
-                        placeholder="Özel sorumlu adını girin"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        value={actionForm.other_responsible_description}
+                        onChange={(e) => setActionForm({ ...actionForm, other_responsible_description: e.target.value })}
+                        placeholder="Özel sorumlu rolünü açıklayın"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-3"
                       />
                     )}
                   </div>
@@ -2071,7 +2138,7 @@ export default function ICActionPlanDetail() {
                           });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
                     >
                       <option value="">+ İlgili Birim Ekle</option>
                       {departments
@@ -2082,46 +2149,87 @@ export default function ICActionPlanDetail() {
                           </option>
                         ))}
                     </select>
-                  </div>
 
-                  <div className="border border-indigo-200 rounded-lg p-4 bg-indigo-50">
-                    <label className="block text-sm font-medium text-slate-700 mb-3">
-                      İlgili Özel Roller
-                    </label>
+                    <div className="border-t border-blue-300 pt-4 mt-4">
+                      <label className="block text-sm font-medium text-slate-700 mb-3">
+                        İlgili Özel Roller
+                      </label>
 
-                    <div className="space-y-2">
-                      {[
-                        { value: 'TOP_MANAGEMENT', label: 'Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)' },
-                        { value: 'INTERNAL_AUDITOR', label: 'İç Denetçi / İç Denetim Birimi' },
-                        { value: 'ETHICS_COMMITTEE', label: 'Etik Komisyonu' },
-                        { value: 'IT_COORDINATOR', label: 'Bilgi Teknolojileri Koordinatörü' },
-                        { value: 'HR_COORDINATOR', label: 'İnsan Kaynakları Koordinatörü' },
-                        { value: 'QUALITY_MANAGER', label: 'Kalite Yönetim Temsilcisi' },
-                        { value: 'RISK_COORDINATOR', label: 'Risk Koordinatörü' },
-                        { value: 'STRATEGY_COORDINATOR', label: 'Strateji Geliştirme Koordinatörü' }
-                      ].map((role) => (
-                        <label key={role.value} className="flex items-center gap-2 p-2 hover:bg-white rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={actionForm.related_special_responsible_types.includes(role.value)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setActionForm({
-                                  ...actionForm,
-                                  related_special_responsible_types: [...actionForm.related_special_responsible_types, role.value]
-                                });
-                              } else {
-                                setActionForm({
-                                  ...actionForm,
-                                  related_special_responsible_types: actionForm.related_special_responsible_types.filter(t => t !== role.value)
-                                });
-                              }
-                            }}
-                            className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="text-sm text-slate-700">{role.label}</span>
-                        </label>
-                      ))}
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {actionForm.related_special_responsible_types.map((roleType) => {
+                          const roleLabels: Record<string, string> = {
+                            TOP_MANAGEMENT: 'Üst Yönetim',
+                            INTERNAL_AUDITOR: 'İç Denetçi',
+                            ETHICS_COMMITTEE: 'Etik Komisyonu',
+                            IT_COORDINATOR: 'BT Koordinatörü',
+                            HR_COORDINATOR: 'İK Koordinatörü',
+                            QUALITY_MANAGER: 'Kalite Yöneticisi',
+                            RISK_COORDINATOR: 'Risk Koordinatörü',
+                            STRATEGY_COORDINATOR: 'Strateji Koordinatörü'
+                          };
+
+                          return (
+                            <div
+                              key={roleType}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium"
+                            >
+                              <span>👤 {roleLabels[roleType] || roleType}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newRoles = actionForm.related_special_responsible_types.filter(r => r !== roleType);
+                                  setActionForm({
+                                    ...actionForm,
+                                    related_special_responsible_types: newRoles
+                                  });
+                                }}
+                                className="text-indigo-600 hover:text-indigo-800"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value && !actionForm.related_special_responsible_types.includes(e.target.value)) {
+                            setActionForm({
+                              ...actionForm,
+                              related_special_responsible_types: [...actionForm.related_special_responsible_types, e.target.value]
+                            });
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="">+ İlgili Özel Rol Ekle</option>
+                        {!actionForm.related_special_responsible_types.includes('TOP_MANAGEMENT') && (
+                          <option value="TOP_MANAGEMENT">Üst Yönetim (Başkan/Genel Sekreter/Genel Müdür)</option>
+                        )}
+                        {!actionForm.related_special_responsible_types.includes('INTERNAL_AUDITOR') && (
+                          <option value="INTERNAL_AUDITOR">İç Denetçi / İç Denetim Birimi</option>
+                        )}
+                        {!actionForm.related_special_responsible_types.includes('ETHICS_COMMITTEE') && (
+                          <option value="ETHICS_COMMITTEE">Etik Komisyonu</option>
+                        )}
+                        {!actionForm.related_special_responsible_types.includes('IT_COORDINATOR') && (
+                          <option value="IT_COORDINATOR">Bilgi Teknolojileri Koordinatörü</option>
+                        )}
+                        {!actionForm.related_special_responsible_types.includes('HR_COORDINATOR') && (
+                          <option value="HR_COORDINATOR">İnsan Kaynakları Koordinatörü</option>
+                        )}
+                        {!actionForm.related_special_responsible_types.includes('QUALITY_MANAGER') && (
+                          <option value="QUALITY_MANAGER">Kalite Yönetim Temsilcisi</option>
+                        )}
+                        {!actionForm.related_special_responsible_types.includes('RISK_COORDINATOR') && (
+                          <option value="RISK_COORDINATOR">Risk Koordinatörü</option>
+                        )}
+                        {!actionForm.related_special_responsible_types.includes('STRATEGY_COORDINATOR') && (
+                          <option value="STRATEGY_COORDINATOR">Strateji Geliştirme Koordinatörü</option>
+                        )}
+                      </select>
                     </div>
                   </div>
                 </>
