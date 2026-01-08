@@ -27,6 +27,15 @@ interface ICComponent {
   icon: string;
 }
 
+interface ICGeneralCondition {
+  id: string;
+  standard_id: string;
+  condition_text: string;
+  current_situation_description?: string;
+  current_status_satisfied: boolean;
+  order_index: number;
+}
+
 interface ICStandard {
   id: string;
   component_id: string;
@@ -36,8 +45,7 @@ interface ICStandard {
   general_conditions: string;
   order_index: number;
   compliance_level?: number;
-  current_situation_description?: string;
-  current_status_satisfied?: boolean;
+  conditions?: ICGeneralCondition[];
   action_count?: {
     active: number;
     completed: number;
@@ -109,6 +117,12 @@ export default function ICStandards() {
         `)
         .eq('ic_action_plans.organization_id', profile.organization_id);
 
+      const { data: conditionsData } = await supabase
+        .from('ic_general_conditions')
+        .select('*')
+        .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
+        .order('order_index');
+
       const standardsMap = new Map<string, ICStandard>();
       standardsData?.forEach(std => {
         const assessments = assessmentDetails?.filter(a => a.standard_id === std.id) || [];
@@ -120,9 +134,12 @@ export default function ICStandards() {
         ).length;
         const completedActions = actions.filter(a => a.status === 'COMPLETED').length;
 
+        const conditions = conditionsData?.filter(c => c.standard_id === std.id) || [];
+
         standardsMap.set(std.id, {
           ...std,
           compliance_level: latestAssessment?.compliance_level,
+          conditions: conditions,
           action_count: {
             active: activeActions,
             completed: completedActions
@@ -238,24 +255,47 @@ export default function ICStandards() {
   };
 
   const handleSaveStandard = async () => {
-    if (!editingStandard) return;
+    if (!editingStandard || !profile?.organization_id) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error: standardError } = await supabase
         .from('ic_standards')
         .update({
           code: editingStandard.code,
           name: editingStandard.name,
           description: editingStandard.description,
           general_conditions: editingStandard.general_conditions,
-          order_index: editingStandard.order_index,
-          current_situation_description: editingStandard.current_situation_description,
-          current_status_satisfied: editingStandard.current_status_satisfied
+          order_index: editingStandard.order_index
         })
         .eq('id', editingStandard.id);
 
-      if (error) throw error;
+      if (standardError) throw standardError;
+
+      const { error: deleteError } = await supabase
+        .from('ic_general_conditions')
+        .delete()
+        .eq('standard_id', editingStandard.id)
+        .eq('organization_id', profile.organization_id);
+
+      if (deleteError) throw deleteError;
+
+      if (editingStandard.conditions && editingStandard.conditions.length > 0) {
+        const conditionsToInsert = editingStandard.conditions.map((cond, idx) => ({
+          standard_id: editingStandard.id,
+          condition_text: cond.condition_text,
+          current_situation_description: cond.current_situation_description || null,
+          current_status_satisfied: cond.current_status_satisfied || false,
+          order_index: idx,
+          organization_id: profile.organization_id
+        }));
+
+        const { error: insertError } = await supabase
+          .from('ic_general_conditions')
+          .insert(conditionsToInsert);
+
+        if (insertError) throw insertError;
+      }
 
       setShowEditStandardModal(false);
       setEditingStandard(null);
@@ -591,12 +631,35 @@ export default function ICStandards() {
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
                   Genel Şartlar
                 </h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                  {selectedStandard.general_conditions.split('\n').map((condition, idx) => (
-                    <p key={idx} className="text-sm text-gray-700 leading-relaxed">
-                      {condition}
-                    </p>
-                  ))}
+                <div className="space-y-3">
+                  {selectedStandard.conditions && selectedStandard.conditions.length > 0 ? (
+                    selectedStandard.conditions.map((condition, idx) => (
+                      <div key={condition.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-start justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-500">Genel Şart {idx + 1}</span>
+                          {condition.current_status_satisfied && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Sağlanıyor
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed mb-2">
+                          {condition.condition_text}
+                        </p>
+                        {condition.current_situation_description && (
+                          <div className="mt-2 pt-2 border-t border-gray-300">
+                            <span className="text-xs font-medium text-gray-600">Mevcut Durum:</span>
+                            <p className="text-xs text-gray-600 mt-1">{condition.current_situation_description}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-500 text-center">Henüz genel şart eklenmemiş</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -832,19 +895,6 @@ export default function ICStandards() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Genel Şartlar <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={editingStandard.general_conditions}
-                  onChange={(e) => setEditingStandard({ ...editingStandard, general_conditions: e.target.value })}
-                  rows={8}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Her satıra bir genel şart yazın"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sıra No <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -856,38 +906,95 @@ export default function ICStandards() {
               </div>
 
               <div className="col-span-2 border-t border-gray-200 pt-4 mt-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Mevcut Durum Bilgisi</h4>
-
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mevcut Durum Açıklaması
-                  </label>
-                  <textarea
-                    value={editingStandard.current_situation_description || ''}
-                    onChange={(e) => setEditingStandard({ ...editingStandard, current_situation_description: e.target.value })}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Bu standardın kurumdaki mevcut durumunu açıklayın..."
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Bu standardın kurumunuzda şu anda nasıl uygulandığını veya mevcut durumunu açıklayın.
-                  </p>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-900">Genel Şartlar</h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newConditions = [...(editingStandard.conditions || [])];
+                      newConditions.push({
+                        id: `temp-${Date.now()}`,
+                        standard_id: editingStandard.id,
+                        condition_text: '',
+                        current_situation_description: '',
+                        current_status_satisfied: false,
+                        order_index: newConditions.length
+                      });
+                      setEditingStandard({ ...editingStandard, conditions: newConditions });
+                    }}
+                    className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    + Yeni Şart Ekle
+                  </button>
                 </div>
 
-                <div className="flex items-start">
-                  <input
-                    type="checkbox"
-                    id="current_status_satisfied"
-                    checked={editingStandard.current_status_satisfied || false}
-                    onChange={(e) => setEditingStandard({ ...editingStandard, current_status_satisfied: e.target.checked })}
-                    className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="current_status_satisfied" className="ml-2 block text-sm text-gray-700">
-                    <span className="font-medium">Mevcut Durum Sağlanıyor</span>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Bu standart zaten karşılanıyorsa işaretleyin. İşaretlenirse, bu standart için eylem planı oluşturulmasına gerek kalmaz.
+                <div className="space-y-3">
+                  {(editingStandard.conditions || []).map((condition, index) => (
+                    <div key={condition.id} className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs font-medium text-gray-500">Genel Şart {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newConditions = editingStandard.conditions?.filter((_, i) => i !== index) || [];
+                            setEditingStandard({ ...editingStandard, conditions: newConditions });
+                          }}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Sil
+                        </button>
+                      </div>
+
+                      <textarea
+                        value={condition.condition_text}
+                        onChange={(e) => {
+                          const newConditions = [...(editingStandard.conditions || [])];
+                          newConditions[index] = { ...condition, condition_text: e.target.value };
+                          setEditingStandard({ ...editingStandard, conditions: newConditions });
+                        }}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-2"
+                        placeholder="Genel şart metnini girin..."
+                      />
+
+                      <div className="border-t border-gray-300 pt-2 mt-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Mevcut Durum Açıklaması (Opsiyonel)
+                        </label>
+                        <textarea
+                          value={condition.current_situation_description || ''}
+                          onChange={(e) => {
+                            const newConditions = [...(editingStandard.conditions || [])];
+                            newConditions[index] = { ...condition, current_situation_description: e.target.value };
+                            setEditingStandard({ ...editingStandard, conditions: newConditions });
+                          }}
+                          rows={2}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mb-2"
+                          placeholder="Bu şartın kurumdaki mevcut durumunu açıklayın..."
+                        />
+
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={condition.current_status_satisfied}
+                            onChange={(e) => {
+                              const newConditions = [...(editingStandard.conditions || [])];
+                              newConditions[index] = { ...condition, current_status_satisfied: e.target.checked };
+                              setEditingStandard({ ...editingStandard, conditions: newConditions });
+                            }}
+                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">Mevcut Durum Sağlanıyor</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!editingStandard.conditions || editingStandard.conditions.length === 0) && (
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      Henüz genel şart eklenmemiş. Yukarıdaki "Yeni Şart Ekle" butonunu kullanarak şart ekleyin.
                     </p>
-                  </label>
+                  )}
                 </div>
               </div>
             </div>

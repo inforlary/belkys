@@ -80,13 +80,21 @@ interface User {
   department_id: string;
 }
 
+interface GeneralCondition {
+  id: string;
+  standard_id: string;
+  condition_text: string;
+  current_situation_description?: string;
+  current_status_satisfied: boolean;
+  order_index: number;
+}
+
 interface Standard {
   id: string;
   code: string;
   name: string;
   component_id: string;
-  current_situation_description?: string;
-  current_status_satisfied?: boolean;
+  conditions?: GeneralCondition[];
 }
 
 interface Component {
@@ -168,7 +176,7 @@ export default function ICActionPlanDetail() {
   const loadData = async () => {
     try {
       console.log('[ICActionPlanDetail] Loading data for planId:', planId);
-      const [planRes, actionsRes, departmentsRes, usersRes, standardsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
+      const [planRes, actionsRes, departmentsRes, usersRes, standardsRes, conditionsRes, componentsRes, goalsRes, risksRes, controlsRes, riskActivitiesRes] = await Promise.all([
         supabase
           .from('ic_action_plans')
           .select('*')
@@ -195,7 +203,12 @@ export default function ICActionPlanDetail() {
           .order('full_name'),
         supabase
           .from('ic_standards')
-          .select('id, code, name, component_id, current_situation_description, current_status_satisfied')
+          .select('id, code, name, component_id')
+          .order('order_index'),
+        supabase
+          .from('ic_general_conditions')
+          .select('*')
+          .or(`organization_id.is.null,organization_id.eq.${profile?.organization_id}`)
           .order('order_index'),
         supabase
           .from('ic_components')
@@ -258,7 +271,13 @@ export default function ICActionPlanDetail() {
       setActions(actionsRes.data || []);
       setDepartments(departmentsRes.data || []);
       setUsers(usersRes.data || []);
-      setStandards(standardsRes.data || []);
+
+      const standardsWithConditions = (standardsRes.data || []).map(std => ({
+        ...std,
+        conditions: (conditionsRes.data || []).filter(c => c.standard_id === std.id)
+      }));
+      setStandards(standardsWithConditions);
+
       setComponents(componentsRes.data || []);
       setGoals(goalsRes.data || []);
       setRisks(risksRes.data || []);
@@ -1320,21 +1339,18 @@ export default function ICActionPlanDetail() {
                         const standardCompleted = standardActions.filter(a => a.status === 'COMPLETED').length;
                         const standardProgress = standardActions.length > 0 ? Math.round((standardCompleted / standardActions.length) * 100) : 0;
 
+                        const satisfiedConditionsCount = standard.conditions?.filter(c => c.current_status_satisfied).length || 0;
+                        const totalConditionsCount = standard.conditions?.length || 0;
+
                         return (
                           <div key={standard.id} className="bg-slate-50 rounded-lg p-3">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
                                 <div className="text-xs font-medium text-slate-900">{standard.code}</div>
                                 <div className="text-xs text-slate-600 line-clamp-2">{standard.name}</div>
-                                {standard.current_status_satisfied && (
-                                  <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    Mevcut Durum Sağlanıyor
-                                  </div>
-                                )}
-                                {standard.current_situation_description && (
-                                  <div className="mt-1 text-xs text-slate-500 line-clamp-2">
-                                    <span className="font-medium">Mevcut Durum:</span> {standard.current_situation_description}
+                                {satisfiedConditionsCount > 0 && (
+                                  <div className="mt-1 text-xs text-green-700 font-medium">
+                                    {satisfiedConditionsCount}/{totalConditionsCount} genel şart sağlanıyor
                                   </div>
                                 )}
                               </div>
