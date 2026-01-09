@@ -85,6 +85,16 @@ import RiskTreatments from './pages/RiskTreatments';
 import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
 import RiskCategories from './pages/RiskCategories';
 import RiskReports from './pages/RiskReports';
+import QualityDashboard from './pages/QualityDashboard';
+import QualityProcesses from './pages/QualityProcesses';
+import QualityProcessDetail from './pages/QualityProcessDetail';
+import QualityDocuments from './pages/QualityDocuments';
+import QualityDOF from './pages/QualityDOF';
+import QualityDOFDetail from './pages/QualityDOFDetail';
+import QualityAudits from './pages/QualityAudits';
+import QualityAuditDetail from './pages/QualityAuditDetail';
+import QualityCustomerSatisfaction from './pages/QualityCustomerSatisfaction';
+import QualityReports from './pages/QualityReports';
 import InternalControl from './pages/InternalControl';
 import InternalControlDashboard from './pages/InternalControlDashboard';
 import ICStandards from './pages/ICStandards';
@@ -157,6 +167,15 @@ const renderPage = () => {
     }
     if (currentPath.startsWith('risk-management/risks/') && currentPath !== 'risk-management/risks') {
       return <RiskDetail />;
+    }
+    if (currentPath.startsWith('quality-management/processes/') && currentPath !== 'quality-management/processes') {
+      return <QualityProcessDetail />;
+    }
+    if (currentPath.startsWith('quality-management/dof/') && currentPath !== 'quality-management/dof') {
+      return <QualityDOFDetail />;
+    }
+    if (currentPath.startsWith('quality-management/audits/') && currentPath !== 'quality-management/audits') {
+      return <QualityAuditDetail />;
     }
     if (currentPath.match(/internal-control\/action-plans\/[^/]+\/actions\/[^/]+/)) {
       return <ICActionDetail />;
@@ -338,6 +357,22 @@ const renderPage = () => {
         return <RiskIndicatorEntry />;
       case 'risk-management/reports':
         return <RiskReports />;
+      case 'quality-management':
+        return <QualityDashboard />;
+      case 'quality-management/dashboard':
+        return <QualityDashboard />;
+      case 'quality-management/processes':
+        return <QualityProcesses />;
+      case 'quality-management/documents':
+        return <QualityDocuments />;
+      case 'quality-management/dof':
+        return <QualityDOF />;
+      case 'quality-management/audits':
+        return <QualityAudits />;
+      case 'quality-management/customer-satisfaction':
+        return <QualityCustomerSatisfaction />;
+      case 'quality-management/reports':
+        return <QualityReports />;
       case 'internal-control':
         return <InternalControl />;
       case 'internal-control/dashboard':

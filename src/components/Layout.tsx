@@ -294,6 +294,19 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       ],
     },
     {
+      label: 'Kalite Yönetimi',
+      icon: Award,
+      items: [
+        { icon: LayoutDashboard, label: 'Dashboard', path: 'quality-management/dashboard' },
+        { icon: TrendingUp, label: 'Süreç Yönetimi', path: 'quality-management/processes' },
+        { icon: FileText, label: 'Doküman Yönetimi', path: 'quality-management/documents' },
+        { icon: AlertCircle, label: 'DÖF Yönetimi', path: 'quality-management/dof' },
+        { icon: ClipboardCheck, label: 'İç Tetkik', path: 'quality-management/audits' },
+        { icon: Star, label: 'Müşteri Memnuniyeti', path: 'quality-management/customer-satisfaction' },
+        { icon: FileText, label: 'Raporlar', path: 'quality-management/reports' },
+      ],
+    },
+    {
       label: 'Ayarlar',
       icon: Settings,
       items: [
