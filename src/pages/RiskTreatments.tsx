@@ -19,23 +19,23 @@ interface Department {
 
 interface Treatment {
   id: string;
-  code: string;
+  code?: string;
   title: string;
-  description: string;
-  treatment_type: string;
-  responsible_department_id: string;
-  responsible_person_id: string;
-  planned_start_date: string;
-  planned_end_date: string;
-  actual_start_date: string;
-  actual_end_date: string;
-  estimated_budget: number;
-  progress_percent: number;
-  status: string;
+  description?: string;
+  treatment_type?: string;
+  responsible_department_id?: string;
+  responsible_person_id?: string;
+  planned_start_date?: string;
+  planned_end_date?: string;
+  actual_start_date?: string;
+  actual_end_date?: string;
+  estimated_budget?: number;
+  progress_percent?: number;
+  status?: string;
   risk_id: string;
-  risk: Risk;
-  responsible_department: Department;
-  notes: string;
+  risk?: Risk;
+  responsible_department?: Department;
+  notes?: string;
 }
 
 const statusLabels: Record<string, { label: string; color: string; emoji: string }> = {
@@ -100,17 +100,17 @@ export default function RiskTreatments() {
           .from('risk_treatments')
           .select(`
             *,
-            risk:risks(id, code, name),
+            risk:risks!inner(id, code, name, organization_id),
             responsible_department:departments!responsible_department_id(id, name)
           `)
-          .eq('risks.organization_id', profile?.organization_id)
+          .eq('risk.organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
 
         supabase
           .from('risks')
           .select('id, code, name')
           .eq('organization_id', profile?.organization_id)
-          .eq('status', 'ACTIVE')
+          .eq('is_active', true)
           .order('code'),
 
         supabase
@@ -167,8 +167,8 @@ export default function RiskTreatments() {
   function openProgressModal(treatment: Treatment) {
     setEditingTreatment(treatment);
     setProgressData({
-      progress_percent: treatment.progress_percent,
-      status: treatment.status,
+      progress_percent: treatment.progress_percent ?? 0,
+      status: treatment.status || 'IN_PROGRESS',
       notes: '',
       completed_date: treatment.actual_end_date || ''
     });
@@ -217,8 +217,8 @@ export default function RiskTreatments() {
         responsible_department_id: formData.responsible_department_id || null,
         planned_end_date: formData.planned_end_date,
         notes: formData.notes,
-        status: editingTreatment ? editingTreatment.status : 'NOT_STARTED',
-        progress_percent: editingTreatment ? editingTreatment.progress_percent : 0
+        status: editingTreatment ? (editingTreatment.status || 'NOT_STARTED') : 'NOT_STARTED',
+        progress_percent: editingTreatment ? (editingTreatment.progress_percent ?? 0) : 0
       };
 
       if (editingTreatment) {
@@ -281,9 +281,9 @@ export default function RiskTreatments() {
         .insert({
           treatment_id: editingTreatment.id,
           updated_by_id: profile?.id,
-          previous_progress: editingTreatment.progress_percent,
+          previous_progress: editingTreatment.progress_percent ?? 0,
           new_progress: progressData.progress_percent,
-          previous_status: editingTreatment.status,
+          previous_status: editingTreatment.status || 'NOT_STARTED',
           new_status: progressData.status,
           notes: progressData.notes
         });
@@ -315,7 +315,8 @@ export default function RiskTreatments() {
     }
   }
 
-  function getDelayDays(treatment: Treatment): number {
+  function getDelayDays(treatment: Treatment | null): number {
+    if (!treatment || !treatment.planned_end_date) return 0;
     if (treatment.status === 'COMPLETED' || treatment.status === 'CANCELLED') return 0;
     const endDate = new Date(treatment.planned_end_date);
     const today = new Date();
@@ -325,7 +326,8 @@ export default function RiskTreatments() {
     return 0;
   }
 
-  function isDueSoon(treatment: Treatment): boolean {
+  function isDueSoon(treatment: Treatment | null): boolean {
+    if (!treatment || !treatment.planned_end_date) return false;
     if (treatment.status === 'COMPLETED' || treatment.status === 'CANCELLED') return false;
     const endDate = new Date(treatment.planned_end_date);
     const today = new Date();
@@ -334,11 +336,12 @@ export default function RiskTreatments() {
   }
 
   const filteredTreatments = treatments.filter(t => {
+    if (!t) return false;
     if (filters.risk_id && t.risk_id !== filters.risk_id) return false;
     if (filters.status && t.status !== filters.status) return false;
     if (filters.department_id && t.responsible_department_id !== filters.department_id) return false;
-    if (filters.date_from && t.planned_end_date < filters.date_from) return false;
-    if (filters.date_to && t.planned_end_date > filters.date_to) return false;
+    if (filters.date_from && t.planned_end_date && t.planned_end_date < filters.date_from) return false;
+    if (filters.date_to && t.planned_end_date && t.planned_end_date > filters.date_to) return false;
     if (filters.search) {
       const search = filters.search.toLowerCase();
       return t.code?.toLowerCase().includes(search) || t.title?.toLowerCase().includes(search);
@@ -347,6 +350,8 @@ export default function RiskTreatments() {
   });
 
   const sortedTreatments = [...filteredTreatments].sort((a, b) => {
+    if (!a || !b) return 0;
+
     const aDelayed = getDelayDays(a) > 0;
     const bDelayed = getDelayDays(b) > 0;
 
@@ -361,19 +366,22 @@ export default function RiskTreatments() {
       'CANCELLED': 5
     };
 
-    const aOrder = statusOrder[a.status] || 999;
-    const bOrder = statusOrder[b.status] || 999;
+    const aOrder = statusOrder[a.status || ''] || 999;
+    const bOrder = statusOrder[b.status || ''] || 999;
 
     if (aOrder !== bOrder) return aOrder - bOrder;
 
-    return new Date(a.planned_end_date).getTime() - new Date(b.planned_end_date).getTime();
+    const aDate = a.planned_end_date ? new Date(a.planned_end_date).getTime() : 0;
+    const bDate = b.planned_end_date ? new Date(b.planned_end_date).getTime() : 0;
+
+    return aDate - bDate;
   });
 
   const stats = {
     total: filteredTreatments.length,
-    inProgress: filteredTreatments.filter(t => t.status === 'IN_PROGRESS').length,
-    completed: filteredTreatments.filter(t => t.status === 'COMPLETED').length,
-    delayed: filteredTreatments.filter(t => getDelayDays(t) > 0).length
+    inProgress: filteredTreatments.filter(t => t && t.status === 'IN_PROGRESS').length,
+    completed: filteredTreatments.filter(t => t && t.status === 'COMPLETED').length,
+    delayed: filteredTreatments.filter(t => t && getDelayDays(t) > 0).length
   };
 
   function clearFilters() {
@@ -599,7 +607,7 @@ export default function RiskTreatments() {
                       <td className="px-4 py-3">
                         <div className="text-sm">
                           <div className={isDelayed ? 'text-red-600 font-medium' : dueSoon ? 'text-yellow-600 font-medium' : 'text-gray-700'}>
-                            {new Date(treatment.planned_end_date).toLocaleDateString('tr-TR')}
+                            {treatment.planned_end_date ? new Date(treatment.planned_end_date).toLocaleDateString('tr-TR') : '-'}
                           </div>
                           {isDelayed && (
                             <div className="text-xs text-red-600 font-medium">
@@ -618,7 +626,7 @@ export default function RiskTreatments() {
                           <div className="flex-1">
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
                               <span>{statusInfo.emoji}</span>
-                              <span>{treatment.progress_percent}%</span>
+                              <span>{treatment.progress_percent ?? 0}%</span>
                               {isDelayed && treatment.status !== 'COMPLETED' && (
                                 <span className="ml-1">Gecikmiş</span>
                               )}
@@ -835,10 +843,10 @@ export default function RiskTreatments() {
               Sorumlu: {editingTreatment?.responsible_department?.name || '-'}
             </div>
             <div className="text-sm">
-              Hedef Tarih: <span className={getDelayDays(editingTreatment!) > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
+              Hedef Tarih: <span className={getDelayDays(editingTreatment) > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
                 {editingTreatment?.planned_end_date && new Date(editingTreatment.planned_end_date).toLocaleDateString('tr-TR')}
-                {getDelayDays(editingTreatment!) > 0 && (
-                  <span className="ml-2">🔴 {getDelayDays(editingTreatment!)} gün gecikmiş</span>
+                {getDelayDays(editingTreatment) > 0 && (
+                  <span className="ml-2">🔴 {getDelayDays(editingTreatment)} gün gecikmiş</span>
                 )}
               </span>
             </div>
@@ -846,7 +854,7 @@ export default function RiskTreatments() {
 
           <div className="border-t border-gray-200 pt-4">
             <div className="text-sm font-medium text-gray-700 mb-2">
-              Mevcut İlerleme: %{editingTreatment?.progress_percent}
+              Mevcut İlerleme: %{editingTreatment?.progress_percent ?? 0}
             </div>
           </div>
 
