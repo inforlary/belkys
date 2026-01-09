@@ -13,7 +13,7 @@ interface Risk {
   causes: string;
   category_id: string;
   owner_department_id: string;
-  objective_id: string;
+  goal_id: string;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -122,7 +122,7 @@ export default function RiskRegister() {
     category_id: '',
     owner_department_id: '',
     owner_id: '',
-    objective_id: '',
+    goal_id: '',
     inherent_likelihood: 3,
     inherent_impact: 3,
     residual_likelihood: 2,
@@ -273,7 +273,7 @@ export default function RiskRegister() {
       category_id: '',
       owner_department_id: '',
       owner_id: '',
-      objective_id: '',
+      goal_id: '',
       inherent_likelihood: 3,
       inherent_impact: 3,
       residual_likelihood: 2,
@@ -334,7 +334,7 @@ export default function RiskRegister() {
           causes: formData.causes,
           category_id: formData.category_id,
           owner_department_id: formData.owner_department_id,
-          objective_id: formData.objective_id || null,
+          goal_id: formData.goal_id || null,
           inherent_likelihood: formData.inherent_likelihood,
           inherent_impact: formData.inherent_impact,
           residual_likelihood: formData.residual_likelihood,
@@ -860,7 +860,7 @@ export default function RiskRegister() {
                       onChange={(e) => setFormData({
                         ...formData,
                         owner_department_id: e.target.value,
-                        objective_id: ''
+                        goal_id: ''
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
@@ -876,8 +876,8 @@ export default function RiskRegister() {
                       İlişkili Hedef (Opsiyonel)
                     </label>
                     <select
-                      value={formData.objective_id}
-                      onChange={(e) => setFormData({ ...formData, objective_id: e.target.value })}
+                      value={formData.goal_id}
+                      onChange={(e) => setFormData({ ...formData, goal_id: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       disabled={!formData.owner_department_id}
                     >
