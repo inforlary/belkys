@@ -2,63 +2,63 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
-import {
-  AlertTriangle,
-  TrendingUp,
-  Shield,
-  Activity,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  ArrowRight,
-  Target
-} from 'lucide-react';
+import { AlertTriangle, TrendingUp, Clock, Bell, ChevronRight } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 interface DashboardStats {
   totalRisks: number;
   criticalRisks: number;
-  highRisks: number;
-  mediumRisks: number;
-  lowRisks: number;
-  overdueActivities: number;
-  redIndicators: number;
-  totalActivities: number;
-  completedActivities: number;
+  openTreatments: number;
+  alarmIndicators: number;
 }
 
-interface RiskMatrixData {
-  risk_id: string;
-  risk_code: string;
-  risk_name: string;
+interface MatrixCell {
   likelihood: number;
   impact: number;
-  score: number;
+  count: number;
 }
 
-interface OverdueActivity {
-  id: string;
-  title: string;
-  risk_name: string;
-  target_date: string;
-  responsible_unit: string;
-  days_overdue: number;
-}
-
-interface RedIndicator {
-  id: string;
+interface CategoryData {
   name: string;
-  current_value: number;
-  red_threshold: number;
-  unit: string;
+  count: number;
+}
+
+interface CriticalRisk {
+  id: string;
+  code: string;
+  name: string;
+  residual_score: number;
+}
+
+interface DelayedTreatment {
+  id: string;
+  code: string;
+  title: string;
+  planned_end_date: string;
+  risk: { code: string };
+  delay_days: number;
+}
+
+interface AlarmIndicator {
+  id: string;
+  indicator_id: string;
+  code: string;
+  name: string;
+  value: number;
+  status: string;
+  unit_of_measure: string;
+  threshold: string;
 }
 
 export default function RiskDashboard() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [matrixData, setMatrixData] = useState<RiskMatrixData[]>([]);
-  const [overdueActivities, setOverdueActivities] = useState<OverdueActivity[]>([]);
-  const [redIndicators, setRedIndicators] = useState<RedIndicator[]>([]);
+  const [matrixData, setMatrixData] = useState<MatrixCell[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [criticalRisks, setCriticalRisks] = useState<CriticalRisk[]>([]);
+  const [delayedTreatments, setDelayedTreatments] = useState<DelayedTreatment[]>([]);
+  const [alarmIndicators, setAlarmIndicators] = useState<AlarmIndicator[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,12 +70,114 @@ export default function RiskDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      await Promise.all([
-        loadStats(),
-        loadMatrixData(),
-        loadOverdueActivities(),
-        loadRedIndicators()
+      const orgId = profile?.organization_id;
+      if (!orgId) return;
+
+      const [risksData, treatmentsData, indicatorsData] = await Promise.all([
+        supabase.from('risks').select('*').eq('organization_id', orgId).eq('is_active', true),
+        supabase.from('risk_treatments').select('*').in('risk_id',
+          supabase.from('risks').select('id').eq('organization_id', orgId)
+        ),
+        supabase
+          .from('risk_indicator_values')
+          .select('*, risk_indicators!inner(organization_id, code, name, unit_of_measure, red_threshold)')
+          .eq('risk_indicators.organization_id', orgId)
+          .order('measurement_date', { ascending: false })
       ]);
+
+      const totalRisks = risksData.data?.length || 0;
+      const criticalRisks = risksData.data?.filter(r => r.residual_score && r.residual_score >= 17).length || 0;
+      const openTreatments = treatmentsData.data?.filter(t => !['COMPLETED', 'CANCELLED'].includes(t.status || '')).length || 0;
+
+      const indicatorsByIndicator = new Map<string, any>();
+      indicatorsData.data?.forEach(val => {
+        const indId = val.indicator_id;
+        if (!indicatorsByIndicator.has(indId) || new Date(val.measurement_date) > new Date(indicatorsByIndicator.get(indId).measurement_date)) {
+          indicatorsByIndicator.set(indId, val);
+        }
+      });
+
+      const alarmIndicators = Array.from(indicatorsByIndicator.values()).filter(v => v.status === 'RED').length;
+
+      setStats({ totalRisks, criticalRisks, openTreatments, alarmIndicators });
+
+      const matrix: MatrixCell[] = [];
+      const matrixMap = new Map<string, number>();
+      risksData.data?.forEach(r => {
+        if (r.residual_likelihood && r.residual_impact) {
+          const key = `${r.residual_likelihood}-${r.residual_impact}`;
+          matrixMap.set(key, (matrixMap.get(key) || 0) + 1);
+        }
+      });
+      matrixMap.forEach((count, key) => {
+        const [likelihood, impact] = key.split('-').map(Number);
+        matrix.push({ likelihood, impact, count });
+      });
+      setMatrixData(matrix);
+
+      const categoriesResult = await supabase
+        .from('risks')
+        .select('category_id, risk_categories(name)')
+        .eq('organization_id', orgId)
+        .eq('is_active', true);
+
+      const catMap = new Map<string, number>();
+      categoriesResult.data?.forEach(r => {
+        const catName = (r as any).risk_categories?.name || 'Diğer';
+        catMap.set(catName, (catMap.get(catName) || 0) + 1);
+      });
+      const categories: CategoryData[] = [];
+      catMap.forEach((count, name) => {
+        categories.push({ name, count });
+      });
+      setCategoryData(categories.sort((a, b) => b.count - a.count));
+
+      const criticalResult = await supabase
+        .from('risks')
+        .select('id, code, name, residual_score')
+        .eq('organization_id', orgId)
+        .eq('is_active', true)
+        .order('residual_score', { ascending: false })
+        .limit(5);
+      setCriticalRisks(criticalResult.data || []);
+
+      const delayedResult = await supabase
+        .from('risk_treatments')
+        .select('id, code, title, planned_end_date, risk_id, risks!inner(code, organization_id)')
+        .eq('risks.organization_id', orgId)
+        .not('status', 'in', '(COMPLETED,CANCELLED)')
+        .lt('planned_end_date', new Date().toISOString().split('T')[0]);
+
+      const delayed = delayedResult.data?.map(t => {
+        const targetDate = new Date(t.planned_end_date);
+        const today = new Date();
+        const delayDays = Math.floor((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          id: t.id,
+          code: t.code || '',
+          title: t.title,
+          planned_end_date: t.planned_end_date,
+          risk: { code: (t as any).risks?.code || '' },
+          delay_days: delayDays
+        };
+      }) || [];
+      setDelayedTreatments(delayed.slice(0, 5));
+
+      const alarms = Array.from(indicatorsByIndicator.values())
+        .filter(v => ['RED', 'YELLOW'].includes(v.status))
+        .map(a => ({
+          id: a.id,
+          indicator_id: a.indicator_id,
+          code: (a as any).risk_indicators?.code || '',
+          name: (a as any).risk_indicators?.name || '',
+          value: a.value || 0,
+          status: a.status || '',
+          unit_of_measure: (a as any).risk_indicators?.unit_of_measure || '',
+          threshold: (a as any).risk_indicators?.red_threshold || ''
+        }))
+        .sort((a, b) => (a.status === 'RED' ? -1 : 1));
+      setAlarmIndicators(alarms.slice(0, 5));
+
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -83,160 +185,21 @@ export default function RiskDashboard() {
     }
   };
 
-  const loadStats = async () => {
-    const orgId = profile?.organization_id;
-    if (!orgId) return;
-
-    const { data: risks } = await supabase
-      .from('risk_register')
-      .select('residual_likelihood, residual_impact')
-      .eq('organization_id', orgId)
-      .eq('status', 'active');
-
-    const totalRisks = risks?.length || 0;
-    let criticalRisks = 0;
-    let highRisks = 0;
-    let mediumRisks = 0;
-    let lowRisks = 0;
-
-    risks?.forEach(risk => {
-      const score = (risk.residual_likelihood || 0) * (risk.residual_impact || 0);
-      if (score >= 20) criticalRisks++;
-      else if (score >= 12) highRisks++;
-      else if (score >= 5) mediumRisks++;
-      else lowRisks++;
-    });
-
-    const { count: overdueCount } = await supabase
-      .from('risk_treatments')
-      .select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .lt('target_date', new Date().toISOString().split('T')[0])
-      .neq('status', 'completed');
-
-    const { count: totalActivitiesCount } = await supabase
-      .from('risk_treatments')
-      .select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId);
-
-    const { count: completedActivitiesCount } = await supabase
-      .from('risk_treatments')
-      .select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .eq('status', 'completed');
-
-    const { data: indicators } = await supabase
-      .from('risk_indicators')
-      .select('current_value, red_threshold')
-      .eq('organization_id', orgId);
-
-    const redIndicators = indicators?.filter(ind =>
-      ind.current_value >= ind.red_threshold
-    ).length || 0;
-
-    setStats({
-      totalRisks,
-      criticalRisks,
-      highRisks,
-      mediumRisks,
-      lowRisks,
-      overdueActivities: overdueCount || 0,
-      redIndicators,
-      totalActivities: totalActivitiesCount || 0,
-      completedActivities: completedActivitiesCount || 0
-    });
+  const getMatrixColor = (likelihood: number, impact: number) => {
+    const score = likelihood * impact;
+    if (score <= 4) return '#22c55e';
+    if (score <= 9) return '#eab308';
+    if (score <= 14) return '#f97316';
+    if (score <= 19) return '#ef4444';
+    return '#991b1b';
   };
 
-  const loadMatrixData = async () => {
-    const orgId = profile?.organization_id;
-    if (!orgId) return;
-
-    const { data } = await supabase
-      .from('risk_register')
-      .select('id, code, risk_name, residual_likelihood, residual_impact')
-      .eq('organization_id', orgId)
-      .eq('status', 'active')
-      .limit(15);
-
-    const matrixData = (data || []).map(risk => ({
-      risk_id: risk.id,
-      risk_code: risk.code,
-      risk_name: risk.risk_name,
-      likelihood: risk.residual_likelihood || 1,
-      impact: risk.residual_impact || 1,
-      score: (risk.residual_likelihood || 1) * (risk.residual_impact || 1)
-    }));
-
-    setMatrixData(matrixData);
+  const getCellCount = (likelihood: number, impact: number) => {
+    const cell = matrixData.find(m => m.likelihood === likelihood && m.impact === impact);
+    return cell?.count || 0;
   };
 
-  const loadOverdueActivities = async () => {
-    const orgId = profile?.organization_id;
-    if (!orgId) return;
-
-    const today = new Date();
-
-    const { data } = await supabase
-      .from('risk_treatments')
-      .select(`
-        id,
-        action_plan,
-        target_date,
-        responsible_department_id,
-        departments(name),
-        risk_register(risk_name)
-      `)
-      .eq('organization_id', orgId)
-      .lt('target_date', today.toISOString().split('T')[0])
-      .neq('status', 'completed')
-      .order('target_date', { ascending: true })
-      .limit(5);
-
-    const overdue = (data || []).map((activity: any) => {
-      const targetDate = new Date(activity.target_date);
-      const daysOverdue = Math.floor((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      return {
-        id: activity.id,
-        title: activity.action_plan,
-        risk_name: activity.risk_register?.risk_name || 'Bilinmeyen Risk',
-        target_date: activity.target_date,
-        responsible_unit: activity.departments?.name || 'Belirtilmemiş',
-        days_overdue: daysOverdue
-      };
-    });
-
-    setOverdueActivities(overdue);
-  };
-
-  const loadRedIndicators = async () => {
-    const orgId = profile?.organization_id;
-    if (!orgId) return;
-
-    const { data } = await supabase
-      .from('risk_indicators')
-      .select('id, indicator_name, current_value, red_threshold, unit')
-      .eq('organization_id', orgId)
-      .order('current_value', { ascending: false })
-      .limit(5);
-
-    const red = (data || []).filter(ind => ind.current_value >= ind.red_threshold).map(ind => ({
-      id: ind.id,
-      name: ind.indicator_name,
-      current_value: ind.current_value,
-      red_threshold: ind.red_threshold,
-      unit: ind.unit || ''
-    }));
-
-    setRedIndicators(red);
-  };
-
-  const getRiskColor = (score: number) => {
-    if (score >= 20) return 'bg-red-900';
-    if (score >= 12) return 'bg-red-600';
-    if (score >= 5) return 'bg-orange-400';
-    return 'bg-green-500';
-  };
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   if (loading) {
     return (
@@ -249,121 +212,212 @@ export default function RiskDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Risk Yönetimi Dashboard</h1>
-        <p className="mt-2 text-gray-600">Risk durum özeti ve kritik göstergeler</p>
+        <h1 className="text-3xl font-bold text-gray-900">Risk Yönetimi</h1>
+        <p className="mt-2 text-gray-600">Kurumsal risk durumu özeti</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div
+          onClick={() => navigate('/risk-management/risks')}
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Toplam Risk</span>
-            <Shield className="w-5 h-5 text-blue-600" />
+            <span className="text-sm font-medium text-gray-600">TOPLAM RİSK</span>
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-blue-600" />
+            </div>
           </div>
           <div className="text-3xl font-bold text-gray-900">{stats?.totalRisks || 0}</div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-red-900" />
-              <span>Kritik: {stats?.criticalRisks || 0}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-red-600" />
-              <span>Yüksek: {stats?.highRisks || 0}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-orange-400" />
-              <span>Orta: {stats?.mediumRisks || 0}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span>Düşük: {stats?.lowRisks || 0}</span>
-            </div>
+          <div className="mt-2 flex items-center text-sm text-blue-600">
+            <span className="mr-1">🔵</span> Aktif
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div
+          onClick={() => navigate('/risk-management/risks?level=critical')}
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Gösterge Alarmları</span>
-            <AlertTriangle className="w-5 h-5 text-red-600" />
+            <span className="text-sm font-medium text-gray-600">KRİTİK RİSK</span>
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
           </div>
-          <div className="text-3xl font-bold text-red-600">{stats?.redIndicators || 0}</div>
-          <p className="mt-2 text-xs text-gray-500">Kırmızı eşik aşımı</p>
+          <div className="text-3xl font-bold text-gray-900">{stats?.criticalRisks || 0}</div>
+          <div className="mt-2 text-xs text-gray-500">(skor 17-25)</div>
+          <div className="mt-1 flex items-center text-sm text-red-600">
+            <span className="mr-1">🔴</span> Kritik
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div
+          onClick={() => navigate('/risk-management/treatments?status=open')}
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Geciken Faaliyetler</span>
-            <Clock className="w-5 h-5 text-orange-600" />
+            <span className="text-sm font-medium text-gray-600">AÇIK FALİYET</span>
+            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-yellow-600" />
+            </div>
           </div>
-          <div className="text-3xl font-bold text-orange-600">{stats?.overdueActivities || 0}</div>
-          <p className="mt-2 text-xs text-gray-500">Süre aşımı</p>
+          <div className="text-3xl font-bold text-gray-900">{stats?.openTreatments || 0}</div>
+          <div className="mt-2 text-xs text-gray-500">(tamamlanmamış)</div>
+          <div className="mt-1 flex items-center text-sm text-yellow-600">
+            <span className="mr-1">🟡</span> Bekleyen
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div
+          onClick={() => navigate('/risk-management/indicators?status=red')}
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Faaliyet İlerlemesi</span>
-            <Activity className="w-5 h-5 text-green-600" />
+            <span className="text-sm font-medium text-gray-600">ALARM VEREN GÖSTERGE</span>
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <Bell className="w-5 h-5 text-red-600" />
+            </div>
           </div>
-          <div className="text-3xl font-bold text-gray-900">
-            {stats?.totalActivities ?
-              Math.round((stats.completedActivities / stats.totalActivities) * 100) : 0}%
+          <div className="text-3xl font-bold text-gray-900">{stats?.alarmIndicators || 0}</div>
+          <div className="mt-2 text-xs text-gray-500">(kırmızı)</div>
+          <div className="mt-1 flex items-center text-sm text-red-600">
+            <span className="mr-1">🔴</span> Alarm
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            {stats?.completedActivities || 0} / {stats?.totalActivities || 0} tamamlandı
-          </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Risk Matrisi Özet</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Risk Matrisi (5x5)</h2>
             <button
               onClick={() => navigate('/risk-management/matrix')}
               className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
-              Detaylı Görünüm
-              <ArrowRight className="w-4 h-4" />
+              Matrise Git <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-
-          <div className="space-y-2">
-            <div className="grid grid-cols-6 gap-1 text-xs font-medium text-gray-600">
-              <div />
-              <div className="text-center">1</div>
-              <div className="text-center">2</div>
-              <div className="text-center">3</div>
-              <div className="text-center">4</div>
-              <div className="text-center">5</div>
-            </div>
-
-            {[5, 4, 3, 2, 1].map(likelihood => (
-              <div key={likelihood} className="grid grid-cols-6 gap-1">
-                <div className="text-xs font-medium text-gray-600 flex items-center">{likelihood}</div>
-                {[1, 2, 3, 4, 5].map(impact => {
-                  const score = likelihood * impact;
-                  const risksInCell = matrixData.filter(
-                    r => r.likelihood === likelihood && r.impact === impact
-                  );
-                  return (
-                    <div
-                      key={impact}
-                      className={`h-12 ${getRiskColor(score)} rounded flex items-center justify-center text-white text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity`}
-                      onClick={() => navigate('/risk-management/matrix')}
-                      title={risksInCell.map(r => r.risk_name).join('\n')}
-                    >
-                      {risksInCell.length > 0 && risksInCell.length}
-                    </div>
-                  );
-                })}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="w-12 h-12 text-xs font-medium text-gray-600"></th>
+                  <th className="w-12 h-12 text-xs font-medium text-gray-600">1</th>
+                  <th className="w-12 h-12 text-xs font-medium text-gray-600">2</th>
+                  <th className="w-12 h-12 text-xs font-medium text-gray-600">3</th>
+                  <th className="w-12 h-12 text-xs font-medium text-gray-600">4</th>
+                  <th className="w-12 h-12 text-xs font-medium text-gray-600">5</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[5, 4, 3, 2, 1].map(likelihood => (
+                  <tr key={likelihood}>
+                    <td className="w-12 h-12 text-xs font-medium text-gray-600 text-center">{likelihood}</td>
+                    {[1, 2, 3, 4, 5].map(impact => {
+                      const count = getCellCount(likelihood, impact);
+                      const color = getMatrixColor(likelihood, impact);
+                      return (
+                        <td
+                          key={impact}
+                          className="w-12 h-12 border border-gray-200 text-center cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{ backgroundColor: color }}
+                          onClick={() => navigate(`/risk-management/risks?likelihood=${likelihood}&impact=${impact}`)}
+                        >
+                          <span className="text-white font-bold text-sm">{count || ''}</span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#22c55e' }}></div>
+                <span>Düşük (1-4)</span>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-600">Olasılık →</span>
-              <span className="text-gray-600">← Etki</span>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#eab308' }}></div>
+                <span>Orta (5-9)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f97316' }}></div>
+                <span>Yüksek (10-14)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ef4444' }}></div>
+                <span>Çok Yüksek (15-19)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#991b1b' }}></div>
+                <span>Kritik (20-25)</span>
+              </div>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Risk Dağılımı</h2>
+          {categoryData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, count }) => `${name} (${count})`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="count"
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-500">
+              Henüz risk verisi yok
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Kritik Riskler (Top 5)</h2>
+            <button
+              onClick={() => navigate('/risk-management/risks?sort=score')}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              Tümünü Gör <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-2">
+            {criticalRisks.length > 0 ? (
+              criticalRisks.map((risk, index) => (
+                <div
+                  key={risk.id}
+                  onClick={() => navigate(`/risk-management/risks/${risk.id}`)}
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-500">{index + 1}.</span>
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{risk.code}</span>
+                      <div className="text-sm text-gray-600">{risk.name}</div>
+                    </div>
+                  </div>
+                  <span className="text-lg font-bold text-red-600">[{risk.residual_score}]</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">Henüz risk kaydı yok</div>
+            )}
           </div>
         </div>
 
@@ -371,123 +425,69 @@ export default function RiskDashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Geciken Faaliyetler</h2>
             <button
-              onClick={() => navigate('/risk-management/treatments')}
+              onClick={() => navigate('/risk-management/treatments?status=delayed')}
               className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
-              Tümünü Gör
-              <ArrowRight className="w-4 h-4" />
+              Tümünü Gör <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-
-          {overdueActivities.length > 0 ? (
-            <div className="space-y-3">
-              {overdueActivities.map(activity => (
+          <div className="space-y-2">
+            {delayedTreatments.length > 0 ? (
+              delayedTreatments.map((treatment, index) => (
                 <div
-                  key={activity.id}
-                  className="p-3 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
-                  onClick={() => navigate('/risk-management/treatments')}
+                  key={treatment.id}
+                  onClick={() => navigate(`/risk-management/treatments/${treatment.id}`)}
+                  className="p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
                 >
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900">{activity.title}</div>
-                      <div className="text-xs text-gray-600 mt-1">Risk: {activity.risk_name}</div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                        <span>{activity.responsible_unit}</span>
-                        <span>•</span>
-                        <span className="text-red-600 font-medium">
-                          {activity.days_overdue} gün gecikti
-                        </span>
-                      </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-orange-600" />
+                      <span className="text-sm font-medium text-gray-900">{treatment.code}</span>
                     </div>
+                    <span className="text-xs font-medium text-orange-600">Gecikme: {treatment.delay_days} gün</span>
                   </div>
+                  <div className="text-sm text-gray-600 mt-1">{treatment.title}</div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              Geciken faaliyet bulunmuyor
-            </div>
-          )}
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">Geciken faaliyet yok</div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Gösterge Alarmları</h2>
-            <button
-              onClick={() => navigate('/risk-management/indicators')}
-              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              Tüm Göstergeler
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {redIndicators.length > 0 ? (
-            <div className="space-y-3">
-              {redIndicators.map(indicator => (
-                <div
-                  key={indicator.id}
-                  className="p-3 bg-red-50 border border-red-200 rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{indicator.name}</div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        Eşik: {indicator.red_threshold} {indicator.unit}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-red-600">
-                        {indicator.current_value}
-                      </div>
-                      <div className="text-xs text-gray-500">{indicator.unit}</div>
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Gösterge Alarmları</h2>
+          <button
+            onClick={() => navigate('/risk-management/indicators')}
+            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+          >
+            Tüm Göstergeler <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {alarmIndicators.length > 0 ? (
+            alarmIndicators.map(indicator => (
+              <div
+                key={indicator.id}
+                onClick={() => navigate('/risk-management/indicators')}
+                className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{indicator.status === 'RED' ? '🔴' : '🟡'}</span>
+                  <div>
+                    <div className="font-medium text-gray-900">{indicator.code} {indicator.name}</div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      Değer: {indicator.value} {indicator.unit_of_measure} | Eşik: {indicator.threshold}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              Alarm durumunda gösterge yok
-            </div>
+            <div className="text-center py-8 text-gray-500">Alarm durumu yok</div>
           )}
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Hızlı Erişim</h2>
-          <div className="space-y-2">
-            <a
-              href="/#/risk-management/risks"
-              className="block p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
-            >
-              <div className="font-medium text-gray-900">Risk Listesi</div>
-              <div className="text-sm text-gray-600">Tüm riskleri görüntüle ve yönet</div>
-            </a>
-            <a
-              href="/#/risk-management/matrix"
-              className="block p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
-            >
-              <div className="font-medium text-gray-900">Risk Matrisi</div>
-              <div className="text-sm text-gray-600">5x5 interaktif risk matrisi</div>
-            </a>
-            <a
-              href="/#/risk-management/treatments"
-              className="block p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
-            >
-              <div className="font-medium text-gray-900">Risk Faaliyetleri</div>
-              <div className="text-sm text-gray-600">Azaltma eylemleri ve takip</div>
-            </a>
-            <a
-              href="/#/risk-management/settings"
-              className="block p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
-            >
-              <div className="font-medium text-gray-900">Ayarlar</div>
-              <div className="text-sm text-gray-600">Risk yönetimi konfigürasyonu</div>
-            </a>
-          </div>
         </div>
       </div>
     </div>
