@@ -11,6 +11,7 @@ interface Risk {
   id: string;
   code: string;
   name: string;
+  owner_department_id?: string;
 }
 
 interface Department {
@@ -135,7 +136,7 @@ export default function RiskIndicators() {
 
         supabase
           .from('risks')
-          .select('id, code, name')
+          .select('id, code, name, owner_department_id')
           .eq('organization_id', profile?.organization_id)
           .eq('is_active', true)
           .order('code'),
@@ -236,12 +237,29 @@ export default function RiskIndicators() {
     setEditingIndicator(null);
   }
 
+  function handleRiskChange(riskId: string) {
+    const selectedRisk = risks.find(r => r.id === riskId);
+    setFormData({
+      ...formData,
+      risk_id: riskId,
+      responsible_department_id: selectedRisk?.owner_department_id || ''
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.name || !formData.risk_id || !formData.threshold_green ||
-        !formData.threshold_yellow || !formData.threshold_red) {
+    if (!formData.name.trim() || !formData.risk_id) {
       alert('Lütfen tüm zorunlu alanları doldurun');
+      return;
+    }
+
+    const greenValue = parseFloat(formData.threshold_green);
+    const yellowValue = parseFloat(formData.threshold_yellow);
+    const redValue = parseFloat(formData.threshold_red);
+
+    if (isNaN(greenValue) || isNaN(yellowValue) || isNaN(redValue)) {
+      alert('Lütfen geçerli eşik değerleri girin');
       return;
     }
 
@@ -249,14 +267,14 @@ export default function RiskIndicators() {
       const indicatorData = {
         organization_id: profile?.organization_id,
         risk_id: formData.risk_id,
-        name: formData.name,
+        name: formData.name.trim(),
         description: formData.description || null,
         unit_of_measure: formData.unit_of_measure,
         measurement_frequency: formData.measurement_frequency,
         direction: formData.direction,
-        threshold_green: parseFloat(formData.threshold_green),
-        threshold_yellow: parseFloat(formData.threshold_yellow),
-        threshold_red: parseFloat(formData.threshold_red),
+        threshold_green: greenValue,
+        threshold_yellow: yellowValue,
+        threshold_red: redValue,
         responsible_department_id: formData.responsible_department_id || null,
         is_active: formData.is_active
       };
@@ -734,7 +752,7 @@ export default function RiskIndicators() {
             </label>
             <select
               value={formData.risk_id}
-              onChange={(e) => setFormData({ ...formData, risk_id: e.target.value })}
+              onChange={(e) => handleRiskChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
@@ -745,6 +763,11 @@ export default function RiskIndicators() {
                 </option>
               ))}
             </select>
+            {formData.risk_id && formData.responsible_department_id && (
+              <p className="text-xs text-green-600 mt-1">
+                ✓ Sorumlu birim otomatik olarak yüklendi
+              </p>
+            )}
           </div>
 
           <div>
