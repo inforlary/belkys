@@ -73,11 +73,18 @@ export default function RiskDashboard() {
       const orgId = profile?.organization_id;
       if (!orgId) return;
 
-      const [risksData, treatmentsData, indicatorsData] = await Promise.all([
-        supabase.from('risks').select('*').eq('organization_id', orgId).eq('is_active', true),
-        supabase.from('risk_treatments').select('*').in('risk_id',
-          supabase.from('risks').select('id').eq('organization_id', orgId)
-        ),
+      const risksData = await supabase
+        .from('risks')
+        .select('*')
+        .eq('organization_id', orgId)
+        .eq('is_active', true);
+
+      const riskIds = risksData.data?.map(r => r.id) || [];
+
+      const [treatmentsData, indicatorsData] = await Promise.all([
+        riskIds.length > 0
+          ? supabase.from('risk_treatments').select('*').in('risk_id', riskIds)
+          : Promise.resolve({ data: [], error: null }),
         supabase
           .from('risk_indicator_values')
           .select('*, risk_indicators!inner(organization_id, code, name, unit_of_measure, red_threshold)')
@@ -143,24 +150,25 @@ export default function RiskDashboard() {
 
       const delayedResult = await supabase
         .from('risk_treatments')
-        .select('id, code, title, planned_end_date, risk_id, risks!inner(code, organization_id)')
+        .select('id, code, title, planned_end_date, status, risk_id, risks!inner(code, organization_id)')
         .eq('risks.organization_id', orgId)
-        .not('status', 'in', '(COMPLETED,CANCELLED)')
         .lt('planned_end_date', new Date().toISOString().split('T')[0]);
 
-      const delayed = delayedResult.data?.map(t => {
-        const targetDate = new Date(t.planned_end_date);
-        const today = new Date();
-        const delayDays = Math.floor((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
-        return {
-          id: t.id,
-          code: t.code || '',
-          title: t.title,
-          planned_end_date: t.planned_end_date,
-          risk: { code: (t as any).risks?.code || '' },
-          delay_days: delayDays
-        };
-      }) || [];
+      const delayed = delayedResult.data
+        ?.filter(t => !['COMPLETED', 'CANCELLED'].includes(t.status || ''))
+        .map(t => {
+          const targetDate = new Date(t.planned_end_date);
+          const today = new Date();
+          const delayDays = Math.floor((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            id: t.id,
+            code: t.code || '',
+            title: t.title,
+            planned_end_date: t.planned_end_date,
+            risk: { code: (t as any).risks?.code || '' },
+            delay_days: delayDays
+          };
+        }) || [];
       setDelayedTreatments(delayed.slice(0, 5));
 
       const alarms = Array.from(indicatorsByIndicator.values())
