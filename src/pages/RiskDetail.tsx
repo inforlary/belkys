@@ -126,6 +126,8 @@ export default function RiskDetail() {
   const [showControlModal, setShowControlModal] = useState(false);
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
+  const [editingIndicator, setEditingIndicator] = useState<RiskIndicator | null>(null);
+  const [deletingIndicator, setDeletingIndicator] = useState<RiskIndicator | null>(null);
 
   const [departments, setDepartments] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -693,7 +695,10 @@ export default function RiskDetail() {
                 <h3 className="text-lg font-semibold text-gray-900">Risk Göstergeleri (KRI)</h3>
                 {isAdmin && (
                   <button
-                    onClick={() => setShowIndicatorModal(true)}
+                    onClick={() => {
+                      setEditingIndicator(null);
+                      setShowIndicatorModal(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     <Plus className="w-4 h-4" />
@@ -726,7 +731,7 @@ export default function RiskDetail() {
                             </span>
                             <span className="text-gray-600">
                               Yön: <span className="font-medium">
-                                {indicator.direction === 'LOWER_BETTER' ? '↓ Düşük iyi' : '↑ Yüksek iyi'}
+                                {indicator.direction === 'LOWER_BETTER' ? '↓ Düşük iyi' : indicator.direction === 'HIGHER_BETTER' ? '↑ Yüksek iyi' : '🎯 Hedef'}
                               </span>
                             </span>
                           </div>
@@ -746,9 +751,25 @@ export default function RiskDetail() {
                           </div>
                         </div>
                         {isAdmin && (
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <MoreVertical className="w-5 h-5" />
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingIndicator(indicator);
+                                setShowIndicatorModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-700 p-1"
+                              title="Düzenle"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeletingIndicator(indicator)}
+                              className="text-red-600 hover:text-red-700 p-1"
+                              title="Sil"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -824,10 +845,65 @@ export default function RiskDetail() {
 
       <IndicatorModal
         isOpen={showIndicatorModal}
-        onClose={() => setShowIndicatorModal(false)}
+        onClose={() => {
+          setShowIndicatorModal(false);
+          setEditingIndicator(null);
+        }}
         riskId={riskId}
+        indicator={editingIndicator}
         onSuccess={loadData}
       />
+
+      {deletingIndicator && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Gösterge Sil</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  "{deletingIndicator.name}" göstergesini silmek istediğinize emin misiniz?
+                </p>
+                <p className="text-sm text-red-600">
+                  Bu işlem geri alınamaz.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setDeletingIndicator(null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('risk_indicators')
+                      .delete()
+                      .eq('id', deletingIndicator.id);
+
+                    if (error) throw error;
+
+                    alert('Gösterge başarıyla silindi!');
+                    setDeletingIndicator(null);
+                    loadData();
+                  } catch (error) {
+                    console.error('Error deleting indicator:', error);
+                    alert('Gösterge silinirken hata oluştu.');
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1188,7 +1264,9 @@ function TreatmentModal({ isOpen, onClose, riskId, departments, profiles, onSucc
   );
 }
 
-function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
+function IndicatorModal({ isOpen, onClose, riskId, indicator, onSuccess }: any) {
+  const isEditMode = !!indicator;
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -1203,6 +1281,36 @@ function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
   });
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (indicator) {
+      setFormData({
+        name: indicator.name || '',
+        description: indicator.description || '',
+        indicator_type: indicator.indicator_type || 'LEI',
+        unit_of_measure: indicator.unit_of_measure || '',
+        measurement_frequency: indicator.measurement_frequency || 'MONTHLY',
+        green_threshold: indicator.green_threshold || '',
+        yellow_threshold: indicator.yellow_threshold || '',
+        red_threshold: indicator.red_threshold || '',
+        direction: indicator.direction || 'LOWER_BETTER',
+        target_value: indicator.target_value || 0
+      });
+    } else {
+      setFormData({
+        name: '',
+        description: '',
+        indicator_type: 'LEI',
+        unit_of_measure: '',
+        measurement_frequency: 'MONTHLY',
+        green_threshold: '',
+        yellow_threshold: '',
+        red_threshold: '',
+        direction: 'LOWER_BETTER',
+        target_value: 0
+      });
+    }
+  }, [indicator]);
+
   if (!isOpen) return null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1210,37 +1318,49 @@ function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
     setSaving(true);
 
     try {
-      const prefix = formData.indicator_type;
+      if (isEditMode) {
+        const { error } = await supabase
+          .from('risk_indicators')
+          .update(formData)
+          .eq('id', indicator.id);
 
-      const { data: lastIndicator } = await supabase
-        .from('risk_indicators')
-        .select('code')
-        .eq('risk_id', riskId)
-        .like('code', `${prefix}%`)
-        .order('code', { ascending: false })
-        .limit(1)
-        .single();
+        if (error) throw error;
 
-      let nextCode = `${prefix}001`;
-      if (lastIndicator?.code) {
-        const lastNum = parseInt(lastIndicator.code.substring(3));
-        nextCode = `${prefix}${String(lastNum + 1).padStart(3, '0')}`;
+        alert('Gösterge başarıyla güncellendi!');
+      } else {
+        const prefix = formData.indicator_type;
+
+        const { data: lastIndicator } = await supabase
+          .from('risk_indicators')
+          .select('code')
+          .eq('risk_id', riskId)
+          .like('code', `${prefix}%`)
+          .order('code', { ascending: false })
+          .limit(1)
+          .single();
+
+        let nextCode = `${prefix}001`;
+        if (lastIndicator?.code) {
+          const lastNum = parseInt(lastIndicator.code.substring(3));
+          nextCode = `${prefix}${String(lastNum + 1).padStart(3, '0')}`;
+        }
+
+        const { error } = await supabase.from('risk_indicators').insert({
+          risk_id: riskId,
+          code: nextCode,
+          ...formData
+        });
+
+        if (error) throw error;
+
+        alert('Gösterge başarıyla eklendi!');
       }
 
-      const { error } = await supabase.from('risk_indicators').insert({
-        risk_id: riskId,
-        code: nextCode,
-        ...formData
-      });
-
-      if (error) throw error;
-
-      alert('Gösterge başarıyla eklendi!');
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error adding indicator:', error);
-      alert('Gösterge eklenirken hata oluştu.');
+      console.error('Error saving indicator:', error);
+      alert(`Gösterge ${isEditMode ? 'güncellenirken' : 'eklenirken'} hata oluştu.`);
     } finally {
       setSaving(false);
     }
@@ -1250,7 +1370,9 @@ function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-gray-900">Yeni Risk Göstergesi Ekle</h3>
+          <h3 className="text-xl font-semibold text-gray-900">
+            {isEditMode ? 'Risk Göstergesi Düzenle' : 'Yeni Risk Göstergesi Ekle'}
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
           </button>
