@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, History, Grid3x3, List, TrendingUp, TrendingDown, Minus, X, Filter } from 'lucide-react';
+import { Plus, CreditCard as Edit, History, Grid3x3, List, TrendingUp, TrendingDown, Minus, X, Filter } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface Risk {
