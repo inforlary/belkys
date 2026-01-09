@@ -62,14 +62,14 @@ interface Action {
   title: string;
   condition_id: string;
   responsible_department_id: string;
-  cooperation_department_ids: string[];
-  expected_output: string;
+  collaborating_departments_ids: string[];
+  expected_outputs: string;
   is_continuous: boolean;
   start_date: string | null;
   target_date: string | null;
   status: string;
   progress_percent: number;
-  notes: string;
+  description: string;
   departments?: { name: string };
 }
 
@@ -103,11 +103,11 @@ export default function ICStandards() {
   const [actionForm, setActionForm] = useState({
     title: '',
     responsible_department_id: '',
-    cooperation_department_ids: [] as string[],
-    expected_output: '',
+    collaborating_departments_ids: [] as string[],
+    expected_outputs: '',
     is_continuous: false,
     target_date: '',
-    notes: ''
+    description: ''
   });
 
   useEffect(() => {
@@ -273,22 +273,22 @@ export default function ICStandards() {
       setActionForm({
         title: action.title,
         responsible_department_id: action.responsible_department_id,
-        cooperation_department_ids: action.cooperation_department_ids || [],
-        expected_output: action.expected_output || '',
+        collaborating_departments_ids: action.collaborating_departments_ids || [],
+        expected_outputs: action.expected_outputs || '',
         is_continuous: action.is_continuous,
         target_date: action.target_date || '',
-        notes: action.notes || ''
+        description: action.description || ''
       });
     } else {
       setEditingAction(null);
       setActionForm({
         title: '',
         responsible_department_id: '',
-        cooperation_department_ids: [],
-        expected_output: '',
+        collaborating_departments_ids: [],
+        expected_outputs: '',
         is_continuous: false,
         target_date: '',
-        notes: ''
+        description: ''
       });
     }
 
@@ -315,14 +315,14 @@ export default function ICStandards() {
         code: editingAction ? editingAction.code : generateActionCode(actionConditionId),
         title: actionForm.title,
         responsible_department_id: actionForm.responsible_department_id,
-        cooperation_department_ids: actionForm.cooperation_department_ids,
-        expected_output: actionForm.expected_output,
+        collaborating_departments_ids: actionForm.collaborating_departments_ids,
+        expected_outputs: actionForm.expected_outputs,
         is_continuous: actionForm.is_continuous,
         start_date: new Date().toISOString().split('T')[0],
         target_date: actionForm.is_continuous ? null : actionForm.target_date,
         status: actionForm.is_continuous ? 'ONGOING' : 'NOT_STARTED',
         progress_percent: editingAction ? editingAction.progress_percent : 0,
-        notes: actionForm.notes
+        description: actionForm.description
       };
 
       if (editingAction) {
@@ -823,10 +823,10 @@ export default function ICStandards() {
             </label>
             <select
               multiple
-              value={actionForm.cooperation_department_ids}
+              value={actionForm.collaborating_departments_ids}
               onChange={(e) => {
                 const selected = Array.from(e.target.selectedOptions, option => option.value);
-                setActionForm({ ...actionForm, cooperation_department_ids: selected });
+                setActionForm({ ...actionForm, collaborating_departments_ids: selected });
               }}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               size={4}
@@ -843,8 +843,8 @@ export default function ICStandards() {
               Beklenen Çıktı/Sonuç
             </label>
             <textarea
-              value={actionForm.expected_output}
-              onChange={(e) => setActionForm({ ...actionForm, expected_output: e.target.value })}
+              value={actionForm.expected_outputs}
+              onChange={(e) => setActionForm({ ...actionForm, expected_outputs: e.target.value })}
               rows={2}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Beklenen çıktı veya sonuç..."
@@ -902,8 +902,8 @@ export default function ICStandards() {
               Açıklama/Not
             </label>
             <textarea
-              value={actionForm.notes}
-              onChange={(e) => setActionForm({ ...actionForm, notes: e.target.value })}
+              value={actionForm.description}
+              onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
               rows={2}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Ek açıklama veya notlar..."
