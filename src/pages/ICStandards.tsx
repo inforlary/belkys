@@ -222,12 +222,12 @@ export default function ICStandards() {
   };
 
   const handleEditStandard = (standard: ICStandard) => {
-    const allConditions = standard.conditions?.filter(c =>
-      c.organization_id === null || c.organization_id === profile?.organization_id
+    const orgConditions = standard.conditions?.filter(c =>
+      c.organization_id === profile?.organization_id
     ) || [];
     setEditingStandard({
       ...standard,
-      conditions: allConditions
+      conditions: orgConditions
     });
     setShowEditStandardModal(true);
   };
@@ -920,7 +920,7 @@ export default function ICStandards() {
 
               <div className="col-span-2 border-t border-gray-200 pt-4 mt-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-900">Genel Şartlar</h4>
+                  <h4 className="text-sm font-semibold text-gray-900">Kuruma Özel Genel Şartlar</h4>
                   <button
                     type="button"
                     onClick={() => {
@@ -939,6 +939,13 @@ export default function ICStandards() {
                   >
                     + Yeni Şart Ekle
                   </button>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                  <p className="text-xs text-blue-800">
+                    Bu bölümde sadece kurumunuza özel genel şartları düzenleyebilirsiniz.
+                    Tebliğ kapsamındaki standart genel şartları görmek için "Detay" butonuna tıklayın.
+                  </p>
                 </div>
 
                 <div className="space-y-3">
@@ -1005,7 +1012,7 @@ export default function ICStandards() {
 
                   {(!editingStandard.conditions || editingStandard.conditions.length === 0) && (
                     <p className="text-sm text-gray-500 text-center py-4">
-                      Henüz genel şart eklenmemiş. Yukarıdaki "Yeni Şart Ekle" butonunu kullanarak şart ekleyin.
+                      Henüz kurumunuza özel genel şart eklenmemiş. Yukarıdaki "Yeni Şart Ekle" butonunu kullanarak kurumunuza özel genel şartlar ekleyebilirsiniz.
                     </p>
                   )}
                 </div>
