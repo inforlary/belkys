@@ -400,7 +400,7 @@ export default function ICActionPlans() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`internal-control/action-plans/${plan.id}`);
+                        navigate(`/internal-control/action-plans/${plan.id}`);
                       }}
                       className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     >
