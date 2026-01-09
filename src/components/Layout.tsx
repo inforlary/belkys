@@ -285,6 +285,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: 'internal-control/dashboard' },
         { icon: BookOpen, label: 'Standartlar & Eylemler', path: 'internal-control/standards' },
+        { icon: Settings, label: 'Standart Yönetimi', path: 'internal-control/standards-management', adminOnly: true },
         { icon: ClipboardCheck, label: 'Eylem Planları', path: 'internal-control/action-plans' },
         { icon: ListChecks, label: 'Tüm Eylemler', path: 'internal-control/actions' },
         { icon: Scale, label: 'Öz Değerlendirmeler', path: 'internal-control/assessments' },

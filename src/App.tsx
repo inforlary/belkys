@@ -98,6 +98,7 @@ import QualityReports from './pages/QualityReports';
 import InternalControl from './pages/InternalControl';
 import InternalControlDashboard from './pages/InternalControlDashboard';
 import ICStandards from './pages/ICStandards';
+import ICStandardsManagement from './pages/ICStandardsManagement';
 import ICActionPlans from './pages/ICActionPlans';
 import ICActionPlanDetail from './pages/ICActionPlanDetail';
 import ICActionDetail from './pages/ICActionDetail';
@@ -379,6 +380,8 @@ const renderPage = () => {
         return <InternalControlDashboard />;
       case 'internal-control/standards':
         return <ICStandards />;
+      case 'internal-control/standards-management':
+        return <ICStandardsManagement />;
       case 'internal-control/action-plans':
         return <ICActionPlans />;
       case 'internal-control/actions':
