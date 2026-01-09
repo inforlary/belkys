@@ -804,6 +804,592 @@ export default function RiskDetail() {
           </div>
         </div>
       )}
+
+      <ControlModal
+        isOpen={showControlModal}
+        onClose={() => setShowControlModal(false)}
+        riskId={riskId}
+        departments={departments}
+        onSuccess={loadData}
+      />
+
+      <TreatmentModal
+        isOpen={showTreatmentModal}
+        onClose={() => setShowTreatmentModal(false)}
+        riskId={riskId}
+        departments={departments}
+        profiles={profiles}
+        onSuccess={loadData}
+      />
+
+      <IndicatorModal
+        isOpen={showIndicatorModal}
+        onClose={() => setShowIndicatorModal(false)}
+        riskId={riskId}
+        onSuccess={loadData}
+      />
+    </div>
+  );
+}
+
+function ControlModal({ isOpen, onClose, riskId, departments, onSuccess }: any) {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    control_type: 'PREVENTIVE',
+    control_nature: 'MANUAL',
+    design_effectiveness: 3,
+    operating_effectiveness: 3,
+    responsible_department_id: '',
+    test_frequency: 'QUARTERLY',
+    last_test_date: '',
+    next_test_date: ''
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (!isOpen) return null;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const { error } = await supabase.from('risk_controls').insert({
+        risk_id: riskId,
+        ...formData
+      });
+
+      if (error) throw error;
+
+      alert('Kontrol başarıyla eklendi!');
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Error adding control:', error);
+      alert('Kontrol eklenirken hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Yeni Kontrol Ekle</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Kontrol Adı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+            <textarea
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kontrol Türü</label>
+              <select
+                value={formData.control_type}
+                onChange={e => setFormData({ ...formData, control_type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="PREVENTIVE">Önleyici</option>
+                <option value="DETECTIVE">Tespit Edici</option>
+                <option value="CORRECTIVE">Düzeltici</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kontrol Yapısı</label>
+              <select
+                value={formData.control_nature}
+                onChange={e => setFormData({ ...formData, control_nature: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="MANUAL">Manuel</option>
+                <option value="AUTOMATED">Otomatik</option>
+                <option value="IT_DEPENDENT">IT Bağımlı</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tasarım Etkinliği (1-5)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="5"
+                value={formData.design_effectiveness}
+                onChange={e => setFormData({ ...formData, design_effectiveness: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Çalışma Etkinliği (1-5)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="5"
+                value={formData.operating_effectiveness}
+                onChange={e => setFormData({ ...formData, operating_effectiveness: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sorumlu Birim <span className="text-red-500">*</span>
+            </label>
+            <select
+              required
+              value={formData.responsible_department_id}
+              onChange={e => setFormData({ ...formData, responsible_department_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seçiniz</option>
+              {departments.map((dept: any) => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function TreatmentModal({ isOpen, onClose, riskId, departments, profiles, onSuccess }: any) {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    treatment_type: 'MITIGATE',
+    responsible_department_id: '',
+    responsible_person_id: '',
+    planned_start_date: '',
+    planned_end_date: '',
+    status: 'PLANNED'
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (!isOpen) return null;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const { data: lastTreatment } = await supabase
+        .from('risk_treatments')
+        .select('code')
+        .eq('risk_id', riskId)
+        .order('code', { ascending: false })
+        .limit(1)
+        .single();
+
+      let nextCode = 'F001';
+      if (lastTreatment?.code) {
+        const lastNum = parseInt(lastTreatment.code.substring(1));
+        nextCode = `F${String(lastNum + 1).padStart(3, '0')}`;
+      }
+
+      const { error } = await supabase.from('risk_treatments').insert({
+        risk_id: riskId,
+        code: nextCode,
+        progress_percent: 0,
+        ...formData
+      });
+
+      if (error) throw error;
+
+      alert('Faaliyet başarıyla eklendi!');
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Error adding treatment:', error);
+      alert('Faaliyet eklenirken hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Yeni Faaliyet Ekle</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Faaliyet Başlığı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.title}
+              onChange={e => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+            <textarea
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Faaliyet Türü</label>
+            <select
+              value={formData.treatment_type}
+              onChange={e => setFormData({ ...formData, treatment_type: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="MITIGATE">Azaltma</option>
+              <option value="TRANSFER">Transfer</option>
+              <option value="AVOID">Kaçınma</option>
+              <option value="ACCEPT">Kabul</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sorumlu Birim <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={formData.responsible_department_id}
+                onChange={e => setFormData({ ...formData, responsible_department_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seçiniz</option>
+                {departments.map((dept: any) => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Kişi</label>
+              <select
+                value={formData.responsible_person_id}
+                onChange={e => setFormData({ ...formData, responsible_person_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seçiniz</option>
+                {profiles.map((profile: any) => (
+                  <option key={profile.id} value={profile.id}>{profile.full_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Başlangıç Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.planned_start_date}
+                onChange={e => setFormData({ ...formData, planned_start_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bitiş Tarihi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.planned_end_date}
+                onChange={e => setFormData({ ...formData, planned_end_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    indicator_type: 'LEADING',
+    unit_of_measure: '',
+    measurement_frequency: 'MONTHLY',
+    green_threshold: '',
+    yellow_threshold: '',
+    red_threshold: '',
+    direction: 'LOWER_BETTER',
+    target_value: 0
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (!isOpen) return null;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const { data: lastIndicator } = await supabase
+        .from('risk_indicators')
+        .select('code')
+        .eq('risk_id', riskId)
+        .order('code', { ascending: false })
+        .limit(1)
+        .single();
+
+      let nextCode = 'KRI001';
+      if (lastIndicator?.code) {
+        const lastNum = parseInt(lastIndicator.code.substring(3));
+        nextCode = `KRI${String(lastNum + 1).padStart(3, '0')}`;
+      }
+
+      const { error } = await supabase.from('risk_indicators').insert({
+        risk_id: riskId,
+        code: nextCode,
+        ...formData
+      });
+
+      if (error) throw error;
+
+      alert('Gösterge başarıyla eklendi!');
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Error adding indicator:', error);
+      alert('Gösterge eklenirken hata oluştu.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Yeni Risk Göstergesi Ekle</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Gösterge Adı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+            <textarea
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Gösterge Türü</label>
+              <select
+                value={formData.indicator_type}
+                onChange={e => setFormData({ ...formData, indicator_type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="LEADING">Öncü Gösterge</option>
+                <option value="LAGGING">Gecikmiş Gösterge</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ölçüm Birimi</label>
+              <input
+                type="text"
+                value={formData.unit_of_measure}
+                onChange={e => setFormData({ ...formData, unit_of_measure: e.target.value })}
+                placeholder="Adet, %, TL, vb."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ölçüm Sıklığı</label>
+              <select
+                value={formData.measurement_frequency}
+                onChange={e => setFormData({ ...formData, measurement_frequency: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="DAILY">Günlük</option>
+                <option value="WEEKLY">Haftalık</option>
+                <option value="MONTHLY">Aylık</option>
+                <option value="QUARTERLY">Çeyreklik</option>
+                <option value="ANNUAL">Yıllık</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Yön</label>
+              <select
+                value={formData.direction}
+                onChange={e => setFormData({ ...formData, direction: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="LOWER_BETTER">Düşük İyi</option>
+                <option value="HIGHER_BETTER">Yüksek İyi</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Yeşil Eşik <span className="text-green-600">🟢</span>
+              </label>
+              <input
+                type="text"
+                value={formData.green_threshold}
+                onChange={e => setFormData({ ...formData, green_threshold: e.target.value })}
+                placeholder="örn: <5"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sarı Eşik <span className="text-yellow-500">🟡</span>
+              </label>
+              <input
+                type="text"
+                value={formData.yellow_threshold}
+                onChange={e => setFormData({ ...formData, yellow_threshold: e.target.value })}
+                placeholder="örn: 5-10"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Kırmızı Eşik <span className="text-red-600">🔴</span>
+              </label>
+              <input
+                type="text"
+                value={formData.red_threshold}
+                onChange={e => setFormData({ ...formData, red_threshold: e.target.value })}
+                placeholder="örn: >10"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
