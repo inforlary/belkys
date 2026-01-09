@@ -263,12 +263,17 @@ export default function RiskIndicators() {
       return;
     }
 
-    const greenValue = parseFloat(formData.threshold_green);
-    const yellowValue = parseFloat(formData.threshold_yellow);
-    const redValue = parseFloat(formData.threshold_red);
+    const greenValue = formData.threshold_green ? parseFloat(formData.threshold_green) : 0;
+    const yellowValue = formData.threshold_yellow ? parseFloat(formData.threshold_yellow) : 0;
+    const redValue = formData.threshold_red ? parseFloat(formData.threshold_red) : 0;
 
     if (isNaN(greenValue) || isNaN(yellowValue) || isNaN(redValue)) {
       alert('Lütfen geçerli eşik değerleri girin');
+      return;
+    }
+
+    if (greenValue === 0 || yellowValue === 0) {
+      alert('Lütfen yeşil ve sarı eşik değerlerini girin');
       return;
     }
 
