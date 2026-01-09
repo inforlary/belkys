@@ -283,7 +283,6 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       icon: ShieldCheck,
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: 'internal-control' },
-        { icon: BookOpen, label: 'Standartlar', path: 'internal-control/standards' },
         { icon: ClipboardCheck, label: 'Eylem Planları', path: 'internal-control/action-plans' },
         { icon: Scale, label: 'Değerlendirmeler', path: 'internal-control/assessments' },
         { icon: Users, label: 'İKİYK Toplantıları', path: 'internal-control/ikyk', adminOnly: true },
