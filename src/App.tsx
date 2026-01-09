@@ -79,13 +79,16 @@ import RiskTreatments from './pages/RiskTreatments';
 import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
 import RiskCategories from './pages/RiskCategories';
 import InternalControl from './pages/InternalControl';
+import InternalControlDashboard from './pages/InternalControlDashboard';
 import ICStandards from './pages/ICStandards';
 import ICActionPlans from './pages/ICActionPlans';
 import ICActionPlanDetail from './pages/ICActionPlanDetail';
 import ICActionDetail from './pages/ICActionDetail';
+import ICActions from './pages/ICActions';
 import ICAssessments from './pages/ICAssessments';
 import ICMeetings from './pages/ICMeetings';
 import ICAssuranceStatements from './pages/ICAssuranceStatements';
+import ICReports from './pages/ICReports';
 import Settings from './pages/Settings';
 import GeneralSettings from './pages/GeneralSettings';
 import OrganizationSettings from './pages/OrganizationSettings';
@@ -303,16 +306,22 @@ const renderPage = () => {
         return <RiskCategories />;
       case 'internal-control':
         return <InternalControl />;
+      case 'internal-control/dashboard':
+        return <InternalControlDashboard />;
       case 'internal-control/standards':
         return <ICStandards />;
       case 'internal-control/action-plans':
         return <ICActionPlans />;
+      case 'internal-control/actions':
+        return <ICActions />;
       case 'internal-control/assessments':
         return <ICAssessments />;
       case 'internal-control/ikyk':
         return <ICMeetings />;
       case 'internal-control/assurance':
         return <ICAssuranceStatements />;
+      case 'internal-control/reports':
+        return <ICReports />;
       case 'settings':
         return <Settings />;
       case 'settings/general':
