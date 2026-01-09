@@ -37,6 +37,21 @@ interface ICGeneralCondition {
   organization_id?: string | null;
 }
 
+interface ICAction {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  progress_percent: number;
+  start_date: string;
+  target_date: string;
+  completed_date?: string | null;
+  responsible_department_ids?: string[];
+  departments?: { name: string };
+}
+
 interface ICStandard {
   id: string;
   component_id: string;
@@ -47,6 +62,7 @@ interface ICStandard {
   order_index: number;
   compliance_level?: number;
   conditions?: ICGeneralCondition[];
+  actions?: ICAction[];
   action_count?: {
     active: number;
     completed: number;
@@ -80,6 +96,7 @@ export default function ICStandards() {
   const [editingComponent, setEditingComponent] = useState<ICComponent | null>(null);
   const [editingStandard, setEditingStandard] = useState<ICStandard | null>(null);
   const [saving, setSaving] = useState(false);
+  const [conditionFilter, setConditionFilter] = useState<'all' | 'satisfied' | 'unsatisfied'>('all');
 
   useEffect(() => {
     loadComponentsWithStandards();
@@ -206,9 +223,42 @@ export default function ICStandards() {
     setExpandedComponents(newExpanded);
   };
 
-  const openStandardModal = (standard: ICStandard) => {
-    setSelectedStandard(standard);
-    setShowModal(true);
+  const openStandardModal = async (standard: ICStandard) => {
+    if (!profile?.organization_id) return;
+
+    try {
+      const { data: actionsData } = await supabase
+        .from('ic_actions')
+        .select(`
+          id,
+          code,
+          title,
+          description,
+          status,
+          priority,
+          progress_percent,
+          start_date,
+          target_date,
+          completed_date,
+          responsible_department_ids,
+          ic_action_plans!inner(organization_id)
+        `)
+        .eq('standard_id', standard.id)
+        .eq('ic_action_plans.organization_id', profile.organization_id)
+        .order('code');
+
+      setSelectedStandard({
+        ...standard,
+        actions: actionsData || []
+      });
+      setShowModal(true);
+      setConditionFilter('all');
+    } catch (error) {
+      console.error('Error loading actions:', error);
+      setSelectedStandard(standard);
+      setShowModal(true);
+      setConditionFilter('all');
+    }
   };
 
   const closeModal = () => {
@@ -400,6 +450,37 @@ export default function ICStandards() {
           style={{ width: `${percent}%` }}
         />
       </div>
+    );
+  }
+
+  function getStatusBadge(status: string) {
+    const statusConfig: {[key: string]: {label: string; color: string}} = {
+      'NOT_STARTED': { label: 'Başlamadı', color: 'bg-gray-100 text-gray-700' },
+      'IN_PROGRESS': { label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-700' },
+      'COMPLETED': { label: 'Tamamlandı', color: 'bg-green-100 text-green-700' },
+      'DELAYED': { label: 'Gecikmiş', color: 'bg-red-100 text-red-700' },
+      'CANCELLED': { label: 'İptal', color: 'bg-gray-100 text-gray-500' }
+    };
+    const config = statusConfig[status] || { label: status, color: 'bg-gray-100 text-gray-700' };
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    );
+  }
+
+  function getPriorityBadge(priority: string) {
+    const priorityConfig: {[key: string]: {label: string; color: string}} = {
+      'LOW': { label: 'Düşük', color: 'bg-gray-100 text-gray-700' },
+      'MEDIUM': { label: 'Orta', color: 'bg-yellow-100 text-yellow-700' },
+      'HIGH': { label: 'Yüksek', color: 'bg-orange-100 text-orange-700' },
+      'CRITICAL': { label: 'Kritik', color: 'bg-red-100 text-red-700' }
+    };
+    const config = priorityConfig[priority] || { label: priority, color: 'bg-gray-100 text-gray-700' };
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
     );
   }
 
@@ -641,15 +722,70 @@ export default function ICStandards() {
               </div>
 
               <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
-                  Genel Şartlar
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Genel Şartlar
+                  </h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConditionFilter('all')}
+                      className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                        conditionFilter === 'all'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Tümü
+                    </button>
+                    <button
+                      onClick={() => setConditionFilter('satisfied')}
+                      className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                        conditionFilter === 'satisfied'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Sağlanan
+                    </button>
+                    <button
+                      onClick={() => setConditionFilter('unsatisfied')}
+                      className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                        conditionFilter === 'unsatisfied'
+                          ? 'bg-red-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Sağlanmayan
+                    </button>
+                  </div>
+                </div>
                 <div className="space-y-3">
                   {selectedStandard.conditions && selectedStandard.conditions.length > 0 ? (
-                    selectedStandard.conditions.map((condition, idx) => (
+                    (() => {
+                      const filteredConditions = selectedStandard.conditions.filter(condition => {
+                        if (conditionFilter === 'all') return true;
+                        if (conditionFilter === 'satisfied') return condition.current_status_satisfied;
+                        if (conditionFilter === 'unsatisfied') return !condition.current_status_satisfied;
+                        return true;
+                      });
+
+                      if (filteredConditions.length === 0) {
+                        return (
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-sm text-gray-500 text-center">
+                              {conditionFilter === 'satisfied' && 'Sağlanan genel şart bulunamadı'}
+                              {conditionFilter === 'unsatisfied' && 'Sağlanmayan genel şart bulunamadı'}
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return filteredConditions.map((condition, idx) => (
                       <div key={condition.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                         <div className="flex items-start justify-between mb-2">
-                          <span className="text-xs font-medium text-gray-500">Genel Şart {idx + 1}</span>
+                          <span className="text-xs font-medium text-gray-500">
+                            Genel Şart {selectedStandard.conditions.indexOf(condition) + 1}
+                          </span>
                           {condition.current_status_satisfied && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                               <CheckCircle2 className="w-3 h-3" />
@@ -667,7 +803,8 @@ export default function ICStandards() {
                           </div>
                         )}
                       </div>
-                    ))
+                      ));
+                    })()
                   ) : (
                     <div className="bg-gray-50 rounded-lg p-4">
                       <p className="text-sm text-gray-500 text-center">Henüz genel şart eklenmemiş</p>
@@ -692,30 +829,57 @@ export default function ICStandards() {
                 </div>
               )}
 
-              {selectedStandard.action_count && (selectedStandard.action_count.active > 0 || selectedStandard.action_count.completed > 0) && (
+              {selectedStandard.actions && selectedStandard.actions.length > 0 && (
                 <div className="border-t border-gray-200 pt-6">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
-                    İlişkili Eylemler
+                    İlişkili Eylemler ({selectedStandard.actions.length})
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-orange-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-orange-800">Aktif Eylemler</span>
-                        <Clock className="h-5 w-5 text-orange-600" />
+                  <div className="space-y-3">
+                    {selectedStandard.actions.map((action) => (
+                      <div key={action.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                {action.code}
+                              </span>
+                              {getStatusBadge(action.status)}
+                              {getPriorityBadge(action.priority)}
+                            </div>
+                            <h4 className="font-semibold text-gray-900 mb-1">{action.title}</h4>
+                            <p className="text-sm text-gray-600 mb-3">{action.description}</p>
+                            <div className="grid grid-cols-3 gap-3 text-xs">
+                              <div>
+                                <span className="text-gray-500">Başlangıç:</span>
+                                <span className="text-gray-900 ml-1 font-medium">
+                                  {new Date(action.start_date).toLocaleDateString('tr-TR')}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Hedef:</span>
+                                <span className="text-gray-900 ml-1 font-medium">
+                                  {new Date(action.target_date).toLocaleDateString('tr-TR')}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">İlerleme:</span>
+                                <span className="text-gray-900 ml-1 font-medium">%{action.progress_percent}</span>
+                              </div>
+                            </div>
+                            {action.progress_percent > 0 && (
+                              <div className="mt-3">
+                                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-blue-600 transition-all"
+                                    style={{ width: `${action.progress_percent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-orange-900 mt-2">
-                        {selectedStandard.action_count.active}
-                      </div>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-green-800">Tamamlanan</span>
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div className="text-2xl font-bold text-green-900 mt-2">
-                        {selectedStandard.action_count.completed}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               )}
