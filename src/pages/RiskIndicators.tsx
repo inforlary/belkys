@@ -123,13 +123,12 @@ export default function RiskIndicators() {
     try {
       setLoading(true);
 
-      const [indicatorsRes, risksRes, departmentsRes] = await Promise.all([
+      const [indicatorsRes, risksRes] = await Promise.all([
         supabase
           .from('risk_indicators')
           .select(`
             *,
-            risk:risks!inner(id, code, name, organization_id),
-            responsible_department:departments!responsible_department_id(id, name)
+            risk:risks!inner(id, code, name, organization_id)
           `)
           .eq('risk.organization_id', profile?.organization_id)
           .order('code'),
@@ -139,18 +138,11 @@ export default function RiskIndicators() {
           .select('id, code, name')
           .eq('organization_id', profile?.organization_id)
           .eq('is_active', true)
-          .order('code'),
-
-        supabase
-          .from('departments')
-          .select('id, name')
-          .eq('organization_id', profile?.organization_id)
-          .order('name')
+          .order('code')
       ]);
 
       if (indicatorsRes.error) throw indicatorsRes.error;
       if (risksRes.error) throw risksRes.error;
-      if (departmentsRes.error) throw departmentsRes.error;
 
       const indicatorsWithValues = await Promise.all(
         (indicatorsRes.data || []).map(async (indicator) => {
