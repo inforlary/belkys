@@ -222,10 +222,12 @@ export default function ICStandards() {
   };
 
   const handleEditStandard = (standard: ICStandard) => {
-    const orgConditions = standard.conditions?.filter(c => c.organization_id === profile?.organization_id) || [];
+    const allConditions = standard.conditions?.filter(c =>
+      c.organization_id === null || c.organization_id === profile?.organization_id
+    ) || [];
     setEditingStandard({
       ...standard,
-      conditions: orgConditions
+      conditions: allConditions
     });
     setShowEditStandardModal(true);
   };
