@@ -342,9 +342,10 @@ export default function ICStandards() {
 
       setShowActionModal(false);
       await loadPlanData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving action:', error);
-      alert('Eylem kaydedilirken hata oluştu');
+      const errorMessage = error?.message || 'Bilinmeyen hata';
+      alert(`Eylem kaydedilirken hata oluştu: ${errorMessage}`);
     } finally {
       setSaving(false);
     }

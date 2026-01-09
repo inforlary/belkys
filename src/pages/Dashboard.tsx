@@ -71,7 +71,7 @@ export default function Dashboard() {
           .from('ic_action_plans')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', profile.organization_id)
-          .eq('approval_status', 'pending_approval')
+          .eq('status', 'DRAFT')
       ]);
 
       const [goalsDataRes, indicatorsDataRes, targetsRes, entriesRes] = await Promise.all([
