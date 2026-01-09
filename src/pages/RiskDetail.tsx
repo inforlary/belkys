@@ -841,9 +841,8 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess }: any) 
     design_effectiveness: 3,
     operating_effectiveness: 3,
     responsible_department_id: '',
-    test_frequency: 'QUARTERLY',
-    last_test_date: '',
-    next_test_date: ''
+    frequency: 'Çeyreklik',
+    evidence: ''
   });
   const [saving, setSaving] = useState(false);
 
@@ -929,7 +928,7 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess }: any) 
               >
                 <option value="MANUAL">Manuel</option>
                 <option value="AUTOMATED">Otomatik</option>
-                <option value="IT_DEPENDENT">IT Bağımlı</option>
+                <option value="SEMI_AUTOMATED">Yarı Otomatik</option>
               </select>
             </div>
           </div>
@@ -1007,7 +1006,7 @@ function TreatmentModal({ isOpen, onClose, riskId, departments, profiles, onSucc
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    treatment_type: 'MITIGATE',
+    treatment_type: 'NEW_CONTROL',
     responsible_department_id: '',
     responsible_person_id: '',
     planned_start_date: '',
@@ -1098,7 +1097,8 @@ function TreatmentModal({ isOpen, onClose, riskId, departments, profiles, onSucc
               onChange={e => setFormData({ ...formData, treatment_type: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
-              <option value="MITIGATE">Azaltma</option>
+              <option value="NEW_CONTROL">Yeni Kontrol</option>
+              <option value="IMPROVE_CONTROL">Kontrol İyileştirme</option>
               <option value="TRANSFER">Transfer</option>
               <option value="AVOID">Kaçınma</option>
               <option value="ACCEPT">Kabul</option>
@@ -1192,7 +1192,7 @@ function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    indicator_type: 'LEADING',
+    indicator_type: 'LEI',
     unit_of_measure: '',
     measurement_frequency: 'MONTHLY',
     green_threshold: '',
@@ -1210,18 +1210,21 @@ function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
     setSaving(true);
 
     try {
+      const prefix = formData.indicator_type;
+
       const { data: lastIndicator } = await supabase
         .from('risk_indicators')
         .select('code')
         .eq('risk_id', riskId)
+        .like('code', `${prefix}%`)
         .order('code', { ascending: false })
         .limit(1)
         .single();
 
-      let nextCode = 'KRI001';
+      let nextCode = `${prefix}001`;
       if (lastIndicator?.code) {
         const lastNum = parseInt(lastIndicator.code.substring(3));
-        nextCode = `KRI${String(lastNum + 1).padStart(3, '0')}`;
+        nextCode = `${prefix}${String(lastNum + 1).padStart(3, '0')}`;
       }
 
       const { error } = await supabase.from('risk_indicators').insert({
@@ -1285,8 +1288,8 @@ function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
                 onChange={e => setFormData({ ...formData, indicator_type: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="LEADING">Öncü Gösterge</option>
-                <option value="LAGGING">Gecikmiş Gösterge</option>
+                <option value="LEI">Öncü Gösterge (LEI)</option>
+                <option value="KRI">Anahtar Risk Göstergesi (KRI)</option>
               </select>
             </div>
 
@@ -1327,6 +1330,7 @@ function IndicatorModal({ isOpen, onClose, riskId, onSuccess }: any) {
               >
                 <option value="LOWER_BETTER">Düşük İyi</option>
                 <option value="HIGHER_BETTER">Yüksek İyi</option>
+                <option value="TARGET">Hedefe Ulaşma</option>
               </select>
             </div>
           </div>
