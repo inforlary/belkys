@@ -62,7 +62,7 @@ interface Action {
   related_objective_id?: string;
   ic_general_conditions?: {
     code: string;
-    condition_text: string;
+    description: string;
     standard_id: string;
   };
   departments?: {
@@ -189,7 +189,8 @@ export default function ICActionPlanDetail() {
           .from('ic_actions')
           .select(`
             *,
-            ic_standards(code, name, component_id),
+            ic_standards!ic_actions_main_standard_id_fkey(code, name, component_id),
+            ic_general_conditions!ic_actions_condition_id_fkey(code, description, standard_id),
             departments(name)
           `)
           .eq('action_plan_id', planId)
@@ -1031,8 +1032,20 @@ export default function ICActionPlanDetail() {
                       <td className="px-4 py-3 text-sm font-medium text-green-600 hover:text-green-700">
                         {action.code}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {action.ic_standards?.code}
+                      <td className="px-4 py-3">
+                        {action.ic_standards?.code && (
+                          <div className="text-xs font-semibold text-slate-900" title={action.ic_standards.name}>
+                            {action.ic_standards.code}
+                          </div>
+                        )}
+                        {action.ic_general_conditions?.code && (
+                          <div
+                            className="text-xs text-green-600 font-medium mt-0.5"
+                            title={action.ic_general_conditions.description}
+                          >
+                            {action.ic_general_conditions.code}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900 text-sm hover:text-green-600">{action.title}</div>
