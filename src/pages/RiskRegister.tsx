@@ -135,6 +135,13 @@ export default function RiskRegister() {
 
   const [controls, setControls] = useState<RiskControl[]>([]);
   const [saving, setSaving] = useState(false);
+  const [showControlForm, setShowControlForm] = useState(false);
+  const [newControl, setNewControl] = useState<RiskControl>({
+    name: '',
+    description: '',
+    control_type: 'PREVENTIVE',
+    effectiveness: 'EFFECTIVE'
+  });
 
   useEffect(() => {
     if (profile?.organization_id) {
@@ -284,6 +291,8 @@ export default function RiskRegister() {
       status: 'ACTIVE'
     });
     setControls([]);
+    setShowControlForm(false);
+    setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
     generateNextCode();
     setShowModal(true);
   }
@@ -368,6 +377,8 @@ export default function RiskRegister() {
 
       alert(saveStatus === 'DRAFT' ? 'Risk taslak olarak kaydedildi!' : 'Risk başarıyla kaydedildi!');
       setShowModal(false);
+      setShowControlForm(false);
+      setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
       loadData();
     } catch (error) {
       console.error('Error saving risk:', error);
@@ -769,7 +780,11 @@ export default function RiskRegister() {
                 <p className="text-sm text-gray-600 mt-1">Tüm alanları dikkatlice doldurun</p>
               </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setShowControlForm(false);
+                  setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="w-6 h-6" />
@@ -991,28 +1006,123 @@ export default function RiskRegister() {
                     </div>
                   ))}
 
-                  {controls.length === 0 && (
+                  {controls.length === 0 && !showControlForm && (
                     <div className="text-center py-4 text-gray-500 text-sm">
                       Henüz kontrol eklenmedi
                     </div>
                   )}
 
-                  <button
-                    onClick={() => {
-                      const name = prompt('Kontrol Adı:');
-                      if (!name) return;
-                      const description = prompt('Açıklama:');
-                      const type = prompt('Kontrol Türü (PREVENTIVE/DETECTIVE/CORRECTIVE):')?.toUpperCase();
-                      const effectiveness = prompt('Etkinlik (EFFECTIVE/PARTIAL/INEFFECTIVE):')?.toUpperCase();
+                  {showControlForm && (
+                    <div className="bg-white p-4 rounded-lg border-2 border-blue-400 space-y-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-gray-900">Yeni Kontrol</h4>
+                        <button
+                          onClick={() => {
+                            setShowControlForm(false);
+                            setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+                          }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                      if (name && type && effectiveness) {
-                        setControls([...controls, { name, description: description || '', control_type: type, effectiveness }]);
-                      }
-                    }}
-                    className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600 transition"
-                  >
-                    + Kontrol Ekle
-                  </button>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Kontrol Adı <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newControl.name}
+                          onChange={(e) => setNewControl({ ...newControl, name: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Kontrol adını girin"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Açıklama
+                        </label>
+                        <textarea
+                          value={newControl.description}
+                          onChange={(e) => setNewControl({ ...newControl, description: e.target.value })}
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Kontrolün açıklaması"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Kontrol Türü <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={newControl.control_type}
+                            onChange={(e) => setNewControl({ ...newControl, control_type: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="PREVENTIVE">Önleyici</option>
+                            <option value="DETECTIVE">Tespit Edici</option>
+                            <option value="CORRECTIVE">Düzeltici</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Etkinlik <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={newControl.effectiveness}
+                            onChange={(e) => setNewControl({ ...newControl, effectiveness: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="EFFECTIVE">Etkin</option>
+                            <option value="PARTIAL">Kısmen Etkin</option>
+                            <option value="INEFFECTIVE">Etkin Değil</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            if (!newControl.name.trim()) {
+                              alert('Lütfen kontrol adını girin');
+                              return;
+                            }
+                            setControls([...controls, newControl]);
+                            setShowControlForm(false);
+                            setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+                          }}
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                        >
+                          <Save className="w-4 h-4 inline mr-2" />
+                          Kaydet
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowControlForm(false);
+                            setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+                          }}
+                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                        >
+                          İptal
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!showControlForm && (
+                    <button
+                      onClick={() => setShowControlForm(true)}
+                      className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600 transition"
+                    >
+                      <Plus className="w-4 h-4 inline mr-2" />
+                      Kontrol Ekle
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1172,7 +1282,11 @@ export default function RiskRegister() {
 
             <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg flex items-center justify-between">
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setShowControlForm(false);
+                  setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+                }}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 İptal
