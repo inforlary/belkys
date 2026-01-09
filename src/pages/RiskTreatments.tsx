@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Eye, Trash2, X, Filter, TrendingUp, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Filter, TrendingUp, Calendar, ExternalLink, MoreVertical, Search, X } from 'lucide-react';
 
 interface Risk {
   id: string;
@@ -15,11 +15,6 @@ interface Risk {
 interface Department {
   id: string;
   name: string;
-}
-
-interface User {
-  id: string;
-  full_name: string;
 }
 
 interface Treatment {
@@ -40,24 +35,15 @@ interface Treatment {
   risk_id: string;
   risk: Risk;
   responsible_department: Department;
-  responsible_person: User;
+  notes: string;
 }
 
-const treatmentTypeLabels: Record<string, string> = {
-  NEW_CONTROL: 'Yeni Kontrol Oluştur',
-  IMPROVE_CONTROL: 'Mevcut Kontrolü İyileştir',
-  TRANSFER: 'Riski Transfer Et',
-  ACCEPT: 'Riski Kabul Et',
-  AVOID: 'Riskten Kaçın'
-};
-
-const statusLabels: Record<string, { label: string; color: string }> = {
-  PLANNED: { label: 'Planlandı', color: 'bg-gray-100 text-gray-800' },
-  IN_PROGRESS: { label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-800' },
-  COMPLETED: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800' },
-  DELAYED: { label: 'Gecikmiş', color: 'bg-red-100 text-red-800' },
-  ON_HOLD: { label: 'Beklemede', color: 'bg-yellow-100 text-yellow-800' },
-  CANCELLED: { label: 'İptal Edildi', color: 'bg-gray-200 text-gray-700' }
+const statusLabels: Record<string, { label: string; color: string; emoji: string }> = {
+  NOT_STARTED: { label: 'Başlamadı', color: 'bg-gray-100 text-gray-800', emoji: '○' },
+  IN_PROGRESS: { label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-800', emoji: '🔄' },
+  COMPLETED: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800', emoji: '✅' },
+  DELAYED: { label: 'Gecikmiş', color: 'bg-red-100 text-red-800', emoji: '⚠️' },
+  CANCELLED: { label: 'İptal', color: 'bg-gray-200 text-gray-700', emoji: '✖' }
 };
 
 export default function RiskTreatments() {
@@ -67,42 +53,36 @@ export default function RiskTreatments() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [editingTreatment, setEditingTreatment] = useState<Treatment | null>(null);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const [filters, setFilters] = useState({
     risk_id: '',
     status: '',
     department_id: '',
     date_from: '',
-    date_to: ''
+    date_to: '',
+    search: ''
   });
 
   const [formData, setFormData] = useState({
     risk_id: '',
     title: '',
     description: '',
-    treatment_type: 'NEW_CONTROL',
     responsible_department_id: '',
-    responsible_person_id: '',
-    planned_start_date: '',
     planned_end_date: '',
-    estimated_budget: '',
-    required_resources: '',
-    expected_impact: '',
-    target_residual_score: ''
+    notes: ''
   });
 
   const [progressData, setProgressData] = useState({
     progress_percent: 0,
     status: 'IN_PROGRESS',
     notes: '',
-    challenges: '',
-    next_steps: ''
+    completed_date: ''
   });
 
   useEffect(() => {
@@ -115,47 +95,38 @@ export default function RiskTreatments() {
     try {
       setLoading(true);
 
-      const [treatmentsRes, risksRes, departmentsRes, usersRes] = await Promise.all([
+      const [treatmentsRes, risksRes, departmentsRes] = await Promise.all([
         supabase
           .from('risk_treatments')
           .select(`
             *,
             risk:risks(id, code, name),
-            responsible_department:departments!responsible_department_id(id, name),
-            responsible_person:profiles!responsible_person_id(id, full_name)
+            responsible_department:departments!responsible_department_id(id, name)
           `)
-          .eq('risk:risks.organization_id', profile?.organization_id)
+          .eq('risks.organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
 
         supabase
           .from('risks')
           .select('id, code, name')
           .eq('organization_id', profile?.organization_id)
-          .eq('is_active', true)
+          .eq('status', 'ACTIVE')
           .order('code'),
 
         supabase
           .from('departments')
           .select('id, name')
           .eq('organization_id', profile?.organization_id)
-          .order('name'),
-
-        supabase
-          .from('profiles')
-          .select('id, full_name')
-          .eq('organization_id', profile?.organization_id)
-          .order('full_name')
+          .order('name')
       ]);
 
       if (treatmentsRes.error) throw treatmentsRes.error;
       if (risksRes.error) throw risksRes.error;
       if (departmentsRes.error) throw departmentsRes.error;
-      if (usersRes.error) throw usersRes.error;
 
       setTreatments(treatmentsRes.data || []);
       setRisks(risksRes.data || []);
       setDepartments(departmentsRes.data || []);
-      setUsers(usersRes.data || []);
     } catch (error) {
       console.error('Veriler yüklenirken hata:', error);
     } finally {
@@ -170,15 +141,9 @@ export default function RiskTreatments() {
         risk_id: treatment.risk_id,
         title: treatment.title,
         description: treatment.description || '',
-        treatment_type: treatment.treatment_type,
         responsible_department_id: treatment.responsible_department_id || '',
-        responsible_person_id: treatment.responsible_person_id || '',
-        planned_start_date: treatment.planned_start_date || '',
         planned_end_date: treatment.planned_end_date || '',
-        estimated_budget: treatment.estimated_budget?.toString() || '',
-        required_resources: '',
-        expected_impact: '',
-        target_residual_score: ''
+        notes: treatment.notes || ''
       });
     } else {
       setEditingTreatment(null);
@@ -186,15 +151,9 @@ export default function RiskTreatments() {
         risk_id: '',
         title: '',
         description: '',
-        treatment_type: 'NEW_CONTROL',
         responsible_department_id: '',
-        responsible_person_id: '',
-        planned_start_date: '',
         planned_end_date: '',
-        estimated_budget: '',
-        required_resources: '',
-        expected_impact: '',
-        target_residual_score: ''
+        notes: ''
       });
     }
     setShowModal(true);
@@ -211,8 +170,7 @@ export default function RiskTreatments() {
       progress_percent: treatment.progress_percent,
       status: treatment.status,
       notes: '',
-      challenges: '',
-      next_steps: ''
+      completed_date: treatment.actual_end_date || ''
     });
     setShowProgressModal(true);
   }
@@ -233,24 +191,22 @@ export default function RiskTreatments() {
     try {
       let code = '';
       if (!editingTreatment) {
-        const selectedRisk = risks.find(r => r.id === formData.risk_id);
         const { data: existingTreatments } = await supabase
           .from('risk_treatments')
           .select('code')
-          .eq('risk_id', formData.risk_id)
           .order('created_at', { ascending: false })
           .limit(1);
 
         let nextNumber = 1;
         if (existingTreatments && existingTreatments.length > 0) {
           const lastCode = existingTreatments[0].code;
-          const match = lastCode?.match(/-(\d+)$/);
+          const match = lastCode?.match(/F-(\d+)$/);
           if (match) {
             nextNumber = parseInt(match[1]) + 1;
           }
         }
 
-        code = `${selectedRisk?.code}-F${nextNumber.toString().padStart(2, '0')}`;
+        code = `F-${nextNumber.toString().padStart(3, '0')}`;
       }
 
       const treatmentData = {
@@ -258,13 +214,10 @@ export default function RiskTreatments() {
         code: editingTreatment ? editingTreatment.code : code,
         title: formData.title,
         description: formData.description,
-        treatment_type: formData.treatment_type,
         responsible_department_id: formData.responsible_department_id || null,
-        responsible_person_id: formData.responsible_person_id || null,
-        planned_start_date: formData.planned_start_date || null,
         planned_end_date: formData.planned_end_date,
-        estimated_budget: formData.estimated_budget ? parseFloat(formData.estimated_budget) : null,
-        status: editingTreatment ? editingTreatment.status : 'PLANNED',
+        notes: formData.notes,
+        status: editingTreatment ? editingTreatment.status : 'NOT_STARTED',
         progress_percent: editingTreatment ? editingTreatment.progress_percent : 0
       };
 
@@ -295,17 +248,30 @@ export default function RiskTreatments() {
     e.preventDefault();
 
     if (!editingTreatment || !progressData.notes) {
-      alert('Lütfen açıklama girin');
+      alert('Lütfen güncelleme notu girin');
       return;
     }
 
+    if (progressData.progress_percent === 100 && progressData.status !== 'COMPLETED') {
+      if (!confirm('İlerleme %100 ancak durum Tamamlandı değil. Durumu Tamamlandı olarak işaretlemek ister misiniz?')) {
+        return;
+      }
+      progressData.status = 'COMPLETED';
+    }
+
     try {
+      const updateData: any = {
+        progress_percent: progressData.progress_percent,
+        status: progressData.status
+      };
+
+      if (progressData.status === 'COMPLETED' && progressData.completed_date) {
+        updateData.actual_end_date = progressData.completed_date;
+      }
+
       const { error: updateError } = await supabase
         .from('risk_treatments')
-        .update({
-          progress_percent: progressData.progress_percent,
-          status: progressData.status
-        })
+        .update(updateData)
         .eq('id', editingTreatment.id);
 
       if (updateError) throw updateError;
@@ -319,9 +285,7 @@ export default function RiskTreatments() {
           new_progress: progressData.progress_percent,
           previous_status: editingTreatment.status,
           new_status: progressData.status,
-          notes: progressData.notes,
-          challenges: progressData.challenges,
-          next_steps: progressData.next_steps
+          notes: progressData.notes
         });
 
       if (historyError) throw historyError;
@@ -334,14 +298,14 @@ export default function RiskTreatments() {
     }
   }
 
-  async function handleDelete(treatmentId: string) {
-    if (!confirm('Bu faaliyeti silmek istediğinizden emin misiniz?')) return;
+  async function handleDelete(treatment: Treatment) {
+    if (!confirm(`${treatment.code} - ${treatment.title} faaliyetini silmek istediğinize emin misiniz?\n\nİlerleme geçmişi de silinecektir.`)) return;
 
     try {
       const { error } = await supabase
         .from('risk_treatments')
         .delete()
-        .eq('id', treatmentId);
+        .eq('id', treatment.id);
 
       if (error) throw error;
       loadData();
@@ -351,10 +315,22 @@ export default function RiskTreatments() {
     }
   }
 
-  function isOverdue(treatment: Treatment): boolean {
-    if (treatment.status === 'COMPLETED') return false;
+  function getDelayDays(treatment: Treatment): number {
+    if (treatment.status === 'COMPLETED' || treatment.status === 'CANCELLED') return 0;
     const endDate = new Date(treatment.planned_end_date);
-    return endDate < new Date();
+    const today = new Date();
+    if (endDate < today) {
+      return Math.floor((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    return 0;
+  }
+
+  function isDueSoon(treatment: Treatment): boolean {
+    if (treatment.status === 'COMPLETED' || treatment.status === 'CANCELLED') return false;
+    const endDate = new Date(treatment.planned_end_date);
+    const today = new Date();
+    const diffDays = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 7;
   }
 
   const filteredTreatments = treatments.filter(t => {
@@ -363,8 +339,53 @@ export default function RiskTreatments() {
     if (filters.department_id && t.responsible_department_id !== filters.department_id) return false;
     if (filters.date_from && t.planned_end_date < filters.date_from) return false;
     if (filters.date_to && t.planned_end_date > filters.date_to) return false;
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      return t.code?.toLowerCase().includes(search) || t.title?.toLowerCase().includes(search);
+    }
     return true;
   });
+
+  const sortedTreatments = [...filteredTreatments].sort((a, b) => {
+    const aDelayed = getDelayDays(a) > 0;
+    const bDelayed = getDelayDays(b) > 0;
+
+    if (aDelayed && !bDelayed) return -1;
+    if (!aDelayed && bDelayed) return 1;
+
+    const statusOrder: Record<string, number> = {
+      'DELAYED': 1,
+      'IN_PROGRESS': 2,
+      'NOT_STARTED': 3,
+      'COMPLETED': 4,
+      'CANCELLED': 5
+    };
+
+    const aOrder = statusOrder[a.status] || 999;
+    const bOrder = statusOrder[b.status] || 999;
+
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    return new Date(a.planned_end_date).getTime() - new Date(b.planned_end_date).getTime();
+  });
+
+  const stats = {
+    total: filteredTreatments.length,
+    inProgress: filteredTreatments.filter(t => t.status === 'IN_PROGRESS').length,
+    completed: filteredTreatments.filter(t => t.status === 'COMPLETED').length,
+    delayed: filteredTreatments.filter(t => getDelayDays(t) > 0).length
+  };
+
+  function clearFilters() {
+    setFilters({
+      risk_id: '',
+      status: '',
+      department_id: '',
+      date_from: '',
+      date_to: '',
+      search: ''
+    });
+  }
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
@@ -372,38 +393,94 @@ export default function RiskTreatments() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <TrendingUp className="w-7 h-7 text-blue-600" />
+            <TrendingUp className="w-7 h-7" />
             Risk Faaliyetleri
           </h1>
-          <p className="text-gray-600 mt-1">Risk azaltma faaliyetlerini planlayın ve takip edin</p>
+          <p className="text-gray-600 mt-1">Risk azaltma faaliyetleri takibi</p>
         </div>
         <button
           onClick={() => openModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           <Plus className="w-4 h-4" />
-          Yeni Faaliyet Ekle
+          Yeni Faaliyet
         </button>
       </div>
 
-      <Card>
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <h3 className="font-semibold text-gray-900">Filtreler</h3>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card
+          className="cursor-pointer hover:shadow-md transition"
+          onClick={() => setFilters({ ...filters, status: '' })}
+        >
+          <div className="p-6 text-center">
+            <div className="text-3xl font-bold text-gray-900">{stats.total}</div>
+            <div className="text-sm text-gray-600 mt-1">Toplam</div>
+            <div className="text-xs text-gray-500 mt-1">Faaliyet</div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        </Card>
+
+        <Card
+          className="cursor-pointer hover:shadow-md transition"
+          onClick={() => setFilters({ ...filters, status: 'IN_PROGRESS' })}
+        >
+          <div className="p-6 text-center">
+            <div className="text-3xl font-bold text-blue-600">{stats.inProgress}</div>
+            <div className="text-sm text-gray-600 mt-1">Devam Eden</div>
+            <div className="text-xs text-gray-500 mt-1">🔄 Aktif</div>
+          </div>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover:shadow-md transition"
+          onClick={() => setFilters({ ...filters, status: 'COMPLETED' })}
+        >
+          <div className="p-6 text-center">
+            <div className="text-3xl font-bold text-green-600">{stats.completed}</div>
+            <div className="text-sm text-gray-600 mt-1">Tamamlanan</div>
+            <div className="text-xs text-gray-500 mt-1">✅ Biten</div>
+          </div>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover:shadow-md transition"
+          onClick={() => setFilters({ ...filters, status: 'DELAYED' })}
+        >
+          <div className="p-6 text-center">
+            <div className="text-3xl font-bold text-red-600">{stats.delayed}</div>
+            <div className="text-sm text-gray-600 mt-1">Geciken</div>
+            <div className="text-xs text-gray-500 mt-1">⚠️ Gecikmiş</div>
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="w-5 h-5 text-gray-500" />
+              <h3 className="font-semibold text-gray-900">Filtreler</h3>
+            </div>
+            {(filters.risk_id || filters.status || filters.department_id || filters.date_from || filters.date_to || filters.search) && (
+              <button
+                onClick={clearFilters}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Temizle
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Risk</label>
               <select
                 value={filters.risk_id}
                 onChange={(e) => setFilters({ ...filters, risk_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Tümü</option>
+                <option value="">Risk ▼</option>
                 {risks.map((risk) => (
                   <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
                 ))}
@@ -411,13 +488,25 @@ export default function RiskTreatments() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+              <select
+                value={filters.department_id}
+                onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Birim ▼</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <select
                 value={filters.status}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Tümü</option>
+                <option value="">Durum ▼</option>
                 {Object.entries(statusLabels).map(([key, { label }]) => (
                   <option key={key} value={key}>{label}</option>
                 ))}
@@ -425,154 +514,198 @@ export default function RiskTreatments() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Birim</label>
-              <select
-                value={filters.department_id}
-                onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="">Tümü</option>
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Başlangıç</label>
               <input
                 type="date"
                 value={filters.date_from}
                 onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                placeholder="Başlangıç"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bitiş</label>
               <input
                 type="date"
                 value={filters.date_to}
                 onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                placeholder="Bitiş"
+              />
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                placeholder="Ara..."
               />
             </div>
           </div>
         </div>
+      </Card>
 
-        <div className="p-4">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kod</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Faaliyet</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">İlgili Risk</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tip</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sorumlu</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Hedef Tarih</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">İlerleme</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Durum</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">İşlemler</th>
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kod</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faaliyet Adı</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlişkili Risk</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu Birim</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hedef Tarih</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlerleme</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İşlem</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {sortedTreatments.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    Faaliyet bulunamadı
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredTreatments.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                      Faaliyet bulunamadı
-                    </td>
-                  </tr>
-                ) : (
-                  filteredTreatments.map((treatment) => (
+              ) : (
+                sortedTreatments.map((treatment) => {
+                  const delayDays = getDelayDays(treatment);
+                  const isDelayed = delayDays > 0;
+                  const dueSoon = isDueSoon(treatment);
+                  const statusInfo = statusLabels[treatment.status] || statusLabels['NOT_STARTED'];
+
+                  return (
                     <tr
                       key={treatment.id}
-                      className={`border-b border-gray-100 hover:bg-gray-50 ${isOverdue(treatment) ? 'bg-red-50' : ''}`}
+                      className="hover:bg-gray-50 cursor-pointer transition"
+                      onClick={() => openProgressModal(treatment)}
                     >
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{treatment.code}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{treatment.title}</div>
-                        {treatment.description && (
-                          <div className="text-sm text-gray-500 mt-1">{treatment.description.substring(0, 60)}...</div>
-                        )}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{treatment.title}</td>
                       <td className="px-4 py-3">
                         {treatment.risk ? (
-                          <button
-                            onClick={() => navigate(`risks/register/${treatment.risk_id}`)}
-                            className="text-sm text-blue-600 hover:text-blue-800"
-                          >
-                            {treatment.risk.code}
-                          </button>
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-900">{treatment.risk.code}</div>
+                            <div className="text-xs text-gray-500">{treatment.risk.name}</div>
+                          </div>
                         ) : (
-                          <span className="text-sm text-red-600">Risk eksik!</span>
+                          <span className="text-sm text-red-600">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          {treatmentTypeLabels[treatment.treatment_type] || treatment.treatment_type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-700">
-                          <div className="font-medium">
-                            {treatment.responsible_department?.name || <span className="text-red-600">Birim belirlenmemiş</span>}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {treatment.responsible_person?.full_name || <span className="text-red-600">Sorumlu belirlenmemiş</span>}
-                          </div>
-                        </div>
-                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {treatment.planned_end_date ? new Date(treatment.planned_end_date).toLocaleDateString('tr-TR') : '-'}
+                        {treatment.responsible_department?.name || '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm">
+                          <div className={isDelayed ? 'text-red-600 font-medium' : dueSoon ? 'text-yellow-600 font-medium' : 'text-gray-700'}>
+                            {new Date(treatment.planned_end_date).toLocaleDateString('tr-TR')}
+                          </div>
+                          {isDelayed && (
+                            <div className="text-xs text-red-600 font-medium">
+                              🔴 {delayDays} gün
+                            </div>
+                          )}
+                          {dueSoon && !isDelayed && (
+                            <div className="text-xs text-yellow-600">
+                              🟡 Yaklaşıyor
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full"
-                              style={{ width: `${treatment.progress_percent}%` }}
-                            />
+                          <div className="flex-1">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
+                              <span>{statusInfo.emoji}</span>
+                              <span>{treatment.progress_percent}%</span>
+                              {isDelayed && treatment.status !== 'COMPLETED' && (
+                                <span className="ml-1">Gecikmiş</span>
+                              )}
+                              {treatment.status === 'NOT_STARTED' && (
+                                <span className="ml-1">Başlamadı</span>
+                              )}
+                            </span>
                           </div>
-                          <span className="text-sm font-medium text-gray-700">{treatment.progress_percent}%</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusLabels[treatment.status]?.color || 'bg-gray-100 text-gray-800'}`}>
-                          {statusLabels[treatment.status]?.label || treatment.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative inline-block">
                           <button
-                            onClick={() => openProgressModal(treatment)}
-                            className="p-1 text-green-600 hover:text-green-800"
-                            title="İlerleme Güncelle"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenu(activeMenu === treatment.id ? null : treatment.id);
+                            }}
+                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition"
                           >
-                            <TrendingUp className="w-4 h-4" />
+                            <MoreVertical className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => openModal(treatment)}
-                            className="p-1 text-blue-600 hover:text-blue-800"
-                            title="Düzenle"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(treatment.id)}
-                            className="p-1 text-red-600 hover:text-red-800"
-                            title="Sil"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+
+                          {activeMenu === treatment.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenu(null);
+                                }}
+                              />
+                              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenu(null);
+                                    openProgressModal(treatment);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <TrendingUp className="w-4 h-4" />
+                                  İlerleme Güncelle
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenu(null);
+                                    openModal(treatment);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                  Düzenle
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenu(null);
+                                    navigate(`risk-management/risks/${treatment.risk_id}`);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                  Riske Git
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenu(null);
+                                    handleDelete(treatment);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Sil
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </Card>
 
@@ -580,126 +713,94 @@ export default function RiskTreatments() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              İlgili Risk <span className="text-red-500">*</span>
+              İlişkili Risk <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.risk_id}
               onChange={(e) => setFormData({ ...formData, risk_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
               disabled={!!editingTreatment}
             >
-              <option value="">Seçiniz</option>
+              <option value="">Seçiniz...</option>
               {risks.map((risk) => (
                 <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
               ))}
             </select>
           </div>
 
+          {!editingTreatment && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Faaliyet Kodu</label>
+              <input
+                type="text"
+                value="Otomatik oluşturulacak"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                disabled
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Faaliyet Başlığı <span className="text-red-500">*</span>
+              Faaliyet Adı <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Açıklama <span className="text-red-500">*</span>
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               rows={3}
-              required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Faaliyet Tipi <span className="text-red-500">*</span>
+              Sorumlu Birim <span className="text-red-500">*</span>
             </label>
             <select
-              value={formData.treatment_type}
-              onChange={(e) => setFormData({ ...formData, treatment_type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              value={formData.responsible_department_id}
+              onChange={(e) => setFormData({ ...formData, responsible_department_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
             >
-              {Object.entries(treatmentTypeLabels).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
+              <option value="">Seçiniz...</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Birim</label>
-              <select
-                value={formData.responsible_department_id}
-                onChange={(e) => setFormData({ ...formData, responsible_department_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">Seçiniz</option>
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Kişi</label>
-              <select
-                value={formData.responsible_person_id}
-                onChange={(e) => setFormData({ ...formData, responsible_person_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">Seçiniz</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>{user.full_name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Planlanan Başlangıç</label>
-              <input
-                type="date"
-                value={formData.planned_start_date}
-                onChange={(e) => setFormData({ ...formData, planned_start_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Planlanan Bitiş <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.planned_end_date}
-                onChange={(e) => setFormData({ ...formData, planned_end_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hedef Tarih <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={formData.planned_end_date}
+              onChange={(e) => setFormData({ ...formData, planned_end_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tahmini Bütçe (TL)</label>
-            <input
-              type="number"
-              value={formData.estimated_budget}
-              onChange={(e) => setFormData({ ...formData, estimated_budget: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              step="0.01"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notlar</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              rows={2}
             />
           </div>
 
@@ -707,15 +808,15 @@ export default function RiskTreatments() {
             <button
               type="button"
               onClick={closeModal}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
             >
               İptal
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
-              {editingTreatment ? 'Güncelle' : 'Kaydet'}
+              Kaydet
             </button>
           </div>
         </form>
@@ -723,84 +824,93 @@ export default function RiskTreatments() {
 
       <Modal isOpen={showProgressModal} onClose={closeProgressModal} title="İlerleme Güncelle">
         <form onSubmit={handleProgressUpdate} className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-sm font-medium text-gray-700 mb-2">
-              Faaliyet: {editingTreatment?.code} - {editingTreatment?.title}
+          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div className="text-sm font-medium text-gray-900">
+              {editingTreatment?.code} - {editingTreatment?.title}
             </div>
             <div className="text-sm text-gray-600">
-              Mevcut İlerleme: {editingTreatment?.progress_percent}%
+              Risk: {editingTreatment?.risk?.code} - {editingTreatment?.risk?.name}
             </div>
-            <div className="mt-2 bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full"
-                style={{ width: `${editingTreatment?.progress_percent}%` }}
-              />
+            <div className="text-sm text-gray-600">
+              Sorumlu: {editingTreatment?.responsible_department?.name || '-'}
+            </div>
+            <div className="text-sm">
+              Hedef Tarih: <span className={getDelayDays(editingTreatment!) > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
+                {editingTreatment?.planned_end_date && new Date(editingTreatment.planned_end_date).toLocaleDateString('tr-TR')}
+                {getDelayDays(editingTreatment!) > 0 && (
+                  <span className="ml-2">🔴 {getDelayDays(editingTreatment!)} gün gecikmiş</span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">
+              Mevcut İlerleme: %{editingTreatment?.progress_percent}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Yeni İlerleme (%) <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Yeni İlerleme <span className="text-red-500">*</span>
             </label>
             <input
               type="range"
               min="0"
               max="100"
+              step="5"
               value={progressData.progress_percent}
               onChange={(e) => setProgressData({ ...progressData, progress_percent: parseInt(e.target.value) })}
-              className="w-full"
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
             />
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>0%</span>
-              <span className="font-semibold text-blue-600">{progressData.progress_percent}%</span>
-              <span>100%</span>
+            <div className="flex justify-between text-sm mt-2">
+              <span className="text-gray-600">0%</span>
+              <span className="text-lg font-semibold text-blue-600">%{progressData.progress_percent}</span>
+              <span className="text-gray-600">100%</span>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Durum <span className="text-red-500">*</span>
+            </label>
             <select
               value={progressData.status}
               onChange={(e) => setProgressData({ ...progressData, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
-              {Object.entries(statusLabels).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
+              <option value="NOT_STARTED">Başlamadı</option>
+              <option value="IN_PROGRESS">Devam Ediyor</option>
+              <option value="COMPLETED">Tamamlandı</option>
+              <option value="CANCELLED">İptal Edildi</option>
             </select>
           </div>
 
+          {progressData.status === 'COMPLETED' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tamamlanma Tarihi
+              </label>
+              <input
+                type="date"
+                value={progressData.completed_date}
+                onChange={(e) => setProgressData({ ...progressData, completed_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Açıklama <span className="text-red-500">*</span>
+              Güncelleme Notu <span className="text-red-500">*</span>
             </label>
             <textarea
               value={progressData.notes}
               onChange={(e) => setProgressData({ ...progressData, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               rows={3}
-              placeholder="Bu güncelleme ile ilgili açıklama..."
+              placeholder="Yapılan çalışmayı açıklayın..."
               required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Karşılaşılan Sorunlar</label>
-            <textarea
-              value={progressData.challenges}
-              onChange={(e) => setProgressData({ ...progressData, challenges: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              rows={2}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sonraki Adımlar</label>
-            <textarea
-              value={progressData.next_steps}
-              onChange={(e) => setProgressData({ ...progressData, next_steps: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              rows={2}
             />
           </div>
 
@@ -808,13 +918,13 @@ export default function RiskTreatments() {
             <button
               type="button"
               onClick={closeProgressModal}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
             >
               İptal
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
               Güncelle
             </button>
