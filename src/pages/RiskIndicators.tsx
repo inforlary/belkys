@@ -246,6 +246,15 @@ export default function RiskIndicators() {
     });
   }
 
+  function updateThresholdRed(greenValue: string, yellowValue: string) {
+    setFormData(prev => ({
+      ...prev,
+      threshold_green: greenValue,
+      threshold_yellow: yellowValue,
+      threshold_red: yellowValue
+    }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -730,7 +739,6 @@ export default function RiskIndicators() {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
             />
           </div>
 
@@ -754,7 +762,6 @@ export default function RiskIndicators() {
               value={formData.risk_id}
               onChange={(e) => handleRiskChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
             >
               <option value="">Seçiniz...</option>
               {risks.map(risk => (
@@ -778,7 +785,6 @@ export default function RiskIndicators() {
               value={formData.unit_of_measure}
               onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
             >
               {unitOptions.map(unit => (
                 <option key={unit} value={unit}>{unit}</option>
@@ -865,9 +871,8 @@ export default function RiskIndicators() {
                     type="number"
                     step="0.01"
                     value={formData.threshold_green}
-                    onChange={(e) => setFormData({ ...formData, threshold_green: e.target.value })}
+                    onChange={(e) => updateThresholdRed(e.target.value, formData.threshold_yellow)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                 </div>
                 <div>
@@ -878,9 +883,8 @@ export default function RiskIndicators() {
                     type="number"
                     step="0.01"
                     value={formData.threshold_yellow}
-                    onChange={(e) => setFormData({ ...formData, threshold_yellow: e.target.value })}
+                    onChange={(e) => updateThresholdRed(formData.threshold_green, e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                 </div>
                 <div>
@@ -908,9 +912,8 @@ export default function RiskIndicators() {
                     type="number"
                     step="0.01"
                     value={formData.threshold_green}
-                    onChange={(e) => setFormData({ ...formData, threshold_green: e.target.value })}
+                    onChange={(e) => updateThresholdRed(e.target.value, formData.threshold_yellow)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                 </div>
                 <div>
@@ -921,9 +924,8 @@ export default function RiskIndicators() {
                     type="number"
                     step="0.01"
                     value={formData.threshold_yellow}
-                    onChange={(e) => setFormData({ ...formData, threshold_yellow: e.target.value })}
+                    onChange={(e) => updateThresholdRed(formData.threshold_green, e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                 </div>
                 <div>

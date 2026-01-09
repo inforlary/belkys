@@ -10,6 +10,7 @@ interface Risk {
   id: string;
   code: string;
   name: string;
+  owner_department_id?: string;
 }
 
 interface Department {
@@ -108,7 +109,7 @@ export default function RiskTreatments() {
 
         supabase
           .from('risks')
-          .select('id, code, name')
+          .select('id, code, name, owner_department_id')
           .eq('organization_id', profile?.organization_id)
           .eq('is_active', true)
           .order('code'),
@@ -162,6 +163,15 @@ export default function RiskTreatments() {
   function closeModal() {
     setShowModal(false);
     setEditingTreatment(null);
+  }
+
+  function handleRiskChange(riskId: string) {
+    const selectedRisk = risks.find(r => r.id === riskId);
+    setFormData({
+      ...formData,
+      risk_id: riskId,
+      responsible_department_id: selectedRisk?.owner_department_id || ''
+    });
   }
 
   function openProgressModal(treatment: Treatment) {
@@ -725,7 +735,7 @@ export default function RiskTreatments() {
             </label>
             <select
               value={formData.risk_id}
-              onChange={(e) => setFormData({ ...formData, risk_id: e.target.value })}
+              onChange={(e) => handleRiskChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
               disabled={!!editingTreatment}
@@ -735,6 +745,11 @@ export default function RiskTreatments() {
                 <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
               ))}
             </select>
+            {formData.risk_id && formData.responsible_department_id && !editingTreatment && (
+              <p className="text-xs text-green-600 mt-1">
+                ✓ Sorumlu birim otomatik olarak yüklendi
+              </p>
+            )}
           </div>
 
           {!editingTreatment && (
