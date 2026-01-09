@@ -71,13 +71,20 @@ import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
 import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
 import RiskManagement from './pages/RiskManagement';
+import RiskDashboard from './pages/RiskDashboard';
+import RiskSettings from './pages/RiskSettings';
+import RiskSettingsStrategy from './pages/RiskSettingsStrategy';
+import RiskSettingsCriteria from './pages/RiskSettingsCriteria';
 import RiskRegister from './pages/RiskRegister';
 import RiskRegisterNew from './pages/RiskRegisterNew';
+import RiskDetail from './pages/RiskDetail';
 import RiskMatrix from './pages/RiskMatrix';
 import RiskIndicators from './pages/RiskIndicators';
+import RiskIndicatorEntry from './pages/RiskIndicatorEntry';
 import RiskTreatments from './pages/RiskTreatments';
 import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
 import RiskCategories from './pages/RiskCategories';
+import RiskReports from './pages/RiskReports';
 import InternalControl from './pages/InternalControl';
 import InternalControlDashboard from './pages/InternalControlDashboard';
 import ICStandards from './pages/ICStandards';
@@ -147,6 +154,9 @@ const renderPage = () => {
     }
     if (currentPath.startsWith('risks/treatments/') && currentPath !== 'risks/treatments') {
       return <RiskTreatmentDetail />;
+    }
+    if (currentPath.startsWith('risk-management/risks/') && currentPath !== 'risk-management/risks') {
+      return <RiskDetail />;
     }
     if (currentPath.match(/internal-control\/action-plans\/[^/]+\/actions\/[^/]+/)) {
       return <ICActionDetail />;
@@ -304,6 +314,30 @@ const renderPage = () => {
         return <RiskTreatments />;
       case 'risks/categories':
         return <RiskCategories />;
+      case 'risk-management':
+        return <RiskManagement />;
+      case 'risk-management/dashboard':
+        return <RiskDashboard />;
+      case 'risk-management/settings':
+        return <RiskSettings />;
+      case 'risk-management/settings/strategy':
+        return <RiskSettingsStrategy />;
+      case 'risk-management/settings/categories':
+        return <RiskCategories />;
+      case 'risk-management/settings/criteria':
+        return <RiskSettingsCriteria />;
+      case 'risk-management/risks':
+        return <RiskRegister />;
+      case 'risk-management/matrix':
+        return <RiskMatrix />;
+      case 'risk-management/treatments':
+        return <RiskTreatments />;
+      case 'risk-management/indicators':
+        return <RiskIndicators />;
+      case 'risk-management/indicators/entry':
+        return <RiskIndicatorEntry />;
+      case 'risk-management/reports':
+        return <RiskReports />;
       case 'internal-control':
         return <InternalControl />;
       case 'internal-control/dashboard':
