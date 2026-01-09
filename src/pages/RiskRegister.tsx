@@ -93,6 +93,7 @@ export default function RiskRegister() {
   const [categories, setCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [objectives, setObjectives] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [criteria, setCriteria] = useState<RiskCriterion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +159,7 @@ export default function RiskRegister() {
     try {
       setLoading(true);
 
-      const [risksRes, categoriesRes, departmentsRes, objectivesRes, profilesRes, criteriaRes] = await Promise.all([
+      const [risksRes, categoriesRes, departmentsRes, objectivesRes, goalsRes, profilesRes, criteriaRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -184,6 +185,11 @@ export default function RiskRegister() {
           .eq('organization_id', profile?.organization_id)
           .order('code', { ascending: true }),
         supabase
+          .from('goals')
+          .select('id, code, title, department_id')
+          .eq('organization_id', profile?.organization_id)
+          .order('code', { ascending: true }),
+        supabase
           .from('profiles')
           .select('id, full_name, department_id')
           .eq('organization_id', profile?.organization_id)
@@ -200,12 +206,14 @@ export default function RiskRegister() {
       if (categoriesRes.error) throw categoriesRes.error;
       if (departmentsRes.error) throw departmentsRes.error;
       if (objectivesRes.error) throw objectivesRes.error;
+      if (goalsRes.error) throw goalsRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
       setRisks(risksRes.data || []);
       setCategories(categoriesRes.data || []);
       setDepartments(departmentsRes.data || []);
       setObjectives(objectivesRes.data || []);
+      setGoals(goalsRes.data || []);
       setProfiles(profilesRes.data || []);
       setCriteria(criteriaRes.data || []);
 
@@ -849,7 +857,11 @@ export default function RiskRegister() {
                     </label>
                     <select
                       value={formData.owner_department_id}
-                      onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        owner_department_id: e.target.value,
+                        objective_id: ''
+                      })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="">Seçiniz...</option>
@@ -867,12 +879,20 @@ export default function RiskRegister() {
                       value={formData.objective_id}
                       onChange={(e) => setFormData({ ...formData, objective_id: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={!formData.owner_department_id}
                     >
-                      <option value="">Seçiniz...</option>
-                      {objectives.map(obj => (
-                        <option key={obj.id} value={obj.id}>{obj.code} - {obj.title}</option>
-                      ))}
+                      <option value="">
+                        {formData.owner_department_id ? 'Seçiniz...' : 'Önce sorumlu birim seçiniz'}
+                      </option>
+                      {goals
+                        .filter(goal => goal.department_id === formData.owner_department_id)
+                        .map(goal => (
+                          <option key={goal.id} value={goal.id}>{goal.code} - {goal.title}</option>
+                        ))}
                     </select>
+                    {formData.owner_department_id && goals.filter(g => g.department_id === formData.owner_department_id).length === 0 && (
+                      <p className="mt-1 text-sm text-amber-600">Bu birime ait hedef bulunamadı</p>
+                    )}
                   </div>
                 </div>
               </div>
