@@ -33,7 +33,7 @@ interface Action {
   code: string;
   title: string;
   description: string;
-  standard_id: string;
+  general_condition_id: string;
   responsible_department_id: string;
   responsible_department_ids?: string[];
   responsible_department_coordinators?: {[key: string]: string};
@@ -60,10 +60,10 @@ interface Action {
   related_risk_control_id?: string;
   related_risk_treatment_id?: string;
   related_objective_id?: string;
-  ic_standards?: {
+  ic_general_conditions?: {
     code: string;
-    name: string;
-    component_id: string;
+    condition_text: string;
+    standard_id: string;
   };
   departments?: {
     name: string;
@@ -136,6 +136,7 @@ export default function ICActionPlanDetail() {
     code: '',
     component_id: '',
     standard_id: '',
+    general_condition_id: '',
     title: '',
     description: '',
     is_continuous: false,
@@ -292,16 +293,17 @@ export default function ICActionPlanDetail() {
     }
   };
 
-  const generateActionCode = (standardId: string) => {
-    if (!standardId) return '';
+  const generateActionCode = (generalConditionId: string) => {
+    if (!generalConditionId) return '';
 
-    const standard = standards.find(s => s.id === standardId);
-    if (!standard) return '';
+    const condition = standards.flatMap(s => s.conditions || []).find(c => c.id === generalConditionId);
+    if (!condition || !condition.code) return '';
 
-    const actionsForStandard = actions.filter(a => a.standard_id === standardId);
-    const nextNumber = actionsForStandard.length + 1;
+    const conditionCode = condition.code.replace(/\s/g, '');
+    const conditionActions = actions.filter(a => a.general_condition_id === generalConditionId);
+    const nextNumber = conditionActions.length + 1;
 
-    return `${standard.code}.${nextNumber}`;
+    return `${conditionCode}-${nextNumber.toString().padStart(2, '0')}`;
   };
 
   const handleExportReport = () => {
@@ -514,8 +516,8 @@ export default function ICActionPlanDetail() {
     try {
       const actionData = {
         action_plan_id: planId,
-        code: actionForm.code || generateActionCode(actionForm.standard_id),
-        standard_id: actionForm.standard_id || null,
+        code: actionForm.code || generateActionCode(actionForm.general_condition_id),
+        general_condition_id: actionForm.general_condition_id || null,
         title: actionForm.title,
         description: actionForm.description,
         is_continuous: actionForm.is_continuous,
@@ -565,6 +567,7 @@ export default function ICActionPlanDetail() {
         code: '',
         component_id: '',
         standard_id: '',
+        general_condition_id: '',
         title: '',
         description: '',
         is_continuous: false,
@@ -1761,11 +1764,11 @@ export default function ICActionPlanDetail() {
                         required
                         value={actionForm.standard_id}
                         onChange={(e) => {
-                          const stdId = e.target.value;
                           setActionForm({
                             ...actionForm,
-                            standard_id: stdId,
-                            code: stdId ? generateActionCode(stdId) : ''
+                            standard_id: e.target.value,
+                            general_condition_id: '',
+                            code: ''
                           });
                         }}
                         className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -1775,7 +1778,37 @@ export default function ICActionPlanDetail() {
                           .filter(std => std.component_id === actionForm.component_id)
                           .map((std) => (
                             <option key={std.id} value={std.id}>
-                              {std.code} - {std.name}
+                              {std.code} {std.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {actionForm.standard_id && (
+                    <div>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">
+                        Genel Şart Seçin <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={actionForm.general_condition_id}
+                        onChange={(e) => {
+                          const condId = e.target.value;
+                          setActionForm({
+                            ...actionForm,
+                            general_condition_id: condId,
+                            code: condId ? generateActionCode(condId) : ''
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Genel şart seçiniz</option>
+                        {standards
+                          .find(std => std.id === actionForm.standard_id)
+                          ?.conditions?.map((cond) => (
+                            <option key={cond.id} value={cond.id}>
+                              {cond.code} {cond.condition_text}
                             </option>
                           ))}
                       </select>
@@ -1784,13 +1817,16 @@ export default function ICActionPlanDetail() {
 
                 </div>
 
-                {actionForm.standard_id && (
+                {actionForm.general_condition_id && (
                   <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-300">
+                    <div className="text-xs font-medium text-green-900 mb-1">
+                      ✓ Seçilen Standart: {standards.find(s => s.id === actionForm.standard_id)?.code} - {standards.find(s => s.id === actionForm.standard_id)?.name}
+                    </div>
                     <div className="text-xs font-medium text-green-900">
-                      ✓ Seçilen: {standards.find(s => s.id === actionForm.standard_id)?.code}
+                      ✓ Seçilen Genel Şart: {standards.flatMap(s => s.conditions || []).find(c => c.id === actionForm.general_condition_id)?.code}
                     </div>
                     <div className="text-xs text-green-700 mt-1">
-                      {standards.find(s => s.id === actionForm.standard_id)?.name}
+                      {standards.flatMap(s => s.conditions || []).find(c => c.id === actionForm.general_condition_id)?.condition_text}
                     </div>
                   </div>
                 )}

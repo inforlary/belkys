@@ -126,33 +126,34 @@ export default function ICStandards() {
         `)
         .eq('ic_assessments.organization_id', profile.organization_id);
 
-      const { data: actionsData } = await supabase
-        .from('ic_actions')
-        .select(`
-          standard_id,
-          status,
-          ic_action_plans!inner(organization_id)
-        `)
-        .eq('ic_action_plans.organization_id', profile.organization_id);
-
       const { data: conditionsData } = await supabase
         .from('ic_general_conditions')
         .select('*')
         .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
         .order('order_index');
 
+      const { data: actionsData } = await supabase
+        .from('ic_actions')
+        .select(`
+          general_condition_id,
+          status,
+          ic_action_plans!inner(organization_id)
+        `)
+        .eq('ic_action_plans.organization_id', profile.organization_id);
+
       const standardsMap = new Map<string, ICStandard>();
       standardsData?.forEach(std => {
         const assessments = assessmentDetails?.filter(a => a.standard_id === std.id) || [];
         const latestAssessment = assessments[assessments.length - 1];
 
-        const actions = actionsData?.filter(a => a.standard_id === std.id) || [];
+        const conditions = conditionsData?.filter(c => c.standard_id === std.id) || [];
+        const conditionIds = conditions.map(c => c.id);
+
+        const actions = actionsData?.filter(a => conditionIds.includes(a.general_condition_id)) || [];
         const activeActions = actions.filter(a =>
           ['NOT_STARTED', 'IN_PROGRESS', 'DELAYED'].includes(a.status)
         ).length;
         const completedActions = actions.filter(a => a.status === 'COMPLETED').length;
-
-        const conditions = conditionsData?.filter(c => c.standard_id === std.id) || [];
 
         standardsMap.set(std.id, {
           ...std,
@@ -227,6 +228,8 @@ export default function ICStandards() {
     if (!profile?.organization_id) return;
 
     try {
+      const standardConditionIds = (standard.conditions || []).map(c => c.id);
+
       const { data: actionsData } = await supabase
         .from('ic_actions')
         .select(`
@@ -241,9 +244,10 @@ export default function ICStandards() {
           target_date,
           completed_date,
           responsible_department_ids,
+          general_condition_id,
           ic_action_plans!inner(organization_id)
         `)
-        .eq('standard_id', standard.id)
+        .in('general_condition_id', standardConditionIds.length > 0 ? standardConditionIds : [''])
         .eq('ic_action_plans.organization_id', profile.organization_id)
         .order('code');
 
