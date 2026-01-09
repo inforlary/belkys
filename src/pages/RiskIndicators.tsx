@@ -4,8 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, TrendingUp, TrendingDown, Minus, BarChart3, Filter } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Plus, Edit, History, Grid3x3, List, TrendingUp, TrendingDown, Minus, X, Filter } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface Risk {
   id: string;
@@ -13,30 +13,34 @@ interface Risk {
   name: string;
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
 interface Indicator {
   id: string;
+  organization_id: string;
   risk_id: string;
   code: string;
   name: string;
-  description: string;
-  indicator_type: string;
+  description?: string;
   unit_of_measure: string;
-  measurement_frequency: string;
-  green_threshold: string;
-  yellow_threshold: string;
-  red_threshold: string;
-  direction: string;
-  target_value: number;
-  alert_enabled: boolean;
-  data_source?: string;
-  calculation_method?: string;
+  measurement_frequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  direction: 'DOWN' | 'UP';
+  threshold_green: number;
+  threshold_yellow: number;
+  threshold_red: number;
+  responsible_department_id?: string;
   is_active: boolean;
   risk?: Risk;
+  responsible_department?: Department;
   latest_value?: {
     value: number;
-    status: string;
-    trend: string;
+    status: 'GREEN' | 'YELLOW' | 'RED';
+    trend: 'UP' | 'DOWN' | 'STABLE';
     measurement_date: string;
+    period: string;
   };
 }
 
@@ -46,40 +50,30 @@ interface IndicatorValue {
   measurement_date: string;
   period: string;
   value: number;
-  status: string;
-  trend: string;
-  notes: string;
-  analysis?: string;
+  status: 'GREEN' | 'YELLOW' | 'RED';
+  trend?: 'UP' | 'DOWN' | 'STABLE';
+  notes?: string;
+  recorded_by_id: string;
   recorded_by?: {
     full_name: string;
   };
+  created_at: string;
 }
 
-const indicatorTypeLabels = {
-  KRI: 'TRG - Temel Risk Göstergesi',
-  LEI: 'ÖRG - Öncü Risk Göstergesi'
-};
-
-const directionLabels = {
-  LOWER_BETTER: 'Düşük değer daha iyi',
-  HIGHER_BETTER: 'Yüksek değer daha iyi',
-  TARGET: 'Hedefe yakın'
-};
-
 const statusConfig = {
-  GREEN: { label: 'Normal', color: 'bg-green-100 text-green-800', icon: '🟢' },
-  YELLOW: { label: 'Dikkat', color: 'bg-yellow-100 text-yellow-800', icon: '🟡' },
-  RED: { label: 'Alarm', color: 'bg-red-100 text-red-800', icon: '🔴' }
+  GREEN: { label: 'Normal', color: 'bg-green-100 text-green-800 border-green-500', cardBg: 'bg-green-50', icon: '🟢' },
+  YELLOW: { label: 'Uyarı', color: 'bg-yellow-100 text-yellow-800 border-yellow-500', cardBg: 'bg-yellow-50', icon: '🟡' },
+  RED: { label: 'Alarm', color: 'bg-red-100 text-red-800 border-red-500', cardBg: 'bg-red-50', icon: '🔴' },
+  NONE: { label: 'Değer Girilmemiş', color: 'bg-gray-100 text-gray-800 border-gray-300', cardBg: 'bg-gray-50', icon: '⚪' }
 };
 
-const frequencyOptions = [
-  { value: 'DAILY', label: 'Günlük' },
-  { value: 'WEEKLY', label: 'Haftalık' },
-  { value: 'MONTHLY', label: 'Aylık' },
-  { value: 'QUARTERLY', label: 'Çeyreklik' },
-  { value: 'SEMI_ANNUAL', label: '6 Aylık' },
-  { value: 'ANNUAL', label: 'Yıllık' }
-];
+const trendIcons = {
+  UP: { icon: '↗️', label: 'Artış' },
+  DOWN: { icon: '↘️', label: 'Azalış' },
+  STABLE: { icon: '→', label: 'Stabil' }
+};
+
+const unitOptions = ['Adet', 'Yüzde (%)', 'Dakika', 'Saat', 'Gün', 'TL', 'Kişi', 'Diğer'];
 
 export default function RiskIndicators() {
   const { navigate } = useLocation();
@@ -87,43 +81,36 @@ export default function RiskIndicators() {
 
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
-  const [selectedIndicator, setSelectedIndicator] = useState<Indicator | null>(null);
-  const [indicatorValues, setIndicatorValues] = useState<IndicatorValue[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [showValueModal, setShowValueModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [editingIndicator, setEditingIndicator] = useState<Indicator | null>(null);
+  const [selectedIndicator, setSelectedIndicator] = useState<Indicator | null>(null);
+  const [indicatorValues, setIndicatorValues] = useState<IndicatorValue[]>([]);
 
   const [filters, setFilters] = useState({
     risk_id: '',
-    indicator_type: '',
-    status: ''
+    department_id: '',
+    status: '',
+    frequency: '',
+    search: ''
   });
 
-  const [indicatorForm, setIndicatorForm] = useState({
-    risk_id: '',
+  const [formData, setFormData] = useState({
     name: '',
     description: '',
-    indicator_type: 'KRI',
-    unit_of_measure: '',
-    measurement_frequency: 'MONTHLY',
-    data_source: '',
-    calculation_method: '',
-    direction: 'LOWER_BETTER',
-    target_value: '',
-    green_threshold: '',
-    yellow_threshold: '',
-    red_threshold: '',
-    alert_enabled: true
-  });
-
-  const [valueForm, setValueForm] = useState({
-    measurement_date: new Date().toISOString().split('T')[0],
-    period: '',
-    value: '',
-    notes: '',
-    analysis: ''
+    risk_id: '',
+    unit_of_measure: 'Adet',
+    measurement_frequency: 'MONTHLY' as 'MONTHLY' | 'QUARTERLY' | 'ANNUAL',
+    direction: 'DOWN' as 'DOWN' | 'UP',
+    threshold_green: '',
+    threshold_yellow: '',
+    threshold_red: '',
+    responsible_department_id: '',
+    is_active: true
   });
 
   useEffect(() => {
@@ -132,31 +119,19 @@ export default function RiskIndicators() {
     }
   }, [profile?.organization_id]);
 
-  useEffect(() => {
-    if (selectedIndicator) {
-      loadIndicatorValues(selectedIndicator.id);
-    }
-  }, [selectedIndicator]);
-
-  useEffect(() => {
-    const date = new Date(valueForm.measurement_date);
-    const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    setValueForm(prev => ({ ...prev, period }));
-  }, [valueForm.measurement_date]);
-
   async function loadData() {
     try {
       setLoading(true);
 
-      const [indicatorsRes, risksRes] = await Promise.all([
+      const [indicatorsRes, risksRes, departmentsRes] = await Promise.all([
         supabase
           .from('risk_indicators')
           .select(`
             *,
-            risk:risks(id, code, name)
+            risk:risks!inner(id, code, name, organization_id),
+            responsible_department:departments!responsible_department_id(id, name)
           `)
-          .eq('risk:risks.organization_id', profile?.organization_id)
-          .eq('is_active', true)
+          .eq('risk.organization_id', profile?.organization_id)
           .order('code'),
 
         supabase
@@ -164,21 +139,28 @@ export default function RiskIndicators() {
           .select('id, code, name')
           .eq('organization_id', profile?.organization_id)
           .eq('is_active', true)
-          .order('code')
+          .order('code'),
+
+        supabase
+          .from('departments')
+          .select('id, name')
+          .eq('organization_id', profile?.organization_id)
+          .order('name')
       ]);
 
       if (indicatorsRes.error) throw indicatorsRes.error;
       if (risksRes.error) throw risksRes.error;
+      if (departmentsRes.error) throw departmentsRes.error;
 
       const indicatorsWithValues = await Promise.all(
         (indicatorsRes.data || []).map(async (indicator) => {
           const { data: latestValue } = await supabase
             .from('risk_indicator_values')
-            .select('value, status, trend, measurement_date')
+            .select('value, status, trend, measurement_date, period')
             .eq('indicator_id', indicator.id)
             .order('measurement_date', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           return {
             ...indicator,
@@ -189,132 +171,95 @@ export default function RiskIndicators() {
 
       setIndicators(indicatorsWithValues);
       setRisks(risksRes.data || []);
+      setDepartments(departmentsRes.data || []);
     } catch (error) {
-      console.error('Veriler yüklenirken hata:', error);
+      console.error('Error loading data:', error);
+      alert('Veriler yüklenirken hata oluştu');
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadIndicatorValues(indicatorId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('risk_indicator_values')
-        .select(`
-          *,
-          recorded_by:profiles!recorded_by_id(full_name)
-        `)
-        .eq('indicator_id', indicatorId)
-        .order('measurement_date', { ascending: false });
+  async function generateNextCode() {
+    const { data } = await supabase
+      .from('risk_indicators')
+      .select('code')
+      .eq('organization_id', profile?.organization_id)
+      .like('code', 'KRI-%')
+      .order('code', { ascending: false })
+      .limit(1);
 
-      if (error) throw error;
-      setIndicatorValues(data || []);
-    } catch (error) {
-      console.error('Gösterge değerleri yüklenirken hata:', error);
+    if (data && data.length > 0) {
+      const lastCode = data[0].code;
+      const lastNumber = parseInt(lastCode.split('-')[1]);
+      return `KRI-${String(lastNumber + 1).padStart(3, '0')}`;
     }
+    return 'KRI-001';
   }
 
   function openIndicatorModal(indicator?: Indicator) {
     if (indicator) {
       setEditingIndicator(indicator);
-      setIndicatorForm({
-        risk_id: indicator.risk_id,
+      setFormData({
         name: indicator.name,
         description: indicator.description || '',
-        indicator_type: indicator.indicator_type,
-        unit_of_measure: indicator.unit_of_measure || '',
-        measurement_frequency: indicator.measurement_frequency || 'MONTHLY',
-        data_source: indicator.data_source || '',
-        calculation_method: indicator.calculation_method || '',
+        risk_id: indicator.risk_id,
+        unit_of_measure: indicator.unit_of_measure,
+        measurement_frequency: indicator.measurement_frequency,
         direction: indicator.direction,
-        target_value: indicator.target_value?.toString() || '',
-        green_threshold: indicator.green_threshold || '',
-        yellow_threshold: indicator.yellow_threshold || '',
-        red_threshold: indicator.red_threshold || '',
-        alert_enabled: indicator.alert_enabled
+        threshold_green: indicator.threshold_green.toString(),
+        threshold_yellow: indicator.threshold_yellow.toString(),
+        threshold_red: indicator.threshold_red.toString(),
+        responsible_department_id: indicator.responsible_department_id || '',
+        is_active: indicator.is_active
       });
     } else {
       setEditingIndicator(null);
-      setIndicatorForm({
-        risk_id: '',
+      setFormData({
         name: '',
         description: '',
-        indicator_type: 'KRI',
-        unit_of_measure: '',
+        risk_id: '',
+        unit_of_measure: 'Adet',
         measurement_frequency: 'MONTHLY',
-        data_source: '',
-        calculation_method: '',
-        direction: 'LOWER_BETTER',
-        target_value: '',
-        green_threshold: '',
-        yellow_threshold: '',
-        red_threshold: '',
-        alert_enabled: true
+        direction: 'DOWN',
+        threshold_green: '',
+        threshold_yellow: '',
+        threshold_red: '',
+        responsible_department_id: '',
+        is_active: true
       });
     }
     setShowIndicatorModal(true);
   }
 
-  function openValueModal() {
-    if (!selectedIndicator) return;
-    setValueForm({
-      measurement_date: new Date().toISOString().split('T')[0],
-      period: '',
-      value: '',
-      notes: '',
-      analysis: ''
-    });
-    setShowValueModal(true);
+  function closeIndicatorModal() {
+    setShowIndicatorModal(false);
+    setEditingIndicator(null);
   }
 
-  async function handleIndicatorSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!indicatorForm.risk_id || !indicatorForm.name) {
-      alert('Lütfen zorunlu alanları doldurun');
+    if (!formData.name || !formData.risk_id || !formData.threshold_green ||
+        !formData.threshold_yellow || !formData.threshold_red) {
+      alert('Lütfen tüm zorunlu alanları doldurun');
       return;
     }
 
     try {
-      let code = '';
-      if (!editingIndicator) {
-        const prefix = indicatorForm.indicator_type === 'KRI' ? 'TRG' : 'ÖRG';
-        const { data: existingIndicators } = await supabase
-          .from('risk_indicators')
-          .select('code')
-          .ilike('code', `${prefix}%`)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        let nextNumber = 1;
-        if (existingIndicators && existingIndicators.length > 0) {
-          const lastCode = existingIndicators[0].code;
-          const match = lastCode.match(/\d+$/);
-          if (match) {
-            nextNumber = parseInt(match[0]) + 1;
-          }
-        }
-
-        code = `${prefix}-${nextNumber.toString().padStart(3, '0')}`;
-      }
-
       const indicatorData = {
-        risk_id: indicatorForm.risk_id,
-        code: editingIndicator ? editingIndicator.code : code,
-        name: indicatorForm.name,
-        description: indicatorForm.description,
-        indicator_type: indicatorForm.indicator_type,
-        unit_of_measure: indicatorForm.unit_of_measure,
-        measurement_frequency: indicatorForm.measurement_frequency,
-        data_source: indicatorForm.data_source || null,
-        calculation_method: indicatorForm.calculation_method || null,
-        direction: indicatorForm.direction,
-        target_value: indicatorForm.target_value ? parseFloat(indicatorForm.target_value) : null,
-        green_threshold: indicatorForm.green_threshold,
-        yellow_threshold: indicatorForm.yellow_threshold,
-        red_threshold: indicatorForm.red_threshold,
-        alert_enabled: indicatorForm.alert_enabled,
-        is_active: true
+        organization_id: profile?.organization_id,
+        risk_id: formData.risk_id,
+        name: formData.name,
+        description: formData.description || null,
+        unit_of_measure: formData.unit_of_measure,
+        measurement_frequency: formData.measurement_frequency,
+        direction: formData.direction,
+        threshold_green: parseFloat(formData.threshold_green),
+        threshold_yellow: parseFloat(formData.threshold_yellow),
+        threshold_red: parseFloat(formData.threshold_red),
+        responsible_department_id: formData.responsible_department_id || null,
+        is_active: formData.is_active
       };
 
       if (editingIndicator) {
@@ -324,732 +269,692 @@ export default function RiskIndicators() {
           .eq('id', editingIndicator.id);
 
         if (error) throw error;
+        alert('Gösterge güncellendi');
       } else {
+        const code = await generateNextCode();
         const { error } = await supabase
           .from('risk_indicators')
-          .insert(indicatorData);
+          .insert({ ...indicatorData, code });
 
         if (error) throw error;
+        alert('Gösterge eklendi');
       }
 
-      setShowIndicatorModal(false);
+      closeIndicatorModal();
       loadData();
     } catch (error) {
-      console.error('Gösterge kaydedilirken hata:', error);
-      alert('Gösterge kaydedilemedi');
+      console.error('Error saving indicator:', error);
+      alert('Gösterge kaydedilirken hata oluştu');
     }
   }
 
-  async function handleValueSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!selectedIndicator || !valueForm.value) {
-      alert('Lütfen değer girin');
-      return;
-    }
+  async function openHistoryModal(indicator: Indicator) {
+    setSelectedIndicator(indicator);
+    setShowHistoryModal(true);
 
     try {
-      const value = parseFloat(valueForm.value);
-      const status = calculateStatus(value, selectedIndicator);
-
-      const previousValue = indicatorValues[0]?.value;
-      const trend = previousValue ? calculateTrend(value, previousValue, selectedIndicator.direction) : 'STABLE';
-
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('risk_indicator_values')
-        .insert({
-          indicator_id: selectedIndicator.id,
-          measurement_date: valueForm.measurement_date,
-          period: valueForm.period,
-          value,
-          status,
-          trend,
-          notes: valueForm.notes,
-          analysis: valueForm.analysis || null,
-          recorded_by_id: profile?.id,
-          alert_triggered: status === 'RED' && selectedIndicator.alert_enabled
-        });
+        .select(`
+          *,
+          recorded_by:profiles!recorded_by_id(full_name)
+        `)
+        .eq('indicator_id', indicator.id)
+        .order('measurement_date', { ascending: false })
+        .limit(12);
 
       if (error) throw error;
-
-      if (status === 'RED' && selectedIndicator.alert_enabled) {
-        await supabase.from('notifications').insert({
-          user_id: profile?.id,
-          organization_id: profile?.organization_id,
-          title: `Risk Göstergesi Alarm: ${selectedIndicator.code}`,
-          message: `${selectedIndicator.name} göstergesi alarm seviyesine ulaştı. Değer: ${value} ${selectedIndicator.unit_of_measure}`,
-          type: 'risk_alert',
-          priority: 'high'
-        });
-      }
-
-      setShowValueModal(false);
-      loadIndicatorValues(selectedIndicator.id);
-      loadData();
+      setIndicatorValues(data || []);
     } catch (error) {
-      console.error('Değer kaydedilirken hata:', error);
-      alert('Değer kaydedilemedi');
+      console.error('Error loading history:', error);
+      alert('Geçmiş yüklenirken hata oluştu');
     }
   }
 
-  function calculateStatus(value: number, indicator: Indicator): string {
-    const { direction, green_threshold, yellow_threshold, red_threshold } = indicator;
-
-    if (direction === 'LOWER_BETTER') {
-      const greenMax = parseFloat(green_threshold.replace(/[<>]/g, ''));
-      const yellowRange = yellow_threshold.split('-').map(v => parseFloat(v.trim()));
-
-      if (value < greenMax) return 'GREEN';
-      if (value >= yellowRange[0] && value <= yellowRange[1]) return 'YELLOW';
-      return 'RED';
-    } else if (direction === 'HIGHER_BETTER') {
-      const greenMin = parseFloat(green_threshold.replace(/[<>]/g, ''));
-      const yellowRange = yellow_threshold.split('-').map(v => parseFloat(v.trim()));
-
-      if (value > greenMin) return 'GREEN';
-      if (value >= yellowRange[0] && value <= yellowRange[1]) return 'YELLOW';
-      return 'RED';
-    } else {
-      const target = indicator.target_value || 0;
-      const tolerance = target * 0.1;
-
-      if (Math.abs(value - target) < tolerance) return 'GREEN';
-      if (Math.abs(value - target) < tolerance * 2) return 'YELLOW';
-      return 'RED';
-    }
-  }
-
-  function calculateTrend(current: number, previous: number, direction: string): string {
-    const change = ((current - previous) / previous) * 100;
-
-    if (Math.abs(change) < 5) return 'STABLE';
-    return change > 0 ? 'UP' : 'DOWN';
-  }
-
-  function getTrendIcon(trend: string) {
-    if (trend === 'UP') return <TrendingUp className="w-4 h-4 text-red-600" />;
-    if (trend === 'DOWN') return <TrendingDown className="w-4 h-4 text-green-600" />;
-    return <Minus className="w-4 h-4 text-gray-600" />;
-  }
-
-  function getTrendLabel(trend: string) {
-    if (trend === 'UP') return 'Artıyor';
-    if (trend === 'DOWN') return 'Azalıyor';
-    return 'Sabit';
+  function closeHistoryModal() {
+    setShowHistoryModal(false);
+    setSelectedIndicator(null);
+    setIndicatorValues([]);
   }
 
   const filteredIndicators = indicators.filter(ind => {
     if (filters.risk_id && ind.risk_id !== filters.risk_id) return false;
-    if (filters.indicator_type && ind.indicator_type !== filters.indicator_type) return false;
-    if (filters.status && ind.latest_value?.status !== filters.status) return false;
+    if (filters.department_id && ind.responsible_department_id !== filters.department_id) return false;
+    if (filters.frequency && ind.measurement_frequency !== filters.frequency) return false;
+    if (filters.status) {
+      if (filters.status === 'NONE' && ind.latest_value) return false;
+      if (filters.status !== 'NONE' && (!ind.latest_value || ind.latest_value.status !== filters.status)) return false;
+    }
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      return ind.code?.toLowerCase().includes(search) ||
+             ind.name?.toLowerCase().includes(search);
+    }
     return true;
   });
 
-  const chartData = indicatorValues
-    .slice(0, 12)
-    .reverse()
-    .map(v => ({
-      period: v.period,
-      value: v.value,
-      date: new Date(v.measurement_date).toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' })
-    }));
+  const stats = {
+    total: filteredIndicators.filter(i => i.is_active).length,
+    green: filteredIndicators.filter(i => i.latest_value?.status === 'GREEN').length,
+    yellow: filteredIndicators.filter(i => i.latest_value?.status === 'YELLOW').length,
+    red: filteredIndicators.filter(i => i.latest_value?.status === 'RED').length
+  };
+
+  function clearFilters() {
+    setFilters({
+      risk_id: '',
+      department_id: '',
+      status: '',
+      frequency: '',
+      search: ''
+    });
+  }
+
+  function getThresholdDisplay(indicator: Indicator) {
+    if (indicator.direction === 'DOWN') {
+      return `🟢 <${indicator.threshold_green} 🟡 ${indicator.threshold_green}-${indicator.threshold_yellow} 🔴 >${indicator.threshold_yellow}`;
+    } else {
+      return `🟢 >${indicator.threshold_green} 🟡 ${indicator.threshold_yellow}-${indicator.threshold_green} 🔴 <${indicator.threshold_yellow}`;
+    }
+  }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="w-7 h-7 text-blue-600" />
-            Risk Göstergeleri
-          </h1>
-          <p className="text-gray-600 mt-1">Risk göstergelerini izleyin ve yönetin</p>
+          <h1 className="text-2xl font-bold text-gray-900">Risk Göstergeleri (KRI)</h1>
+          <p className="text-gray-600 mt-1">Anahtar risk göstergeleri tanımlama ve izleme</p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => navigate('risks/indicators/entry')}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            onClick={() => navigate('/risk-management/indicators/entry')}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
           >
-            Toplu Değer Girişi
+            <Edit className="w-4 h-4" />
+            Değer Girişi
           </button>
           <button
             onClick={() => openIndicatorModal()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Yeni Gösterge Ekle
+            Yeni Gösterge
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-4 space-y-4">
-          <Card>
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Filter className="w-5 h-5 text-gray-500" />
-                <h3 className="font-semibold text-gray-900">Filtreler</h3>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Risk</label>
-                  <select
-                    value={filters.risk_id}
-                    onChange={(e) => setFilters({ ...filters, risk_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Tümü</option>
-                    {risks.map((risk) => (
-                      <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Gösterge Tipi</label>
-                  <select
-                    value={filters.indicator_type}
-                    onChange={(e) => setFilters({ ...filters, indicator_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Tümü</option>
-                    <option value="KRI">TRG</option>
-                    <option value="LEI">ÖRG</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Tümü</option>
-                    <option value="GREEN">Normal</option>
-                    <option value="YELLOW">Dikkat</option>
-                    <option value="RED">Alarm</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {filteredIndicators.length === 0 ? (
-              <Card>
-                <div className="p-6 text-center text-gray-500">
-                  Gösterge bulunamadı
-                </div>
-              </Card>
-            ) : (
-              filteredIndicators.map((indicator) => (
-                <Card
-                  key={indicator.id}
-                  className={`cursor-pointer transition-all ${
-                    selectedIndicator?.id === indicator.id ? 'ring-2 ring-blue-500' : ''
-                  }`}
-                  onClick={() => setSelectedIndicator(indicator)}
-                >
-                  <div className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="font-semibold text-gray-900">{indicator.code}</div>
-                      {indicator.latest_value && (
-                        <span className={`text-xs px-2 py-1 rounded-full ${statusConfig[indicator.latest_value.status as keyof typeof statusConfig]?.color}`}>
-                          {statusConfig[indicator.latest_value.status as keyof typeof statusConfig]?.icon} {statusConfig[indicator.latest_value.status as keyof typeof statusConfig]?.label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm font-medium text-gray-700 mb-2">{indicator.name}</div>
-                    <div className="text-xs text-gray-600 mb-3">
-                      {indicator.risk ? (
-                        <>Risk: {indicator.risk.code} - {indicator.risk.name}</>
-                      ) : (
-                        <span className="text-red-600">Risk bilgisi eksik!</span>
-                      )}
-                    </div>
-                    {indicator.latest_value && (
-                      <div className="flex justify-between items-center text-sm border-t pt-2">
-                        <div>
-                          <span className="text-gray-600">Son Değer: </span>
-                          <span className="font-semibold">{indicator.latest_value.value} {indicator.unit_of_measure}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-gray-600">
-                          {getTrendIcon(indicator.latest_value.trend)}
-                          <span className="text-xs">{getTrendLabel(indicator.latest_value.trend)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))
-            )}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-gray-900">{stats.total}</div>
+            <div className="text-sm text-gray-600 mt-1">TOPLAM GÖSTERGE</div>
+            <div className="text-xs text-gray-500 mt-2">Aktif</div>
           </div>
+        </Card>
+
+        <Card className="p-6 bg-green-50 border-green-200">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-green-700">{stats.green}</div>
+            <div className="text-sm text-gray-600 mt-1">YEŞİL</div>
+            <div className="text-xs text-gray-500 mt-2">🟢 Normal</div>
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-yellow-50 border-yellow-200">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-yellow-700">{stats.yellow}</div>
+            <div className="text-sm text-gray-600 mt-1">SARI</div>
+            <div className="text-xs text-gray-500 mt-2">🟡 Uyarı</div>
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-red-50 border-red-200">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-red-700">{stats.red}</div>
+            <div className="text-sm text-gray-600 mt-1">KIRMIZI</div>
+            <div className="text-xs text-gray-500 mt-2">🔴 Alarm</div>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-6">
+        <div className="flex flex-wrap gap-4">
+          <select
+            value={filters.risk_id}
+            onChange={(e) => setFilters({ ...filters, risk_id: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Risk</option>
+            {risks.map(risk => (
+              <option key={risk.id} value={risk.id}>
+                {risk.code} - {risk.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filters.department_id}
+            onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Birim</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Durum</option>
+            <option value="GREEN">Yeşil</option>
+            <option value="YELLOW">Sarı</option>
+            <option value="RED">Kırmızı</option>
+            <option value="NONE">Değer Girilmemiş</option>
+          </select>
+
+          <select
+            value={filters.frequency}
+            onChange={(e) => setFilters({ ...filters, frequency: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Ölçüm Sıklığı</option>
+            <option value="MONTHLY">Aylık</option>
+            <option value="QUARTERLY">Çeyreklik</option>
+            <option value="ANNUAL">Yıllık</option>
+          </select>
+
+          <input
+            type="text"
+            placeholder="🔍 Ara..."
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+
+          <button
+            onClick={clearFilters}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          >
+            Temizle
+          </button>
         </div>
+      </Card>
 
-        <div className="col-span-8">
-          {!selectedIndicator ? (
-            <Card>
-              <div className="p-12 text-center text-gray-500">
-                <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                <p>Detayları görüntülemek için bir gösterge seçin</p>
-              </div>
-            </Card>
-          ) : (
-            <Card>
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">
-                      {selectedIndicator.code}: {selectedIndicator.name}
-                    </h2>
-                    <p className="text-sm text-gray-600">
-                      {selectedIndicator.risk ? (
-                        <>İlgili Risk: {selectedIndicator.risk.code} - {selectedIndicator.risk.name}</>
-                      ) : (
-                        <span className="text-red-600">Risk bilgisi eksik!</span>
-                      )}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => openIndicatorModal(selectedIndicator)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                  >
-                    <Edit className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Tip:</span>
-                    <span className="ml-2 font-medium">{indicatorTypeLabels[selectedIndicator.indicator_type as keyof typeof indicatorTypeLabels]}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Ölçü Birimi:</span>
-                    <span className="ml-2 font-medium">{selectedIndicator.unit_of_measure}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Sıklık:</span>
-                    <span className="ml-2 font-medium">
-                      {frequencyOptions.find(f => f.value === selectedIndicator.measurement_frequency)?.label}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-b border-gray-200 bg-gray-50">
-                <h3 className="font-semibold text-gray-900 mb-3">Eşik Değerleri</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🟢</span>
-                    <span className="text-gray-700">Yeşil (Normal):</span>
-                    <span className="font-medium">{selectedIndicator.green_threshold}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🟡</span>
-                    <span className="text-gray-700">Sarı (Dikkat):</span>
-                    <span className="font-medium">{selectedIndicator.yellow_threshold}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🔴</span>
-                    <span className="text-gray-700">Kırmızı (Alarm):</span>
-                    <span className="font-medium">{selectedIndicator.red_threshold}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-semibold text-gray-900">Trend Grafiği (Son 12 Dönem)</h3>
-                  <button
-                    onClick={openValueModal}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Değer Ekle
-                  </button>
-                </div>
-
-                {chartData.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    Henüz veri girilmemiş
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#2563eb"
-                        strokeWidth={2}
-                        dot={{ fill: '#2563eb', r: 4 }}
-                        name={`Değer (${selectedIndicator.unit_of_measure})`}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-
-              <div className="p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Değer Geçmişi</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Tarih</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Dönem</th>
-                        <th className="px-4 py-2 text-right font-semibold text-gray-700">Değer</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Durum</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Not</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {indicatorValues.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                            Henüz değer girilmemiş
-                          </td>
-                        </tr>
-                      ) : (
-                        indicatorValues.map((value) => (
-                          <tr key={value.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-4 py-3">{new Date(value.measurement_date).toLocaleDateString('tr-TR')}</td>
-                            <td className="px-4 py-3">{value.period}</td>
-                            <td className="px-4 py-3 text-right font-medium">
-                              {value.value} {selectedIndicator.unit_of_measure}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${statusConfig[value.status as keyof typeof statusConfig]?.color}`}>
-                                {statusConfig[value.status as keyof typeof statusConfig]?.icon} {statusConfig[value.status as keyof typeof statusConfig]?.label}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">{value.notes || '-'}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </Card>
-          )}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+              viewMode === 'grid'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Grid3x3 className="w-4 h-4" />
+            Grid Görünüm
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+              viewMode === 'table'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <List className="w-4 h-4" />
+            Tablo Görünüm
+          </button>
         </div>
       </div>
 
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredIndicators.map(indicator => {
+            const status = indicator.latest_value?.status || 'NONE';
+            const statusInfo = statusConfig[status];
+            const trend = indicator.latest_value?.trend;
+            const trendInfo = trend ? trendIcons[trend] : null;
+
+            return (
+              <Card
+                key={indicator.id}
+                className={`p-6 border-2 ${statusInfo.cardBg} ${statusInfo.color.split(' ')[2]}`}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {statusInfo.icon} {indicator.code}
+                      </div>
+                      <div className="text-sm text-gray-700 mt-1">{indicator.name}</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-6 text-center border border-gray-200">
+                    {indicator.latest_value ? (
+                      <>
+                        <div className="text-4xl font-bold text-gray-900">
+                          {indicator.latest_value.value}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {indicator.unit_of_measure}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-gray-400 py-4">Değer Yok</div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-700">Eşikler:</span>
+                      <div className="text-xs text-gray-600 mt-1">
+                        {getThresholdDisplay(indicator)}
+                      </div>
+                    </div>
+
+                    {trendInfo && (
+                      <div>
+                        <span className="font-medium text-gray-700">Trend:</span>
+                        <span className="ml-2">{trendInfo.icon} {trendInfo.label}</span>
+                      </div>
+                    )}
+
+                    <div>
+                      <span className="font-medium text-gray-700">Risk:</span>
+                      <span className="ml-2">{indicator.risk?.code}</span>
+                    </div>
+
+                    {indicator.latest_value && (
+                      <div>
+                        <span className="font-medium text-gray-700">Dönem:</span>
+                        <span className="ml-2">{indicator.latest_value.period}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-4 border-t">
+                    <button
+                      onClick={() => openIndicatorModal(indicator)}
+                      className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm flex items-center justify-center gap-1"
+                    >
+                      <Edit className="w-3 h-3" />
+                      Düzenle
+                    </button>
+                    <button
+                      onClick={() => openHistoryModal(indicator)}
+                      className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm flex items-center justify-center gap-1"
+                    >
+                      <History className="w-3 h-3" />
+                      Geçmiş
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kod</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gösterge Adı</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlişkili Risk</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Son Değer</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Eşikler</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trend</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredIndicators.map(indicator => {
+                  const status = indicator.latest_value?.status || 'NONE';
+                  const statusInfo = statusConfig[status];
+                  const trend = indicator.latest_value?.trend;
+                  const trendInfo = trend ? trendIcons[trend] : null;
+
+                  return (
+                    <tr key={indicator.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {indicator.code}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {indicator.name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {indicator.risk?.code}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {indicator.latest_value
+                          ? `${indicator.latest_value.value} ${indicator.unit_of_measure}`
+                          : '-'
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {getThresholdDisplay(indicator)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-2xl`}>
+                          {statusInfo.icon}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xl">
+                        {trendInfo?.icon || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => openIndicatorModal(indicator)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openHistoryModal(indicator)}
+                            className="text-gray-600 hover:text-gray-800"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       <Modal
         isOpen={showIndicatorModal}
-        onClose={() => setShowIndicatorModal(false)}
+        onClose={closeIndicatorModal}
         title={editingIndicator ? 'Gösterge Düzenle' : 'Yeni Gösterge Ekle'}
       >
-        <form onSubmit={handleIndicatorSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              İlgili Risk <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={indicatorForm.risk_id}
-              onChange={(e) => setIndicatorForm({ ...indicatorForm, risk_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              required
-            >
-              <option value="">Seçiniz</option>
-              {risks.map((risk) => (
-                <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
-              ))}
-            </select>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {editingIndicator && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Gösterge Kodu
+              </label>
+              <input
+                type="text"
+                value={editingIndicator.code}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+              />
+            </div>
+          )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Gösterge Adı <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={indicatorForm.name}
-              onChange={(e) => setIndicatorForm({ ...indicatorForm, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Açıklama
+            </label>
             <textarea
-              value={indicatorForm.description}
-              onChange={(e) => setIndicatorForm({ ...indicatorForm, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              rows={2}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Gösterge Tipi <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={indicatorForm.indicator_type}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, indicator_type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                {Object.entries(indicatorTypeLabels).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ölçü Birimi <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={indicatorForm.unit_of_measure}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, unit_of_measure: e.target.value })}
-                placeholder="Adet, %, TL, Gün..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ölçüm Sıklığı <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={indicatorForm.measurement_frequency}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, measurement_frequency: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                {frequencyOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Veri Kaynağı</label>
-              <input
-                type="text"
-                value={indicatorForm.data_source}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, data_source: e.target.value })}
-                placeholder="IT Sistemleri, Muhasebe..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hesaplama Yöntemi</label>
-            <textarea
-              value={indicatorForm.calculation_method}
-              onChange={(e) => setIndicatorForm({ ...indicatorForm, calculation_method: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              rows={2}
-              placeholder="Göstergenin nasıl hesaplandığını açıklayın"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              rows={3}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Yön <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              İlişkili Risk <span className="text-red-500">*</span>
             </label>
             <select
-              value={indicatorForm.direction}
-              onChange={(e) => setIndicatorForm({ ...indicatorForm, direction: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              value={formData.risk_id}
+              onChange={(e) => setFormData({ ...formData, risk_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
             >
-              {Object.entries(directionLabels).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
+              <option value="">Seçiniz...</option>
+              {risks.map(risk => (
+                <option key={risk.id} value={risk.id}>
+                  {risk.code} - {risk.name}
+                </option>
               ))}
             </select>
           </div>
 
-          {indicatorForm.direction === 'TARGET' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Hedef Değer <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={indicatorForm.target_value}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, target_value: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required={indicatorForm.direction === 'TARGET'}
-              />
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Ölçüm Birimi <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.unit_of_measure}
+              onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              {unitOptions.map(unit => (
+                <option key={unit} value={unit}>{unit}</option>
+              ))}
+            </select>
+          </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Yeşil Eşik <span className="text-red-500">*</span>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Ölçüm Sıklığı <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="MONTHLY"
+                  checked={formData.measurement_frequency === 'MONTHLY'}
+                  onChange={(e) => setFormData({ ...formData, measurement_frequency: e.target.value as any })}
+                  className="mr-2"
+                />
+                Aylık
               </label>
-              <input
-                type="text"
-                value={indicatorForm.green_threshold}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, green_threshold: e.target.value })}
-                placeholder="<3 veya 85-100"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sarı Eşik <span className="text-red-500">*</span>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="QUARTERLY"
+                  checked={formData.measurement_frequency === 'QUARTERLY'}
+                  onChange={(e) => setFormData({ ...formData, measurement_frequency: e.target.value as any })}
+                  className="mr-2"
+                />
+                Çeyreklik
               </label>
-              <input
-                type="text"
-                value={indicatorForm.yellow_threshold}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, yellow_threshold: e.target.value })}
-                placeholder="3-5 veya 70-85"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kırmızı Eşik <span className="text-red-500">*</span>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="ANNUAL"
+                  checked={formData.measurement_frequency === 'ANNUAL'}
+                  onChange={(e) => setFormData({ ...formData, measurement_frequency: e.target.value as any })}
+                  className="mr-2"
+                />
+                Yıllık
               </label>
-              <input
-                type="text"
-                value={indicatorForm.red_threshold}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, red_threshold: e.target.value })}
-                placeholder=">5 veya <70"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required
-              />
             </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Yön <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="UP"
+                  checked={formData.direction === 'UP'}
+                  onChange={(e) => setFormData({ ...formData, direction: e.target.value as any })}
+                  className="mr-2"
+                />
+                Yukarı iyi (değer arttıkça iyi)
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="DOWN"
+                  checked={formData.direction === 'DOWN'}
+                  onChange={(e) => setFormData({ ...formData, direction: e.target.value as any })}
+                  className="mr-2"
+                />
+                Aşağı iyi (değer azaldıkça iyi)
+              </label>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">EŞİK DEĞERLERİ</h3>
+
+            {formData.direction === 'DOWN' ? (
+              <div className="space-y-3 text-sm">
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🟢 Yeşil (İyi): değer &lt; <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.threshold_green}
+                    onChange={(e) => setFormData({ ...formData, threshold_green: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🟡 Sarı (Uyarı): değer &gt;= {formData.threshold_green} ve &lt; <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.threshold_yellow}
+                    onChange={(e) => setFormData({ ...formData, threshold_yellow: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🔴 Kırmızı (Alarm): değer &gt;= {formData.threshold_yellow}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.threshold_red}
+                    onChange={(e) => setFormData({ ...formData, threshold_red: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-100"
+                    disabled
+                    placeholder="Otomatik (threshold_yellow)"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🟢 Yeşil (İyi): değer &gt; <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.threshold_green}
+                    onChange={(e) => setFormData({ ...formData, threshold_green: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🟡 Sarı (Uyarı): değer &lt;= {formData.threshold_green} ve &gt; <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.threshold_yellow}
+                    onChange={(e) => setFormData({ ...formData, threshold_yellow: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🔴 Kırmızı (Alarm): değer &lt;= {formData.threshold_yellow}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.threshold_red}
+                    onChange={(e) => setFormData({ ...formData, threshold_red: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-100"
+                    disabled
+                    placeholder="Otomatik (threshold_yellow)"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Sorumlu Birim
+            </label>
+            <select
+              value={formData.responsible_department_id}
+              onChange={(e) => setFormData({ ...formData, responsible_department_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seçiniz...</option>
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={indicatorForm.alert_enabled}
-                onChange={(e) => setIndicatorForm({ ...indicatorForm, alert_enabled: e.target.checked })}
-                className="rounded"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="mr-2"
               />
-              <span className="text-sm text-gray-700">Alarm aktif (Kırmızı seviyede bildirim gönder)</span>
+              <span className="text-sm text-gray-700">Aktif</span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-4">
             <button
               type="button"
-              onClick={() => setShowIndicatorModal(false)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              İptal
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              {editingIndicator ? 'Güncelle' : 'Kaydet'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={showValueModal}
-        onClose={() => setShowValueModal(false)}
-        title="Değer Girişi"
-      >
-        <form onSubmit={handleValueSubmit} className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="font-medium text-gray-900">
-              {selectedIndicator?.code} - {selectedIndicator?.name}
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              Birim: {selectedIndicator?.unit_of_measure}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ölçüm Tarihi <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={valueForm.measurement_date}
-                onChange={(e) => setValueForm({ ...valueForm, measurement_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Dönem <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={valueForm.period}
-                onChange={(e) => setValueForm({ ...valueForm, period: e.target.value })}
-                placeholder="2025-01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Değer <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={valueForm.value}
-              onChange={(e) => setValueForm({ ...valueForm, value: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Not/Açıklama</label>
-            <textarea
-              value={valueForm.notes}
-              onChange={(e) => setValueForm({ ...valueForm, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              rows={2}
-              placeholder="Bu ölçüm hakkında notlar"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Analiz Yorumu</label>
-            <textarea
-              value={valueForm.analysis}
-              onChange={(e) => setValueForm({ ...valueForm, analysis: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              rows={2}
-              placeholder="Değerin analizi ve yorumu"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => setShowValueModal(false)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              onClick={closeIndicatorModal}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
             >
               İptal
             </button>
@@ -1061,6 +966,95 @@ export default function RiskIndicators() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={showHistoryModal}
+        onClose={closeHistoryModal}
+        title={selectedIndicator ? `${selectedIndicator.code} - ${selectedIndicator.name} - Geçmiş Değerler` : ''}
+        maxWidth="4xl"
+      >
+        <div className="space-y-6">
+          {indicatorValues.length > 0 && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={[...indicatorValues].reverse()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  {selectedIndicator && (
+                    <>
+                      <ReferenceLine
+                        y={selectedIndicator.threshold_yellow}
+                        stroke="#fbbf24"
+                        strokeDasharray="3 3"
+                        label="Sarı Eşik"
+                      />
+                      <ReferenceLine
+                        y={selectedIndicator.threshold_red}
+                        stroke="#ef4444"
+                        strokeDasharray="3 3"
+                        label="Kırmızı Eşik"
+                      />
+                    </>
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    name="Değer"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dönem</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Değer</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Giren</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {indicatorValues.map(value => {
+                  const statusInfo = statusConfig[value.status];
+                  return (
+                    <tr key={value.id}>
+                      <td className="px-4 py-3 text-sm text-gray-900">{value.period}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {value.value} {selectedIndicator?.unit_of_measure}
+                      </td>
+                      <td className="px-4 py-3 text-2xl">{statusInfo.icon}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {value.recorded_by?.full_name || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {new Date(value.created_at).toLocaleDateString('tr-TR')}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {indicatorValues.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              Henüz veri girilmemiş
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
