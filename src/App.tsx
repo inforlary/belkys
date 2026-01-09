@@ -79,6 +79,7 @@ import RiskTreatments from './pages/RiskTreatments';
 import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
 import RiskCategories from './pages/RiskCategories';
 import InternalControl from './pages/InternalControl';
+import ICStandards from './pages/ICStandards';
 import ICActionPlans from './pages/ICActionPlans';
 import ICActionPlanDetail from './pages/ICActionPlanDetail';
 import ICActionDetail from './pages/ICActionDetail';
@@ -302,6 +303,8 @@ const renderPage = () => {
         return <RiskCategories />;
       case 'internal-control':
         return <InternalControl />;
+      case 'internal-control/standards':
+        return <ICStandards />;
       case 'internal-control/action-plans':
         return <ICActionPlans />;
       case 'internal-control/assessments':
