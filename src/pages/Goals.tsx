@@ -144,7 +144,6 @@ export default function Goals() {
             *,
             risk_appetite_level,
             risk_appetite_description,
-            risk_appetite_max_score,
             objectives!inner(title, code),
             departments(name),
             vice_president:profiles!vice_president_id(full_name)

@@ -124,7 +124,6 @@ export default function CollaborationPlanning() {
     cost_estimates: {} as Record<number, string>,
     risk_appetite_level: '',
     risk_appetite_description: '',
-    risk_appetite_max_score: '',
     risks: [''],
     findings: [''],
     needs: ['']
@@ -158,7 +157,7 @@ export default function CollaborationPlanning() {
 
         supabase
           .from('goals')
-          .select('*, objective:objectives(code, title), risk_appetite_level, risk_appetite_description, risk_appetite_max_score')
+          .select('*, objective:objectives(code, title), risk_appetite_level, risk_appetite_description')
           .eq('organization_id', profile.organization_id)
           .order('code'),
 
@@ -259,15 +258,19 @@ export default function CollaborationPlanning() {
         planId = data.id;
       }
 
-      if (formData.risk_appetite_level || formData.risk_appetite_description || formData.risk_appetite_max_score) {
-        await supabase
+      if (formData.risk_appetite_level || formData.risk_appetite_description) {
+        const { error: riskAppetiteError } = await supabase
           .from('goals')
           .update({
             risk_appetite_level: formData.risk_appetite_level || null,
-            risk_appetite_description: formData.risk_appetite_description || null,
-            risk_appetite_max_score: formData.risk_appetite_max_score ? parseFloat(formData.risk_appetite_max_score) : null
+            risk_appetite_description: formData.risk_appetite_description || null
           })
           .eq('id', formData.goal_id);
+
+        if (riskAppetiteError) {
+          console.error('Risk iştahı kaydedilirken hata:', riskAppetiteError);
+          throw new Error('Risk iştahı kaydedilemedi: ' + riskAppetiteError.message);
+        }
       }
 
       if (!formData.all_departments && formData.partners.length > 0) {
@@ -337,6 +340,8 @@ export default function CollaborationPlanning() {
       all_departments: false,
       partners: [],
       cost_estimates: {},
+      risk_appetite_level: '',
+      risk_appetite_description: '',
       risks: [''],
       findings: [''],
       needs: ['']
@@ -353,6 +358,8 @@ export default function CollaborationPlanning() {
     const findings = plan.items?.filter(i => i.category === 'finding').map(i => i.content) || [''];
     const needs = plan.items?.filter(i => i.category === 'need').map(i => i.content) || [''];
 
+    const selectedGoal = goals.find(g => g.id === plan.goal_id);
+
     setEditingPlan(plan);
     setFormData({
       goal_id: plan.goal_id,
@@ -360,6 +367,8 @@ export default function CollaborationPlanning() {
       all_departments: plan.all_departments || false,
       partners: plan.partners?.map(p => p.department_id) || [],
       cost_estimates: estimates,
+      risk_appetite_level: selectedGoal?.risk_appetite_level || '',
+      risk_appetite_description: selectedGoal?.risk_appetite_description || '',
       risks: risks.length > 0 ? risks : [''],
       findings: findings.length > 0 ? findings : [''],
       needs: needs.length > 0 ? needs : ['']
@@ -1037,52 +1046,36 @@ export default function CollaborationPlanning() {
                     Risk İştahı Belirleme (Opsiyonel)
                   </h3>
                   <div className="space-y-3 bg-orange-50 p-4 rounded-lg border border-orange-200">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Risk İştahı Seviyesi
-                        </label>
-                        <select
-                          value={formData.risk_appetite_level}
-                          onChange={(e) => setFormData({ ...formData, risk_appetite_level: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
-                        >
-                          <option value="">Seçiniz</option>
-                          <option value="LOW">Düşük - Minimum Risk</option>
-                          <option value="MODERATE">Orta - Kontrollü Risk</option>
-                          <option value="HIGH">Yüksek - Agresif Hedefler</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Maksimum Risk Skoru
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="25"
-                          value={formData.risk_appetite_max_score}
-                          onChange={(e) => setFormData({ ...formData, risk_appetite_max_score: e.target.value })}
-                          placeholder="örn: 12"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Risk İştahı Seviyesi
+                      </label>
+                      <select
+                        value={formData.risk_appetite_level}
+                        onChange={(e) => setFormData({ ...formData, risk_appetite_level: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="">Seçiniz</option>
+                        <option value="LOW">Düşük - Minimum Risk</option>
+                        <option value="MODERATE">Orta - Kontrollü Risk</option>
+                        <option value="HIGH">Yüksek - Agresif Hedefler</option>
+                      </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Risk İştahı Açıklaması
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Risk Kapasitesi
                       </label>
                       <textarea
                         value={formData.risk_appetite_description}
                         onChange={(e) => setFormData({ ...formData, risk_appetite_description: e.target.value })}
-                        placeholder="Bu hedef için kabul edilebilir risk seviyesini ve gerekçesini açıklayın..."
-                        rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                        placeholder="Bu hedef için kabul edilebilir risk seviyesini ve kuruluşun risk alma kapasitesini açıklayın..."
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
                     <div className="text-xs text-gray-600 bg-white p-2 rounded border border-orange-200">
                       <strong>Not:</strong> Risk iştahı, bu hedef için kabul edilebilir risk seviyesini belirler.
-                      Maksimum skor üzerindeki riskler izlenecek ve önlem alınması gerekecektir.
+                      Risk kapasitesi ise kuruluşun bu riski taşıyabilme yeteneğini tanımlar.
                     </div>
                   </div>
                 </div>
