@@ -11,7 +11,8 @@ import {
   AlertCircle,
   XCircle,
   TrendingUp,
-  ArrowLeft
+  ArrowLeft,
+  Trash2
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { useLocation } from '../hooks/useLocation';
@@ -128,6 +129,14 @@ export default function ICStandards() {
     is_continuous: false,
     target_date: '',
     description: ''
+  });
+
+  const [showComponentModal, setShowComponentModal] = useState(false);
+  const [editingComponent, setEditingComponent] = useState<Component | null>(null);
+  const [componentForm, setComponentForm] = useState({
+    code: '',
+    name: '',
+    order_index: 0
   });
 
   useEffect(() => {
@@ -374,6 +383,91 @@ export default function ICStandards() {
     }
   };
 
+  const openComponentModal = (component?: Component) => {
+    if (component) {
+      setEditingComponent(component);
+      setComponentForm({
+        code: component.code,
+        name: component.name,
+        order_index: component.order_index
+      });
+    } else {
+      setEditingComponent(null);
+      setComponentForm({
+        code: '',
+        name: '',
+        order_index: components.length > 0 ? Math.max(...components.map(c => c.order_index)) + 1 : 1
+      });
+    }
+    setShowComponentModal(true);
+  };
+
+  const saveComponent = async () => {
+    if (!profile?.organization_id || !componentForm.code || !componentForm.name) {
+      alert('Lütfen kod ve isim alanlarını doldurun');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const componentData = {
+        organization_id: profile.organization_id,
+        code: componentForm.code,
+        name: componentForm.name,
+        order_index: componentForm.order_index
+      };
+
+      if (editingComponent) {
+        const { error } = await supabase
+          .from('ic_components')
+          .update(componentData)
+          .eq('id', editingComponent.id);
+
+        if (error) throw error;
+        alert('Bileşen başarıyla güncellendi');
+      } else {
+        const { error } = await supabase
+          .from('ic_components')
+          .insert(componentData);
+
+        if (error) throw error;
+        alert('Bileşen başarıyla eklendi');
+      }
+
+      setShowComponentModal(false);
+      setEditingComponent(null);
+      loadData();
+    } catch (error) {
+      console.error('Error saving component:', error);
+      alert('Bileşen kaydedilirken hata oluştu');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteComponent = async (componentId: string) => {
+    if (!confirm('Bu bileşeni silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve bileşene bağlı tüm standartlar da silinecektir.')) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('ic_components')
+        .delete()
+        .eq('id', componentId);
+
+      if (error) throw error;
+      alert('Bileşen başarıyla silindi');
+      loadData();
+    } catch (error) {
+      console.error('Error deleting component:', error);
+      alert('Bileşen silinirken hata oluştu');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const stats = {
     total: conditions.length,
     compliant: assessments.filter(a => a.compliance_status === 'COMPLIANT').length,
@@ -544,6 +638,18 @@ export default function ICStandards() {
         </div>
       </div>
 
+      {(profile?.role === 'ADMIN' || profile?.role === 'DIRECTOR') && (
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => openComponentModal()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Yeni Bileşen Ekle
+          </button>
+        </div>
+      )}
+
       <div className="space-y-4">
         {components.map((component) => {
           const componentStandards = standards.filter(s => s.component_id === component.id);
@@ -551,19 +657,19 @@ export default function ICStandards() {
 
           return (
             <div key={component.id} className="bg-white rounded-lg shadow">
-              <button
-                onClick={() => {
-                  const newExpanded = new Set(expandedComponents);
-                  if (isExpanded) {
-                    newExpanded.delete(component.id);
-                  } else {
-                    newExpanded.add(component.id);
-                  }
-                  setExpandedComponents(newExpanded);
-                }}
-                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
+              <div className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <button
+                  onClick={() => {
+                    const newExpanded = new Set(expandedComponents);
+                    if (isExpanded) {
+                      newExpanded.delete(component.id);
+                    } else {
+                      newExpanded.add(component.id);
+                    }
+                    setExpandedComponents(newExpanded);
+                  }}
+                  className="flex items-center gap-3 flex-1"
+                >
                   {isExpanded ? (
                     <ChevronDown className="w-5 h-5 text-slate-400" />
                   ) : (
@@ -573,8 +679,33 @@ export default function ICStandards() {
                     <div className="font-bold text-lg text-slate-900">{component.code} - {component.name}</div>
                     <div className="text-sm text-slate-600">{componentStandards.length} Standart</div>
                   </div>
-                </div>
-              </button>
+                </button>
+
+                {(profile?.role === 'ADMIN' || profile?.role === 'DIRECTOR') && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openComponentModal(component);
+                      }}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Düzenle"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteComponent(component.id);
+                      }}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Sil"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {isExpanded && (
                 <div className="px-6 pb-4 space-y-3">
@@ -1054,6 +1185,78 @@ export default function ICStandards() {
               disabled={saving}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showComponentModal}
+        onClose={() => {
+          setShowComponentModal(false);
+          setEditingComponent(null);
+        }}
+        title={editingComponent ? 'Bileşen Düzenle' : 'Yeni Bileşen Ekle'}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Bileşen Kodu <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={componentForm.code}
+              onChange={(e) => setComponentForm({ ...componentForm, code: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Örn: KOS"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Bileşen Adı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={componentForm.name}
+              onChange={(e) => setComponentForm({ ...componentForm, name: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Örn: KONTROL ORTAMI"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Sıra
+            </label>
+            <input
+              type="number"
+              value={componentForm.order_index}
+              onChange={(e) => setComponentForm({ ...componentForm, order_index: parseInt(e.target.value) || 0 })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              min="0"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button
+              onClick={() => {
+                setShowComponentModal(false);
+                setEditingComponent(null);
+              }}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+            >
+              İptal
+            </button>
+            <button
+              onClick={saveComponent}
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
               {saving ? 'Kaydediliyor...' : 'Kaydet'}
             </button>
           </div>
