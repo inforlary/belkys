@@ -18,7 +18,7 @@ export default function RiskRegisterNew() {
     code: '',
     name: '',
     description: '',
-    category_id: '',
+    category_ids: [] as string[],
     owner_department_id: '',
     objective_id: '',
     goal_id: '',
@@ -87,8 +87,9 @@ export default function RiskRegisterNew() {
     try {
       const { data, error } = await supabase
         .from('risk_categories')
-        .select('id, name')
-        .eq('organization_id', profile?.organization_id)
+        .select('id, code, name, type')
+        .or(`organization_id.is.null,organization_id.eq.${profile?.organization_id}`)
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
@@ -147,14 +148,19 @@ export default function RiskRegisterNew() {
       return;
     }
 
+    if (formData.category_ids.length === 0) {
+      alert('En az bir risk kategorisi seçmelisiniz!');
+      return;
+    }
+
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { data: riskData, error: riskError } = await supabase
         .from('risks')
         .insert({
           organization_id: profile?.organization_id,
-          category_id: formData.category_id || null,
           objective_id: formData.objective_id || null,
+          goal_id: formData.goal_id || null,
           owner_department_id: formData.owner_department_id || null,
           code: formData.code,
           name: formData.name,
@@ -172,9 +178,22 @@ export default function RiskRegisterNew() {
           is_active: true,
           identified_date: new Date().toISOString().split('T')[0],
           identified_by_id: profile?.id,
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (riskError) throw riskError;
+
+      const categoryMappings = formData.category_ids.map(categoryId => ({
+        risk_id: riskData.id,
+        category_id: categoryId
+      }));
+
+      const { error: mappingError } = await supabase
+        .from('risk_category_mappings')
+        .insert(categoryMappings);
+
+      if (mappingError) throw mappingError;
 
       alert('Risk başarıyla kaydedildi!');
       navigate('risks/register');
@@ -233,20 +252,36 @@ export default function RiskRegisterNew() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Kategori
+                  Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
                 </label>
-                <select
-                  value={formData.category_id}
-                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Seçiniz</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-slate-300 rounded-lg p-4">
+                  {categories.map((category) => (
+                    <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={formData.category_ids.includes(category.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData(prev => ({
+                              ...prev,
+                              category_ids: [...prev.category_ids, category.id]
+                            }));
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              category_ids: prev.category_ids.filter(id => id !== category.id)
+                            }));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm text-slate-700">
+                        {category.code} - {category.name}
+                        <span className="text-xs text-slate-500 ml-1">({category.type})</span>
+                      </span>
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
 

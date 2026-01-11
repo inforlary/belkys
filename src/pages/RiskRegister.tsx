@@ -28,6 +28,15 @@ interface Risk {
     name: string;
     color: string;
   };
+  categories?: Array<{
+    category_id: string;
+    category: {
+      id: string;
+      name: string;
+      code: string;
+      color: string;
+    };
+  }>;
   department?: {
     name: string;
   };
@@ -173,6 +182,7 @@ export default function RiskRegister() {
           .select(`
             *,
             category:risk_categories(name, color),
+            categories:risk_category_mappings(category_id, category:risk_categories(id, name, code, color)),
             department:departments!owner_department_id(name)
           `)
           .eq('organization_id', profile?.organization_id)
@@ -689,17 +699,24 @@ export default function RiskRegister() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {risk.category && (
-                          <span
-                            className="px-2 py-1 rounded-full text-xs font-medium"
-                            style={{
-                              backgroundColor: `${risk.category.color}20`,
-                              color: risk.category.color
-                            }}
-                          >
-                            {risk.category.name}
-                          </span>
+                      <td className="px-6 py-4 text-sm">
+                        {risk.categories && risk.categories.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {risk.categories.map((catMapping) => (
+                              <span
+                                key={catMapping.category_id}
+                                className="px-2 py-1 rounded-full text-xs font-medium"
+                                style={{
+                                  backgroundColor: `${catMapping.category.color || '#6B7280'}20`,
+                                  color: catMapping.category.color || '#6B7280'
+                                }}
+                              >
+                                {catMapping.category.code}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
