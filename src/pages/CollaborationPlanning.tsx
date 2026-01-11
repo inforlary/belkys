@@ -12,6 +12,9 @@ interface Goal {
   code: string;
   title: string;
   department_id: string | null;
+  risk_appetite_level?: string | null;
+  risk_appetite_description?: string | null;
+  risk_appetite_max_score?: number | null;
   objective?: {
     id: string;
     code: string;
@@ -127,7 +130,7 @@ export default function CollaborationPlanning() {
 
         supabase
           .from('goals')
-          .select('*, objective:objectives(code, title)')
+          .select('*, objective:objectives(code, title), risk_appetite_level, risk_appetite_description, risk_appetite_max_score')
           .eq('organization_id', profile.organization_id)
           .order('code'),
 
@@ -426,6 +429,82 @@ export default function CollaborationPlanning() {
     setExpandedObjectives(newExpanded);
   };
 
+  const transferRiskToRegister = async (riskItem: PlanItem, plan: CollaborationPlan) => {
+    if (!profile?.organization_id || !plan.goal) return;
+
+    try {
+      const existingRisk = await supabase
+        .from('risks')
+        .select('id')
+        .eq('collaboration_item_id', riskItem.id)
+        .maybeSingle();
+
+      if (existingRisk.data) {
+        alert('Bu risk zaten Risk Yönetimi sistemine aktarılmış.');
+        return;
+      }
+
+      const nextCode = await getNextRiskCode();
+
+      const { error } = await supabase
+        .from('risks')
+        .insert({
+          organization_id: profile.organization_id,
+          goal_id: plan.goal_id,
+          collaboration_item_id: riskItem.id,
+          code: nextCode,
+          name: riskItem.content,
+          description: `İşbirliği planından aktarılan risk: ${plan.title}`,
+          owner_department_id: plan.responsible_department_id,
+          inherent_likelihood: 3,
+          inherent_impact: 3,
+          residual_likelihood: 3,
+          residual_impact: 3,
+          risk_level: 'MEDIUM',
+          status: 'IDENTIFIED',
+          is_active: true,
+          identified_date: new Date().toISOString().split('T')[0],
+          identified_by_id: user?.id
+        });
+
+      if (error) throw error;
+
+      alert('Risk başarıyla Risk Yönetimi sistemine aktarıldı!');
+      loadData();
+    } catch (error) {
+      console.error('Risk aktarılırken hata:', error);
+      alert('Risk aktarılırken hata oluştu.');
+    }
+  };
+
+  const getNextRiskCode = async (): Promise<string> => {
+    if (!profile?.organization_id) return 'R001';
+
+    try {
+      const { data, error } = await supabase
+        .from('risks')
+        .select('code')
+        .eq('organization_id', profile.organization_id)
+        .order('code', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return 'R001';
+      }
+
+      const lastCode = data[0].code;
+      const numericPart = parseInt(lastCode.replace(/\D/g, ''));
+      const nextNumber = numericPart + 1;
+
+      return `R${nextNumber.toString().padStart(3, '0')}`;
+    } catch (error) {
+      console.error('Risk kodu oluşturulurken hata:', error);
+      return 'R001';
+    }
+  };
+
   const exportToExcel = () => {
     const data = plans.map(plan => ({
       'Amaç': plan.goal?.objective?.code || '',
@@ -631,7 +710,7 @@ export default function CollaborationPlanning() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
                             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-5 border border-blue-300 shadow-sm">
                               <div className="flex items-center gap-2 text-blue-800 mb-3">
                                 <Users className="w-5 h-5" />
@@ -684,21 +763,64 @@ export default function CollaborationPlanning() {
                                 <span className="text-sm text-purple-700 font-medium">Belirtilmemiş</span>
                               )}
                             </div>
+
+                            {plan.goal?.risk_appetite_level && (
+                              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-5 border border-orange-300 shadow-sm">
+                                <div className="flex items-center gap-2 text-orange-800 mb-3">
+                                  <Shield className="w-5 h-5" />
+                                  <span className="font-semibold text-sm">Risk İştahı</span>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                      plan.goal.risk_appetite_level === 'LOW' ? 'bg-green-200 text-green-900' :
+                                      plan.goal.risk_appetite_level === 'MEDIUM' ? 'bg-yellow-200 text-yellow-900' :
+                                      plan.goal.risk_appetite_level === 'HIGH' ? 'bg-orange-200 text-orange-900' :
+                                      'bg-red-200 text-red-900'
+                                    }`}>
+                                      {plan.goal.risk_appetite_level === 'LOW' ? 'Düşük' :
+                                       plan.goal.risk_appetite_level === 'MEDIUM' ? 'Orta' :
+                                       plan.goal.risk_appetite_level === 'HIGH' ? 'Yüksek' : 'Çok Yüksek'}
+                                    </span>
+                                  </div>
+                                  {plan.goal.risk_appetite_max_score && (
+                                    <p className="text-sm text-orange-800 font-medium">
+                                      Max Skor: {plan.goal.risk_appetite_max_score}
+                                    </p>
+                                  )}
+                                  {plan.goal.risk_appetite_description && (
+                                    <p className="text-xs text-orange-700 mt-2">{plan.goal.risk_appetite_description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {plan.items && plan.items.length > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5 pt-5 border-t-2 border-gray-300">
                               {plan.items.filter(i => i.category === 'risk').length > 0 && (
                                 <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-5 border border-red-300 shadow-sm">
-                                  <div className="flex items-center gap-2 text-red-800 mb-3">
-                                    <AlertTriangle className="w-5 h-5" />
-                                    <span className="font-semibold text-sm">Riskler</span>
+                                  <div className="flex items-center justify-between text-red-800 mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <AlertTriangle className="w-5 h-5" />
+                                      <span className="font-semibold text-sm">Riskler</span>
+                                    </div>
                                   </div>
-                                  <ul className="space-y-2">
+                                  <ul className="space-y-3">
                                     {plan.items.filter(i => i.category === 'risk').map((item, idx) => (
-                                      <li key={idx} className="text-sm text-red-900 flex items-start gap-2">
-                                        <span className="text-red-500 mt-0.5 font-bold">•</span>
-                                        <span className="font-medium">{item.content}</span>
+                                      <li key={idx} className="flex items-start justify-between gap-2 bg-white bg-opacity-60 rounded-md p-2.5 border border-red-200">
+                                        <div className="flex items-start gap-2 flex-1">
+                                          <span className="text-red-500 mt-0.5 font-bold">•</span>
+                                          <span className="font-medium text-sm text-red-900 flex-1">{item.content}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => transferRiskToRegister(item, plan)}
+                                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors whitespace-nowrap flex-shrink-0"
+                                          title="Risk Yönetimine Aktar"
+                                        >
+                                          <Shield className="w-3.5 h-3.5" />
+                                          Aktar
+                                        </button>
                                       </li>
                                     ))}
                                   </ul>
