@@ -22,9 +22,14 @@ interface Risk {
   residual_score: number;
   status: string;
   created_at: string;
-  category?: {
-    name: string;
-  };
+  categories?: Array<{
+    category_id: string;
+    category: {
+      id: string;
+      name: string;
+      code: string;
+    };
+  }>;
   department?: {
     name: string;
   };
@@ -92,7 +97,7 @@ export default function RiskMatrix() {
           .from('risks')
           .select(`
             *,
-            category:risk_categories(name),
+            categories:risk_category_mappings(category_id, category:risk_categories(id, name, code)),
             department:departments!owner_department_id(name)
           `)
           .eq('organization_id', profile.organization_id)
@@ -125,7 +130,10 @@ export default function RiskMatrix() {
 
   const filteredRisks = risks.filter(risk => {
     if (filters.department && risk.owner_department_id !== filters.department) return false;
-    if (filters.category && risk.category_id !== filters.category) return false;
+    if (filters.category) {
+      const hasCategory = risk.categories?.some((c: any) => c.category_id === filters.category);
+      if (!hasCategory) return false;
+    }
     if (filters.status === 'ACTIVE' && risk.status !== 'ACTIVE') return false;
     if (filters.status === 'CLOSED' && risk.status !== 'CLOSED') return false;
     return true;
@@ -217,7 +225,9 @@ export default function RiskMatrix() {
         wsData.push([
           risk.code,
           risk.name,
-          risk.category?.name || '-',
+          risk.categories && risk.categories.length > 0
+            ? risk.categories.map(c => c.category?.name).filter(Boolean).join(', ')
+            : '-',
           risk.department?.name || '-',
           likelihood,
           impact,
@@ -598,7 +608,11 @@ export default function RiskMatrix() {
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900">{risk.code} {risk.name}</h4>
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                          <span>Kategori: <span className="font-medium">{risk.category?.name || '-'}</span></span>
+                          <span>Kategori: <span className="font-medium">
+                            {risk.categories && risk.categories.length > 0
+                              ? risk.categories.map(c => c.category?.name).filter(Boolean).join(', ')
+                              : '-'}
+                          </span></span>
                           <span>Birim: <span className="font-medium">{risk.department?.name || '-'}</span></span>
                         </div>
                       </div>

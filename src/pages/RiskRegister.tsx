@@ -409,7 +409,10 @@ export default function RiskRegister() {
   }
 
   const filteredRisks = risks.filter(risk => {
-    if (filters.category && risk.category_id !== filters.category) return false;
+    if (filters.category) {
+      const hasCategory = risk.categories?.some(c => c.category_id === filters.category);
+      if (!hasCategory) return false;
+    }
     if (filters.department && risk.owner_department_id !== filters.department) return false;
     if (filters.goal && risk.goal_id !== filters.goal) return false;
     if (filters.status && risk.status !== filters.status) return false;
