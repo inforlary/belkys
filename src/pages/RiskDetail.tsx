@@ -131,6 +131,9 @@ export default function RiskDetail() {
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
   const [editingIndicator, setEditingIndicator] = useState<RiskIndicator | null>(null);
   const [deletingIndicator, setDeletingIndicator] = useState<RiskIndicator | null>(null);
+  const [editingControl, setEditingControl] = useState<RiskControl | null>(null);
+  const [deletingControl, setDeletingControl] = useState<RiskControl | null>(null);
+  const [controlDropdown, setControlDropdown] = useState<string | null>(null);
 
   const [departments, setDepartments] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -651,7 +654,10 @@ export default function RiskDetail() {
                 <h3 className="text-lg font-semibold text-gray-900">Mevcut Kontroller</h3>
                 {isAdmin && (
                   <button
-                    onClick={() => setShowControlModal(true)}
+                    onClick={() => {
+                      setEditingControl(null);
+                      setShowControlModal(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     <Plus className="w-4 h-4" />
@@ -694,9 +700,39 @@ export default function RiskDetail() {
                           </div>
                         </div>
                         {isAdmin && (
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <MoreVertical className="w-5 h-5" />
-                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => setControlDropdown(controlDropdown === control.id ? null : control.id)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <MoreVertical className="w-5 h-5" />
+                            </button>
+                            {controlDropdown === control.id && (
+                              <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                                <button
+                                  onClick={() => {
+                                    setEditingControl(control);
+                                    setShowControlModal(true);
+                                    setControlDropdown(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                  Düzenle
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setDeletingControl(control);
+                                    setControlDropdown(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Sil
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -926,11 +962,56 @@ export default function RiskDetail() {
 
       <ControlModal
         isOpen={showControlModal}
-        onClose={() => setShowControlModal(false)}
+        onClose={() => {
+          setShowControlModal(false);
+          setEditingControl(null);
+        }}
         riskId={riskId}
         departments={departments}
         onSuccess={loadData}
+        editingControl={editingControl}
       />
+
+      {deletingControl && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Kontrolü Sil</h3>
+            <p className="text-gray-600 mb-6">
+              "{deletingControl.name}" kontrolünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeletingControl(null)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                İptal
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('risk_controls')
+                      .delete()
+                      .eq('id', deletingControl.id);
+
+                    if (error) throw error;
+
+                    alert('Kontrol başarıyla silindi!');
+                    setDeletingControl(null);
+                    loadData();
+                  } catch (error) {
+                    console.error('Error deleting control:', error);
+                    alert('Kontrol silinirken hata oluştu.');
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <TreatmentModal
         isOpen={showTreatmentModal}
@@ -1233,7 +1314,7 @@ export default function RiskDetail() {
   );
 }
 
-function ControlModal({ isOpen, onClose, riskId, departments, onSuccess }: any) {
+function ControlModal({ isOpen, onClose, riskId, departments, onSuccess, editingControl }: any) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -1247,6 +1328,34 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess }: any) 
   });
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (editingControl) {
+      setFormData({
+        name: editingControl.name || '',
+        description: editingControl.description || '',
+        control_type: editingControl.control_type || 'PREVENTIVE',
+        control_nature: editingControl.control_nature || 'MANUAL',
+        design_effectiveness: editingControl.design_effectiveness || 3,
+        operating_effectiveness: editingControl.operating_effectiveness || 3,
+        responsible_department_id: editingControl.responsible_department_id || '',
+        frequency: 'Çeyreklik',
+        evidence: ''
+      });
+    } else {
+      setFormData({
+        name: '',
+        description: '',
+        control_type: 'PREVENTIVE',
+        control_nature: 'MANUAL',
+        design_effectiveness: 3,
+        operating_effectiveness: 3,
+        responsible_department_id: '',
+        frequency: 'Çeyreklik',
+        evidence: ''
+      });
+    }
+  }, [editingControl, isOpen]);
+
   if (!isOpen) return null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1254,19 +1363,29 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess }: any) 
     setSaving(true);
 
     try {
-      const { error } = await supabase.from('risk_controls').insert({
-        risk_id: riskId,
-        ...formData
-      });
+      if (editingControl) {
+        const { error } = await supabase
+          .from('risk_controls')
+          .update(formData)
+          .eq('id', editingControl.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        alert('Kontrol başarıyla güncellendi!');
+      } else {
+        const { error } = await supabase.from('risk_controls').insert({
+          risk_id: riskId,
+          ...formData
+        });
 
-      alert('Kontrol başarıyla eklendi!');
+        if (error) throw error;
+        alert('Kontrol başarıyla eklendi!');
+      }
+
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error adding control:', error);
-      alert('Kontrol eklenirken hata oluştu.');
+      console.error('Error saving control:', error);
+      alert('Kontrol kaydedilirken hata oluştu.');
     } finally {
       setSaving(false);
     }
@@ -1276,7 +1395,9 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess }: any) 
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-gray-900">Yeni Kontrol Ekle</h3>
+          <h3 className="text-xl font-semibold text-gray-900">
+            {editingControl ? 'Kontrol Düzenle' : 'Yeni Kontrol Ekle'}
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
           </button>
