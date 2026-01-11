@@ -711,7 +711,7 @@ export default function RiskRegister() {
                                   color: catMapping.category.color || '#6B7280'
                                 }}
                               >
-                                {catMapping.category.code}
+                                {catMapping.category.name}
                               </span>
                             ))}
                           </div>
