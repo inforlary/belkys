@@ -638,7 +638,7 @@ export default function ICStandards() {
         </div>
       </div>
 
-      {(profile?.role === 'ADMIN' || profile?.role === 'DIRECTOR') && (
+      {(profile?.role === 'ADMIN' || profile?.role === 'DIRECTOR' || profile?.role === 'SUPER_ADMIN') && (
         <div className="flex justify-end mb-4">
           <button
             onClick={() => openComponentModal()}
@@ -681,7 +681,7 @@ export default function ICStandards() {
                   </div>
                 </button>
 
-                {(profile?.role === 'ADMIN' || profile?.role === 'DIRECTOR') && (
+                {(profile?.role === 'ADMIN' || profile?.role === 'DIRECTOR' || profile?.role === 'SUPER_ADMIN') && (
                   <div className="flex items-center gap-2">
                     <button
                       onClick={(e) => {
