@@ -29,7 +29,7 @@ interface Risk {
   status: string;
   identified_date: string;
   identified_by_id: string;
-  category?: { name: string; color: string };
+  categories?: Array<{ category_id: string; category: { id: string; code: string; name: string; color: string } }>;
   department?: { name: string };
   objective?: { code: string; title: string };
   identified_by?: { full_name: string };
@@ -153,7 +153,7 @@ export default function RiskDetail() {
           .from('risks')
           .select(`
             *,
-            category:risk_categories(name, color),
+            categories:risk_category_mappings(category_id, category:risk_categories(id, code, name, color)),
             department:departments!owner_department_id(name),
             objective:objectives(code, title),
             identified_by:profiles!identified_by_id(full_name)
@@ -468,7 +468,11 @@ export default function RiskDetail() {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Kategori</div>
-                    <div className="text-base font-medium text-gray-900">{risk.category?.name || '-'}</div>
+                    <div className="text-base font-medium text-gray-900">
+                      {risk.categories && risk.categories.length > 0
+                        ? risk.categories.map((c: any) => c.category?.name).filter(Boolean).join(', ')
+                        : '-'}
+                    </div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Sorumlu Birim</div>
