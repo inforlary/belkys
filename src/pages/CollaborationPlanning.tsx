@@ -124,6 +124,7 @@ export default function CollaborationPlanning() {
     cost_estimates: {} as Record<number, string>,
     risk_appetite_level: '',
     risk_appetite_description: '',
+    risk_appetite_max_score: '',
     risks: [''],
     findings: [''],
     needs: ['']
@@ -258,12 +259,19 @@ export default function CollaborationPlanning() {
         planId = data.id;
       }
 
-      if (formData.risk_appetite_level || formData.risk_appetite_description) {
+      if (formData.risk_appetite_level || formData.risk_appetite_description || formData.risk_appetite_max_score) {
+        const maxScore = formData.risk_appetite_max_score ? parseInt(formData.risk_appetite_max_score) : null;
+
+        if (maxScore && (maxScore < 1 || maxScore > 25)) {
+          throw new Error('Risk kapasite skoru 1-25 arasında olmalıdır');
+        }
+
         const { error: riskAppetiteError } = await supabase
           .from('goals')
           .update({
             risk_appetite_level: formData.risk_appetite_level || null,
-            risk_appetite_description: formData.risk_appetite_description || null
+            risk_appetite_description: formData.risk_appetite_description || null,
+            risk_appetite_max_score: maxScore
           })
           .eq('id', formData.goal_id);
 
@@ -342,6 +350,7 @@ export default function CollaborationPlanning() {
       cost_estimates: {},
       risk_appetite_level: '',
       risk_appetite_description: '',
+      risk_appetite_max_score: '',
       risks: [''],
       findings: [''],
       needs: ['']
@@ -369,6 +378,7 @@ export default function CollaborationPlanning() {
       cost_estimates: estimates,
       risk_appetite_level: selectedGoal?.risk_appetite_level || '',
       risk_appetite_description: selectedGoal?.risk_appetite_description || '',
+      risk_appetite_max_score: selectedGoal?.risk_appetite_max_score?.toString() || '',
       risks: risks.length > 0 ? risks : [''],
       findings: findings.length > 0 ? findings : [''],
       needs: needs.length > 0 ? needs : ['']
@@ -566,9 +576,9 @@ export default function CollaborationPlanning() {
       setShowTransferModal(false);
       setTransferringRisk(null);
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Risk aktarılırken hata:', error);
-      alert('Risk aktarılırken hata oluştu.');
+      alert('Risk aktarılırken hata oluştu: ' + (error?.message || 'Bilinmeyen hata'));
     }
   };
 
@@ -864,14 +874,16 @@ export default function CollaborationPlanning() {
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-2">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                      plan.goal.risk_appetite_level === 'LOW' ? 'bg-green-200 text-green-900' :
-                                      plan.goal.risk_appetite_level === 'MEDIUM' ? 'bg-yellow-200 text-yellow-900' :
-                                      plan.goal.risk_appetite_level === 'HIGH' ? 'bg-orange-200 text-orange-900' :
+                                      plan.goal.risk_appetite_level === 'very_low' ? 'bg-blue-200 text-blue-900' :
+                                      plan.goal.risk_appetite_level === 'low' ? 'bg-green-200 text-green-900' :
+                                      plan.goal.risk_appetite_level === 'moderate' ? 'bg-yellow-200 text-yellow-900' :
+                                      plan.goal.risk_appetite_level === 'high' ? 'bg-orange-200 text-orange-900' :
                                       'bg-red-200 text-red-900'
                                     }`}>
-                                      {plan.goal.risk_appetite_level === 'LOW' ? 'Düşük' :
-                                       plan.goal.risk_appetite_level === 'MEDIUM' ? 'Orta' :
-                                       plan.goal.risk_appetite_level === 'HIGH' ? 'Yüksek' : 'Çok Yüksek'}
+                                      {plan.goal.risk_appetite_level === 'very_low' ? 'Çok Düşük' :
+                                       plan.goal.risk_appetite_level === 'low' ? 'Düşük' :
+                                       plan.goal.risk_appetite_level === 'moderate' ? 'Orta' :
+                                       plan.goal.risk_appetite_level === 'high' ? 'Yüksek' : 'Çok Yüksek'}
                                     </span>
                                   </div>
                                   {plan.goal.risk_appetite_max_score && (
@@ -1056,9 +1068,11 @@ export default function CollaborationPlanning() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                       >
                         <option value="">Seçiniz</option>
-                        <option value="LOW">Düşük - Minimum Risk</option>
-                        <option value="MODERATE">Orta - Kontrollü Risk</option>
-                        <option value="HIGH">Yüksek - Agresif Hedefler</option>
+                        <option value="very_low">Çok Düşük - Minimum Risk</option>
+                        <option value="low">Düşük - Sınırlı Risk</option>
+                        <option value="moderate">Orta - Dengeli Risk</option>
+                        <option value="high">Yüksek - Agresif Hedefler</option>
+                        <option value="very_high">Çok Yüksek - Maksimum Risk</option>
                       </select>
                     </div>
                     <div>
@@ -1072,6 +1086,21 @@ export default function CollaborationPlanning() {
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Risk Kapasite Skoru (1-25)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="25"
+                        value={formData.risk_appetite_max_score}
+                        onChange={(e) => setFormData({ ...formData, risk_appetite_max_score: e.target.value })}
+                        placeholder="Risk kapasite skorunu giriniz (opsiyonel)"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">1 (En Düşük) - 25 (En Yüksek)</p>
                     </div>
                     <div className="text-xs text-gray-600 bg-white p-2 rounded border border-orange-200">
                       <strong>Not:</strong> Risk iştahı, bu hedef için kabul edilebilir risk seviyesini belirler.
