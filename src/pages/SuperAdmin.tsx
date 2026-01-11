@@ -14,6 +14,7 @@ import StandardRevenueCodesManager from '../components/superadmin/StandardRevenu
 import StandardProgramsManager from '../components/superadmin/StandardProgramsManager';
 import OrganizationLicenseManager from '../components/superadmin/OrganizationLicenseManager';
 import OrganizationModuleManager from '../components/superadmin/OrganizationModuleManager';
+import ICComponentsManager from '../components/superadmin/ICComponentsManager';
 
 interface Organization {
   id: string;
@@ -44,7 +45,7 @@ interface OrganizationStats {
   indicatorCount: number;
 }
 
-type TabType = 'organizations' | 'standard-codes' | 'organization-licenses' | 'module-access';
+type TabType = 'organizations' | 'standard-codes' | 'ic-components' | 'organization-licenses' | 'module-access';
 type StandardCodeTab = 'expense' | 'revenue' | 'financing' | 'programs';
 
 export default function SuperAdmin() {
@@ -289,6 +290,19 @@ export default function SuperAdmin() {
             <div className="flex items-center gap-2">
               <Settings className="w-5 h-5" />
               Standart Kodlar
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('ic-components')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'ic-components'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              İç Kontrol Bileşenleri
             </div>
           </button>
           <button
@@ -646,6 +660,10 @@ export default function SuperAdmin() {
             )}
           </div>
         </Card>
+      )}
+
+      {activeTab === 'ic-components' && (
+        <ICComponentsManager />
       )}
 
       {activeTab === 'organization-licenses' && (
