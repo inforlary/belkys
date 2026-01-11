@@ -29,9 +29,9 @@ interface Indicator {
   unit_of_measure: string;
   measurement_frequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   direction: 'DOWN' | 'UP';
-  threshold_green: number;
-  threshold_yellow: number;
-  threshold_red: number;
+  green_threshold: number;
+  yellow_threshold: number;
+  red_threshold: number;
   responsible_department_id?: string;
   is_active: boolean;
   risk?: Risk;
@@ -107,9 +107,9 @@ export default function RiskIndicators() {
     unit_of_measure: 'Adet',
     measurement_frequency: 'MONTHLY' as 'MONTHLY' | 'QUARTERLY' | 'ANNUAL',
     direction: 'DOWN' as 'DOWN' | 'UP',
-    threshold_green: '',
-    threshold_yellow: '',
-    threshold_red: '',
+    green_threshold: '',
+    yellow_threshold: '',
+    red_threshold: '',
     responsible_department_id: '',
     is_active: true
   });
@@ -207,9 +207,9 @@ export default function RiskIndicators() {
         unit_of_measure: indicator.unit_of_measure,
         measurement_frequency: indicator.measurement_frequency,
         direction: indicator.direction,
-        threshold_green: indicator.threshold_green.toString(),
-        threshold_yellow: indicator.threshold_yellow.toString(),
-        threshold_red: indicator.threshold_red.toString(),
+        green_threshold: indicator.green_threshold.toString(),
+        yellow_threshold: indicator.yellow_threshold.toString(),
+        red_threshold: indicator.red_threshold.toString(),
         responsible_department_id: indicator.responsible_department_id || '',
         is_active: indicator.is_active
       });
@@ -222,9 +222,9 @@ export default function RiskIndicators() {
         unit_of_measure: 'Adet',
         measurement_frequency: 'MONTHLY',
         direction: 'DOWN',
-        threshold_green: '',
-        threshold_yellow: '',
-        threshold_red: '',
+        green_threshold: '',
+        yellow_threshold: '',
+        red_threshold: '',
         responsible_department_id: '',
         is_active: true
       });
@@ -249,9 +249,9 @@ export default function RiskIndicators() {
   function updateThresholdRed(greenValue: string, yellowValue: string) {
     setFormData(prev => ({
       ...prev,
-      threshold_green: greenValue,
-      threshold_yellow: yellowValue,
-      threshold_red: yellowValue
+      green_threshold: greenValue,
+      yellow_threshold: yellowValue,
+      red_threshold: yellowValue
     }));
   }
 
@@ -263,9 +263,9 @@ export default function RiskIndicators() {
       return;
     }
 
-    const greenValue = formData.threshold_green ? parseFloat(formData.threshold_green) : 0;
-    const yellowValue = formData.threshold_yellow ? parseFloat(formData.threshold_yellow) : 0;
-    const redValue = formData.threshold_red ? parseFloat(formData.threshold_red) : 0;
+    const greenValue = formData.green_threshold ? parseFloat(formData.green_threshold) : 0;
+    const yellowValue = formData.yellow_threshold ? parseFloat(formData.yellow_threshold) : 0;
+    const redValue = formData.red_threshold ? parseFloat(formData.red_threshold) : 0;
 
     if (isNaN(greenValue) || isNaN(yellowValue) || isNaN(redValue)) {
       alert('Lütfen geçerli eşik değerleri girin');
@@ -286,9 +286,9 @@ export default function RiskIndicators() {
         unit_of_measure: formData.unit_of_measure,
         measurement_frequency: formData.measurement_frequency,
         direction: formData.direction,
-        threshold_green: greenValue,
-        threshold_yellow: yellowValue,
-        threshold_red: redValue,
+        green_threshold: greenValue,
+        yellow_threshold: yellowValue,
+        red_threshold: redValue,
         responsible_department_id: formData.responsible_department_id || null,
         is_active: formData.is_active
       };
@@ -383,9 +383,9 @@ export default function RiskIndicators() {
 
   function getThresholdDisplay(indicator: Indicator) {
     if (indicator.direction === 'DOWN') {
-      return `🟢 <${indicator.threshold_green} 🟡 ${indicator.threshold_green}-${indicator.threshold_yellow} 🔴 >${indicator.threshold_yellow}`;
+      return `🟢 <${indicator.green_threshold} 🟡 ${indicator.green_threshold}-${indicator.yellow_threshold} 🔴 >${indicator.yellow_threshold}`;
     } else {
-      return `🟢 >${indicator.threshold_green} 🟡 ${indicator.threshold_yellow}-${indicator.threshold_green} 🔴 <${indicator.threshold_yellow}`;
+      return `🟢 >${indicator.green_threshold} 🟡 ${indicator.yellow_threshold}-${indicator.green_threshold} 🔴 <${indicator.yellow_threshold}`;
     }
   }
 
@@ -875,35 +875,35 @@ export default function RiskIndicators() {
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.threshold_green}
-                    onChange={(e) => updateThresholdRed(e.target.value, formData.threshold_yellow)}
+                    value={formData.green_threshold}
+                    onChange={(e) => updateThresholdRed(e.target.value, formData.yellow_threshold)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-1">
-                    🟡 Sarı (Uyarı): değer &gt;= {formData.threshold_green} ve &lt; <span className="text-red-500">*</span>
+                    🟡 Sarı (Uyarı): değer &gt;= {formData.green_threshold} ve &lt; <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.threshold_yellow}
-                    onChange={(e) => updateThresholdRed(formData.threshold_green, e.target.value)}
+                    value={formData.yellow_threshold}
+                    onChange={(e) => updateThresholdRed(formData.green_threshold, e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-1">
-                    🔴 Kırmızı (Alarm): değer &gt;= {formData.threshold_yellow}
+                    🔴 Kırmızı (Alarm): değer &gt;= {formData.yellow_threshold}
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.threshold_red}
-                    onChange={(e) => setFormData({ ...formData, threshold_red: e.target.value })}
+                    value={formData.red_threshold}
+                    onChange={(e) => setFormData({ ...formData, red_threshold: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-100"
                     disabled
-                    placeholder="Otomatik (threshold_yellow)"
+                    placeholder="Otomatik (yellow_threshold)"
                   />
                 </div>
               </div>
@@ -916,35 +916,35 @@ export default function RiskIndicators() {
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.threshold_green}
-                    onChange={(e) => updateThresholdRed(e.target.value, formData.threshold_yellow)}
+                    value={formData.green_threshold}
+                    onChange={(e) => updateThresholdRed(e.target.value, formData.yellow_threshold)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-1">
-                    🟡 Sarı (Uyarı): değer &lt;= {formData.threshold_green} ve &gt; <span className="text-red-500">*</span>
+                    🟡 Sarı (Uyarı): değer &lt;= {formData.green_threshold} ve &gt; <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.threshold_yellow}
-                    onChange={(e) => updateThresholdRed(formData.threshold_green, e.target.value)}
+                    value={formData.yellow_threshold}
+                    onChange={(e) => updateThresholdRed(formData.green_threshold, e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-1">
-                    🔴 Kırmızı (Alarm): değer &lt;= {formData.threshold_yellow}
+                    🔴 Kırmızı (Alarm): değer &lt;= {formData.yellow_threshold}
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.threshold_red}
-                    onChange={(e) => setFormData({ ...formData, threshold_red: e.target.value })}
+                    value={formData.red_threshold}
+                    onChange={(e) => setFormData({ ...formData, red_threshold: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-100"
                     disabled
-                    placeholder="Otomatik (threshold_yellow)"
+                    placeholder="Otomatik (yellow_threshold)"
                   />
                 </div>
               </div>
@@ -1019,13 +1019,13 @@ export default function RiskIndicators() {
                   {selectedIndicator && (
                     <>
                       <ReferenceLine
-                        y={selectedIndicator.threshold_yellow}
+                        y={selectedIndicator.yellow_threshold}
                         stroke="#fbbf24"
                         strokeDasharray="3 3"
                         label="Sarı Eşik"
                       />
                       <ReferenceLine
-                        y={selectedIndicator.threshold_red}
+                        y={selectedIndicator.red_threshold}
                         stroke="#ef4444"
                         strokeDasharray="3 3"
                         label="Kırmızı Eşik"
