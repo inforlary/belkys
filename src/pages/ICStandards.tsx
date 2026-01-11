@@ -83,7 +83,7 @@ interface Department {
 
 export default function ICStandards() {
   const { profile } = useAuth();
-  const { navigate } = useLocation();
+  const { navigate, searchParams } = useLocation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -115,13 +115,12 @@ export default function ICStandards() {
   });
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const plan_id = urlParams.get('plan_id');
+    const plan_id = searchParams.get('plan_id');
 
     if (plan_id) {
       setPlanId(plan_id);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     if (profile?.organization_id && planId) {

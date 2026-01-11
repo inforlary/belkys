@@ -77,7 +77,7 @@ interface InstitutionalCode {
 
 export default function BudgetProposalForm() {
   const { user, profile } = useAuth();
-  const { navigate } = useLocation();
+  const { navigate, searchParams } = useLocation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -162,8 +162,7 @@ export default function BudgetProposalForm() {
       setFinancingTypes(financingRes.data || []);
       setInstitutionalCodes(institutionalRes.data || []);
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const campaignId = urlParams.get('campaign');
+      const campaignId = searchParams.get('campaign');
       if (campaignId && campaignsRes.data?.some(c => c.id === campaignId)) {
         setSelectedCampaign(campaignId);
       }

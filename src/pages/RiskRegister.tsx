@@ -97,7 +97,7 @@ function getStatusBadge(status: string) {
 }
 
 export default function RiskRegister() {
-  const { navigate, currentPath } = useLocation();
+  const { navigate, currentPath, searchParams } = useLocation();
   const { profile } = useAuth();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -161,9 +161,8 @@ export default function RiskRegister() {
   }, [profile?.organization_id]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const level = params.get('level');
-    const department = params.get('department');
+    const level = searchParams.get('level');
+    const department = searchParams.get('department');
 
     if (level) {
       setFilters(prev => ({ ...prev, level: level === 'critical' ? '20-25' : '' }));
