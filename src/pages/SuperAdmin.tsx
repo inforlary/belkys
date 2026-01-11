@@ -13,6 +13,7 @@ import StandardExpenseCodesManager from '../components/superadmin/StandardExpens
 import StandardRevenueCodesManager from '../components/superadmin/StandardRevenueCodesManager';
 import StandardProgramsManager from '../components/superadmin/StandardProgramsManager';
 import OrganizationLicenseManager from '../components/superadmin/OrganizationLicenseManager';
+import OrganizationModuleManager from '../components/superadmin/OrganizationModuleManager';
 
 interface Organization {
   id: string;
@@ -28,6 +29,10 @@ interface Organization {
   module_activity_reports: boolean;
   module_budget_performance: boolean;
   module_internal_control: boolean;
+  module_risk_management: boolean;
+  module_quality_management: boolean;
+  module_settings: boolean;
+  module_administration: boolean;
 }
 
 interface OrganizationStats {
@@ -39,7 +44,7 @@ interface OrganizationStats {
   indicatorCount: number;
 }
 
-type TabType = 'organizations' | 'standard-codes' | 'organization-licenses';
+type TabType = 'organizations' | 'standard-codes' | 'organization-licenses' | 'module-access';
 type StandardCodeTab = 'expense' | 'revenue' | 'financing' | 'programs';
 
 export default function SuperAdmin() {
@@ -297,6 +302,19 @@ export default function SuperAdmin() {
             <div className="flex items-center gap-2">
               <Key className="w-5 h-5" />
               Belediye Lisansları
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('module-access')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'module-access'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5" />
+              Modül Erişim Yetkileri
             </div>
           </button>
         </nav>
@@ -632,6 +650,10 @@ export default function SuperAdmin() {
 
       {activeTab === 'organization-licenses' && (
         <OrganizationLicenseManager />
+      )}
+
+      {activeTab === 'module-access' && (
+        <OrganizationModuleManager />
       )}
 
       {showCreateModal && (
