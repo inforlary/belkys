@@ -81,31 +81,75 @@ export default function ActivityProgressReport({ onClose }: { onClose: () => voi
     const doc = new jsPDF();
 
     doc.setFontSize(18);
-    doc.text('FAALİYET İLERLEME RAPORU', 14, 20);
+    doc.text('FAALIYET ILERLEME RAPORU', 14, 20);
     doc.setFontSize(10);
     doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 28);
 
     let yPos = 40;
 
     doc.setFontSize(14);
-    doc.text('1. ÖZET', 14, yPos);
-    yPos += 10;
+    doc.text('1. OZET', 14, yPos);
+    yPos += 8;
 
-    const tableData = overdueTreatments.slice(0, 10).map(t => [
-      t.code || '-',
-      t.action_plan?.substring(0, 30) || '-',
-      t.risk?.code || '-',
-      `${getOverdueDays(t.due_date)} gün`,
-      departments.find(d => d.id === t.responsible_department)?.name || '-'
-    ]);
+    doc.setFontSize(10);
+    doc.text(`Toplam Faaliyet: ${treatments.length}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Tamamlanan: ${completedTreatments.length} (${treatments.length > 0 ? Math.round((completedTreatments.length / treatments.length) * 100) : 0}%)`, 14, yPos);
+    yPos += 6;
+    doc.text(`Devam Eden: ${inProgressTreatments.length} (${treatments.length > 0 ? Math.round((inProgressTreatments.length / treatments.length) * 100) : 0}%)`, 14, yPos);
+    yPos += 6;
+    doc.text(`Geciken: ${overdueTreatments.length} (${treatments.length > 0 ? Math.round((overdueTreatments.length / treatments.length) * 100) : 0}%)`, 14, yPos);
+    yPos += 15;
 
-    (doc as any).autoTable({
-      startY: yPos,
-      head: [['KOD', 'FAALİYET', 'RİSK', 'GECİKME', 'SORUMLU']],
-      body: tableData,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [51, 65, 85] }
-    });
+    if (overdueTreatments.length > 0) {
+      doc.setFontSize(14);
+      doc.text('2. GECIKEN FAALIYETLER', 14, yPos);
+      yPos += 10;
+
+      const tableData = overdueTreatments.slice(0, 15).map(t => [
+        t.code || '-',
+        t.action_plan?.substring(0, 35) || '-',
+        t.risk?.code || '-',
+        `${getOverdueDays(t.due_date)} gun`,
+        departments.find(d => d.id === t.responsible_department)?.name?.substring(0, 20) || '-'
+      ]);
+
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['KOD', 'FAALIYET', 'RISK', 'GECIKME', 'SORUMLU']],
+        body: tableData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    if (departmentStats.length > 0 && yPos < 250) {
+      doc.setFontSize(14);
+      doc.text('3. BIRIM BAZLI FAALIYET DURUMU', 14, yPos);
+      yPos += 10;
+
+      const deptTableData = departmentStats.slice(0, 10).map(dept => [
+        dept.name?.substring(0, 30) || '-',
+        dept.total.toString(),
+        dept.completed.toString(),
+        dept.inProgress.toString(),
+        dept.overdue.toString()
+      ]);
+
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['Birim', 'Toplam', 'Tamamlanan', 'Devam', 'Geciken']],
+        body: deptTableData,
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 }
+      });
+    }
 
     doc.save('faaliyet-ilerleme-raporu.pdf');
   };

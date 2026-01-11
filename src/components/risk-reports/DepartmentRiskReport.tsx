@@ -98,9 +98,78 @@ export default function DepartmentRiskReport({ onClose }: { onClose: () => void 
     const doc = new jsPDF();
 
     doc.setFontSize(18);
-    doc.text(`BİRİM RİSK RAPORU`, 14, 20);
-    doc.setFontSize(14);
+    doc.text('BIRIM RISK RAPORU', 14, 20);
+    doc.setFontSize(12);
     doc.text(dept?.name || '', 14, 28);
+    doc.setFontSize(10);
+    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 34);
+
+    let yPos = 45;
+
+    doc.setFontSize(14);
+    doc.text('BIRIM RISK PROFILI', 14, yPos);
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.text(`Toplam Risk: ${risks.length}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Kritik/Cok Yuksek: ${criticalRisks}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Ortalama Skor: ${avgScore}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Acik Faaliyet: ${openTreatments}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Geciken Faaliyet: ${overdueTreatments}`, 14, yPos);
+    yPos += 15;
+
+    if (risks.length > 0) {
+      doc.setFontSize(14);
+      doc.text('BIRIM RISKLERI', 14, yPos);
+      yPos += 10;
+
+      const riskTableData = risks.slice(0, 15).map(risk => [
+        risk.code || '-',
+        risk.title?.substring(0, 35) || '-',
+        risk.inherent_score?.toString() || '0',
+        risk.residual_score?.toString() || '0',
+        getRiskLevel(risk.residual_score),
+        risk.status === 'active' ? 'Aktif' : 'Kapali'
+      ]);
+
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['KOD', 'RISK ADI', 'DOGAL', 'ARTIK', 'SEVIYE', 'DURUM']],
+        body: riskTableData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    if (treatments.length > 0 && yPos < 250) {
+      doc.setFontSize(14);
+      doc.text('FAALIYET DURUMU', 14, yPos);
+      yPos += 10;
+
+      const treatmentTableData = treatments.slice(0, 10).map(t => [
+        t.action_plan?.substring(0, 40) || '-',
+        t.status === 'completed' ? 'Tamamlandi' : t.status === 'in_progress' ? 'Devam' : 'Baslamadi',
+        new Date(t.due_date).toLocaleDateString('tr-TR')
+      ]);
+
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['FAALIYET', 'DURUM', 'TERMIN']],
+        body: treatmentTableData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 }
+      });
+    }
 
     doc.save(`birim-risk-raporu-${dept?.name}.pdf`);
   };

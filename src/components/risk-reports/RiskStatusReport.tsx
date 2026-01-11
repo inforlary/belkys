@@ -134,26 +134,26 @@ export default function RiskStatusReport({ onClose }: { onClose: () => void }) {
     const filteredRisks = getFilteredRisks();
 
     doc.setFontSize(18);
-    doc.text('RİSK DURUM RAPORU', 14, 20);
+    doc.text('RISK DURUM RAPORU', 14, 20);
 
     doc.setFontSize(10);
     doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 28);
-    doc.text(`Hazırlayan: ${profile?.full_name || 'Sistem'}`, 14, 34);
+    doc.text(`Hazirlayan: ${profile?.full_name || 'Sistem'}`, 14, 34);
 
     let yPos = 45;
 
     if (reportOptions.summary) {
       doc.setFontSize(14);
-      doc.text('1. ÖZET İSTATİSTİKLER', 14, yPos);
+      doc.text('1. OZET ISTATISTIKLER', 14, yPos);
       yPos += 8;
 
       doc.setFontSize(10);
       const stats = [
-        ['Toplam Risk Sayısı:', filteredRisks.length.toString()],
-        ['Aktif Risk Sayısı:', filteredRisks.filter(r => r.status === 'active').length.toString()],
-        ['Kapatılan Risk Sayısı:', filteredRisks.filter(r => r.status === 'closed').length.toString()],
+        ['Toplam Risk Sayisi:', filteredRisks.length.toString()],
+        ['Aktif Risk Sayisi:', filteredRisks.filter(r => r.status === 'active').length.toString()],
+        ['Kapatilan Risk Sayisi:', filteredRisks.filter(r => r.status === 'closed').length.toString()],
         ['Ortalama Risk Skoru:', (filteredRisks.reduce((sum, r) => sum + r.residual_score, 0) / filteredRisks.length || 0).toFixed(1)],
-        ['Kritik Risk Sayısı:', filteredRisks.filter(r => getRiskLevel(r.residual_score) === 'Kritik').length.toString()]
+        ['Kritik Risk Sayisi:', filteredRisks.filter(r => getRiskLevel(r.residual_score) === 'Kritik').length.toString()]
       ];
 
       stats.forEach(([label, value]) => {
@@ -163,26 +163,50 @@ export default function RiskStatusReport({ onClose }: { onClose: () => void }) {
       yPos += 5;
     }
 
+    if (reportOptions.levelChart) {
+      doc.setFontSize(14);
+      doc.text('2. SEVIYE DAGILIMI', 14, yPos);
+      yPos += 8;
+
+      const levelStats = [
+        ['Kritik', filteredRisks.filter(r => getRiskLevel(r.residual_score) === 'Kritik').length],
+        ['Cok Yuksek', filteredRisks.filter(r => getRiskLevel(r.residual_score) === 'Çok Yüksek').length],
+        ['Yuksek', filteredRisks.filter(r => getRiskLevel(r.residual_score) === 'Yüksek').length],
+        ['Orta', filteredRisks.filter(r => getRiskLevel(r.residual_score) === 'Orta').length],
+        ['Dusuk', filteredRisks.filter(r => getRiskLevel(r.residual_score) === 'Düşük').length]
+      ];
+
+      doc.setFontSize(10);
+      levelStats.forEach(([level, count]) => {
+        const percentage = filteredRisks.length > 0 ? ((count / filteredRisks.length) * 100).toFixed(0) : 0;
+        doc.text(`${level}: ${count} (${percentage}%)`, 14, yPos);
+        yPos += 6;
+      });
+      yPos += 10;
+    }
+
     if (reportOptions.riskList && yPos < 250) {
       doc.setFontSize(14);
-      doc.text('2. RİSK LİSTESİ', 14, yPos);
+      doc.text('3. RISK LISTESI', 14, yPos);
       yPos += 8;
 
       const tableData = filteredRisks.slice(0, 20).map(risk => [
-        risk.code,
-        risk.title.substring(0, 30),
-        risk.category,
-        risk.inherent_score.toString(),
-        risk.residual_score.toString(),
-        risk.response_strategy || '-'
+        risk.code || '-',
+        risk.title.substring(0, 30) || '-',
+        risk.category || '-',
+        risk.inherent_score?.toString() || '0',
+        risk.residual_score?.toString() || '0',
+        getRiskLevel(risk.residual_score)
       ]);
 
       (doc as any).autoTable({
         startY: yPos,
-        head: [['KOD', 'RİSK ADI', 'KATEGORİ', 'DOĞAL', 'ARTIK', 'YANIT']],
+        head: [['KOD', 'RISK ADI', 'KATEGORI', 'DOGAL', 'ARTIK', 'SEVIYE']],
         body: tableData,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [51, 65, 85] }
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 }
       });
     }
 

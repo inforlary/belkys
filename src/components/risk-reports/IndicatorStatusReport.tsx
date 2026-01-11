@@ -70,9 +70,78 @@ export default function IndicatorStatusReport({ onClose }: { onClose: () => void
     const doc = new jsPDF();
 
     doc.setFontSize(18);
-    doc.text('GÖSTERGE DURUM RAPORU', 14, 20);
+    doc.text('GOSTERGE DURUM RAPORU', 14, 20);
     doc.setFontSize(10);
     doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 28);
+
+    let yPos = 40;
+
+    doc.setFontSize(14);
+    doc.text('1. OZET', 14, yPos);
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.text(`Toplam Gosterge: ${indicators.length}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Yesil (Normal): ${greenIndicators.length} (${indicators.length > 0 ? Math.round((greenIndicators.length / indicators.length) * 100) : 0}%)`, 14, yPos);
+    yPos += 6;
+    doc.text(`Sari (Dikkat): ${yellowIndicators.length} (${indicators.length > 0 ? Math.round((yellowIndicators.length / indicators.length) * 100) : 0}%)`, 14, yPos);
+    yPos += 6;
+    doc.text(`Kirmizi (Alarm): ${redIndicators.length} (${indicators.length > 0 ? Math.round((redIndicators.length / indicators.length) * 100) : 0}%)`, 14, yPos);
+    yPos += 15;
+
+    if (redIndicators.length > 0) {
+      doc.setFontSize(14);
+      doc.text('2. ALARM DURUMUNDA GOSTERGELER', 14, yPos);
+      yPos += 10;
+
+      const alarmTableData = redIndicators.slice(0, 10).map(ind => [
+        ind.code || '-',
+        ind.name?.substring(0, 35) || '-',
+        (ind.current_value || 0).toString(),
+        `> ${ind.threshold_red || 0}`,
+        ind.risk?.code || '-'
+      ]);
+
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['KOD', 'GOSTERGE', 'DEGER', 'ESIK', 'ILISKILI RISK']],
+        body: alarmTableData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    if (indicators.length > 0 && yPos < 250) {
+      doc.setFontSize(14);
+      doc.text('3. TUM GOSTERGELER', 14, yPos);
+      yPos += 10;
+
+      const allTableData = indicators.slice(0, 15).map(ind => {
+        const status = getIndicatorStatus(ind);
+        return [
+          ind.code || '-',
+          ind.name?.substring(0, 35) || '-',
+          (ind.current_value || 0).toString(),
+          status.label,
+          ind.risk?.code || '-'
+        ];
+      });
+
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['KOD', 'GOSTERGE', 'DEGER', 'DURUM', 'ILISKILI RISK']],
+        body: allTableData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 }
+      });
+    }
 
     doc.save('gosterge-durum-raporu.pdf');
   };

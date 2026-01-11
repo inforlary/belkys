@@ -83,10 +83,63 @@ export default function RiskMatrixReport({ onClose }: { onClose: () => void }) {
     const doc = new jsPDF();
 
     doc.setFontSize(18);
-    doc.text('RİSK MATRİS RAPORU', 14, 20);
+    doc.text('RISK MATRIS RAPORU', 14, 20);
 
     doc.setFontSize(10);
     doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 28);
+
+    let yPos = 40;
+
+    doc.setFontSize(14);
+    doc.text('1. DOGAL RISK MATRISI', 14, yPos);
+    yPos += 10;
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['O/E', '1', '2', '3', '4', '5']],
+      body: inherentMatrix.map((row, i) => [`${5-i}`, ...row.map(v => v > 0 ? v.toString() : '')]),
+      styles: { fontSize: 8, cellPadding: 3, halign: 'center' },
+      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+      margin: { left: 14, right: 14 }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setFontSize(14);
+    doc.text('2. ARTIK RISK MATRISI', 14, yPos);
+    yPos += 10;
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['O/E', '1', '2', '3', '4', '5']],
+      body: residualMatrix.map((row, i) => [`${5-i}`, ...row.map(v => v > 0 ? v.toString() : '')]),
+      styles: { fontSize: 8, cellPadding: 3, halign: 'center' },
+      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+      margin: { left: 14, right: 14 }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setFontSize(14);
+    doc.text('3. KARSILASTIRMA', 14, yPos);
+    yPos += 10;
+
+    const comparisonData = Object.keys(inherentLevels).map(level => [
+      level,
+      inherentLevels[level].toString(),
+      residualLevels[level].toString(),
+      (residualLevels[level] - inherentLevels[level]).toString()
+    ]);
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['Seviye', 'Dogal', 'Artik', 'Degisim']],
+      body: comparisonData,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14 }
+    });
 
     doc.save('risk-matris-raporu.pdf');
   };

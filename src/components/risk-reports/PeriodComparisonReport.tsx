@@ -92,9 +92,59 @@ export default function PeriodComparisonReport({ onClose }: { onClose: () => voi
     const doc = new jsPDF();
 
     doc.setFontSize(18);
-    doc.text('DÖNEMSEL KARŞILAŞTIRMA RAPORU', 14, 20);
+    doc.text('DONEMSEL KARSILASTIRMA RAPORU', 14, 20);
     doc.setFontSize(12);
     doc.text(`${period1} vs ${period2}`, 14, 28);
+    doc.setFontSize(10);
+    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 34);
+
+    let yPos = 45;
+
+    doc.setFontSize(14);
+    doc.text('1. GENEL KARSILASTIRMA', 14, yPos);
+    yPos += 10;
+
+    const comparisonData = [
+      ['Toplam Risk', p1Stats.total.toString(), p2Stats.total.toString(), (p2Stats.total - p1Stats.total).toString()],
+      ['Ortalama Skor', p1Stats.avgScore.toFixed(1), p2Stats.avgScore.toFixed(1), (p2Stats.avgScore - p1Stats.avgScore).toFixed(1)],
+      ['Kritik Risk', p1Stats.critical.toString(), p2Stats.critical.toString(), (p2Stats.critical - p1Stats.critical).toString()],
+      ['Tamamlanan Faaliyet', p1Stats.completedActivities.toString(), p2Stats.completedActivities.toString(), (p2Stats.completedActivities - p1Stats.completedActivities).toString()],
+      ['Geciken Faaliyet', p1Stats.overdueActivities.toString(), p2Stats.overdueActivities.toString(), (p2Stats.overdueActivities - p1Stats.overdueActivities).toString()],
+      ['Alarm Gosterge', p1Stats.alarmIndicators.toString(), p2Stats.alarmIndicators.toString(), (p2Stats.alarmIndicators - p1Stats.alarmIndicators).toString()]
+    ];
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['Metrik', period1, period2, 'Degisim']],
+      body: comparisonData,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14 }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setFontSize(14);
+    doc.text('2. SEVIYE DEGISIMI', 14, yPos);
+    yPos += 10;
+
+    const levelData = levelComparison.map(level => [
+      level.name,
+      level[period1].toString(),
+      level[period2].toString(),
+      (level[period2] - level[period1]).toString()
+    ]);
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['Seviye', period1, period2, 'Degisim']],
+      body: levelData,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14 }
+    });
 
     doc.save('donemsel-karsilastirma.pdf');
   };
