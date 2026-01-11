@@ -122,6 +122,9 @@ export default function RiskDetail() {
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [riskCategories, setRiskCategories] = useState<string[]>([]);
 
   const [showControlModal, setShowControlModal] = useState(false);
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
@@ -142,7 +145,7 @@ export default function RiskDetail() {
     try {
       setLoading(true);
 
-      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, deptsRes, profilesRes] = await Promise.all([
+      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -182,7 +185,17 @@ export default function RiskDetail() {
           .from('profiles')
           .select('id, full_name')
           .eq('organization_id', profile?.organization_id)
-          .order('full_name')
+          .order('full_name'),
+        supabase
+          .from('risk_categories')
+          .select('id, code, name, type, color')
+          .or(`organization_id.is.null,organization_id.eq.${profile?.organization_id}`)
+          .eq('is_active', true)
+          .order('name'),
+        supabase
+          .from('risk_category_mappings')
+          .select('category_id')
+          .eq('risk_id', riskId)
       ]);
 
       if (riskRes.error) throw riskRes.error;
@@ -193,6 +206,8 @@ export default function RiskDetail() {
       setIndicators(indicatorsRes.data || []);
       setDepartments(deptsRes.data || []);
       setProfiles(profilesRes.data || []);
+      setCategories(categoriesRes.data || []);
+      setRiskCategories((riskCategoriesRes.data || []).map((m: any) => m.category_id));
     } catch (error) {
       console.error('Error loading risk:', error);
     } finally {
@@ -208,6 +223,73 @@ export default function RiskDetail() {
     } catch (error) {
       console.error('Error deleting risk:', error);
       alert('Risk silinirken hata oluştu.');
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editFormData) return;
+
+    if (editFormData.category_ids.length === 0) {
+      alert('En az bir kategori seçmelisiniz.');
+      return;
+    }
+
+    try {
+      const inherentScore = editFormData.inherent_likelihood * editFormData.inherent_impact;
+      const residualScore = editFormData.residual_likelihood * editFormData.residual_impact;
+
+      const getRiskLevel = (score: number) => {
+        if (score >= 20) return 'CRITICAL';
+        if (score >= 15) return 'HIGH';
+        if (score >= 9) return 'MEDIUM';
+        return 'LOW';
+      };
+
+      const { error: updateError } = await supabase
+        .from('risks')
+        .update({
+          name: editFormData.name,
+          description: editFormData.description,
+          causes: editFormData.causes,
+          consequences: editFormData.consequences,
+          inherent_likelihood: editFormData.inherent_likelihood,
+          inherent_impact: editFormData.inherent_impact,
+          inherent_score: inherentScore,
+          residual_likelihood: editFormData.residual_likelihood,
+          residual_impact: editFormData.residual_impact,
+          residual_score: residualScore,
+          risk_level: getRiskLevel(residualScore),
+          risk_response: editFormData.risk_response,
+          response_rationale: editFormData.response_rationale,
+          status: editFormData.status
+        })
+        .eq('id', riskId);
+
+      if (updateError) throw updateError;
+
+      await supabase
+        .from('risk_category_mappings')
+        .delete()
+        .eq('risk_id', riskId);
+
+      const categoryMappings = editFormData.category_ids.map((categoryId: string) => ({
+        risk_id: riskId,
+        category_id: categoryId
+      }));
+
+      const { error: mappingError } = await supabase
+        .from('risk_category_mappings')
+        .insert(categoryMappings);
+
+      if (mappingError) throw mappingError;
+
+      alert('Risk başarıyla güncellendi!');
+      setShowEditModal(false);
+      setEditFormData(null);
+      loadData();
+    } catch (error) {
+      console.error('Risk güncellenirken hata:', error);
+      alert('Risk güncellenirken hata oluştu.');
     }
   }
 
@@ -279,7 +361,23 @@ export default function RiskDetail() {
         {isAdmin && (
           <div className="flex gap-2">
             <button
-              onClick={() => navigate(`risk-management/risks/${riskId}?edit=true`)}
+              onClick={() => {
+                setEditFormData({
+                  name: risk.name,
+                  description: risk.description || '',
+                  causes: risk.causes || '',
+                  consequences: risk.consequences || '',
+                  inherent_likelihood: risk.inherent_likelihood,
+                  inherent_impact: risk.inherent_impact,
+                  residual_likelihood: risk.residual_likelihood,
+                  residual_impact: risk.residual_impact,
+                  risk_response: risk.risk_response,
+                  response_rationale: risk.response_rationale || '',
+                  status: risk.status,
+                  category_ids: [...riskCategories]
+                });
+                setShowEditModal(true);
+              }}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
             >
               <Edit2 className="w-4 h-4" />
@@ -899,6 +997,233 @@ export default function RiskDetail() {
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
                 Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editFormData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Risk Düzenle</h2>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditFormData(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Risk Adı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-4">
+                  {categories.map((category) => (
+                    <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={editFormData.category_ids.includes(category.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEditFormData({
+                              ...editFormData,
+                              category_ids: [...editFormData.category_ids, category.id]
+                            });
+                          } else {
+                            setEditFormData({
+                              ...editFormData,
+                              category_ids: editFormData.category_ids.filter((id: string) => id !== category.id)
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">
+                        {category.code} - {category.name}
+                        <span className="text-xs text-gray-500 ml-1">({category.type})</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Açıklama
+                </label>
+                <textarea
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nedenler
+                  </label>
+                  <textarea
+                    value={editFormData.causes}
+                    onChange={(e) => setEditFormData({ ...editFormData, causes: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sonuçlar
+                  </label>
+                  <textarea
+                    value={editFormData.consequences}
+                    onChange={(e) => setEditFormData({ ...editFormData, consequences: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    İçsel Olasılık (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={editFormData.inherent_likelihood}
+                    onChange={(e) => setEditFormData({ ...editFormData, inherent_likelihood: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    İçsel Etki (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={editFormData.inherent_impact}
+                    onChange={(e) => setEditFormData({ ...editFormData, inherent_impact: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Artık Olasılık (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={editFormData.residual_likelihood}
+                    onChange={(e) => setEditFormData({ ...editFormData, residual_likelihood: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Artık Etki (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={editFormData.residual_impact}
+                    onChange={(e) => setEditFormData({ ...editFormData, residual_impact: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Risk Yanıtı
+                  </label>
+                  <select
+                    value={editFormData.risk_response}
+                    onChange={(e) => setEditFormData({ ...editFormData, risk_response: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="ACCEPT">Kabul Et</option>
+                    <option value="MITIGATE">Azalt</option>
+                    <option value="TRANSFER">Transfer Et</option>
+                    <option value="AVOID">Kaçın</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Durum
+                  </label>
+                  <select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="IDENTIFIED">Tespit Edildi</option>
+                    <option value="ASSESSING">Değerlendiriliyor</option>
+                    <option value="TREATING">Tedavi Ediliyor</option>
+                    <option value="MONITORING">İzleniyor</option>
+                    <option value="CLOSED">Kapatıldı</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Yanıt Gerekçesi
+                </label>
+                <textarea
+                  value={editFormData.response_rationale}
+                  onChange={(e) => setEditFormData({ ...editFormData, response_rationale: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditFormData(null);
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                Kaydet
               </button>
             </div>
           </div>

@@ -512,9 +512,6 @@ export default function Goals() {
                           {group.goals.map((goal) => {
                             const progress = calculateGoalProgress(goal.id, indicators, dataEntries);
                             const goalRisks = risks.filter(r => r.goal_id === goal.id);
-                            const risksExceedingAppetite = goal.risk_appetite_max_score
-                              ? goalRisks.filter(r => r.residual_score > goal.risk_appetite_max_score)
-                              : [];
 
                             return (
                               <div key={goal.id} className="border border-slate-200 rounded-lg p-6 bg-slate-50">
@@ -577,35 +574,6 @@ export default function Goals() {
                                       <span className="text-sm font-semibold text-slate-900">
                                         %{progress}
                                       </span>
-                                    </div>
-                                  </div>
-
-                                  <div className={`bg-white rounded-lg p-4 border ${risksExceedingAppetite.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <Shield className={`w-3 h-3 ${risksExceedingAppetite.length > 0 ? 'text-red-600' : 'text-slate-500'}`} />
-                                      <div className="text-xs text-slate-500">Risk Durumu</div>
-                                    </div>
-                                    <div className="text-sm font-medium text-slate-900">
-                                      {goalRisks.length === 0 ? (
-                                        <span className="text-slate-500">Risk yok</span>
-                                      ) : (
-                                        <div className="space-y-1">
-                                          <div className="flex items-center gap-2">
-                                            <span>{goalRisks.length} Risk</span>
-                                          </div>
-                                          {risksExceedingAppetite.length > 0 && (
-                                            <div className="flex items-center gap-1 text-xs text-red-600 font-semibold">
-                                              <AlertTriangle className="w-3 h-3" />
-                                              {risksExceedingAppetite.length} risk iştahı aşıyor!
-                                            </div>
-                                          )}
-                                          {goal.risk_appetite_max_score && (
-                                            <div className="text-xs text-slate-600">
-                                              İştah limiti: {goal.risk_appetite_max_score}
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
                                     </div>
                                   </div>
                                 </div>

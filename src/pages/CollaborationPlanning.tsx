@@ -122,6 +122,9 @@ export default function CollaborationPlanning() {
     all_departments: false,
     partners: [] as string[],
     cost_estimates: {} as Record<number, string>,
+    risk_appetite_level: '',
+    risk_appetite_description: '',
+    risk_appetite_max_score: '',
     risks: [''],
     findings: [''],
     needs: ['']
@@ -254,6 +257,17 @@ export default function CollaborationPlanning() {
 
         if (error) throw error;
         planId = data.id;
+      }
+
+      if (formData.risk_appetite_level || formData.risk_appetite_description || formData.risk_appetite_max_score) {
+        await supabase
+          .from('goals')
+          .update({
+            risk_appetite_level: formData.risk_appetite_level || null,
+            risk_appetite_description: formData.risk_appetite_description || null,
+            risk_appetite_max_score: formData.risk_appetite_max_score ? parseFloat(formData.risk_appetite_max_score) : null
+          })
+          .eq('id', formData.goal_id);
       }
 
       if (!formData.all_departments && formData.partners.length > 0) {
@@ -1015,6 +1029,62 @@ export default function CollaborationPlanning() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-orange-600" />
+                    Risk İştahı Belirleme (Opsiyonel)
+                  </h3>
+                  <div className="space-y-3 bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Risk İştahı Seviyesi
+                        </label>
+                        <select
+                          value={formData.risk_appetite_level}
+                          onChange={(e) => setFormData({ ...formData, risk_appetite_level: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                        >
+                          <option value="">Seçiniz</option>
+                          <option value="LOW">Düşük - Minimum Risk</option>
+                          <option value="MODERATE">Orta - Kontrollü Risk</option>
+                          <option value="HIGH">Yüksek - Agresif Hedefler</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Maksimum Risk Skoru
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="25"
+                          value={formData.risk_appetite_max_score}
+                          onChange={(e) => setFormData({ ...formData, risk_appetite_max_score: e.target.value })}
+                          placeholder="örn: 12"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Risk İştahı Açıklaması
+                      </label>
+                      <textarea
+                        value={formData.risk_appetite_description}
+                        onChange={(e) => setFormData({ ...formData, risk_appetite_description: e.target.value })}
+                        placeholder="Bu hedef için kabul edilebilir risk seviyesini ve gerekçesini açıklayın..."
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      />
+                    </div>
+                    <div className="text-xs text-gray-600 bg-white p-2 rounded border border-orange-200">
+                      <strong>Not:</strong> Risk iştahı, bu hedef için kabul edilebilir risk seviyesini belirler.
+                      Maksimum skor üzerindeki riskler izlenecek ve önlem alınması gerekecektir.
+                    </div>
+                  </div>
                 </div>
 
                 <div>
