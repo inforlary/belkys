@@ -5,6 +5,7 @@ import { Card, CardBody } from '../components/ui/Card';
 import { Target, Flag, BarChart3, Briefcase, TrendingUp, Users, AlertTriangle, Bell, Zap, FileText } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import RiskAlertWidget from '../components/dashboard/RiskAlertWidget';
+import RiskAppetiteWidget from '../components/dashboard/RiskAppetiteWidget';
 import PerformanceTrendChart from '../components/dashboard/PerformanceTrendChart';
 import NotificationWidget from '../components/dashboard/NotificationWidget';
 import Button from '../components/ui/Button';
@@ -243,6 +244,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RiskAppetiteWidget />
         <NotificationWidget />
 
         <Card>

@@ -104,6 +104,7 @@ export default function RiskRegister() {
   const [filters, setFilters] = useState({
     category: '',
     department: '',
+    goal: '',
     level: '',
     status: '',
     search: ''
@@ -193,7 +194,7 @@ export default function RiskRegister() {
           .order('code', { ascending: true }),
         supabase
           .from('goals')
-          .select('id, code, title, department_id')
+          .select('id, code, title, department_id, risk_appetite_level, risk_appetite_description, risk_appetite_max_score')
           .eq('organization_id', profile?.organization_id)
           .order('code', { ascending: true }),
         supabase
@@ -399,6 +400,7 @@ export default function RiskRegister() {
   const filteredRisks = risks.filter(risk => {
     if (filters.category && risk.category_id !== filters.category) return false;
     if (filters.department && risk.owner_department_id !== filters.department) return false;
+    if (filters.goal && risk.goal_id !== filters.goal) return false;
     if (filters.status && risk.status !== filters.status) return false;
     if (filters.level) {
       const [min, max] = filters.level.split('-').map(Number);
@@ -472,7 +474,7 @@ export default function RiskRegister() {
 
       <Card>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Kategori
@@ -504,6 +506,24 @@ export default function RiskRegister() {
                 {departments.map(dept => (
                   <option key={dept.id} value={dept.id}>
                     {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Hedef
+              </label>
+              <select
+                value={filters.goal}
+                onChange={(e) => setFilters({ ...filters, goal: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Tümü</option>
+                {goals.map(goal => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.code} - {goal.title}
                   </option>
                 ))}
               </select>
@@ -569,7 +589,7 @@ export default function RiskRegister() {
           </div>
 
           <button
-            onClick={() => setFilters({ category: '', department: '', level: '', status: '', search: '' })}
+            onClick={() => setFilters({ category: '', department: '', goal: '', level: '', status: '', search: '' })}
             className="text-sm text-blue-600 hover:text-blue-700"
           >
             Filtreleri Temizle
@@ -644,18 +664,29 @@ export default function RiskRegister() {
                   const residualBadge = getRiskScoreBadge(risk.residual_score);
                   const statusBadge = getStatusBadge(risk.status);
 
+                  const relatedGoal = risk.goal_id ? goals.find(g => g.id === risk.goal_id) : null;
+                  const exceedsAppetite = relatedGoal?.risk_appetite_max_score && risk.residual_score > relatedGoal.risk_appetite_max_score;
+
                   return (
                     <tr
                       key={risk.id}
                       onClick={() => navigate(`risk-management/risks/${risk.id}`)}
-                      className="hover:bg-gray-50 cursor-pointer"
+                      className={`hover:bg-gray-50 cursor-pointer ${exceedsAppetite ? 'bg-red-50' : ''}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {risk.code}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        <div className="max-w-xs truncate" title={risk.name}>
-                          {risk.name}
+                        <div className="max-w-xs">
+                          <div className="truncate" title={risk.name}>
+                            {risk.name}
+                          </div>
+                          {exceedsAppetite && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-red-600 font-medium">
+                              <AlertTriangle className="w-3 h-3" />
+                              Risk iştahını aşıyor! (Limit: {relatedGoal?.risk_appetite_max_score})
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { Plus, Edit2, Trash2, Search, Sparkles, TrendingUp, ChevronDown, ChevronRight, Target } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Sparkles, TrendingUp, ChevronDown, ChevronRight, Target, AlertTriangle, Shield } from 'lucide-react';
 import { generateGoalCode } from '../utils/codeGenerator';
 import { calculateGoalProgress, getProgressColor } from '../utils/progressCalculations';
 
@@ -60,6 +60,7 @@ export default function Goals() {
   const [vicePresidents, setVicePresidents] = useState<VicePresident[]>([]);
   const [indicators, setIndicators] = useState<any[]>([]);
   const [dataEntries, setDataEntries] = useState<any[]>([]);
+  const [risks, setRisks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -109,11 +110,14 @@ export default function Goals() {
     try {
       const currentYear = new Date().getFullYear();
 
-      const [goalsRes, objectivesRes, deptsRes, vpsRes, indicatorsRes, targetsRes, entriesRes] = await Promise.all([
+      const [goalsRes, objectivesRes, deptsRes, vpsRes, indicatorsRes, targetsRes, entriesRes, risksRes] = await Promise.all([
         supabase
           .from('goals')
           .select(`
             *,
+            risk_appetite_level,
+            risk_appetite_description,
+            risk_appetite_max_score,
             objectives!inner(title, code),
             departments(name),
             vice_president:profiles!vice_president_id(full_name)
@@ -149,7 +153,12 @@ export default function Goals() {
           .select('indicator_id, value, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
-          .in('status', ['approved', 'submitted'])
+          .in('status', ['approved', 'submitted']),
+        supabase
+          .from('risks')
+          .select('id, goal_id, residual_score, status')
+          .eq('organization_id', profile.organization_id)
+          .in('status', ['ACTIVE', 'MONITORING'])
       ]);
 
       if (goalsRes.error) throw goalsRes.error;
@@ -180,6 +189,7 @@ export default function Goals() {
       setVicePresidents(vpsRes.data || []);
       setIndicators(indicatorsData);
       setDataEntries(entriesRes.data || []);
+      setRisks(risksRes.data || []);
     } catch (error) {
       console.error('Veriler yüklenirken hata:', error);
     } finally {
@@ -459,6 +469,10 @@ export default function Goals() {
                         <div className="p-6 space-y-4 bg-white">
                           {group.goals.map((goal) => {
                             const progress = calculateGoalProgress(goal.id, indicators, dataEntries);
+                            const goalRisks = risks.filter(r => r.goal_id === goal.id);
+                            const risksExceedingAppetite = goal.risk_appetite_max_score
+                              ? goalRisks.filter(r => r.residual_score > goal.risk_appetite_max_score)
+                              : [];
 
                             return (
                               <div key={goal.id} className="border border-slate-200 rounded-lg p-6 bg-slate-50">
@@ -494,7 +508,7 @@ export default function Goals() {
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                   <div className="bg-white rounded-lg p-4 border border-slate-200">
                                     <div className="text-xs text-slate-500 mb-1">Müdürlük</div>
                                     <div className="text-sm font-medium text-slate-900">
@@ -521,6 +535,35 @@ export default function Goals() {
                                       <span className="text-sm font-semibold text-slate-900">
                                         %{progress}
                                       </span>
+                                    </div>
+                                  </div>
+
+                                  <div className={`bg-white rounded-lg p-4 border ${risksExceedingAppetite.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Shield className={`w-3 h-3 ${risksExceedingAppetite.length > 0 ? 'text-red-600' : 'text-slate-500'}`} />
+                                      <div className="text-xs text-slate-500">Risk Durumu</div>
+                                    </div>
+                                    <div className="text-sm font-medium text-slate-900">
+                                      {goalRisks.length === 0 ? (
+                                        <span className="text-slate-500">Risk yok</span>
+                                      ) : (
+                                        <div className="space-y-1">
+                                          <div className="flex items-center gap-2">
+                                            <span>{goalRisks.length} Risk</span>
+                                          </div>
+                                          {risksExceedingAppetite.length > 0 && (
+                                            <div className="flex items-center gap-1 text-xs text-red-600 font-semibold">
+                                              <AlertTriangle className="w-3 h-3" />
+                                              {risksExceedingAppetite.length} risk iştahı aşıyor!
+                                            </div>
+                                          )}
+                                          {goal.risk_appetite_max_score && (
+                                            <div className="text-xs text-slate-600">
+                                              İştah limiti: {goal.risk_appetite_max_score}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
