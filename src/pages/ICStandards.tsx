@@ -65,7 +65,12 @@ interface Action {
   title: string;
   condition_id: string;
   responsible_department_id: string;
+  responsible_department_ids: string[];
+  special_responsible_types: string[];
   collaborating_departments_ids: string[];
+  related_special_responsible_types: string[];
+  all_units_responsible: boolean;
+  all_units_collaborating: boolean;
   expected_outputs: string;
   is_continuous: boolean;
   start_date: string | null;
@@ -80,6 +85,13 @@ interface Department {
   id: string;
   name: string;
 }
+
+const SPECIAL_UNITS = [
+  { value: 'TOP_MANAGEMENT', label: 'Üst Yönetim' },
+  { value: 'IC_MONITORING_BOARD', label: 'İç Kontrol İzleme ve Yönlendirme Kurulu' },
+  { value: 'INTERNAL_AUDIT_BOARD', label: 'İç Denetim Kurulu' },
+  { value: 'INTERNAL_AUDIT_COORDINATION_BOARD', label: 'İç Denetim Koordinasyon Kurulu' }
+];
 
 export default function ICStandards() {
   const { profile } = useAuth();
@@ -106,8 +118,12 @@ export default function ICStandards() {
   const [actionConditionId, setActionConditionId] = useState<string>('');
   const [actionForm, setActionForm] = useState({
     title: '',
-    responsible_department_id: '',
+    responsible_department_ids: [] as string[],
+    special_responsible_types: [] as string[],
+    all_units_responsible: false,
     collaborating_departments_ids: [] as string[],
+    related_special_responsible_types: [] as string[],
+    all_units_collaborating: false,
     expected_outputs: '',
     is_continuous: false,
     target_date: '',
@@ -262,8 +278,12 @@ export default function ICStandards() {
       setEditingAction(action);
       setActionForm({
         title: action.title,
-        responsible_department_id: action.responsible_department_id,
+        responsible_department_ids: action.responsible_department_ids || [],
+        special_responsible_types: action.special_responsible_types || [],
+        all_units_responsible: action.all_units_responsible || false,
         collaborating_departments_ids: action.collaborating_departments_ids || [],
+        related_special_responsible_types: action.related_special_responsible_types || [],
+        all_units_collaborating: action.all_units_collaborating || false,
         expected_outputs: action.expected_outputs || '',
         is_continuous: action.is_continuous,
         target_date: action.target_date || '',
@@ -273,8 +293,12 @@ export default function ICStandards() {
       setEditingAction(null);
       setActionForm({
         title: '',
-        responsible_department_id: '',
+        responsible_department_ids: [],
+        special_responsible_types: [],
+        all_units_responsible: false,
         collaborating_departments_ids: [],
+        related_special_responsible_types: [],
+        all_units_collaborating: false,
         expected_outputs: '',
         is_continuous: false,
         target_date: '',
@@ -286,8 +310,13 @@ export default function ICStandards() {
   };
 
   const saveAction = async () => {
-    if (!profile?.organization_id || !actionForm.title || !actionForm.responsible_department_id) {
+    if (!profile?.organization_id || !actionForm.title) {
       alert('Lütfen zorunlu alanları doldurun');
+      return;
+    }
+
+    if (!actionForm.all_units_responsible && actionForm.responsible_department_ids.length === 0 && actionForm.special_responsible_types.length === 0) {
+      alert('Lütfen en az bir sorumlu birim veya özel birim seçin ya da "Tüm Birimler" seçeneğini işaretleyin');
       return;
     }
 
@@ -304,8 +333,12 @@ export default function ICStandards() {
         condition_id: actionConditionId,
         code: editingAction ? editingAction.code : generateActionCode(actionConditionId),
         title: actionForm.title,
-        responsible_department_id: actionForm.responsible_department_id,
-        collaborating_departments_ids: actionForm.collaborating_departments_ids,
+        responsible_department_ids: actionForm.all_units_responsible ? [] : actionForm.responsible_department_ids,
+        special_responsible_types: actionForm.all_units_responsible ? [] : actionForm.special_responsible_types,
+        all_units_responsible: actionForm.all_units_responsible,
+        collaborating_departments_ids: actionForm.all_units_collaborating ? [] : actionForm.collaborating_departments_ids,
+        related_special_responsible_types: actionForm.all_units_collaborating ? [] : actionForm.related_special_responsible_types,
+        all_units_collaborating: actionForm.all_units_collaborating,
         expected_outputs: actionForm.expected_outputs,
         is_continuous: actionForm.is_continuous,
         start_date: new Date().toISOString().split('T')[0],
@@ -807,41 +840,131 @@ export default function ICStandards() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Sorumlu Birim <span className="text-red-500">*</span>
             </label>
-            <select
-              value={actionForm.responsible_department_id}
-              onChange={(e) => setActionForm({ ...actionForm, responsible_department_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            >
-              <option value="">Seçiniz</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>{dept.name}</option>
-              ))}
-            </select>
+
+            <div className="mb-2">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={actionForm.all_units_responsible}
+                  onChange={(e) => setActionForm({
+                    ...actionForm,
+                    all_units_responsible: e.target.checked,
+                    responsible_department_ids: e.target.checked ? [] : actionForm.responsible_department_ids,
+                    special_responsible_types: e.target.checked ? [] : actionForm.special_responsible_types
+                  })}
+                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                />
+                Tüm Birimler
+              </label>
+            </div>
+
+            {!actionForm.all_units_responsible && (
+              <>
+                <div className="mb-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Özel Birimler</label>
+                  <select
+                    multiple
+                    value={actionForm.special_responsible_types}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setActionForm({ ...actionForm, special_responsible_types: selected });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    size={4}
+                  >
+                    {SPECIAL_UNITS.map((unit) => (
+                      <option key={unit.value} value={unit.value}>{unit.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Departmanlar</label>
+                  <select
+                    multiple
+                    value={actionForm.responsible_department_ids}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setActionForm({ ...actionForm, responsible_department_ids: selected });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    size={5}
+                  >
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Ctrl/Cmd tuşu ile çoklu seçim yapabilirsiniz</p>
+              </>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               İş Birliği Yapılacak Birimler
             </label>
-            <select
-              multiple
-              value={actionForm.collaborating_departments_ids}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions, option => option.value);
-                setActionForm({ ...actionForm, collaborating_departments_ids: selected });
-              }}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              size={4}
-            >
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>{dept.name}</option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-500 mt-1">Ctrl/Cmd tuşu ile çoklu seçim yapabilirsiniz</p>
+
+            <div className="mb-2">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={actionForm.all_units_collaborating}
+                  onChange={(e) => setActionForm({
+                    ...actionForm,
+                    all_units_collaborating: e.target.checked,
+                    collaborating_departments_ids: e.target.checked ? [] : actionForm.collaborating_departments_ids,
+                    related_special_responsible_types: e.target.checked ? [] : actionForm.related_special_responsible_types
+                  })}
+                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                />
+                Tüm Birimler
+              </label>
+            </div>
+
+            {!actionForm.all_units_collaborating && (
+              <>
+                <div className="mb-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Özel Birimler</label>
+                  <select
+                    multiple
+                    value={actionForm.related_special_responsible_types}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setActionForm({ ...actionForm, related_special_responsible_types: selected });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    size={4}
+                  >
+                    {SPECIAL_UNITS.map((unit) => (
+                      <option key={unit.value} value={unit.value}>{unit.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Departmanlar</label>
+                  <select
+                    multiple
+                    value={actionForm.collaborating_departments_ids}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setActionForm({ ...actionForm, collaborating_departments_ids: selected });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    size={5}
+                  >
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Ctrl/Cmd tuşu ile çoklu seçim yapabilirsiniz</p>
+              </>
+            )}
           </div>
 
           <div>
