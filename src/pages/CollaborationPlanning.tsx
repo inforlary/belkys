@@ -327,9 +327,9 @@ export default function CollaborationPlanning() {
       setEditingPlan(null);
       resetForm();
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving plan:', error);
-      alert('Plan kaydedilirken hata oluştu.');
+      alert('Plan kaydedilirken hata oluştu: ' + (error?.message || 'Bilinmeyen hata'));
     }
   };
 
