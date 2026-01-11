@@ -284,10 +284,8 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       icon: ShieldCheck,
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: 'internal-control/dashboard' },
-        { icon: BookOpen, label: 'Standartlar & Eylemler', path: 'internal-control/standards' },
-        { icon: Settings, label: 'Standart Yönetimi', path: 'internal-control/standards-management', adminOnly: true },
+        { icon: BookOpen, label: 'Standartlar & Eylemler', path: 'internal-control/actions' },
         { icon: ClipboardCheck, label: 'Eylem Planları', path: 'internal-control/action-plans' },
-        { icon: ListChecks, label: 'Tüm Eylemler', path: 'internal-control/actions' },
         { icon: Scale, label: 'Öz Değerlendirmeler', path: 'internal-control/assessments' },
         { icon: Users, label: 'İKİYK Toplantıları', path: 'internal-control/ikyk', adminOnly: true },
         { icon: Award, label: 'Güvence Beyanları', path: 'internal-control/assurance', adminOnly: true },
