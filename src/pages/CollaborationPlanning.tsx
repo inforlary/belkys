@@ -76,6 +76,18 @@ interface ObjectiveGroup {
   plans: CollaborationPlan[];
 }
 
+interface RiskCategory {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+}
+
+interface TransferredRisk {
+  collaboration_item_id: string;
+  risk_id: string;
+}
+
 export default function CollaborationPlanning() {
   const { user, profile } = useAuth();
   const [plans, setPlans] = useState<CollaborationPlan[]>([]);
@@ -90,6 +102,19 @@ export default function CollaborationPlanning() {
   const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
   const [showRiskManagement, setShowRiskManagement] = useState(false);
   const [selectedPlanForRisks, setSelectedPlanForRisks] = useState<string | null>(null);
+
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferringRisk, setTransferringRisk] = useState<{ item: PlanItem; plan: CollaborationPlan } | null>(null);
+  const [riskCategories, setRiskCategories] = useState<RiskCategory[]>([]);
+  const [transferredRisks, setTransferredRisks] = useState<TransferredRisk[]>([]);
+  const [transferFormData, setTransferFormData] = useState({
+    category_ids: [] as string[],
+    status: 'IDENTIFIED',
+    inherent_likelihood: 3,
+    inherent_impact: 3,
+    risk_response: 'MITIGATE',
+    additional_description: ''
+  });
 
   const [formData, setFormData] = useState({
     goal_id: '',
@@ -114,7 +139,7 @@ export default function CollaborationPlanning() {
     try {
       setLoading(true);
 
-      const [plansRes, goalsRes, depsRes, planRes] = await Promise.all([
+      const [plansRes, goalsRes, depsRes, planRes, categoriesRes, transferredRes] = await Promise.all([
         supabase
           .from('collaboration_plans')
           .select(`
@@ -145,7 +170,20 @@ export default function CollaborationPlanning() {
           .select('*')
           .eq('organization_id', profile.organization_id)
           .eq('is_active', true)
-          .maybeSingle()
+          .maybeSingle(),
+
+        supabase
+          .from('risk_categories')
+          .select('id, code, name, type')
+          .or(`organization_id.is.null,organization_id.eq.${profile.organization_id}`)
+          .eq('is_active', true)
+          .order('name'),
+
+        supabase
+          .from('risks')
+          .select('id, collaboration_item_id')
+          .eq('organization_id', profile.organization_id)
+          .not('collaboration_item_id', 'is', null)
       ]);
 
       if (plansRes.error) throw plansRes.error;
@@ -156,6 +194,8 @@ export default function CollaborationPlanning() {
       setGoals(goalsRes.data || []);
       setDepartments(depsRes.data || []);
       setStrategicPlan(planRes.data);
+      setRiskCategories(categoriesRes.data || []);
+      setTransferredRisks(transferredRes.data || []);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -429,52 +469,91 @@ export default function CollaborationPlanning() {
     setExpandedObjectives(newExpanded);
   };
 
-  const transferRiskToRegister = async (riskItem: PlanItem, plan: CollaborationPlan) => {
-    if (!profile?.organization_id || !plan.goal) return;
+  const openTransferModal = (riskItem: PlanItem, plan: CollaborationPlan) => {
+    const isAlreadyTransferred = transferredRisks.some(tr => tr.collaboration_item_id === riskItem.id);
+    if (isAlreadyTransferred) {
+      alert('Bu risk zaten Risk Yönetimi sistemine aktarılmış.');
+      return;
+    }
+
+    setTransferringRisk({ item: riskItem, plan });
+    setTransferFormData({
+      category_ids: [],
+      status: 'IDENTIFIED',
+      inherent_likelihood: 3,
+      inherent_impact: 3,
+      risk_response: 'MITIGATE',
+      additional_description: ''
+    });
+    setShowTransferModal(true);
+  };
+
+  const handleTransferRisk = async () => {
+    if (!profile?.organization_id || !transferringRisk?.plan.goal) return;
+    if (transferFormData.category_ids.length === 0) {
+      alert('En az bir risk kategorisi seçmelisiniz.');
+      return;
+    }
 
     try {
-      const existingRisk = await supabase
-        .from('risks')
-        .select('id')
-        .eq('collaboration_item_id', riskItem.id)
-        .maybeSingle();
-
-      if (existingRisk.data) {
-        alert('Bu risk zaten Risk Yönetimi sistemine aktarılmış.');
-        return;
-      }
-
       const nextCode = await getNextRiskCode();
 
-      const { error } = await supabase
+      const description = transferFormData.additional_description
+        ? `İşbirliği planından aktarılan risk: ${transferringRisk.plan.title}\n\n${transferFormData.additional_description}`
+        : `İşbirliği planından aktarılan risk: ${transferringRisk.plan.title}`;
+
+      const { data: riskData, error: riskError } = await supabase
         .from('risks')
         .insert({
           organization_id: profile.organization_id,
-          goal_id: plan.goal_id,
-          collaboration_item_id: riskItem.id,
+          goal_id: transferringRisk.plan.goal_id,
+          collaboration_item_id: transferringRisk.item.id,
           code: nextCode,
-          name: riskItem.content,
-          description: `İşbirliği planından aktarılan risk: ${plan.title}`,
-          owner_department_id: plan.responsible_department_id,
-          inherent_likelihood: 3,
-          inherent_impact: 3,
-          residual_likelihood: 3,
-          residual_impact: 3,
-          risk_level: 'MEDIUM',
-          status: 'IDENTIFIED',
+          name: transferringRisk.item.content,
+          description: description,
+          owner_department_id: transferringRisk.plan.responsible_department_id,
+          inherent_likelihood: transferFormData.inherent_likelihood,
+          inherent_impact: transferFormData.inherent_impact,
+          residual_likelihood: transferFormData.inherent_likelihood,
+          residual_impact: transferFormData.inherent_impact,
+          risk_level: calculateRiskLevel(transferFormData.inherent_likelihood * transferFormData.inherent_impact),
+          risk_response: transferFormData.risk_response,
+          status: transferFormData.status,
           is_active: true,
           identified_date: new Date().toISOString().split('T')[0],
           identified_by_id: user?.id
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (riskError) throw riskError;
+
+      const categoryMappings = transferFormData.category_ids.map(categoryId => ({
+        risk_id: riskData.id,
+        category_id: categoryId
+      }));
+
+      const { error: mappingError } = await supabase
+        .from('risk_category_mappings')
+        .insert(categoryMappings);
+
+      if (mappingError) throw mappingError;
 
       alert('Risk başarıyla Risk Yönetimi sistemine aktarıldı!');
+      setShowTransferModal(false);
+      setTransferringRisk(null);
       loadData();
     } catch (error) {
       console.error('Risk aktarılırken hata:', error);
       alert('Risk aktarılırken hata oluştu.');
     }
+  };
+
+  const calculateRiskLevel = (score: number): string => {
+    if (score <= 4) return 'LOW';
+    if (score <= 9) return 'MEDIUM';
+    if (score <= 15) return 'HIGH';
+    return 'CRITICAL';
   };
 
   const getNextRiskCode = async (): Promise<string> => {
@@ -683,17 +762,6 @@ export default function CollaborationPlanning() {
                             <div className="flex items-center gap-2">
                               {getStatusBadge(plan.status)}
                               <button
-                                onClick={() => {
-                                  setSelectedPlanForRisks(plan.id);
-                                  setShowRiskManagement(true);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-2 text-red-700 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors"
-                                title="Risk Yönetimi"
-                              >
-                                <Shield className="w-4 h-4" />
-                                <span className="text-sm font-medium">Riskler</span>
-                              </button>
-                              <button
                                 onClick={() => handleEdit(plan)}
                                 className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                 title="Düzenle"
@@ -807,22 +875,32 @@ export default function CollaborationPlanning() {
                                     </div>
                                   </div>
                                   <ul className="space-y-3">
-                                    {plan.items.filter(i => i.category === 'risk').map((item, idx) => (
-                                      <li key={idx} className="flex items-start justify-between gap-2 bg-white bg-opacity-60 rounded-md p-2.5 border border-red-200">
-                                        <div className="flex items-start gap-2 flex-1">
-                                          <span className="text-red-500 mt-0.5 font-bold">•</span>
-                                          <span className="font-medium text-sm text-red-900 flex-1">{item.content}</span>
-                                        </div>
-                                        <button
-                                          onClick={() => transferRiskToRegister(item, plan)}
-                                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors whitespace-nowrap flex-shrink-0"
-                                          title="Risk Yönetimine Aktar"
-                                        >
-                                          <Shield className="w-3.5 h-3.5" />
-                                          Aktar
-                                        </button>
-                                      </li>
-                                    ))}
+                                    {plan.items.filter(i => i.category === 'risk').map((item, idx) => {
+                                      const isTransferred = transferredRisks.some(tr => tr.collaboration_item_id === item.id);
+                                      return (
+                                        <li key={idx} className="flex items-start justify-between gap-2 bg-white bg-opacity-60 rounded-md p-2.5 border border-red-200">
+                                          <div className="flex items-start gap-2 flex-1">
+                                            <span className="text-red-500 mt-0.5 font-bold">•</span>
+                                            <span className="font-medium text-sm text-red-900 flex-1">{item.content}</span>
+                                          </div>
+                                          {isTransferred ? (
+                                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-800 text-xs font-bold rounded border border-green-300 whitespace-nowrap flex-shrink-0">
+                                              <Shield className="w-3.5 h-3.5" />
+                                              Aktarıldı
+                                            </span>
+                                          ) : (
+                                            <button
+                                              onClick={() => openTransferModal(item, plan)}
+                                              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors whitespace-nowrap flex-shrink-0"
+                                              title="Risk Yönetimine Aktar"
+                                            >
+                                              <Shield className="w-3.5 h-3.5" />
+                                              Aktar
+                                            </button>
+                                          )}
+                                        </li>
+                                      );
+                                    })}
                                   </ul>
                                 </div>
                               )}
@@ -1166,6 +1244,169 @@ export default function CollaborationPlanning() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTransferModal && transferringRisk && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Risk Yönetimine Aktar</h2>
+                <button
+                  onClick={() => setShowTransferModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Risk: <span className="font-medium">{transferringRisk.item.content}</span>
+              </p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                  {riskCategories.map((category) => (
+                    <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={transferFormData.category_ids.includes(category.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setTransferFormData(prev => ({
+                              ...prev,
+                              category_ids: [...prev.category_ids, category.id]
+                            }));
+                          } else {
+                            setTransferFormData(prev => ({
+                              ...prev,
+                              category_ids: prev.category_ids.filter(id => id !== category.id)
+                            }));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">
+                        {category.code} - {category.name}
+                        <span className="text-xs text-gray-500 ml-1">({category.type})</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Risk Durumu <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={transferFormData.status}
+                    onChange={(e) => setTransferFormData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="IDENTIFIED">Tespit Edildi</option>
+                    <option value="ASSESSING">Değerlendiriliyor</option>
+                    <option value="TREATING">Tedavi Ediliyor</option>
+                    <option value="MONITORING">İzleniyor</option>
+                    <option value="CLOSED">Kapatıldı</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Risk Yanıtı <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={transferFormData.risk_response}
+                    onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_response: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="ACCEPT">Kabul Et</option>
+                    <option value="MITIGATE">Azalt</option>
+                    <option value="TRANSFER">Transfer Et</option>
+                    <option value="AVOID">Kaçın</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    İçsel Olasılık (1-5) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={transferFormData.inherent_likelihood}
+                    onChange={(e) => setTransferFormData(prev => ({ ...prev, inherent_likelihood: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">1=Çok Düşük, 5=Çok Yüksek</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    İçsel Etki (1-5) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={transferFormData.inherent_impact}
+                    onChange={(e) => setTransferFormData(prev => ({ ...prev, inherent_impact: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">1=Çok Düşük, 5=Çok Yüksek</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-sm font-medium text-gray-700">Risk Skoru:</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {transferFormData.inherent_likelihood * transferFormData.inherent_impact}
+                  <span className="text-sm font-normal text-gray-600 ml-2">
+                    ({calculateRiskLevel(transferFormData.inherent_likelihood * transferFormData.inherent_impact)})
+                  </span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ek Açıklama
+                </label>
+                <textarea
+                  value={transferFormData.additional_description}
+                  onChange={(e) => setTransferFormData(prev => ({ ...prev, additional_description: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Risk hakkında ek bilgiler..."
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowTransferModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleTransferRisk}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <Shield className="w-4 h-4" />
+                Risk Yönetimine Aktar
+              </button>
             </div>
           </div>
         </div>
