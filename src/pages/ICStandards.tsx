@@ -10,13 +10,16 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
-  TrendingUp
+  TrendingUp,
+  ArrowLeft
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import { useLocation } from '../hooks/useLocation';
 
 interface ActionPlan {
   id: string;
   name: string;
+  description: string;
   start_date: string;
   end_date: string;
   status: string;
@@ -80,11 +83,12 @@ interface Department {
 
 export default function ICStandards() {
   const { profile } = useAuth();
+  const { navigate } = useLocation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [actionPlans, setActionPlans] = useState<ActionPlan[]>([]);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [planId, setPlanId] = useState<string>('');
+  const [actionPlan, setActionPlan] = useState<ActionPlan | null>(null);
 
   const [components, setComponents] = useState<Component[]>([]);
   const [standards, setStandards] = useState<Standard[]>([]);
@@ -111,28 +115,31 @@ export default function ICStandards() {
   });
 
   useEffect(() => {
-    if (profile?.organization_id) {
-      loadData();
+    const urlParams = new URLSearchParams(window.location.search);
+    const plan_id = urlParams.get('plan_id');
+
+    if (plan_id) {
+      setPlanId(plan_id);
     }
-  }, [profile?.organization_id]);
+  }, []);
 
   useEffect(() => {
-    if (selectedPlanId) {
-      loadPlanData();
+    if (profile?.organization_id && planId) {
+      loadData();
     }
-  }, [selectedPlanId]);
+  }, [profile?.organization_id, planId]);
 
   const loadData = async () => {
-    if (!profile?.organization_id) return;
+    if (!profile?.organization_id || !planId) return;
 
     setLoading(true);
     try {
-      const [plansRes, componentsRes, standardsRes, conditionsRes, deptsRes] = await Promise.all([
+      const [planRes, componentsRes, standardsRes, conditionsRes, deptsRes, assessmentsRes, actionsRes] = await Promise.all([
         supabase
           .from('ic_action_plans')
           .select('*')
-          .eq('organization_id', profile.organization_id)
-          .order('created_at', { ascending: false }),
+          .eq('id', planId)
+          .single(),
         supabase
           .from('ic_components')
           .select('*')
@@ -149,35 +156,12 @@ export default function ICStandards() {
           .from('departments')
           .select('id, name')
           .eq('organization_id', profile.organization_id)
-          .order('name')
-      ]);
-
-      if (plansRes.data) setActionPlans(plansRes.data);
-      if (componentsRes.data) setComponents(componentsRes.data);
-      if (standardsRes.data) setStandards(standardsRes.data);
-      if (conditionsRes.data) setConditions(conditionsRes.data);
-      if (deptsRes.data) setDepartments(deptsRes.data);
-
-      if (plansRes.data && plansRes.data.length > 0 && !selectedPlanId) {
-        setSelectedPlanId(plansRes.data[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadPlanData = async () => {
-    if (!profile?.organization_id || !selectedPlanId) return;
-
-    try {
-      const [assessmentsRes, actionsRes] = await Promise.all([
+          .order('name'),
         supabase
           .from('ic_condition_assessments')
           .select('*')
           .eq('organization_id', profile.organization_id)
-          .eq('action_plan_id', selectedPlanId),
+          .eq('action_plan_id', planId),
         supabase
           .from('ic_actions')
           .select(`
@@ -185,14 +169,21 @@ export default function ICStandards() {
             departments(name)
           `)
           .eq('organization_id', profile.organization_id)
-          .eq('action_plan_id', selectedPlanId)
+          .eq('action_plan_id', planId)
           .order('code')
       ]);
 
+      if (planRes.data) setActionPlan(planRes.data);
+      if (componentsRes.data) setComponents(componentsRes.data);
+      if (standardsRes.data) setStandards(standardsRes.data);
+      if (conditionsRes.data) setConditions(conditionsRes.data);
+      if (deptsRes.data) setDepartments(deptsRes.data);
       if (assessmentsRes.data) setAssessments(assessmentsRes.data);
       if (actionsRes.data) setActions(actionsRes.data);
     } catch (error) {
-      console.error('Error loading plan data:', error);
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -203,7 +194,7 @@ export default function ICStandards() {
     return {
       organization_id: profile!.organization_id!,
       condition_id: conditionId,
-      action_plan_id: selectedPlanId,
+      action_plan_id: planId,
       compliance_status: null,
       compliance_score: null,
       current_situation: ''
@@ -232,7 +223,7 @@ export default function ICStandards() {
           .insert({
             organization_id: profile.organization_id,
             condition_id: assessment.condition_id,
-            action_plan_id: selectedPlanId,
+            action_plan_id: planId,
             compliance_status: assessment.compliance_status,
             compliance_score: assessment.compliance_score,
             current_situation: assessment.current_situation,
@@ -242,7 +233,7 @@ export default function ICStandards() {
         if (error) throw error;
       }
 
-      await loadPlanData();
+      await loadData();
     } catch (error) {
       console.error('Error saving assessment:', error);
       alert('Değerlendirme kaydedilirken hata oluştu');
@@ -310,7 +301,7 @@ export default function ICStandards() {
     try {
       const actionData = {
         organization_id: profile.organization_id,
-        action_plan_id: selectedPlanId,
+        action_plan_id: planId,
         condition_id: actionConditionId,
         code: editingAction ? editingAction.code : generateActionCode(actionConditionId),
         title: actionForm.title,
@@ -341,7 +332,7 @@ export default function ICStandards() {
       }
 
       setShowActionModal(false);
-      await loadPlanData();
+      await loadData();
     } catch (error: any) {
       console.error('Error saving action:', error);
       const errorMessage = error?.message || 'Bilinmeyen hata';
@@ -408,7 +399,7 @@ export default function ICStandards() {
     );
   }
 
-  if (!selectedPlanId) {
+  if (!planId) {
     return (
       <div className="max-w-2xl mx-auto mt-12 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
         <div className="flex items-start gap-3">
@@ -416,13 +407,36 @@ export default function ICStandards() {
           <div>
             <h3 className="font-semibold text-yellow-900 mb-2">Eylem Planı Seçilmedi</h3>
             <p className="text-sm text-yellow-800 mb-4">
-              Standartları değerlendirmek için önce bir eylem planı seçmelisiniz.
+              Standartları görüntülemek için bir eylem planı seçmelisiniz.
             </p>
-            {actionPlans.length === 0 && (
-              <p className="text-sm text-yellow-800">
-                Henüz eylem planı oluşturulmamış. Lütfen önce <strong>Eylem Planları</strong> sayfasından bir plan oluşturun.
-              </p>
-            )}
+            <button
+              onClick={() => navigate('/internal-control/action-plans')}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+            >
+              Eylem Planlarına Git
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!actionPlan) {
+    return (
+      <div className="max-w-2xl mx-auto mt-12 bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex items-start gap-3">
+          <XCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-red-900 mb-2">Eylem Planı Bulunamadı</h3>
+            <p className="text-sm text-red-800 mb-4">
+              Seçilen eylem planı bulunamadı veya erişim yetkiniz yok.
+            </p>
+            <button
+              onClick={() => navigate('/internal-control/action-plans')}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Eylem Planlarına Dön
+            </button>
           </div>
         </div>
       </div>
@@ -432,27 +446,19 @@ export default function ICStandards() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">İç Kontrol Standartları</h1>
-          <p className="text-sm text-slate-600 mt-1">Genel şartları değerlendirin ve eylem planı oluşturun</p>
-        </div>
-
-        <div className="w-96">
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Eylem Planı
-          </label>
-          <select
-            value={selectedPlanId}
-            onChange={(e) => setSelectedPlanId(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/internal-control/action-plans')}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <option value="">Plan seçiniz</option>
-            {actionPlans.map((plan) => (
-              <option key={plan.id} value={plan.id}>
-                {plan.name} ({new Date(plan.start_date).getFullYear()})
-              </option>
-            ))}
-          </select>
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">{actionPlan.name}</h1>
+            <p className="text-sm text-slate-600 mt-1">
+              {new Date(actionPlan.start_date).toLocaleDateString('tr-TR')} - {new Date(actionPlan.end_date).toLocaleDateString('tr-TR')}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -609,9 +615,9 @@ export default function ICStandards() {
                                         className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                       >
                                         <option value="">Seçiniz</option>
-                                        <option value="COMPLIANT">Sağlanıyor ✅</option>
-                                        <option value="PARTIAL">Kısmen ⚠️</option>
-                                        <option value="NON_COMPLIANT">Sağlanmıyor ❌</option>
+                                        <option value="COMPLIANT">Sağlanıyor</option>
+                                        <option value="PARTIAL">Kısmen</option>
+                                        <option value="NON_COMPLIANT">Sağlanmıyor</option>
                                       </select>
                                     </div>
 
