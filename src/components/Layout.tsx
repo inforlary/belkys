@@ -206,6 +206,10 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         activity_reports: true,
         budget_performance: true,
         internal_control: true,
+        risk_management: true,
+        quality_management: true,
+        settings: true,
+        administration: true,
       };
     }
     return {
@@ -213,6 +217,10 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       activity_reports: profile?.organization?.module_activity_reports ?? true,
       budget_performance: profile?.organization?.module_budget_performance ?? true,
       internal_control: profile?.organization?.module_internal_control ?? true,
+      risk_management: profile?.organization?.module_risk_management ?? true,
+      quality_management: profile?.organization?.module_quality_management ?? true,
+      settings: profile?.organization?.module_settings ?? true,
+      administration: profile?.organization?.module_administration ?? true,
     };
   };
 
@@ -375,7 +383,10 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     if (section.label === 'Bütçe Yönetimi') return moduleAccess.budget_performance;
     if (section.label === 'Bütçe ve Performans') return moduleAccess.budget_performance;
     if (section.label === 'İç Kontrol') return moduleAccess.internal_control;
-    if (section.label === 'Risk Yönetimi') return true;
+    if (section.label === 'Risk Yönetimi') return moduleAccess.risk_management;
+    if (section.label === 'Kalite Yönetimi') return moduleAccess.quality_management;
+    if (section.label === 'Ayarlar') return moduleAccess.settings;
+    if (section.label === 'Yönetim') return moduleAccess.administration;
 
     return true;
   };
