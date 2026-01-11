@@ -88,11 +88,13 @@ export default function Indicators() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedGoal, setSelectedGoal] = useState('');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const naturalSort = (a: string, b: string): number => {
     const regex = /(\d+)|(\D+)/g;
@@ -120,7 +122,43 @@ export default function Indicators() {
     if (!profile?.organization_id) return;
 
     try {
-      const currentYear = new Date().getFullYear();
+      const allPlansRes = await supabase
+        .from('strategic_plans')
+        .select('id, name, start_year, end_year')
+        .eq('organization_id', profile.organization_id)
+        .order('start_year', { ascending: false });
+
+      if (allPlansRes.data) {
+        const years = new Set<number>();
+        allPlansRes.data.forEach(plan => {
+          for (let year = plan.start_year; year <= plan.end_year; year++) {
+            years.add(year);
+          }
+        });
+        setAvailableYears(Array.from(years).sort((a, b) => b - a));
+        setStrategicPlans(allPlansRes.data);
+      }
+
+      const relevantPlans = allPlansRes.data?.filter(plan =>
+        selectedYear >= plan.start_year && selectedYear <= plan.end_year
+      ) || [];
+
+      const relevantObjectivesRes = await supabase
+        .from('objectives')
+        .select('id')
+        .eq('organization_id', profile.organization_id)
+        .in('strategic_plan_id', relevantPlans.map(p => p.id));
+
+      const relevantObjectiveIds = relevantObjectivesRes.data?.map(o => o.id) || [];
+
+      const relevantGoalsRes = await supabase
+        .from('goals')
+        .select('id')
+        .eq('organization_id', profile.organization_id)
+        .in('objective_id', relevantObjectiveIds);
+
+      const relevantGoalIds = relevantGoalsRes.data?.map(g => g.id) || [];
+
       const [indicatorsRes, goalsRes, deptsRes, plansRes, entriesRes, targetsRes] = await Promise.all([
         supabase
           .from('indicators')
@@ -129,11 +167,13 @@ export default function Indicators() {
             goals!inner(title, code, department_id)
           `)
           .eq('organization_id', profile.organization_id)
+          .in('goal_id', relevantGoalIds)
           .order('code', { ascending: true }),
         supabase
           .from('goals')
           .select('id, code, title, department_id')
           .eq('organization_id', profile.organization_id)
+          .in('id', relevantGoalIds)
           .order('code', { ascending: true }),
         supabase
           .from('departments')
@@ -149,7 +189,7 @@ export default function Indicators() {
           .from('indicator_data_entries')
           .select('indicator_id, value, status, period_year')
           .eq('organization_id', profile.organization_id)
-          .eq('period_year', currentYear)
+          .eq('period_year', selectedYear)
           .in('status', ['approved', 'submitted']),
         supabase
           .from('indicator_targets')
@@ -159,7 +199,7 @@ export default function Indicators() {
             target_value,
             indicators!inner(organization_id)
           `)
-          .eq('year', currentYear)
+          .eq('year', selectedYear)
           .eq('indicators.organization_id', profile.organization_id)
       ]);
 
@@ -360,6 +400,19 @@ export default function Indicators() {
         <Card>
           <CardHeader>
             <div className="flex items-center space-x-4">
+              <div className="w-48">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                >
+                  {availableYears.map(year => (
+                    <option key={year} value={year}>
+                      {year} Yılı
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex-1 relative">
                 <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
