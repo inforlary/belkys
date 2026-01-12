@@ -95,6 +95,13 @@ interface ProgressEntry {
   created_at: string;
 }
 
+const SPECIAL_UNITS = [
+  { value: 'TOP_MANAGEMENT', label: 'Üst Yönetim' },
+  { value: 'IC_MONITORING_BOARD', label: 'İç Kontrol İzleme ve Yönlendirme Kurulu' },
+  { value: 'INTERNAL_AUDIT_BOARD', label: 'İç Denetim Kurulu' },
+  { value: 'INTERNAL_AUDIT_COORDINATION_BOARD', label: 'İç Denetim Koordinasyon Kurulu' }
+];
+
 export default function ICActions() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
@@ -135,8 +142,13 @@ export default function ICActions() {
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
-    responsible_department_id: '',
+    responsible_department_ids: [] as string[],
     related_department_ids: [] as string[],
+    collaborating_departments_ids: [] as string[],
+    special_responsible_types: [] as string[],
+    related_special_responsible_types: [] as string[],
+    all_units_responsible: false,
+    all_units_collaborating: false,
     outputs: '',
     is_continuous: false,
     start_date: '',
@@ -490,17 +502,29 @@ export default function ICActions() {
     setShowDetailModal(true);
   };
 
-  const handleEdit = (action: Action) => {
+  const handleEdit = async (action: Action) => {
     setSelectedAction(action);
+
+    const { data: actionData } = await supabase
+      .from('ic_actions')
+      .select('*')
+      .eq('id', action.id)
+      .single();
+
     setEditForm({
-      title: action.title,
-      description: action.description || '',
-      responsible_department_id: action.responsible_department_id,
-      related_department_ids: action.related_department_ids || [],
-      outputs: action.outputs || '',
-      is_continuous: action.is_continuous || false,
-      start_date: action.start_date || '',
-      target_date: action.target_date,
+      title: actionData?.title || action.title,
+      description: actionData?.description || '',
+      responsible_department_ids: actionData?.responsible_department_ids || [],
+      related_department_ids: actionData?.related_department_ids || [],
+      collaborating_departments_ids: actionData?.collaborating_departments_ids || [],
+      special_responsible_types: actionData?.special_responsible_types || [],
+      related_special_responsible_types: actionData?.related_special_responsible_types || [],
+      all_units_responsible: actionData?.all_units_responsible || false,
+      all_units_collaborating: actionData?.all_units_collaborating || false,
+      outputs: actionData?.outputs || '',
+      is_continuous: actionData?.is_continuous || false,
+      start_date: actionData?.start_date || '',
+      target_date: actionData?.target_date || '',
       notes: ''
     });
     setShowEditModal(true);
@@ -575,13 +599,30 @@ export default function ICActions() {
   const submitEdit = async () => {
     if (!selectedAction) return;
 
+    if (!editForm.title.trim()) {
+      alert('Eylem açıklaması zorunludur');
+      return;
+    }
+
+    if (!editForm.all_units_responsible &&
+        editForm.responsible_department_ids.length === 0 &&
+        editForm.special_responsible_types.length === 0) {
+      alert('En az bir sorumlu birim seçmelisiniz veya "Tüm Birimler Sorumlu" seçeneğini işaretlemelisiniz');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('ic_actions')
         .update({
           title: editForm.title,
           description: editForm.description,
-          responsible_department_id: editForm.responsible_department_id,
+          responsible_department_ids: editForm.responsible_department_ids,
+          special_responsible_types: editForm.special_responsible_types,
+          all_units_responsible: editForm.all_units_responsible,
+          collaborating_departments_ids: editForm.collaborating_departments_ids,
+          related_special_responsible_types: editForm.related_special_responsible_types,
+          all_units_collaborating: editForm.all_units_collaborating,
           related_department_ids: editForm.related_department_ids,
           outputs: editForm.outputs,
           is_continuous: editForm.is_continuous,
@@ -1389,165 +1430,251 @@ export default function ICActions() {
         title="Eylem Düzenle"
       >
         {selectedAction && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Eylem Kodu
-              </label>
-              <input
-                type="text"
-                value={selectedAction.code}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Eylem Başlığı *
-              </label>
-              <input
-                type="text"
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Açıklama
-              </label>
-              <textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sorumlu Birim *
-              </label>
-              <select
-                value={editForm.responsible_department_id}
-                onChange={(e) => setEditForm({ ...editForm, responsible_department_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Seçiniz</option>
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                İş Birliği Yapılacak Birimler
-              </label>
-              <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
-                {departments.map(dept => (
-                  <label key={dept.id} className="flex items-center gap-2 py-1">
-                    <input
-                      type="checkbox"
-                      checked={editForm.related_department_ids.includes(dept.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setEditForm({
-                            ...editForm,
-                            related_department_ids: [...editForm.related_department_ids, dept.id]
-                          });
-                        } else {
-                          setEditForm({
-                            ...editForm,
-                            related_department_ids: editForm.related_department_ids.filter(id => id !== dept.id)
-                          });
-                        }
-                      }}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{dept.name}</span>
-                  </label>
-                ))}
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto px-1">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="text-sm font-medium text-blue-900">
+                Eylem Kodu: <span className="font-bold">{selectedAction.code}</span>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Beklenen Çıktı/Sonuç
-              </label>
-              <input
-                type="text"
-                value={editForm.outputs}
-                onChange={(e) => setEditForm({ ...editForm, outputs: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+            <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+              <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">Temel Bilgiler</h3>
 
-            <div>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={editForm.is_continuous}
-                  onChange={(e) => setEditForm({ ...editForm, is_continuous: e.target.checked })}
-                  className="rounded"
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Eylem Açıklaması <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Eylem açıklaması giriniz..."
+                  required
                 />
-                <span className="text-sm font-medium text-gray-700">Bu eylem sürekli olarak tekrarlanacak</span>
-              </label>
-            </div>
-
-            {!editForm.is_continuous && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Başlangıç Tarihi
-                  </label>
-                  <input
-                    type="date"
-                    value={editForm.start_date}
-                    onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Hedef Tarih *
-                  </label>
-                  <input
-                    type="date"
-                    value={editForm.target_date}
-                    onChange={(e) => setEditForm({ ...editForm, target_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
               </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notlar
-              </label>
-              <textarea
-                value={editForm.notes}
-                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Beklenen Çıktı/Sonuç
+                </label>
+                <textarea
+                  value={editForm.outputs}
+                  onChange={(e) => setEditForm({ ...editForm, outputs: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Beklenen çıktı veya sonuç..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Açıklama/Not
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ek açıklama veya notlar..."
+                />
+              </div>
             </div>
 
-            <div className="flex gap-2 justify-end">
+            <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+              <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">Sorumlu Birimler <span className="text-red-500">*</span></h3>
+
+              <div className="bg-white rounded-lg p-3 border border-slate-200">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.all_units_responsible}
+                    onChange={(e) => setEditForm({
+                      ...editForm,
+                      all_units_responsible: e.target.checked,
+                      responsible_department_ids: e.target.checked ? [] : editForm.responsible_department_ids,
+                      special_responsible_types: e.target.checked ? [] : editForm.special_responsible_types
+                    })}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  Tüm Birimler Sorumlu
+                </label>
+              </div>
+
+              {!editForm.all_units_responsible && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Özel Birimler</label>
+                    <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
+                      {SPECIAL_UNITS.map((unit) => (
+                        <label key={unit.value} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={editForm.special_responsible_types.includes(unit.value)}
+                            onChange={(e) => {
+                              const newTypes = e.target.checked
+                                ? [...editForm.special_responsible_types, unit.value]
+                                : editForm.special_responsible_types.filter(t => t !== unit.value);
+                              setEditForm({ ...editForm, special_responsible_types: newTypes });
+                            }}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-slate-700">{unit.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Departmanlar</label>
+                    <div className="bg-white rounded-lg border border-slate-200 max-h-40 overflow-y-auto divide-y divide-slate-100">
+                      {departments.map((dept) => (
+                        <label key={dept.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={editForm.responsible_department_ids.includes(dept.id)}
+                            onChange={(e) => {
+                              const newDepts = e.target.checked
+                                ? [...editForm.responsible_department_ids, dept.id]
+                                : editForm.responsible_department_ids.filter(d => d !== dept.id);
+                              setEditForm({ ...editForm, responsible_department_ids: newDepts });
+                            }}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-slate-700">{dept.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+              <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">İş Birliği Yapılacak Birimler</h3>
+
+              <div className="bg-white rounded-lg p-3 border border-slate-200">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.all_units_collaborating}
+                    onChange={(e) => setEditForm({
+                      ...editForm,
+                      all_units_collaborating: e.target.checked,
+                      collaborating_departments_ids: e.target.checked ? [] : editForm.collaborating_departments_ids,
+                      related_special_responsible_types: e.target.checked ? [] : editForm.related_special_responsible_types
+                    })}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  Tüm Birimler İşbirliği Yapacak
+                </label>
+              </div>
+
+              {!editForm.all_units_collaborating && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Özel Birimler</label>
+                    <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
+                      {SPECIAL_UNITS.map((unit) => (
+                        <label key={unit.value} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={editForm.related_special_responsible_types.includes(unit.value)}
+                            onChange={(e) => {
+                              const newTypes = e.target.checked
+                                ? [...editForm.related_special_responsible_types, unit.value]
+                                : editForm.related_special_responsible_types.filter(t => t !== unit.value);
+                              setEditForm({ ...editForm, related_special_responsible_types: newTypes });
+                            }}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-slate-700">{unit.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Departmanlar</label>
+                    <div className="bg-white rounded-lg border border-slate-200 max-h-40 overflow-y-auto divide-y divide-slate-100">
+                      {departments.map((dept) => (
+                        <label key={dept.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={editForm.collaborating_departments_ids.includes(dept.id)}
+                            onChange={(e) => {
+                              const newDepts = e.target.checked
+                                ? [...editForm.collaborating_departments_ids, dept.id]
+                                : editForm.collaborating_departments_ids.filter(d => d !== dept.id);
+                              setEditForm({ ...editForm, collaborating_departments_ids: newDepts });
+                            }}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-slate-700">{dept.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+              <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">Tarih ve Süreklilik</h3>
+
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_continuous}
+                    onChange={(e) => setEditForm({ ...editForm, is_continuous: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Bu eylem sürekli olarak tekrarlanacak</span>
+                </label>
+              </div>
+
+              {!editForm.is_continuous && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Başlangıç Tarihi
+                    </label>
+                    <input
+                      type="date"
+                      value={editForm.start_date}
+                      onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Hedef Tarih
+                    </label>
+                    <input
+                      type="date"
+                      value={editForm.target_date}
+                      onChange={(e) => setEditForm({ ...editForm, target_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4 border-t border-slate-200">
               <button
                 onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 İptal
               </button>
               <button
                 onClick={submitEdit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Kaydet
+                Güncelle
               </button>
             </div>
           </div>
