@@ -618,117 +618,192 @@ export default function ICStandards() {
                               const isCompliant = assessment.compliance_status === 'COMPLIANT';
 
                               return (
-                                <div key={condition.id} className="bg-slate-50 rounded-lg p-4">
-                                  <div className="flex items-start justify-between mb-3">
+                                <div key={condition.id} className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+                                  <div className="flex items-start gap-3 mb-4">
+                                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                      <span className="text-sm font-bold text-blue-600">{condition.code.split('.').pop()}</span>
+                                    </div>
                                     <div className="flex-1">
-                                      <div className="font-medium text-slate-900 mb-1">{condition.code}</div>
-                                      <div className="text-sm text-slate-700">{condition.description}</div>
+                                      <div className="font-semibold text-slate-900 mb-1">{condition.code}</div>
+                                      <div className="text-sm text-slate-700 leading-relaxed">{condition.description}</div>
                                     </div>
-                                    {getStatusIcon(assessment.compliance_status)}
                                   </div>
 
-                                  <div className="grid grid-cols-2 gap-4 mb-3">
+                                  <div className="space-y-5">
                                     <div>
-                                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                                        Durum
+                                      <label className="block text-sm font-semibold text-slate-900 mb-3">
+                                        Uyumluluk Durumu
                                       </label>
-                                      <select
-                                        value={assessment.compliance_status || ''}
+                                      <div className="grid grid-cols-3 gap-3">
+                                        <button
+                                          onClick={() => {
+                                            const newAssessment = { ...assessment, compliance_status: 'COMPLIANT' as any };
+                                            const newAssessments = assessment.id
+                                              ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                              : [...assessments, newAssessment];
+                                            setAssessments(newAssessments);
+                                          }}
+                                          className={`p-4 rounded-lg border-2 transition-all ${
+                                            assessment.compliance_status === 'COMPLIANT'
+                                              ? 'border-green-500 bg-green-50 shadow-sm'
+                                              : 'border-slate-200 hover:border-green-300 hover:bg-green-50/50'
+                                          }`}
+                                        >
+                                          <CheckCircle className={`w-6 h-6 mx-auto mb-2 ${
+                                            assessment.compliance_status === 'COMPLIANT' ? 'text-green-600' : 'text-slate-400'
+                                          }`} />
+                                          <div className={`text-sm font-medium ${
+                                            assessment.compliance_status === 'COMPLIANT' ? 'text-green-700' : 'text-slate-600'
+                                          }`}>
+                                            Sağlanıyor
+                                          </div>
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            const newAssessment = { ...assessment, compliance_status: 'PARTIAL' as any };
+                                            const newAssessments = assessment.id
+                                              ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                              : [...assessments, newAssessment];
+                                            setAssessments(newAssessments);
+                                          }}
+                                          className={`p-4 rounded-lg border-2 transition-all ${
+                                            assessment.compliance_status === 'PARTIAL'
+                                              ? 'border-yellow-500 bg-yellow-50 shadow-sm'
+                                              : 'border-slate-200 hover:border-yellow-300 hover:bg-yellow-50/50'
+                                          }`}
+                                        >
+                                          <AlertCircle className={`w-6 h-6 mx-auto mb-2 ${
+                                            assessment.compliance_status === 'PARTIAL' ? 'text-yellow-600' : 'text-slate-400'
+                                          }`} />
+                                          <div className={`text-sm font-medium ${
+                                            assessment.compliance_status === 'PARTIAL' ? 'text-yellow-700' : 'text-slate-600'
+                                          }`}>
+                                            Kısmen
+                                          </div>
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            const newAssessment = { ...assessment, compliance_status: 'NON_COMPLIANT' as any };
+                                            const newAssessments = assessment.id
+                                              ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                              : [...assessments, newAssessment];
+                                            setAssessments(newAssessments);
+                                          }}
+                                          className={`p-4 rounded-lg border-2 transition-all ${
+                                            assessment.compliance_status === 'NON_COMPLIANT'
+                                              ? 'border-red-500 bg-red-50 shadow-sm'
+                                              : 'border-slate-200 hover:border-red-300 hover:bg-red-50/50'
+                                          }`}
+                                        >
+                                          <XCircle className={`w-6 h-6 mx-auto mb-2 ${
+                                            assessment.compliance_status === 'NON_COMPLIANT' ? 'text-red-600' : 'text-slate-400'
+                                          }`} />
+                                          <div className={`text-sm font-medium ${
+                                            assessment.compliance_status === 'NON_COMPLIANT' ? 'text-red-700' : 'text-slate-600'
+                                          }`}>
+                                            Sağlanmıyor
+                                          </div>
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-semibold text-slate-900 mb-3">
+                                        Değerlendirme Puanı
+                                      </label>
+                                      <div className="flex gap-2">
+                                        {[1, 2, 3, 4, 5].map((score) => (
+                                          <button
+                                            key={score}
+                                            onClick={() => {
+                                              const newAssessment = { ...assessment, compliance_score: score };
+                                              const newAssessments = assessment.id
+                                                ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                                : [...assessments, newAssessment];
+                                              setAssessments(newAssessments);
+                                            }}
+                                            className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                                              assessment.compliance_score === score
+                                                ? 'border-blue-500 bg-blue-50 shadow-sm'
+                                                : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                                            }`}
+                                          >
+                                            <div className={`text-2xl font-bold mb-1 ${
+                                              assessment.compliance_score === score ? 'text-blue-600' : 'text-slate-400'
+                                            }`}>
+                                              {score}
+                                            </div>
+                                            <div className={`text-xs font-medium ${
+                                              assessment.compliance_score === score ? 'text-blue-700' : 'text-slate-500'
+                                            }`}>
+                                              {['Çok Zayıf', 'Zayıf', 'Orta', 'İyi', 'Çok İyi'][score - 1]}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-semibold text-slate-900 mb-2">
+                                        Mevcut Durum Açıklaması
+                                      </label>
+                                      <textarea
+                                        value={assessment.current_situation}
                                         onChange={(e) => {
                                           const newAssessment = {
                                             ...assessment,
-                                            compliance_status: e.target.value as any
+                                            current_situation: e.target.value
                                           };
                                           const newAssessments = assessment.id
                                             ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
                                             : [...assessments, newAssessment];
                                           setAssessments(newAssessments);
                                         }}
-                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      >
-                                        <option value="">Seçiniz</option>
-                                        <option value="COMPLIANT">Sağlanıyor</option>
-                                        <option value="PARTIAL">Kısmen</option>
-                                        <option value="NON_COMPLIANT">Sağlanmıyor</option>
-                                      </select>
+                                        rows={4}
+                                        className="w-full px-4 py-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                        placeholder="Mevcut durum hakkında detaylı açıklama yazınız..."
+                                      />
                                     </div>
 
-                                    <div>
-                                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                                        Puan (1-5)
-                                      </label>
-                                      <select
-                                        value={assessment.compliance_score || ''}
-                                        onChange={(e) => {
-                                          const newAssessment = {
-                                            ...assessment,
-                                            compliance_score: e.target.value ? parseInt(e.target.value) : null
-                                          };
-                                          const newAssessments = assessment.id
-                                            ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
-                                            : [...assessments, newAssessment];
-                                          setAssessments(newAssessments);
-                                        }}
-                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      >
-                                        <option value="">Seçiniz</option>
-                                        <option value="1">1 - Çok Zayıf</option>
-                                        <option value="2">2 - Zayıf</option>
-                                        <option value="3">3 - Orta</option>
-                                        <option value="4">4 - İyi</option>
-                                        <option value="5">5 - Çok İyi</option>
-                                      </select>
-                                    </div>
-                                  </div>
-
-                                  <div className="mb-3">
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                                      Mevcut Durum Açıklaması
-                                    </label>
-                                    <textarea
-                                      value={assessment.current_situation}
-                                      onChange={(e) => {
-                                        const newAssessment = {
-                                          ...assessment,
-                                          current_situation: e.target.value
-                                        };
-                                        const newAssessments = assessment.id
-                                          ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
-                                          : [...assessments, newAssessment];
-                                        setAssessments(newAssessments);
-                                      }}
-                                      rows={3}
-                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      placeholder="Mevcut durum hakkında açıklama yazınız..."
-                                    />
-                                  </div>
-
-                                  <div className="flex items-center justify-between">
-                                    <button
-                                      onClick={() => saveAssessment(assessment)}
-                                      disabled={saving}
-                                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
-                                    >
-                                      <Save className="w-4 h-4" />
-                                      {saving ? 'Kaydediliyor...' : 'Kaydet'}
-                                    </button>
-
-                                    {conditionActions.length > 0 && (
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-200">
                                       <button
-                                        onClick={() => {
-                                          const newExpanded = new Set(expandedConditions);
-                                          if (isConditionExpanded) {
-                                            newExpanded.delete(condition.id);
-                                          } else {
-                                            newExpanded.add(condition.id);
-                                          }
-                                          setExpandedConditions(newExpanded);
-                                        }}
-                                        className="text-sm text-blue-600 hover:text-blue-700"
+                                        onClick={() => saveAssessment(assessment)}
+                                        disabled={saving}
+                                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium shadow-sm transition-colors"
                                       >
-                                        {isConditionExpanded ? 'Eylemleri Gizle' : `${conditionActions.length} Eylem Göster`}
+                                        <Save className="w-4 h-4" />
+                                        {saving ? 'Kaydediliyor...' : 'Değerlendirmeyi Kaydet'}
                                       </button>
-                                    )}
+
+                                      {conditionActions.length > 0 && (
+                                        <button
+                                          onClick={() => {
+                                            const newExpanded = new Set(expandedConditions);
+                                            if (isConditionExpanded) {
+                                              newExpanded.delete(condition.id);
+                                            } else {
+                                              newExpanded.add(condition.id);
+                                            }
+                                            setExpandedConditions(newExpanded);
+                                          }}
+                                          className="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                          {isConditionExpanded ? (
+                                            <>
+                                              <ChevronDown className="w-4 h-4" />
+                                              Eylemleri Gizle
+                                            </>
+                                          ) : (
+                                            <>
+                                              <ChevronRight className="w-4 h-4" />
+                                              {conditionActions.length} Eylem Göster
+                                            </>
+                                          )}
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
 
                                   {!isCompliant && (isConditionExpanded || conditionActions.length === 0) && (
