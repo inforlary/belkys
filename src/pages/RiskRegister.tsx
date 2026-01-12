@@ -643,9 +643,9 @@ export default function RiskRegister() {
         </div>
       </Card>
 
-      <Card>
+      <Card className="overflow-visible">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full relative">
             <thead className="bg-gray-50">
               <tr>
                 <th
@@ -686,7 +686,7 @@ export default function RiskRegister() {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200 relative">
               {sortedRisks.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
@@ -717,7 +717,7 @@ export default function RiskRegister() {
                     <tr
                       key={risk.id}
                       onClick={() => navigate(`risk-management/risks/${risk.id}`)}
-                      className={`hover:bg-gray-50 cursor-pointer ${exceedsAppetite ? 'bg-red-50' : ''}`}
+                      className={`hover:bg-gray-50 cursor-pointer relative ${exceedsAppetite ? 'bg-red-50' : ''}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {risk.code}
