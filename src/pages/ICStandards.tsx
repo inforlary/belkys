@@ -618,191 +618,197 @@ export default function ICStandards() {
                               const isCompliant = assessment.compliance_status === 'COMPLIANT';
 
                               return (
-                                <div key={condition.id} className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
-                                  <div className="flex items-start gap-3 mb-4">
-                                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                      <span className="text-sm font-bold text-blue-600">{condition.code.split('.').pop()}</span>
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="font-semibold text-slate-900 mb-1">{condition.code}</div>
-                                      <div className="text-sm text-slate-700 leading-relaxed">{condition.description}</div>
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-5">
-                                    <div>
-                                      <label className="block text-sm font-semibold text-slate-900 mb-3">
-                                        Uyumluluk Durumu
-                                      </label>
-                                      <div className="grid grid-cols-3 gap-3">
-                                        <button
-                                          onClick={() => {
-                                            const newAssessment = { ...assessment, compliance_status: 'COMPLIANT' as any };
-                                            const newAssessments = assessment.id
-                                              ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
-                                              : [...assessments, newAssessment];
-                                            setAssessments(newAssessments);
-                                          }}
-                                          className={`p-4 rounded-lg border-2 transition-all ${
-                                            assessment.compliance_status === 'COMPLIANT'
-                                              ? 'border-green-500 bg-green-50 shadow-sm'
-                                              : 'border-slate-200 hover:border-green-300 hover:bg-green-50/50'
-                                          }`}
-                                        >
-                                          <CheckCircle className={`w-6 h-6 mx-auto mb-2 ${
-                                            assessment.compliance_status === 'COMPLIANT' ? 'text-green-600' : 'text-slate-400'
-                                          }`} />
-                                          <div className={`text-sm font-medium ${
-                                            assessment.compliance_status === 'COMPLIANT' ? 'text-green-700' : 'text-slate-600'
-                                          }`}>
-                                            Sağlanıyor
-                                          </div>
-                                        </button>
-
-                                        <button
-                                          onClick={() => {
-                                            const newAssessment = { ...assessment, compliance_status: 'PARTIAL' as any };
-                                            const newAssessments = assessment.id
-                                              ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
-                                              : [...assessments, newAssessment];
-                                            setAssessments(newAssessments);
-                                          }}
-                                          className={`p-4 rounded-lg border-2 transition-all ${
-                                            assessment.compliance_status === 'PARTIAL'
-                                              ? 'border-yellow-500 bg-yellow-50 shadow-sm'
-                                              : 'border-slate-200 hover:border-yellow-300 hover:bg-yellow-50/50'
-                                          }`}
-                                        >
-                                          <AlertCircle className={`w-6 h-6 mx-auto mb-2 ${
-                                            assessment.compliance_status === 'PARTIAL' ? 'text-yellow-600' : 'text-slate-400'
-                                          }`} />
-                                          <div className={`text-sm font-medium ${
-                                            assessment.compliance_status === 'PARTIAL' ? 'text-yellow-700' : 'text-slate-600'
-                                          }`}>
-                                            Kısmen
-                                          </div>
-                                        </button>
-
-                                        <button
-                                          onClick={() => {
-                                            const newAssessment = { ...assessment, compliance_status: 'NON_COMPLIANT' as any };
-                                            const newAssessments = assessment.id
-                                              ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
-                                              : [...assessments, newAssessment];
-                                            setAssessments(newAssessments);
-                                          }}
-                                          className={`p-4 rounded-lg border-2 transition-all ${
-                                            assessment.compliance_status === 'NON_COMPLIANT'
-                                              ? 'border-red-500 bg-red-50 shadow-sm'
-                                              : 'border-slate-200 hover:border-red-300 hover:bg-red-50/50'
-                                          }`}
-                                        >
-                                          <XCircle className={`w-6 h-6 mx-auto mb-2 ${
-                                            assessment.compliance_status === 'NON_COMPLIANT' ? 'text-red-600' : 'text-slate-400'
-                                          }`} />
-                                          <div className={`text-sm font-medium ${
-                                            assessment.compliance_status === 'NON_COMPLIANT' ? 'text-red-700' : 'text-slate-600'
-                                          }`}>
-                                            Sağlanmıyor
-                                          </div>
-                                        </button>
+                                <div key={condition.id} className="bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-all">
+                                  <div className="p-4">
+                                    <div className="flex items-start gap-4">
+                                      <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-200">
+                                        <span className="text-sm font-bold text-blue-700">{condition.code.split('.').pop()}</span>
                                       </div>
-                                    </div>
 
-                                    <div>
-                                      <label className="block text-sm font-semibold text-slate-900 mb-3">
-                                        Değerlendirme Puanı
-                                      </label>
-                                      <div className="flex gap-2">
-                                        {[1, 2, 3, 4, 5].map((score) => (
-                                          <button
-                                            key={score}
-                                            onClick={() => {
-                                              const newAssessment = { ...assessment, compliance_score: score };
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                          <div className="flex-1">
+                                            <div className="text-sm font-semibold text-slate-900 mb-1">{condition.code}</div>
+                                            <div className="text-sm text-slate-600">{condition.description}</div>
+                                          </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 mb-3">
+                                          <div>
+                                            <label className="text-xs font-medium text-slate-700 mb-2 block">Durum</label>
+                                            <div className="flex gap-1">
+                                              <button
+                                                onClick={async () => {
+                                                  const newAssessment = { ...assessment, compliance_status: 'COMPLIANT' as any };
+                                                  const newAssessments = assessment.id
+                                                    ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                                    : [...assessments, newAssessment];
+                                                  setAssessments(newAssessments);
+                                                  await saveAssessment(newAssessment);
+                                                }}
+                                                className={`flex-1 p-2 rounded-lg border transition-all ${
+                                                  assessment.compliance_status === 'COMPLIANT'
+                                                    ? 'border-green-500 bg-green-50 shadow-sm'
+                                                    : 'border-slate-200 hover:border-green-300 hover:bg-green-50/30'
+                                                }`}
+                                                title="Sağlanıyor"
+                                              >
+                                                <CheckCircle className={`w-5 h-5 mx-auto ${
+                                                  assessment.compliance_status === 'COMPLIANT' ? 'text-green-600' : 'text-slate-400'
+                                                }`} />
+                                              </button>
+                                              <button
+                                                onClick={async () => {
+                                                  const newAssessment = { ...assessment, compliance_status: 'PARTIAL' as any };
+                                                  const newAssessments = assessment.id
+                                                    ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                                    : [...assessments, newAssessment];
+                                                  setAssessments(newAssessments);
+                                                  await saveAssessment(newAssessment);
+                                                }}
+                                                className={`flex-1 p-2 rounded-lg border transition-all ${
+                                                  assessment.compliance_status === 'PARTIAL'
+                                                    ? 'border-yellow-500 bg-yellow-50 shadow-sm'
+                                                    : 'border-slate-200 hover:border-yellow-300 hover:bg-yellow-50/30'
+                                                }`}
+                                                title="Kısmen"
+                                              >
+                                                <AlertCircle className={`w-5 h-5 mx-auto ${
+                                                  assessment.compliance_status === 'PARTIAL' ? 'text-yellow-600' : 'text-slate-400'
+                                                }`} />
+                                              </button>
+                                              <button
+                                                onClick={async () => {
+                                                  const newAssessment = { ...assessment, compliance_status: 'NON_COMPLIANT' as any };
+                                                  const newAssessments = assessment.id
+                                                    ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                                    : [...assessments, newAssessment];
+                                                  setAssessments(newAssessments);
+                                                  await saveAssessment(newAssessment);
+                                                }}
+                                                className={`flex-1 p-2 rounded-lg border transition-all ${
+                                                  assessment.compliance_status === 'NON_COMPLIANT'
+                                                    ? 'border-red-500 bg-red-50 shadow-sm'
+                                                    : 'border-slate-200 hover:border-red-300 hover:bg-red-50/30'
+                                                }`}
+                                                title="Sağlanmıyor"
+                                              >
+                                                <XCircle className={`w-5 h-5 mx-auto ${
+                                                  assessment.compliance_status === 'NON_COMPLIANT' ? 'text-red-600' : 'text-slate-400'
+                                                }`} />
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div>
+                                            <label className="text-xs font-medium text-slate-700 mb-2 block">Puan</label>
+                                            <div className="flex gap-1">
+                                              {[1, 2, 3, 4, 5].map((score) => (
+                                                <button
+                                                  key={score}
+                                                  onClick={async () => {
+                                                    const newAssessment = { ...assessment, compliance_score: score };
+                                                    const newAssessments = assessment.id
+                                                      ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
+                                                      : [...assessments, newAssessment];
+                                                    setAssessments(newAssessments);
+                                                    await saveAssessment(newAssessment);
+                                                  }}
+                                                  className={`flex-1 px-2 py-1.5 rounded-lg border transition-all ${
+                                                    assessment.compliance_score === score
+                                                      ? 'border-blue-500 bg-blue-50 shadow-sm'
+                                                      : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'
+                                                  }`}
+                                                  title={['Çok Zayıf', 'Zayıf', 'Orta', 'İyi', 'Çok İyi'][score - 1]}
+                                                >
+                                                  <div className={`text-base font-bold ${
+                                                    assessment.compliance_score === score ? 'text-blue-600' : 'text-slate-400'
+                                                  }`}>
+                                                    {score}
+                                                  </div>
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="mb-3">
+                                          <label className="text-xs font-medium text-slate-700 mb-2 block">Mevcut Durum Açıklaması</label>
+                                          <textarea
+                                            value={assessment.current_situation}
+                                            onChange={(e) => {
+                                              const newAssessment = {
+                                                ...assessment,
+                                                current_situation: e.target.value
+                                              };
                                               const newAssessments = assessment.id
                                                 ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
                                                 : [...assessments, newAssessment];
                                               setAssessments(newAssessments);
                                             }}
-                                            className={`flex-1 p-3 rounded-lg border-2 transition-all ${
-                                              assessment.compliance_score === score
-                                                ? 'border-blue-500 bg-blue-50 shadow-sm'
-                                                : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
-                                            }`}
-                                          >
-                                            <div className={`text-2xl font-bold mb-1 ${
-                                              assessment.compliance_score === score ? 'text-blue-600' : 'text-slate-400'
-                                            }`}>
-                                              {score}
-                                            </div>
-                                            <div className={`text-xs font-medium ${
-                                              assessment.compliance_score === score ? 'text-blue-700' : 'text-slate-500'
-                                            }`}>
-                                              {['Çok Zayıf', 'Zayıf', 'Orta', 'İyi', 'Çok İyi'][score - 1]}
-                                            </div>
-                                          </button>
-                                        ))}
+                                            onBlur={() => saveAssessment(assessment)}
+                                            rows={2}
+                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                            placeholder="Açıklama yazın ve otomatik kaydedilecektir..."
+                                          />
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2">
+                                            {saving && (
+                                              <span className="text-xs text-slate-500 flex items-center gap-1">
+                                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                Kaydediliyor...
+                                              </span>
+                                            )}
+                                            {assessment.id && !saving && (
+                                              <span className="text-xs text-green-600 flex items-center gap-1">
+                                                <CheckCircle className="w-3 h-3" />
+                                                Kaydedildi
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            {!isCompliant && (
+                                              <button
+                                                onClick={() => openActionModal(condition.id)}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                              >
+                                                <Plus className="w-3 h-3" />
+                                                Eylem Ekle
+                                              </button>
+                                            )}
+
+                                            {conditionActions.length > 0 && (
+                                              <button
+                                                onClick={() => {
+                                                  const newExpanded = new Set(expandedConditions);
+                                                  if (isConditionExpanded) {
+                                                    newExpanded.delete(condition.id);
+                                                  } else {
+                                                    newExpanded.add(condition.id);
+                                                  }
+                                                  setExpandedConditions(newExpanded);
+                                                }}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                              >
+                                                {isConditionExpanded ? (
+                                                  <>
+                                                    <ChevronDown className="w-3 h-3" />
+                                                    {conditionActions.length} Eylem
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <ChevronRight className="w-3 h-3" />
+                                                    {conditionActions.length} Eylem
+                                                  </>
+                                                )}
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
                                       </div>
-                                    </div>
-
-                                    <div>
-                                      <label className="block text-sm font-semibold text-slate-900 mb-2">
-                                        Mevcut Durum Açıklaması
-                                      </label>
-                                      <textarea
-                                        value={assessment.current_situation}
-                                        onChange={(e) => {
-                                          const newAssessment = {
-                                            ...assessment,
-                                            current_situation: e.target.value
-                                          };
-                                          const newAssessments = assessment.id
-                                            ? assessments.map(a => a.id === assessment.id ? newAssessment : a)
-                                            : [...assessments, newAssessment];
-                                          setAssessments(newAssessments);
-                                        }}
-                                        rows={4}
-                                        className="w-full px-4 py-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                        placeholder="Mevcut durum hakkında detaylı açıklama yazınız..."
-                                      />
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-                                      <button
-                                        onClick={() => saveAssessment(assessment)}
-                                        disabled={saving}
-                                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium shadow-sm transition-colors"
-                                      >
-                                        <Save className="w-4 h-4" />
-                                        {saving ? 'Kaydediliyor...' : 'Değerlendirmeyi Kaydet'}
-                                      </button>
-
-                                      {conditionActions.length > 0 && (
-                                        <button
-                                          onClick={() => {
-                                            const newExpanded = new Set(expandedConditions);
-                                            if (isConditionExpanded) {
-                                              newExpanded.delete(condition.id);
-                                            } else {
-                                              newExpanded.add(condition.id);
-                                            }
-                                            setExpandedConditions(newExpanded);
-                                          }}
-                                          className="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                        >
-                                          {isConditionExpanded ? (
-                                            <>
-                                              <ChevronDown className="w-4 h-4" />
-                                              Eylemleri Gizle
-                                            </>
-                                          ) : (
-                                            <>
-                                              <ChevronRight className="w-4 h-4" />
-                                              {conditionActions.length} Eylem Göster
-                                            </>
-                                          )}
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
 
