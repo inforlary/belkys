@@ -248,7 +248,6 @@ export default function RiskDetail() {
     }
 
     try {
-      const inherentScore = editFormData.inherent_likelihood * editFormData.inherent_impact;
       const residualScore = editFormData.residual_likelihood * editFormData.residual_impact;
 
       const getRiskLevel = (score: number) => {
@@ -267,10 +266,8 @@ export default function RiskDetail() {
         goal_id: editFormData.goal_id && editFormData.goal_id.trim() !== '' ? editFormData.goal_id : null,
         inherent_likelihood: editFormData.inherent_likelihood,
         inherent_impact: editFormData.inherent_impact,
-        inherent_score: inherentScore,
         residual_likelihood: editFormData.residual_likelihood,
         residual_impact: editFormData.residual_impact,
-        residual_score: residualScore,
         risk_level: getRiskLevel(residualScore),
         risk_response: editFormData.risk_response,
         response_rationale: editFormData.response_rationale,
