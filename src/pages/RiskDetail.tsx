@@ -92,6 +92,9 @@ function getStatusBadge(status: string) {
   const statusMap: Record<string, { color: string; label: string }> = {
     DRAFT: { color: 'bg-gray-200 text-gray-800', label: 'Taslak' },
     ACTIVE: { color: 'bg-blue-500 text-white', label: 'Aktif' },
+    IDENTIFIED: { color: 'bg-yellow-500 text-white', label: 'Tespit Edildi' },
+    ASSESSING: { color: 'bg-orange-500 text-white', label: 'Değerlendiriliyor' },
+    TREATING: { color: 'bg-blue-600 text-white', label: 'Tedavi Ediliyor' },
     MONITORING: { color: 'bg-purple-500 text-white', label: 'İzlemede' },
     CLOSED: { color: 'bg-gray-500 text-white', label: 'Kapatıldı' }
   };

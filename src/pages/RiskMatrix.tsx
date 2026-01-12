@@ -76,7 +76,7 @@ export default function RiskMatrix() {
   const [filters, setFilters] = useState({
     department: '',
     category: '',
-    status: 'ACTIVE'
+    status: ''
   });
 
   const [viewMode, setViewMode] = useState<'inherent' | 'residual'>('residual');
@@ -134,8 +134,7 @@ export default function RiskMatrix() {
       const hasCategory = risk.categories?.some((c: any) => c.category_id === filters.category);
       if (!hasCategory) return false;
     }
-    if (filters.status === 'ACTIVE' && risk.status !== 'ACTIVE') return false;
-    if (filters.status === 'CLOSED' && risk.status !== 'CLOSED') return false;
+    if (filters.status && risk.status !== filters.status) return false;
     return true;
   });
 
@@ -329,7 +328,12 @@ export default function RiskMatrix() {
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   <option value="">Durum ▼</option>
+                  <option value="DRAFT">Taslak</option>
                   <option value="ACTIVE">Aktif</option>
+                  <option value="IDENTIFIED">Tespit Edildi</option>
+                  <option value="ASSESSING">Değerlendiriliyor</option>
+                  <option value="TREATING">Tedavi Ediliyor</option>
+                  <option value="MONITORING">İzlemede</option>
                   <option value="CLOSED">Kapalı</option>
                 </select>
               </div>
