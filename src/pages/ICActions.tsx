@@ -51,6 +51,7 @@ interface Action {
   component_id?: string;
   action_plan_id: string;
   outputs?: string;
+  expected_outputs?: string;
   is_continuous?: boolean;
   delay_days?: number;
   condition_code?: string;
@@ -166,6 +167,7 @@ export default function ICActions() {
     all_units_responsible: false,
     all_units_collaborating: false,
     outputs: '',
+    expected_outputs: '',
     is_continuous: false,
     start_date: '',
     target_date: '',
@@ -428,14 +430,10 @@ export default function ICActions() {
             }
           }
 
-          const actionTitle = conditionData.provides_reasonable_assurance
-            ? 'Makul güvenceyi sağlayan mevcut düzenleme ve uygulamalar bulunduğundan eylem öngörülmemiştir.'
-            : 'Bu genel şart için eylem oluşturulmamıştır';
-
           return {
             id: `no-action-${conditionId}`,
             code: conditionData.code,
-            title: actionTitle,
+            title: 'Makul güvenceyi sağlayan mevcut düzenleme ve uygulamalar bulunduğundan eylem öngörülmemiştir.',
             description: '',
             status: 'NO_ACTION',
             progress_percent: 0,
@@ -454,6 +452,7 @@ export default function ICActions() {
             component_id: standard?.component_id,
             action_plan_id: selectedPlanId,
             outputs: '',
+            expected_outputs: '',
             is_continuous: false,
             delay_days: 0,
             condition_code: conditionData.code,
@@ -830,6 +829,7 @@ export default function ICActions() {
       all_units_responsible: actionData?.all_units_responsible || false,
       all_units_collaborating: actionData?.all_units_collaborating || false,
       outputs: actionData?.outputs || '',
+      expected_outputs: actionData?.expected_outputs || '',
       is_continuous: actionData?.is_continuous || false,
       start_date: actionData?.start_date || '',
       target_date: actionData?.target_date || '',
@@ -933,6 +933,7 @@ export default function ICActions() {
           all_units_collaborating: editForm.all_units_collaborating,
           related_department_ids: editForm.related_department_ids,
           outputs: editForm.outputs,
+          expected_outputs: editForm.expected_outputs,
           is_continuous: editForm.is_continuous,
           start_date: editForm.start_date,
           target_date: editForm.target_date,
@@ -1559,7 +1560,7 @@ export default function ICActions() {
                               )}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs">
-                              {action.outputs || '-'}
+                              {action.expected_outputs || action.outputs || '-'}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs text-center whitespace-nowrap">
                               {action.is_continuous ? (
@@ -1893,8 +1894,8 @@ export default function ICActions() {
                   </div>
                   <span>%{selectedAction.progress_percent}</span>
                 </div>
-                {selectedAction.outputs && (
-                  <div><strong>Beklenen Çıktı:</strong> {selectedAction.outputs}</div>
+                {(selectedAction.expected_outputs || selectedAction.outputs) && (
+                  <div><strong>Beklenen Çıktı:</strong> {selectedAction.expected_outputs || selectedAction.outputs}</div>
                 )}
               </div>
             </div>
@@ -1974,8 +1975,8 @@ export default function ICActions() {
                   Beklenen Çıktı/Sonuç
                 </label>
                 <textarea
-                  value={editForm.outputs}
-                  onChange={(e) => setEditForm({ ...editForm, outputs: e.target.value })}
+                  value={editForm.expected_outputs}
+                  onChange={(e) => setEditForm({ ...editForm, expected_outputs: e.target.value })}
                   rows={2}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Beklenen çıktı veya sonuç..."
