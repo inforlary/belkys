@@ -621,52 +621,65 @@ export default function DataArchive() {
   };
 
   const exportToExcel = () => {
-    const exportData: any[] = [];
+    const wb = XLSX.utils.book_new();
+    const wsData: any[][] = [];
+
+    const sampleIndicator = filteredObjectives[0]?.goals[0]?.indicators[0];
+    const periods = sampleIndicator ? getPeriodsForIndicator(sampleIndicator) : [];
+
+    const headers = ['Gösterge Kodu', 'Gösterge Adı', 'Hedef Değer', 'Güncel Değer', 'İlerleme (%)'];
+    periods.forEach(p => headers.push(p.label));
+    wsData.push(headers);
 
     filteredObjectives.forEach(objective => {
+      wsData.push([`AMAÇ: ${objective.code} - ${objective.title}`]);
+
       objective.goals.forEach(goal => {
+        wsData.push([`  HEDEF: ${goal.code} - ${goal.title} (${goal.department?.name || '-'})`]);
+
         goal.indicators.forEach(indicator => {
-          const periods = getPeriodsForIndicator(indicator);
+          const indicatorPeriods = getPeriodsForIndicator(indicator);
           const targetValue = getIndicatorTarget(indicator.id, indicator);
           const currentValue = calculateCurrentValue(indicator);
           const progress = calculateProgress(indicator, currentValue, targetValue);
 
-          const row: any = {
-            'Amaç Kodu': objective.code,
-            'Amaç': objective.title,
-            'Hedef Kodu': goal.code,
-            'Hedef': goal.title,
-            'Sorumlu Birim': goal.department?.name || '-',
-            'Gösterge Kodu': indicator.code,
-            'Gösterge Adı': indicator.name,
-            'Ölçü Birimi': indicator.unit,
-            'Hedef Değer': targetValue !== null ? targetValue : '-',
-            'Güncel Değer': currentValue !== null ? currentValue.toFixed(2) : '-',
-            'İlerleme (%)': targetValue !== null ? progress : '-'
-          };
+          const row: any[] = [
+            indicator.code,
+            indicator.name,
+            targetValue !== null ? targetValue : '-',
+            currentValue !== null ? currentValue.toFixed(2) : '-',
+            targetValue !== null ? `%${progress}` : '-'
+          ];
 
-          periods.forEach(period => {
+          const notes: any[] = ['', '', '', '', ''];
+
+          indicatorPeriods.forEach(period => {
             const entry = getPeriodEntry(indicator.id, period.periodType, period.periodMonth, period.periodQuarter);
-            row[period.label] = entry ? entry.value : '-';
+            row.push(entry ? entry.value : '-');
+            notes.push(entry?.notes || '');
           });
 
-          exportData.push(row);
+          wsData.push(row);
+
+          const hasNotes = notes.some(n => n && n !== '');
+          if (hasNotes) {
+            wsData.push(notes);
+          }
         });
+
+        wsData.push([]);
       });
     });
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Veri Arşivi');
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
 
     const colWidths = [
-      { wch: 12 }, { wch: 30 }, { wch: 12 }, { wch: 35 },
-      { wch: 20 }, { wch: 15 }, { wch: 40 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 }, { wch: 12 }
+      { wch: 15 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
     ];
+    periods.forEach(() => colWidths.push({ wch: 12 }));
     ws['!cols'] = colWidths;
 
+    XLSX.utils.book_append_sheet(wb, ws, 'Veri Arşivi');
     XLSX.writeFile(wb, `Veri_Arsivi_${selectedYear}.xlsx`);
   };
 
@@ -696,7 +709,15 @@ export default function DataArchive() {
     headers.push(...periodLabels);
 
     filteredObjectives.forEach(objective => {
+      tableData.push([
+        { content: `AMAÇ: ${objective.code} - ${objective.title}`, colSpan: headers.length, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
+      ]);
+
       objective.goals.forEach(goal => {
+        tableData.push([
+          { content: `  HEDEF: ${goal.code} - ${goal.title} (${goal.department?.name || '-'})`, colSpan: headers.length, styles: { fontStyle: 'bold', fillColor: [248, 248, 248] } }
+        ]);
+
         goal.indicators.forEach(indicator => {
           const periods = getPeriodsForIndicator(indicator);
           const targetValue = getIndicatorTarget(indicator.id, indicator);
@@ -711,12 +732,24 @@ export default function DataArchive() {
             targetValue !== null ? `%${progress}` : '-'
           ];
 
+          const notes: string[] = [];
+
           periods.forEach(period => {
             const entry = getPeriodEntry(indicator.id, period.periodType, period.periodMonth, period.periodQuarter);
             row.push(entry ? entry.value.toString() : '-');
+            notes.push(entry?.notes || '');
           });
 
           tableData.push(row);
+
+          const hasNotes = notes.some(n => n && n !== '');
+          if (hasNotes) {
+            const notesRow: any[] = ['', '', '', '', ''];
+            notes.forEach(note => {
+              notesRow.push({ content: note || '', styles: { fontSize: 5, textColor: [100, 100, 100], fontStyle: 'italic' } });
+            });
+            tableData.push(notesRow);
+          }
         });
       });
     });
@@ -727,7 +760,8 @@ export default function DataArchive() {
       startY: selectedDepartmentId ? 40 : 34,
       styles: {
         fontSize: 6,
-        cellPadding: 1
+        cellPadding: 1,
+        overflow: 'linebreak'
       },
       headStyles: {
         fillColor: [59, 130, 246],
@@ -736,11 +770,11 @@ export default function DataArchive() {
         fontSize: 7
       },
       columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 60 },
-        2: { cellWidth: 18 },
-        3: { cellWidth: 18 },
-        4: { cellWidth: 18 }
+        0: { cellWidth: 18 },
+        1: { cellWidth: 55 },
+        2: { cellWidth: 15 },
+        3: { cellWidth: 15 },
+        4: { cellWidth: 15 }
       }
     });
 
