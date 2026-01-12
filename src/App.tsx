@@ -89,6 +89,7 @@ import RiskReports from './pages/RiskReports';
 import QualityDashboard from './pages/QualityDashboard';
 import QualityProcesses from './pages/QualityProcesses';
 import QualityProcessDetail from './pages/QualityProcessDetail';
+import QualityProcessKPITracking from './pages/QualityProcessKPITracking';
 import QualityDocuments from './pages/QualityDocuments';
 import QualityDOF from './pages/QualityDOF';
 import QualityDOFDetail from './pages/QualityDOFDetail';
@@ -366,6 +367,8 @@ const renderPage = () => {
         return <QualityDashboard />;
       case 'quality-management/processes':
         return <QualityProcesses />;
+      case 'quality-management/process-kpis':
+        return <QualityProcessKPITracking />;
       case 'quality-management/documents':
         return <QualityDocuments />;
       case 'quality-management/dof':

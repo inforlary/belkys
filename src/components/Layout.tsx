@@ -307,6 +307,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: 'quality-management/dashboard' },
         { icon: TrendingUp, label: 'Süreç Yönetimi', path: 'quality-management/processes' },
+        { icon: BarChart3, label: 'Süreç KPI Takip', path: 'quality-management/process-kpis' },
         { icon: FileText, label: 'Doküman Yönetimi', path: 'quality-management/documents' },
         { icon: AlertCircle, label: 'DÖF Yönetimi', path: 'quality-management/dof' },
         { icon: ClipboardCheck, label: 'İç Tetkik', path: 'quality-management/audits' },
