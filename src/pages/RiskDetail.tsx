@@ -1100,219 +1100,371 @@ export default function RiskDetail() {
       )}
 
       {showEditModal && editFormData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Risk Düzenle</h2>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditFormData(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center overflow-y-auto py-8">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+                  Risk Düzenle
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">Tüm alanları dikkatlice doldurun</p>
               </div>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditFormData(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Risk Adı <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+            <div className="px-6 py-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">1. Temel Bilgiler</h3>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-4">
-                  {categories.map((category) => (
-                    <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={editFormData.category_ids.includes(category.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setEditFormData({
-                              ...editFormData,
-                              category_ids: [...editFormData.category_ids, category.id]
-                            });
-                          } else {
-                            setEditFormData({
-                              ...editFormData,
-                              category_ids: editFormData.category_ids.filter((id: string) => id !== category.id)
-                            });
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {category.code} - {category.name}
-                        <span className="text-xs text-gray-500 ml-1">({category.type})</span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Sorumlu Birim <span className="text-red-500">*</span>
+                    Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
                   </label>
-                  <select
-                    value={editFormData.owner_department_id}
-                    onChange={(e) => setEditFormData({ ...editFormData, owner_department_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Seçiniz</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </option>
+                  <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
+                    {categories.map(cat => (
+                      <label key={cat.id} className="flex items-center space-x-2 py-1.5 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.category_ids.includes(cat.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditFormData({ ...editFormData, category_ids: [...editFormData.category_ids, cat.id] });
+                            } else {
+                              setEditFormData({ ...editFormData, category_ids: editFormData.category_ids.filter((id: string) => id !== cat.id) });
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">{cat.name}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    İlgili Hedef
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Risk Adı <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={editFormData.goal_id}
-                    onChange={(e) => setEditFormData({ ...editFormData, goal_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Seçiniz (Opsiyonel)</option>
-                    {goals.map((goal) => (
-                      <option key={goal.id} value={goal.id}>
-                        {goal.code} - {goal.title}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Risk adını giriniz"
+                  />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Açıklama
-                </label>
-                <textarea
-                  value={editFormData.description}
-                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Risk Açıklaması
+                  </label>
+                  <textarea
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Riskin detaylı açıklaması..."
+                  />
+                </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nedenler
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Risk Kaynağı
                   </label>
                   <textarea
                     value={editFormData.causes}
                     onChange={(e) => setEditFormData({ ...editFormData, causes: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Riskin ortaya çıkma nedeni..."
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Sonuçlar
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Olası Sonuçlar
                   </label>
                   <textarea
                     value={editFormData.consequences}
                     onChange={(e) => setEditFormData({ ...editFormData, consequences: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Riskin olası sonuçları..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Sorumlu Birim <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={editFormData.owner_department_id}
+                      onChange={(e) => setEditFormData({
+                        ...editFormData,
+                        owner_department_id: e.target.value,
+                        goal_id: ''
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Seçiniz...</option>
+                      {departments.map(dept => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      İlişkili Hedef (Opsiyonel)
+                    </label>
+                    <select
+                      value={editFormData.goal_id}
+                      onChange={(e) => setEditFormData({ ...editFormData, goal_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={!editFormData.owner_department_id}
+                    >
+                      <option value="">
+                        {editFormData.owner_department_id ? 'Seçiniz...' : 'Önce sorumlu birim seçiniz'}
+                      </option>
+                      {goals
+                        .filter(goal => goal.department_id === editFormData.owner_department_id)
+                        .map(goal => (
+                          <option key={goal.id} value={goal.id}>{goal.code} - {goal.title}</option>
+                        ))}
+                    </select>
+                    {editFormData.owner_department_id && goals.filter(g => g.department_id === editFormData.owner_department_id).length === 0 && (
+                      <p className="mt-1 text-sm text-amber-600">Bu birime ait hedef bulunamadı</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">2. Doğal Risk Değerlendirmesi</h3>
+                <p className="text-sm text-gray-600 mb-4">Herhangi bir kontrol olmadan riskin değerlendirilmesi</p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Olasılık <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(level => (
+                        <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-blue-100">
+                          <input
+                            type="radio"
+                            name="edit_inherent_likelihood"
+                            value={level}
+                            checked={editFormData.inherent_likelihood === level}
+                            onChange={(e) => setEditFormData({ ...editFormData, inherent_likelihood: parseInt(e.target.value) })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Etki <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(level => (
+                        <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-blue-100">
+                          <input
+                            type="radio"
+                            name="edit_inherent_impact"
+                            value={level}
+                            checked={editFormData.inherent_impact === level}
+                            onChange={(e) => setEditFormData({ ...editFormData, inherent_impact: parseInt(e.target.value) })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-4 bg-white rounded-lg border-2 border-blue-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">DOĞAL RİSK SKORU:</span>
+                    <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(editFormData.inherent_likelihood * editFormData.inherent_impact).color} px-4 py-2 rounded-lg`}>
+                      <span>{getRiskScoreBadge(editFormData.inherent_likelihood * editFormData.inherent_impact).emoji}</span>
+                      <span>{editFormData.inherent_likelihood * editFormData.inherent_impact}</span>
+                      <span className="text-sm">({getRiskScoreBadge(editFormData.inherent_likelihood * editFormData.inherent_impact).label})</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-green-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">3. Artık Risk Değerlendirmesi</h3>
+                <p className="text-sm text-gray-600 mb-4">Mevcut kontroller uygulandıktan sonra kalan risk</p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Olasılık <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(level => (
+                        <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-green-100">
+                          <input
+                            type="radio"
+                            name="edit_residual_likelihood"
+                            value={level}
+                            checked={editFormData.residual_likelihood === level}
+                            onChange={(e) => setEditFormData({ ...editFormData, residual_likelihood: parseInt(e.target.value) })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Etki <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(level => (
+                        <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-green-100">
+                          <input
+                            type="radio"
+                            name="edit_residual_impact"
+                            value={level}
+                            checked={editFormData.residual_impact === level}
+                            onChange={(e) => setEditFormData({ ...editFormData, residual_impact: parseInt(e.target.value) })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-4 bg-white rounded-lg border-2 border-green-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">ARTIK RİSK SKORU:</span>
+                    <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(editFormData.residual_likelihood * editFormData.residual_impact).color} px-4 py-2 rounded-lg`}>
+                      <span>{getRiskScoreBadge(editFormData.residual_likelihood * editFormData.residual_impact).emoji}</span>
+                      <span>{editFormData.residual_likelihood * editFormData.residual_impact}</span>
+                      <span className="text-sm">({getRiskScoreBadge(editFormData.residual_likelihood * editFormData.residual_impact).label})</span>
+                    </span>
+                  </div>
+                  {(editFormData.residual_likelihood * editFormData.residual_impact) > (editFormData.inherent_likelihood * editFormData.inherent_impact) && (
+                    <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                      <AlertTriangle className="w-4 h-4" />
+                      Uyarı: Artık risk skoru, doğal risk skorundan büyük olamaz!
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">4. Risk Yanıtı</h3>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Risk Yanıt Stratejisi <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-100">
+                      <input
+                        type="radio"
+                        name="edit_risk_response"
+                        value="ACCEPT"
+                        checked={editFormData.risk_response === 'ACCEPT'}
+                        onChange={(e) => setEditFormData({ ...editFormData, risk_response: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="font-medium">KABUL ET</div>
+                        <div className="text-sm text-gray-600">Risk mevcut haliyle kabul edilir</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-100">
+                      <input
+                        type="radio"
+                        name="edit_risk_response"
+                        value="MITIGATE"
+                        checked={editFormData.risk_response === 'MITIGATE'}
+                        onChange={(e) => setEditFormData({ ...editFormData, risk_response: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="font-medium">AZALT</div>
+                        <div className="text-sm text-gray-600">Risk azaltıcı önlemler alınacak</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-100">
+                      <input
+                        type="radio"
+                        name="edit_risk_response"
+                        value="TRANSFER"
+                        checked={editFormData.risk_response === 'TRANSFER'}
+                        onChange={(e) => setEditFormData({ ...editFormData, risk_response: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="font-medium">TRANSFER ET</div>
+                        <div className="text-sm text-gray-600">Risk üçüncü tarafa aktarılacak (sigorta vb.)</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-100">
+                      <input
+                        type="radio"
+                        name="edit_risk_response"
+                        value="AVOID"
+                        checked={editFormData.risk_response === 'AVOID'}
+                        onChange={(e) => setEditFormData({ ...editFormData, risk_response: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="font-medium">KAÇIN</div>
+                        <div className="text-sm text-gray-600">Riske neden olan faaliyetten vazgeçilecek</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Yanıt Açıklaması
+                  </label>
+                  <textarea
+                    value={editFormData.response_rationale}
+                    onChange={(e) => setEditFormData({ ...editFormData, response_rationale: e.target.value })}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Alınacak önlemler ve gerekçe..."
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    İçsel Olasılık (1-5)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={editFormData.inherent_likelihood}
-                    onChange={(e) => setEditFormData({ ...editFormData, inherent_likelihood: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    İçsel Etki (1-5)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={editFormData.inherent_impact}
-                    onChange={(e) => setEditFormData({ ...editFormData, inherent_impact: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Artık Olasılık (1-5)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={editFormData.residual_likelihood}
-                    onChange={(e) => setEditFormData({ ...editFormData, residual_likelihood: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Artık Etki (1-5)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={editFormData.residual_impact}
-                    onChange={(e) => setEditFormData({ ...editFormData, residual_impact: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Risk Yanıtı
-                  </label>
-                  <select
-                    value={editFormData.risk_response}
-                    onChange={(e) => setEditFormData({ ...editFormData, risk_response: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="ACCEPT">Kabul Et</option>
-                    <option value="MITIGATE">Azalt</option>
-                    <option value="TRANSFER">Transfer Et</option>
-                    <option value="AVOID">Kaçın</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Durum
                   </label>
                   <select
@@ -1328,27 +1480,15 @@ export default function RiskDetail() {
                   </select>
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Yanıt Gerekçesi
-                </label>
-                <textarea
-                  value={editFormData.response_rationale}
-                  onChange={(e) => setEditFormData({ ...editFormData, response_rationale: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg flex items-center justify-between">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setEditFormData(null);
                 }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 İptal
               </button>
