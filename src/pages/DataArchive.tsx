@@ -629,24 +629,28 @@ export default function DataArchive() {
           const periods = getPeriodsForIndicator(indicator);
           const targetValue = getIndicatorTarget(indicator.id, indicator);
           const currentValue = calculateCurrentValue(indicator);
+          const progress = calculateProgress(indicator, currentValue, targetValue);
+
+          const row: any = {
+            'Amaç Kodu': objective.code,
+            'Amaç': objective.title,
+            'Hedef Kodu': goal.code,
+            'Hedef': goal.title,
+            'Sorumlu Birim': goal.department?.name || '-',
+            'Gösterge Kodu': indicator.code,
+            'Gösterge Adı': indicator.name,
+            'Ölçü Birimi': indicator.unit,
+            'Hedef Değer': targetValue !== null ? targetValue : '-',
+            'Güncel Değer': currentValue !== null ? currentValue.toFixed(2) : '-',
+            'İlerleme (%)': targetValue !== null ? progress : '-'
+          };
 
           periods.forEach(period => {
             const entry = getPeriodEntry(indicator.id, period.periodType, period.periodMonth, period.periodQuarter);
-            exportData.push({
-              'Amaç': objective.title,
-              'Hedef': goal.title,
-              'Sorumlu Birim': goal.department?.name || '-',
-              'Gösterge Kodu': indicator.code,
-              'Gösterge Adı': indicator.name,
-              'Dönem': period.label,
-              'Yıl': selectedYear,
-              'Hedef Değer': targetValue !== null ? targetValue : '-',
-              'Gerçekleşen Değer': entry ? entry.value : '-',
-              'Ölçü Birimi': indicator.unit,
-              'Durum': entry ? getStatusLabel(entry.status) : 'Girilmedi',
-              'Açıklama': entry?.notes || '-'
-            });
+            row[period.label] = entry ? entry.value : '-';
           });
+
+          exportData.push(row);
         });
       });
     });
@@ -656,9 +660,10 @@ export default function DataArchive() {
     XLSX.utils.book_append_sheet(wb, ws, 'Veri Arşivi');
 
     const colWidths = [
-      { wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 15 },
-      { wch: 40 }, { wch: 12 }, { wch: 8 }, { wch: 15 },
-      { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 30 }
+      { wch: 12 }, { wch: 30 }, { wch: 12 }, { wch: 35 },
+      { wch: 20 }, { wch: 15 }, { wch: 40 }, { wch: 12 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }
     ];
     ws['!cols'] = colWidths;
 
@@ -684,64 +689,58 @@ export default function DataArchive() {
     doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, selectedDepartmentId ? 34 : 28);
 
     const tableData: any[] = [];
+    const headers = ['Gösterge Kodu', 'Gösterge Adı', 'Hedef', 'Güncel', 'İlerleme'];
+
+    const sampleIndicator = filteredObjectives[0]?.goals[0]?.indicators[0];
+    const periodLabels = sampleIndicator ? getPeriodsForIndicator(sampleIndicator).map(p => p.label) : [];
+    headers.push(...periodLabels);
 
     filteredObjectives.forEach(objective => {
       objective.goals.forEach(goal => {
         goal.indicators.forEach(indicator => {
           const periods = getPeriodsForIndicator(indicator);
           const targetValue = getIndicatorTarget(indicator.id, indicator);
+          const currentValue = calculateCurrentValue(indicator);
+          const progress = calculateProgress(indicator, currentValue, targetValue);
+
+          const row: any[] = [
+            indicator.code,
+            indicator.name.substring(0, 30) + (indicator.name.length > 30 ? '...' : ''),
+            targetValue !== null ? targetValue.toString() : '-',
+            currentValue !== null ? currentValue.toFixed(2) : '-',
+            targetValue !== null ? `%${progress}` : '-'
+          ];
 
           periods.forEach(period => {
             const entry = getPeriodEntry(indicator.id, period.periodType, period.periodMonth, period.periodQuarter);
-            tableData.push([
-              objective.code,
-              goal.code,
-              indicator.code,
-              indicator.name.substring(0, 40) + (indicator.name.length > 40 ? '...' : ''),
-              period.label,
-              targetValue !== null ? targetValue : '-',
-              entry ? entry.value : '-',
-              indicator.unit,
-              entry ? getStatusLabel(entry.status) : 'Girilmedi'
-            ]);
+            row.push(entry ? entry.value.toString() : '-');
           });
+
+          tableData.push(row);
         });
       });
     });
 
     autoTable(doc, {
-      head: [[
-        'Amaç',
-        'Hedef',
-        'Gösterge',
-        'Gösterge Adı',
-        'Dönem',
-        'Hedef',
-        'Değer',
-        'Birim',
-        'Durum'
-      ]],
+      head: [headers],
       body: tableData,
       startY: selectedDepartmentId ? 40 : 34,
       styles: {
-        fontSize: 7,
-        cellPadding: 1.5
+        fontSize: 6,
+        cellPadding: 1
       },
       headStyles: {
         fillColor: [59, 130, 246],
         textColor: 255,
-        fontStyle: 'bold'
+        fontStyle: 'bold',
+        fontSize: 7
       },
       columnStyles: {
-        0: { cellWidth: 18 },
-        1: { cellWidth: 18 },
+        0: { cellWidth: 20 },
+        1: { cellWidth: 60 },
         2: { cellWidth: 18 },
-        3: { cellWidth: 60 },
-        4: { cellWidth: 15 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 18 },
-        7: { cellWidth: 15 },
-        8: { cellWidth: 30 }
+        3: { cellWidth: 18 },
+        4: { cellWidth: 18 }
       }
     });
 
