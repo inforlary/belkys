@@ -406,13 +406,17 @@ export default function ICActionDetail() {
         .delete()
         .eq('id', progressId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('DELETE error details:', error);
+        throw error;
+      }
 
       setToast({ message: 'İlerleme kaydı başarıyla silindi', type: 'success' });
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('İlerleme kaydı silinirken hata:', error);
-      setToast({ message: 'İlerleme kaydı silinirken hata oluştu', type: 'error' });
+      const errorMessage = error?.message || 'İlerleme kaydı silinirken hata oluştu';
+      setToast({ message: errorMessage, type: 'error' });
     }
   };
 
