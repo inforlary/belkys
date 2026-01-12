@@ -77,7 +77,8 @@ export default function ComplianceReport({ planId, onClose }: ComplianceReportPr
         supabase
           .from('ic_condition_assessments')
           .select('*')
-          .eq('action_plan_id', planId),
+          .eq('action_plan_id', planId)
+          .eq('organization_id', profile?.organization_id),
 
         supabase
           .from('ic_actions')

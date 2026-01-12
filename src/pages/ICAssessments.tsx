@@ -133,6 +133,7 @@ export default function ICAssessments() {
 
   const loadActionPlans = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('ic_action_plans')
         .select('id, name, year, start_date, end_date')
@@ -144,9 +145,12 @@ export default function ICAssessments() {
       setActionPlans(data || []);
       if (data && data.length > 0) {
         setSelectedPlanId(data[0].id);
+      } else {
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error loading action plans:', error);
+      setLoading(false);
     }
   };
 
@@ -203,9 +207,18 @@ export default function ICAssessments() {
           .eq('action_plan_id', selectedPlanId)
       ]);
 
-      if (componentsError) throw componentsError;
-      if (standardsError) throw standardsError;
-      if (conditionsError) throw conditionsError;
+      if (componentsError) {
+        console.error('Components error:', componentsError);
+        throw componentsError;
+      }
+      if (standardsError) {
+        console.error('Standards error:', standardsError);
+        throw standardsError;
+      }
+      if (conditionsError) {
+        console.error('Conditions error:', conditionsError);
+        throw conditionsError;
+      }
 
       const assessmentsMap = new Map();
       assessmentsData?.forEach(assessment => {
