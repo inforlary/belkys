@@ -136,6 +136,8 @@ export default function RiskDetail() {
   const [editingControl, setEditingControl] = useState<RiskControl | null>(null);
   const [deletingControl, setDeletingControl] = useState<RiskControl | null>(null);
   const [controlDropdown, setControlDropdown] = useState<string | null>(null);
+  const [treatmentDropdown, setTreatmentDropdown] = useState<string | null>(null);
+  const [indicatorDropdown, setIndicatorDropdown] = useState<string | null>(null);
 
   const [departments, setDepartments] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -737,29 +739,38 @@ export default function RiskDetail() {
                               <MoreVertical className="w-5 h-5" />
                             </button>
                             {controlDropdown === control.id && (
-                              <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                                <button
-                                  onClick={() => {
-                                    setEditingControl(control);
-                                    setShowControlModal(true);
+                              <>
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setControlDropdown(null);
                                   }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                  Düzenle
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setDeletingControl(control);
-                                    setControlDropdown(null);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Sil
-                                </button>
-                              </div>
+                                />
+                                <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                                  <button
+                                    onClick={() => {
+                                      setEditingControl(control);
+                                      setShowControlModal(true);
+                                      setControlDropdown(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                    Düzenle
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setDeletingControl(control);
+                                      setControlDropdown(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Sil
+                                  </button>
+                                </div>
+                              </>
                             )}
                           </div>
                         )}
@@ -839,9 +850,37 @@ export default function RiskDetail() {
                             )}
                           </div>
                           {isAdmin && (
-                            <button className="text-gray-400 hover:text-gray-600">
-                              <MoreVertical className="w-5 h-5" />
-                            </button>
+                            <div className="relative">
+                              <button
+                                onClick={() => setTreatmentDropdown(treatmentDropdown === treatment.id ? null : treatment.id)}
+                                className="text-gray-400 hover:text-gray-600"
+                              >
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+                              {treatmentDropdown === treatment.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTreatmentDropdown(null);
+                                    }}
+                                  />
+                                  <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                                    <button
+                                      onClick={() => {
+                                        navigate(`risk-management/treatments/${treatment.id}`);
+                                        setTreatmentDropdown(null);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                      Detay
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -914,24 +953,47 @@ export default function RiskDetail() {
                           </div>
                         </div>
                         {isAdmin && (
-                          <div className="flex gap-2">
+                          <div className="relative">
                             <button
-                              onClick={() => {
-                                setEditingIndicator(indicator);
-                                setShowIndicatorModal(true);
-                              }}
-                              className="text-blue-600 hover:text-blue-700 p-1"
-                              title="Düzenle"
+                              onClick={() => setIndicatorDropdown(indicatorDropdown === indicator.id ? null : indicator.id)}
+                              className="text-gray-400 hover:text-gray-600"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <MoreVertical className="w-5 h-5" />
                             </button>
-                            <button
-                              onClick={() => setDeletingIndicator(indicator)}
-                              className="text-red-600 hover:text-red-700 p-1"
-                              title="Sil"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {indicatorDropdown === indicator.id && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIndicatorDropdown(null);
+                                  }}
+                                />
+                                <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                                  <button
+                                    onClick={() => {
+                                      setEditingIndicator(indicator);
+                                      setShowIndicatorModal(true);
+                                      setIndicatorDropdown(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                    Düzenle
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setDeletingIndicator(indicator);
+                                      setIndicatorDropdown(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Sil
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
