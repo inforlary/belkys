@@ -273,11 +273,11 @@ export default function IntegratedManagementDashboard() {
 
   const calculateQualityManagementScore = async () => {
     const { data: objectives } = await supabase
-      .from('quality_objectives')
+      .from('qm_objectives')
       .select('status')
       .eq('organization_id', organization?.id);
 
-    const achieved = objectives?.filter(o => o.status === 'achieved').length || 0;
+    const achieved = objectives?.filter(o => o.status === 'ACHIEVED').length || 0;
     const total = objectives?.length || 1;
     const percentage = (achieved / total) * 100;
 
@@ -411,7 +411,7 @@ export default function IntegratedManagementDashboard() {
     doc.text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`, 14, 38);
 
     const { data: objectives } = await supabase
-      .from('quality_objectives')
+      .from('qm_objectives')
       .select('objective_code, objective_title, status')
       .eq('organization_id', organization?.id);
 

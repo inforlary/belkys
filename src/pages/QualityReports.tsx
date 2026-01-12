@@ -29,26 +29,26 @@ export default function QualityReports() {
 
       const [processes, dofs, audits, feedback] = await Promise.all([
         supabase
-          .from('quality_processes')
+          .from('qm_processes')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', orgId)
-          .eq('status', 'active'),
+          .eq('status', 'ACTIVE'),
         supabase
-          .from('quality_dof')
+          .from('qm_nonconformities')
           .select('status')
           .eq('organization_id', orgId),
         supabase
-          .from('quality_audits')
+          .from('qm_audits')
           .select('status')
           .eq('organization_id', orgId),
         supabase
-          .from('quality_customer_feedback')
+          .from('qm_customer_feedback')
           .select('satisfaction_score')
           .eq('organization_id', orgId)
       ]);
 
-      const openDOF = dofs.data?.filter(d => d.status === 'open').length || 0;
-      const completedAudits = audits.data?.filter(a => a.status === 'completed').length || 0;
+      const openDOF = dofs.data?.filter(d => d.status === 'OPEN').length || 0;
+      const completedAudits = audits.data?.filter(a => a.status === 'COMPLETED').length || 0;
 
       const scores = feedback.data?.filter(f => f.satisfaction_score).map(f => f.satisfaction_score) || [];
       const averageSatisfaction = scores.length > 0

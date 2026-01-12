@@ -21,12 +21,12 @@ export default function QualityDOFDetail() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('quality_dof')
+        .from('qm_nonconformities')
         .select(`
           *,
           department:departments(name),
           responsible:profiles(full_name),
-          process:quality_processes(code, name)
+          process:qm_processes(code, name)
         `)
         .eq('id', dofId)
         .single();

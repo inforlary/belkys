@@ -21,12 +21,12 @@ export default function QualityCustomerSatisfaction() {
       setLoading(true);
       const [feedbackData, surveysData] = await Promise.all([
         supabase
-          .from('quality_customer_feedback')
+          .from('qm_customer_feedback')
           .select('*')
           .eq('organization_id', profile?.organization_id)
           .order('received_date', { ascending: false }),
         supabase
-          .from('quality_customer_surveys')
+          .from('qm_customer_surveys')
           .select('*')
           .eq('organization_id', profile?.organization_id)
           .order('created_at', { ascending: false })

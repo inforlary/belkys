@@ -46,42 +46,42 @@ export default function QualityDashboard() {
 
       const [dofCounts, auditCounts, processCount, overdueCount, feedbackData] = await Promise.all([
         supabase
-          .from('quality_dof')
+          .from('qm_nonconformities')
           .select('status')
           .eq('organization_id', orgId),
         supabase
-          .from('quality_audits')
+          .from('qm_audits')
           .select('status')
           .eq('organization_id', orgId),
         supabase
-          .from('quality_processes')
+          .from('qm_processes')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', orgId)
-          .eq('status', 'active'),
+          .eq('status', 'ACTIVE'),
         supabase
-          .from('quality_dof_actions')
+          .from('qm_dof_actions')
           .select('id', { count: 'exact', head: true })
           .lt('due_date', new Date().toISOString().split('T')[0])
-          .neq('status', 'completed')
+          .neq('status', 'COMPLETED')
           .in('dof_id',
             supabase
-              .from('quality_dof')
+              .from('qm_nonconformities')
               .select('id')
               .eq('organization_id', orgId)
           ),
         supabase
-          .from('quality_customer_feedback')
+          .from('qm_customer_feedback')
           .select('satisfaction_score')
           .eq('organization_id', orgId)
       ]);
 
-      const openDOF = dofCounts.data?.filter(d => d.status === 'open').length || 0;
-      const inProgressDOF = dofCounts.data?.filter(d => d.status === 'in_progress').length || 0;
-      const closedDOF = dofCounts.data?.filter(d => d.status === 'closed').length || 0;
+      const openDOF = dofCounts.data?.filter(d => d.status === 'OPEN').length || 0;
+      const inProgressDOF = dofCounts.data?.filter(d => d.status === 'IN_PROGRESS').length || 0;
+      const closedDOF = dofCounts.data?.filter(d => d.status === 'CLOSED').length || 0;
 
-      const plannedAudits = auditCounts.data?.filter(a => a.status === 'planned').length || 0;
-      const inProgressAudits = auditCounts.data?.filter(a => a.status === 'in_progress').length || 0;
-      const completedAudits = auditCounts.data?.filter(a => a.status === 'completed').length || 0;
+      const plannedAudits = auditCounts.data?.filter(a => a.status === 'PLANNED').length || 0;
+      const inProgressAudits = auditCounts.data?.filter(a => a.status === 'IN_PROGRESS').length || 0;
+      const completedAudits = auditCounts.data?.filter(a => a.status === 'COMPLETED').length || 0;
 
       const scores = feedbackData.data?.filter(f => f.satisfaction_score).map(f => f.satisfaction_score) || [];
       const averageSatisfaction = scores.length > 0

@@ -21,12 +21,12 @@ export default function QualityProcessDetail() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('quality_processes')
+        .from('qm_processes')
         .select(`
           *,
           owner_department:departments(name),
           owner_user:profiles(full_name),
-          parent_process:quality_processes!parent_process_id(name)
+          parent_process:qm_processes!parent_process_id(name)
         `)
         .eq('id', processId)
         .single();

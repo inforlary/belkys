@@ -23,12 +23,12 @@ export default function QualityAuditDetail() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('quality_audits')
+        .from('qm_audits')
         .select(`
           *,
           lead_auditor:profiles(full_name),
           audited_department:departments(name),
-          audited_process:quality_processes(code, name)
+          audited_process:qm_processes(code, name)
         `)
         .eq('id', auditId)
         .single();
@@ -45,7 +45,7 @@ export default function QualityAuditDetail() {
   const loadFindings = async () => {
     try {
       const { data, error } = await supabase
-        .from('quality_audit_findings')
+        .from('qm_audit_findings')
         .select('*')
         .eq('audit_id', auditId)
         .order('created_at', { ascending: false });

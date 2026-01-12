@@ -19,7 +19,7 @@ export default function QualityDocuments() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('quality_documents')
+        .from('qm_documents')
         .select('*')
         .eq('organization_id', profile?.organization_id)
         .order('code');

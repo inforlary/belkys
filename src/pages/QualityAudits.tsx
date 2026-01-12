@@ -21,7 +21,7 @@ export default function QualityAudits() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('quality_audits')
+        .from('qm_audits')
         .select(`
           *,
           lead_auditor:profiles(full_name),
