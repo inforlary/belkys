@@ -314,6 +314,9 @@ Hedef: ${editingKPI.target_value} ${editingKPI.unit}
 Gerçekleşen: ${editingKPI.actual_value} ${editingKPI.unit}
 Sapma: ${editingKPI.variance} ${editingKPI.unit}`;
 
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + 30);
+
       const { error } = await supabase
         .from('qm_nonconformities')
         .insert({
@@ -323,11 +326,17 @@ Sapma: ${editingKPI.variance} ${editingKPI.unit}`;
           source: 'PROCESS_KPI',
           source_reference: `${editingKPI.process_code} - ${monthNames[selectedMonth - 1]} ${selectedYear}`,
           process_id: process?.id || null,
+          process_kpi_id: editingKPI.process_kpi_id || null,
           department_id: profile?.department_id || null,
+          responsible_department_id: profile?.department_id || null,
           detected_date: new Date().toISOString().split('T')[0],
+          target_date: targetDate.toISOString().split('T')[0],
+          detected_by: profile?.id,
+          responsible_id: profile?.id,
           status: 'OPEN',
           severity: 'MEDIUM',
-          created_by: profile?.id
+          created_by: profile?.id,
+          immediate_action: 'KPI hedef altı tespit edildi. Kök neden analizi yapılacak ve düzeltici faaliyet planlanacak.'
         });
 
       if (error) throw error;

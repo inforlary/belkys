@@ -45,6 +45,7 @@ const SOURCE_OPTIONS = [
   { value: 'EXTERNAL_AUDIT', label: 'Dış Tetkik' },
   { value: 'CUSTOMER_COMPLAINT', label: 'Müşteri Şikayeti' },
   { value: 'PROCESS_ERROR', label: 'Süreç Hatası' },
+  { value: 'PROCESS_KPI', label: 'Süreç KPI' },
   { value: 'EMPLOYEE_REPORT', label: 'Personel Bildirimi' },
   { value: 'MANAGEMENT_REVIEW', label: 'YGG' },
   { value: 'INSPECTION', label: 'Muayene/Kontrol' },
@@ -709,7 +710,55 @@ function AddNCModal({ onClose, onSuccess, departments, processes, users, profile
   );
 }
 
-function NCDetailModal({ nonconformity, onClose }: any) {
+function NCDetailModal({ nonconformity, onClose, onUpdate, departments, processes, users, profile }: any) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    title: nonconformity.title || '',
+    description: nonconformity.description || '',
+    source: nonconformity.source || '',
+    source_reference: nonconformity.source_reference || '',
+    process_id: nonconformity.process_id || '',
+    department_id: nonconformity.department_id || '',
+    detected_date: nonconformity.detected_date || '',
+    immediate_action: nonconformity.immediate_action || '',
+    responsible_id: nonconformity.responsible_id || '',
+    responsible_department_id: nonconformity.responsible_department_id || '',
+    target_date: nonconformity.target_date || '',
+    status: nonconformity.status || 'OPEN',
+    root_cause: nonconformity.root_cause || '',
+    corrective_action: nonconformity.corrective_action || '',
+    preventive_action: nonconformity.preventive_action || '',
+    verification_result: nonconformity.verification_result || '',
+    effectiveness_result: nonconformity.effectiveness_result || ''
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('qm_nonconformities')
+        .update(formData)
+        .eq('id', nonconformity.id);
+
+      if (error) throw error;
+
+      alert('DÖF başarıyla güncellendi');
+      setIsEditing(false);
+      onUpdate();
+      onClose();
+    } catch (error: any) {
+      alert('Güncelleme hatası: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const statusObj = STATUS_OPTIONS.find(s => s.value === status);
+    return statusObj?.color || 'bg-gray-500';
+  };
+
   return (
     <Modal
       isOpen={true}
@@ -718,30 +767,253 @@ function NCDetailModal({ nonconformity, onClose }: any) {
       size="xlarge"
     >
       <div className="space-y-6">
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2">UYGUNSUZLUK TANIMI</h4>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-gray-900">{nonconformity.description}</p>
+        <div className="flex items-center justify-between pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium text-white ${getStatusColor(formData.status)}`}>
+              {STATUS_OPTIONS.find(s => s.value === formData.status)?.label}
+            </span>
+            <span className="text-sm text-gray-600">
+              Tespit: {formData.detected_date ? new Date(formData.detected_date).toLocaleDateString('tr-TR') : '-'}
+            </span>
           </div>
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Düzenle
+            </button>
+          )}
         </div>
 
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-3">KAYNAK BİLGİLERİ</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Kaynak</p>
-              <p className="text-sm font-medium text-gray-900">
-                {SOURCE_OPTIONS.find(s => s.value === nonconformity.source)?.label}
-              </p>
-            </div>
-            {nonconformity.source_reference && (
+        {isEditing ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Referans</p>
-                <p className="text-sm font-medium text-gray-900">{nonconformity.source_reference}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                >
+                  {STATUS_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu</label>
+                <select
+                  value={formData.responsible_id}
+                  onChange={(e) => setFormData({ ...formData, responsible_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">Seçiniz...</option>
+                  {users.map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.full_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Birim</label>
+                <select
+                  value={formData.responsible_department_id}
+                  onChange={(e) => setFormData({ ...formData, responsible_department_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">Seçiniz...</option>
+                  {departments.map((d: any) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hedef Tarih</label>
+                <input
+                  type="date"
+                  value={formData.target_date}
+                  onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Uygunsuzluk Tanımı</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Acil Düzeltme</label>
+              <textarea
+                value={formData.immediate_action}
+                onChange={(e) => setFormData({ ...formData, immediate_action: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kök Neden Analizi</label>
+              <textarea
+                value={formData.root_cause}
+                onChange={(e) => setFormData({ ...formData, root_cause: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Uygunsuzluğun kök nedeni..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Düzeltici Faaliyet</label>
+              <textarea
+                value={formData.corrective_action}
+                onChange={(e) => setFormData({ ...formData, corrective_action: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Kök nedeni ortadan kaldıracak düzeltici faaliyet..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Önleyici Faaliyet</label>
+              <textarea
+                value={formData.preventive_action}
+                onChange={(e) => setFormData({ ...formData, preventive_action: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Benzer uygunsuzlukların önlenmesi için alınacak önlemler..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Doğrulama Sonucu</label>
+              <textarea
+                value={formData.verification_result}
+                onChange={(e) => setFormData({ ...formData, verification_result: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Faaliyetlerin uygulandığının doğrulanması..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Etkinlik Değerlendirme</label>
+              <textarea
+                value={formData.effectiveness_result}
+                onChange={(e) => setFormData({ ...formData, effectiveness_result: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Alınan aksiyonların etkinliği..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {saving ? 'Kaydediliyor...' : 'Kaydet'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">UYGUNSUZLUK TANIMI</h4>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-gray-900">{nonconformity.description}</p>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-3">KAYNAK BİLGİLERİ</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Kaynak</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {SOURCE_OPTIONS.find(s => s.value === nonconformity.source)?.label}
+                  </p>
+                </div>
+                {nonconformity.source_reference && (
+                  <div>
+                    <p className="text-sm text-gray-600">Referans</p>
+                    <p className="text-sm font-medium text-gray-900">{nonconformity.source_reference}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-gray-600">Birim</p>
+                  <p className="text-sm font-medium text-gray-900">{nonconformity.department?.name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Sorumlu</p>
+                  <p className="text-sm font-medium text-gray-900">{nonconformity.responsible?.full_name || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {nonconformity.immediate_action && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">ACİL DÜZELTME</h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-900">{nonconformity.immediate_action}</p>
+                </div>
+              </div>
+            )}
+
+            {nonconformity.root_cause && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">KÖK NEDEN ANALİZİ</h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-900">{nonconformity.root_cause}</p>
+                </div>
+              </div>
+            )}
+
+            {nonconformity.corrective_action && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">DÜZELTİCİ FAALİYET</h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-900">{nonconformity.corrective_action}</p>
+                </div>
+              </div>
+            )}
+
+            {nonconformity.preventive_action && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">ÖNLEYİCİ FAALİYET</h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-900">{nonconformity.preventive_action}</p>
+                </div>
               </div>
             )}
           </div>
-        </div>
+        )}
       </div>
     </Modal>
   );
