@@ -38,7 +38,14 @@ interface Action {
   start_date: string;
   completed_date?: string;
   responsible_department_id: string;
+  responsible_department_ids?: string[];
   related_department_ids: string[];
+  collaborating_departments_ids?: string[];
+  special_responsible_types?: string[];
+  related_special_responsible_types?: string[];
+  all_units_responsible?: boolean;
+  all_units_collaborating?: boolean;
+  current_status_description?: string;
   condition_id: string;
   standard_id?: string;
   component_id?: string;
@@ -54,6 +61,10 @@ interface Action {
   component_name?: string;
   department_name?: string;
   related_departments?: string[];
+  responsible_departments?: string[];
+  collaborating_departments?: string[];
+  responsible_special_units?: string[];
+  collaborating_special_units?: string[];
 }
 
 interface ActionPlan {
@@ -246,6 +257,25 @@ export default function ICActions() {
 
       if (error) throw error;
 
+      const conditionIds = [...new Set(actionsData?.map(a => a.condition_id).filter(Boolean))];
+      const assessmentsMap = new Map<string, string>();
+
+      if (conditionIds.length > 0) {
+        const { data: assessmentsData } = await supabase
+          .from('ic_condition_assessments')
+          .select('condition_id, current_situation')
+          .eq('action_plan_id', selectedPlanId)
+          .in('condition_id', conditionIds);
+
+        if (assessmentsData) {
+          assessmentsData.forEach(a => {
+            if (a.current_situation) {
+              assessmentsMap.set(a.condition_id, a.current_situation);
+            }
+          });
+        }
+      }
+
       const enrichedActions = await Promise.all((actionsData || []).map(async (action) => {
         const condition = action.ic_general_conditions;
         let standard = null;
@@ -284,11 +314,53 @@ export default function ICActions() {
           }
         }
 
+        const responsibleDepts: string[] = [];
+        if (action.responsible_department_ids && action.responsible_department_ids.length > 0) {
+          const { data: depts } = await supabase
+            .from('departments')
+            .select('name')
+            .in('id', action.responsible_department_ids);
+
+          if (depts) {
+            responsibleDepts.push(...depts.map(d => d.name));
+          }
+        }
+
+        const collaboratingDepts: string[] = [];
+        if (action.collaborating_departments_ids && action.collaborating_departments_ids.length > 0) {
+          const { data: depts } = await supabase
+            .from('departments')
+            .select('name')
+            .in('id', action.collaborating_departments_ids);
+
+          if (depts) {
+            collaboratingDepts.push(...depts.map(d => d.name));
+          }
+        }
+
+        const responsibleSpecialUnits: string[] = [];
+        if (action.special_responsible_types && action.special_responsible_types.length > 0) {
+          responsibleSpecialUnits.push(...action.special_responsible_types.map(type => {
+            const unit = SPECIAL_UNITS.find(u => u.value === type);
+            return unit?.label || type;
+          }));
+        }
+
+        const collaboratingSpecialUnits: string[] = [];
+        if (action.related_special_responsible_types && action.related_special_responsible_types.length > 0) {
+          collaboratingSpecialUnits.push(...action.related_special_responsible_types.map(type => {
+            const unit = SPECIAL_UNITS.find(u => u.value === type);
+            return unit?.label || type;
+          }));
+        }
+
         const delayDays = action.target_date &&
           new Date(action.target_date) < new Date() &&
           !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(action.status)
             ? Math.floor((new Date().getTime() - new Date(action.target_date).getTime()) / (1000 * 60 * 60 * 24))
             : 0;
+
+        const currentStatusDescription = assessmentsMap.get(action.condition_id) || '';
 
         return {
           ...action,
@@ -302,6 +374,11 @@ export default function ICActions() {
           component_name: component?.name,
           department_name: action.departments?.name,
           related_departments: relatedDepts,
+          responsible_departments: responsibleDepts,
+          collaborating_departments: collaboratingDepts,
+          responsible_special_units: responsibleSpecialUnits,
+          collaborating_special_units: collaboratingSpecialUnits,
+          current_status_description: currentStatusDescription,
           delay_days: delayDays
         };
       }));
@@ -665,17 +742,34 @@ export default function ICActions() {
   };
 
   const exportToExcel = () => {
-    const data = sortedActions.map(action => ({
-      'Kod': action.code,
-      'Eylem': action.title,
-      'Standart': action.standard_code || '',
-      'Genel Şart': action.condition_code || '',
-      'Sorumlu Birim': action.department_name || '',
-      'İş Birliği': action.related_departments?.join(', ') || '',
-      'Hedef Tarih': action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '',
-      'Durum': getStatusLabel(action.status),
-      'İlerleme': `%${action.progress_percent}`
-    }));
+    const data = sortedActions.map(action => {
+      const responsibleUnits = action.all_units_responsible
+        ? 'Tüm Birimler'
+        : [
+            ...(action.responsible_special_units || []),
+            ...(action.responsible_departments || [])
+          ].join(', ') || '-';
+
+      const collaboratingUnits = action.all_units_collaborating
+        ? 'Tüm Birimler'
+        : [
+            ...(action.collaborating_special_units || []),
+            ...(action.collaborating_departments || [])
+          ].join(', ') || '-';
+
+      return {
+        'Kod': action.code,
+        'Eylem': action.title,
+        'Standart': action.standard_code || '',
+        'Genel Şart': action.condition_code || '',
+        'Sorumlu Birimler': responsibleUnits,
+        'İş Birliği Yapılacak Birimler': collaboratingUnits,
+        'Mevcut Durum': action.current_status_description || '-',
+        'Hedef Tarih': action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '',
+        'Durum': getStatusLabel(action.status),
+        'İlerleme': `%${action.progress_percent}`
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -1056,7 +1150,13 @@ export default function ICActions() {
                   </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SORUMLU BİRİM
+                  SORUMLU BİRİMLER
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  İŞ BİRLİĞİ YAPILACAK BİRİMLER
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  MEVCUT DURUM
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -1110,8 +1210,82 @@ export default function ICActions() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {action.standard_code || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {action.department_name || '-'}
+                  <td className="px-6 py-4 text-sm text-gray-700">
+                    <div className="max-w-xs">
+                      {action.all_units_responsible ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          Tüm Birimler
+                        </span>
+                      ) : (
+                        <div className="space-y-1">
+                          {action.responsible_special_units && action.responsible_special_units.length > 0 && (
+                            <div className="text-xs">
+                              {action.responsible_special_units.map((unit, idx) => (
+                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-purple-100 text-purple-700">
+                                  {unit}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {action.responsible_departments && action.responsible_departments.length > 0 && (
+                            <div className="text-xs">
+                              {action.responsible_departments.slice(0, 2).map((dept, idx) => (
+                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-slate-100 text-slate-700">
+                                  {dept}
+                                </span>
+                              ))}
+                              {action.responsible_departments.length > 2 && (
+                                <span className="text-xs text-gray-500">+{action.responsible_departments.length - 2} daha</span>
+                              )}
+                            </div>
+                          )}
+                          {!action.responsible_special_units?.length && !action.responsible_departments?.length && '-'}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700">
+                    <div className="max-w-xs">
+                      {action.all_units_collaborating ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Tüm Birimler
+                        </span>
+                      ) : (
+                        <div className="space-y-1">
+                          {action.collaborating_special_units && action.collaborating_special_units.length > 0 && (
+                            <div className="text-xs">
+                              {action.collaborating_special_units.map((unit, idx) => (
+                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-purple-100 text-purple-700">
+                                  {unit}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {action.collaborating_departments && action.collaborating_departments.length > 0 && (
+                            <div className="text-xs">
+                              {action.collaborating_departments.slice(0, 2).map((dept, idx) => (
+                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-slate-100 text-slate-700">
+                                  {dept}
+                                </span>
+                              ))}
+                              {action.collaborating_departments.length > 2 && (
+                                <span className="text-xs text-gray-500">+{action.collaborating_departments.length - 2} daha</span>
+                              )}
+                            </div>
+                          )}
+                          {!action.collaborating_special_units?.length && !action.collaborating_departments?.length && '-'}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700">
+                    <div className="max-w-xs">
+                      {action.current_status_description ? (
+                        <div className="text-xs line-clamp-2" title={action.current_status_description}>
+                          {action.current_status_description}
+                        </div>
+                      ) : '-'}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {action.is_continuous ? (
@@ -1346,10 +1520,90 @@ export default function ICActions() {
 
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-3">SORUMLULUK</h3>
-              <div className="space-y-2 text-sm">
-                <div><strong>Sorumlu Birim:</strong> {selectedAction.department_name}</div>
-                {selectedAction.related_departments && selectedAction.related_departments.length > 0 && (
-                  <div><strong>İş Birliği:</strong> {selectedAction.related_departments.join(', ')}</div>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <strong>Sorumlu Birimler:</strong>
+                  {selectedAction.all_units_responsible ? (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Tüm Birimler
+                    </span>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {selectedAction.responsible_special_units && selectedAction.responsible_special_units.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Özel Birimler:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedAction.responsible_special_units.map((unit, idx) => (
+                              <span key={idx} className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">
+                                {unit}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedAction.responsible_departments && selectedAction.responsible_departments.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Departmanlar:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedAction.responsible_departments.map((dept, idx) => (
+                              <span key={idx} className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">
+                                {dept}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!selectedAction.responsible_special_units?.length && !selectedAction.responsible_departments?.length && (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <strong>İş Birliği Yapılacak Birimler:</strong>
+                  {selectedAction.all_units_collaborating ? (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Tüm Birimler
+                    </span>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {selectedAction.collaborating_special_units && selectedAction.collaborating_special_units.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Özel Birimler:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedAction.collaborating_special_units.map((unit, idx) => (
+                              <span key={idx} className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">
+                                {unit}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedAction.collaborating_departments && selectedAction.collaborating_departments.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Departmanlar:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedAction.collaborating_departments.map((dept, idx) => (
+                              <span key={idx} className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">
+                                {dept}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!selectedAction.collaborating_special_units?.length && !selectedAction.collaborating_departments?.length && (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {selectedAction.current_status_description && (
+                  <div>
+                    <strong>Mevcut Durum Açıklaması:</strong>
+                    <div className="mt-1 p-2 bg-gray-50 rounded text-xs">
+                      {selectedAction.current_status_description}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
