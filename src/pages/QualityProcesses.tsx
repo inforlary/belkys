@@ -1,84 +1,448 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { useLocation } from '../hooks/useLocation';
-import { Plus, Search, Edit, Trash2, TrendingUp } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, BarChart3, X, TrendingUp } from 'lucide-react';
+
+interface ProcessCategory {
+  id: string;
+  name: string;
+  description: string | null;
+}
 
 interface Process {
   id: string;
   code: string;
   name: string;
-  category: string;
+  description: string | null;
+  purpose: string | null;
+  scope: string | null;
+  inputs: string | null;
+  outputs: string | null;
+  resources: string | null;
   status: string;
+  category_id: string | null;
+  process_owner_id: string | null;
+  owner_department_id: string | null;
+  category: ProcessCategory | null;
+  process_owner: { full_name: string } | null;
   owner_department: { name: string } | null;
-  owner_user: { full_name: string } | null;
-  parent_process: { name: string } | null;
+  kpis?: ProcessKPI[];
+}
+
+interface ProcessKPI {
+  id: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  unit: string | null;
+  target_value: number | null;
+  measurement_frequency: string;
+  is_active: boolean;
+  responsible: { full_name: string } | null;
+  latest_value?: number | null;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
 }
 
 export default function QualityProcesses() {
   const { profile } = useAuth();
-  const { navigate } = useLocation();
   const [processes, setProcesses] = useState<Process[]>([]);
+  const [categories, setCategories] = useState<ProcessCategory[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showModal, setShowModal] = useState(false);
-  const [editingProcess, setEditingProcess] = useState<any>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showKPIModal, setShowKPIModal] = useState(false);
+  const [showKPIForm, setShowKPIForm] = useState(false);
+  const [editingProcess, setEditingProcess] = useState<Process | null>(null);
+  const [viewingProcess, setViewingProcess] = useState<Process | null>(null);
+  const [managingKPIProcess, setManagingKPIProcess] = useState<Process | null>(null);
+  const [editingKPI, setEditingKPI] = useState<ProcessKPI | null>(null);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    category_id: '',
+    process_owner_id: '',
+    owner_department_id: '',
+    purpose: '',
+    scope: '',
+    inputs: '',
+    outputs: '',
+    resources: '',
+    description: '',
+    status: 'ACTIVE'
+  });
+  const [kpiFormData, setKpiFormData] = useState({
+    name: '',
+    description: '',
+    unit: '%',
+    target_value: '',
+    measurement_frequency: 'MONTHLY',
+    responsible_id: ''
+  });
 
   useEffect(() => {
     if (profile?.organization_id) {
-      loadProcesses();
+      loadData();
     }
   }, [profile?.organization_id]);
 
-  const loadProcesses = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('quality_processes')
-        .select(`
-          *,
-          owner_department:departments(name),
-          owner_user:profiles(full_name),
-          parent_process:quality_processes!parent_process_id(name)
-        `)
-        .eq('organization_id', profile?.organization_id)
-        .order('code');
-
-      if (error) throw error;
-      setProcesses(data || []);
+      await Promise.all([
+        loadProcesses(),
+        loadCategories(),
+        loadUsers(),
+        loadDepartments()
+      ]);
     } catch (error) {
-      console.error('Error loading processes:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bu süreci silmek istediğinizden emin misiniz?')) return;
+  const loadProcesses = async () => {
+    const { data, error } = await supabase
+      .from('qm_processes')
+      .select(`
+        *,
+        category:qm_process_categories(id, name, description),
+        process_owner:profiles!qm_processes_process_owner_id_fkey(full_name),
+        owner_department:departments(name)
+      `)
+      .eq('organization_id', profile?.organization_id)
+      .order('code');
+
+    if (error) throw error;
+    setProcesses(data || []);
+  };
+
+  const loadCategories = async () => {
+    const { data, error } = await supabase
+      .from('qm_process_categories')
+      .select('*')
+      .eq('organization_id', profile?.organization_id)
+      .order('order_index');
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      await createDefaultCategories();
+    } else {
+      setCategories(data || []);
+    }
+  };
+
+  const createDefaultCategories = async () => {
+    const defaultCategories = [
+      { name: 'Yönetim Süreçleri', order_index: 1 },
+      { name: 'Operasyonel Süreçler', order_index: 2 },
+      { name: 'Destek Süreçleri', order_index: 3 }
+    ];
+
+    const { data, error } = await supabase
+      .from('qm_process_categories')
+      .insert(
+        defaultCategories.map(cat => ({
+          ...cat,
+          organization_id: profile?.organization_id
+        }))
+      )
+      .select();
+
+    if (!error && data) {
+      setCategories(data);
+    }
+  };
+
+  const loadUsers = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('organization_id', profile?.organization_id)
+      .order('full_name');
+
+    if (error) throw error;
+    setUsers(data || []);
+  };
+
+  const loadDepartments = async () => {
+    const { data, error } = await supabase
+      .from('departments')
+      .select('id, name')
+      .eq('organization_id', profile?.organization_id)
+      .order('name');
+
+    if (error) throw error;
+    setDepartments(data || []);
+  };
+
+  const generateProcessCode = async () => {
+    const { data, error } = await supabase
+      .rpc('generate_qm_process_code', { org_id: profile?.organization_id });
+
+    if (error) {
+      console.error('Error generating code:', error);
+      return 'SRC-001';
+    }
+    return data || 'SRC-001';
+  };
+
+  const handleOpenModal = async (process?: Process) => {
+    if (process) {
+      setEditingProcess(process);
+      setFormData({
+        code: process.code,
+        name: process.name,
+        category_id: process.category_id || '',
+        process_owner_id: process.process_owner_id || '',
+        owner_department_id: process.owner_department_id || '',
+        purpose: process.purpose || '',
+        scope: process.scope || '',
+        inputs: process.inputs || '',
+        outputs: process.outputs || '',
+        resources: process.resources || '',
+        description: process.description || '',
+        status: process.status
+      });
+    } else {
+      setEditingProcess(null);
+      const newCode = await generateProcessCode();
+      setFormData({
+        code: newCode,
+        name: '',
+        category_id: '',
+        process_owner_id: '',
+        owner_department_id: '',
+        purpose: '',
+        scope: '',
+        inputs: '',
+        outputs: '',
+        resources: '',
+        description: '',
+        status: 'ACTIVE'
+      });
+    }
+    setShowModal(true);
+  };
+
+  const handleSaveProcess = async () => {
+    if (!formData.code || !formData.name || !formData.category_id || !formData.owner_department_id) {
+      alert('Lütfen zorunlu alanları doldurun');
+      return;
+    }
+
+    try {
+      if (editingProcess) {
+        const { error } = await supabase
+          .from('qm_processes')
+          .update({
+            ...formData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingProcess.id);
+
+        if (error) throw error;
+        alert('Süreç güncellendi');
+      } else {
+        const { error } = await supabase
+          .from('qm_processes')
+          .insert({
+            ...formData,
+            organization_id: profile?.organization_id,
+            created_by: profile?.id
+          });
+
+        if (error) throw error;
+        alert('Süreç başarıyla eklendi');
+      }
+
+      setShowModal(false);
+      loadProcesses();
+    } catch (error: any) {
+      console.error('Error saving process:', error);
+      alert('İşlem sırasında hata oluştu: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (process: Process) => {
+    if (!confirm(`"${process.code} - ${process.name}" sürecini silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz. Sürece bağlı KPI'lar da silinecektir.`)) {
+      return;
+    }
 
     try {
       const { error } = await supabase
-        .from('quality_processes')
+        .from('qm_processes')
         .delete()
-        .eq('id', id);
+        .eq('id', process.id);
 
       if (error) throw error;
+      alert('Süreç silindi');
       loadProcesses();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting process:', error);
-      alert('Süreç silinirken hata oluştu');
+      alert('Süreç silinirken hata oluştu: ' + error.message);
+    }
+  };
+
+  const handleViewProcess = async (process: Process) => {
+    const { data: kpis } = await supabase
+      .from('qm_process_kpis')
+      .select(`
+        *,
+        responsible:profiles!qm_process_kpis_responsible_id_fkey(full_name)
+      `)
+      .eq('process_id', process.id)
+      .order('code');
+
+    setViewingProcess({ ...process, kpis: kpis || [] });
+    setShowDetailModal(true);
+  };
+
+  const handleManageKPIs = async (process: Process) => {
+    const { data: kpis } = await supabase
+      .from('qm_process_kpis')
+      .select(`
+        *,
+        responsible:profiles!qm_process_kpis_responsible_id_fkey(full_name)
+      `)
+      .eq('process_id', process.id)
+      .order('code');
+
+    setManagingKPIProcess({ ...process, kpis: kpis || [] });
+    setShowKPIModal(true);
+  };
+
+  const handleOpenKPIForm = (kpi?: ProcessKPI) => {
+    if (kpi) {
+      setEditingKPI(kpi);
+      setKpiFormData({
+        name: kpi.name,
+        description: kpi.description || '',
+        unit: kpi.unit || '%',
+        target_value: kpi.target_value?.toString() || '',
+        measurement_frequency: kpi.measurement_frequency,
+        responsible_id: kpi.responsible?.id || ''
+      });
+    } else {
+      setEditingKPI(null);
+      setKpiFormData({
+        name: '',
+        description: '',
+        unit: '%',
+        target_value: '',
+        measurement_frequency: 'MONTHLY',
+        responsible_id: ''
+      });
+    }
+    setShowKPIForm(true);
+  };
+
+  const handleSaveKPI = async () => {
+    if (!kpiFormData.name || !kpiFormData.unit) {
+      alert('Lütfen zorunlu alanları doldurun');
+      return;
+    }
+
+    try {
+      if (editingKPI) {
+        const { error } = await supabase
+          .from('qm_process_kpis')
+          .update({
+            name: kpiFormData.name,
+            description: kpiFormData.description || null,
+            unit: kpiFormData.unit,
+            target_value: kpiFormData.target_value ? parseFloat(kpiFormData.target_value) : null,
+            measurement_frequency: kpiFormData.measurement_frequency,
+            responsible_id: kpiFormData.responsible_id || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingKPI.id);
+
+        if (error) throw error;
+        alert('KPI güncellendi');
+      } else {
+        const kpiCount = managingKPIProcess?.kpis?.length || 0;
+        const newCode = `KPI-${String(kpiCount + 1).padStart(2, '0')}`;
+
+        const { error } = await supabase
+          .from('qm_process_kpis')
+          .insert({
+            process_id: managingKPIProcess?.id,
+            code: newCode,
+            name: kpiFormData.name,
+            description: kpiFormData.description || null,
+            unit: kpiFormData.unit,
+            target_value: kpiFormData.target_value ? parseFloat(kpiFormData.target_value) : null,
+            measurement_frequency: kpiFormData.measurement_frequency,
+            responsible_id: kpiFormData.responsible_id || null
+          });
+
+        if (error) throw error;
+        alert('KPI başarıyla eklendi');
+      }
+
+      setShowKPIForm(false);
+      if (managingKPIProcess) {
+        handleManageKPIs(managingKPIProcess);
+      }
+    } catch (error: any) {
+      console.error('Error saving KPI:', error);
+      alert('İşlem sırasında hata oluştu: ' + error.message);
+    }
+  };
+
+  const handleDeleteKPI = async (kpiId: string) => {
+    if (!confirm('Bu KPI\'ı silmek istediğinize emin misiniz?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('qm_process_kpis')
+        .delete()
+        .eq('id', kpiId);
+
+      if (error) throw error;
+      alert('KPI silindi');
+      if (managingKPIProcess) {
+        handleManageKPIs(managingKPIProcess);
+      }
+    } catch (error: any) {
+      console.error('Error deleting KPI:', error);
+      alert('KPI silinirken hata oluştu: ' + error.message);
     }
   };
 
   const filteredProcesses = processes.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          p.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || p.category === filterCategory;
+    const matchesCategory = filterCategory === 'all' || p.category_id === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const categories = [...new Set(processes.map(p => p.category).filter(Boolean))];
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      ACTIVE: { label: 'Aktif', color: 'bg-green-100 text-green-800' },
+      DRAFT: { label: 'Taslak', color: 'bg-yellow-100 text-yellow-800' },
+      INACTIVE: { label: 'Pasif', color: 'bg-gray-100 text-gray-800' },
+      ARCHIVED: { label: 'Arşiv', color: 'bg-red-100 text-red-800' }
+    };
+    const { label, color } = statusMap[status as keyof typeof statusMap] || statusMap.ACTIVE;
+    return <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${color}`}>{label}</span>;
+  };
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   if (loading) {
     return (
@@ -95,16 +459,15 @@ export default function QualityProcesses() {
           <h1 className="text-3xl font-bold text-gray-900">Süreç Yönetimi</h1>
           <p className="mt-2 text-gray-600">Kalite süreçleri tanımlama ve yönetimi</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingProcess(null);
-            setShowModal(true);
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Yeni Süreç
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => handleOpenModal()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Yeni Süreç
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-4">
@@ -128,7 +491,7 @@ export default function QualityProcesses() {
           >
             <option value="all">Tüm Kategoriler</option>
             {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
           </select>
         </div>
@@ -148,7 +511,7 @@ export default function QualityProcesses() {
                 Kategori
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Süreç Sahibi
+                Sorumlu Birim
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Durum
@@ -167,64 +530,49 @@ export default function QualityProcesses() {
               </tr>
             ) : (
               filteredProcesses.map((process) => (
-                <tr
-                  key={process.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/quality-management/processes/${process.id}`)}
-                >
+                <tr key={process.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {process.code}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm text-gray-900">
                     {process.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {process.category || '-'}
+                    {process.category?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {process.owner_department?.name || process.owner_user?.full_name || '-'}
+                    {process.owner_department?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      process.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : process.status === 'inactive'
-                        ? 'bg-gray-100 text-gray-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {process.status === 'active' ? 'Aktif' : process.status === 'inactive' ? 'Pasif' : 'İnceleme'}
-                    </span>
+                    {getStatusBadge(process.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/quality-management/processes/${process.id}`);
-                        }}
+                        onClick={() => handleViewProcess(process)}
                         className="text-blue-600 hover:text-blue-700"
-                        title="Detay"
+                        title="Görüntüle"
                       >
-                        <TrendingUp className="w-4 h-4" />
+                        <Eye className="w-4 h-4" />
                       </button>
-                      {profile?.role === 'admin' && (
+                      <button
+                        onClick={() => handleManageKPIs(process)}
+                        className="text-purple-600 hover:text-purple-700"
+                        title="KPI Yönet"
+                      >
+                        <BarChart3 className="w-4 h-4" />
+                      </button>
+                      {isAdmin && (
                         <>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingProcess(process);
-                              setShowModal(true);
-                            }}
+                            onClick={() => handleOpenModal(process)}
                             className="text-gray-600 hover:text-gray-700"
                             title="Düzenle"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(process.id);
-                            }}
+                            onClick={() => handleDelete(process)}
                             className="text-red-600 hover:text-red-700"
                             title="Sil"
                           >
@@ -240,6 +588,513 @@ export default function QualityProcesses() {
           </tbody>
         </table>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingProcess ? 'Süreç Düzenle' : 'Yeni Süreç Ekle'}
+              </h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Süreç Kodu <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="SRC-001"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Süreç Adı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kategori <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Seçiniz...</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Süreç Sahibi (Kişi)
+                </label>
+                <select
+                  value={formData.process_owner_id}
+                  onChange={(e) => setFormData({ ...formData, process_owner_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Seçiniz...</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>{user.full_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Sorumlu Birim <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.owner_department_id}
+                  onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Seçiniz...</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Süreç Amacı
+                </label>
+                <textarea
+                  value={formData.purpose}
+                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kapsam
+                </label>
+                <textarea
+                  value={formData.scope}
+                  onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Girdiler
+                </label>
+                <textarea
+                  value={formData.inputs}
+                  onChange={(e) => setFormData({ ...formData, inputs: e.target.value })}
+                  rows={3}
+                  placeholder="Her satıra bir girdi yazın..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Çıktılar
+                </label>
+                <textarea
+                  value={formData.outputs}
+                  onChange={(e) => setFormData({ ...formData, outputs: e.target.value })}
+                  rows={3}
+                  placeholder="Her satıra bir çıktı yazın..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kaynaklar
+                </label>
+                <textarea
+                  value={formData.resources}
+                  onChange={(e) => setFormData({ ...formData, resources: e.target.value })}
+                  rows={2}
+                  placeholder="Personel, ekipman, yazılım vb."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Durum
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="ACTIVE">Aktif</option>
+                  <option value="DRAFT">Taslak</option>
+                  <option value="INACTIVE">Pasif</option>
+                  <option value="ARCHIVED">Arşiv</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveProcess}
+                className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                Kaydet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDetailModal && viewingProcess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {viewingProcess.code} - {viewingProcess.name}
+                </h2>
+                {getStatusBadge(viewingProcess.status)}
+              </div>
+              <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">TEMEL BİLGİLER</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Kategori:</span>
+                    <span className="ml-2 text-gray-900">{viewingProcess.category?.name || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Süreç Sahibi:</span>
+                    <span className="ml-2 text-gray-900">{viewingProcess.process_owner?.full_name || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Sorumlu Birim:</span>
+                    <span className="ml-2 text-gray-900">{viewingProcess.owner_department?.name || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {viewingProcess.purpose && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">AMAÇ</h3>
+                  <p className="text-gray-700">{viewingProcess.purpose}</p>
+                </div>
+              )}
+
+              {viewingProcess.scope && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">KAPSAM</h3>
+                  <p className="text-gray-700">{viewingProcess.scope}</p>
+                </div>
+              )}
+
+              {(viewingProcess.inputs || viewingProcess.outputs) && (
+                <div className="grid grid-cols-2 gap-6">
+                  {viewingProcess.inputs && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">GİRDİLER</h3>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        {viewingProcess.inputs.split('\n').filter(i => i.trim()).map((input, idx) => (
+                          <li key={idx}>{input.trim()}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {viewingProcess.outputs && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">ÇIKTILAR</h3>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        {viewingProcess.outputs.split('\n').filter(o => o.trim()).map((output, idx) => (
+                          <li key={idx}>{output.trim()}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {viewingProcess.resources && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">KAYNAKLAR</h3>
+                  <p className="text-gray-700">{viewingProcess.resources}</p>
+                </div>
+              )}
+
+              {viewingProcess.kpis && viewingProcess.kpis.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">PERFORMANS GÖSTERGELERİ (KPI)</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kod</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gösterge</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hedef</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Birim</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {viewingProcess.kpis.map(kpi => (
+                          <tr key={kpi.id}>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{kpi.code}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{kpi.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{kpi.target_value || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{kpi.unit || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    handleOpenModal(viewingProcess);
+                  }}
+                  className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  Düzenle
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  handleManageKPIs(viewingProcess);
+                }}
+                className="px-4 py-2 text-white bg-purple-600 rounded-lg hover:bg-purple-700"
+              >
+                KPI Yönet
+              </button>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showKPIModal && managingKPIProcess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">
+                KPI Yönetimi - {managingKPIProcess.code} {managingKPIProcess.name}
+              </h2>
+              <button onClick={() => setShowKPIModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">KPI Listesi</h3>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleOpenKPIForm()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Yeni KPI
+                  </button>
+                )}
+              </div>
+
+              {showKPIForm && (
+                <div className="mb-6 p-4 border-2 border-blue-200 bg-blue-50 rounded-lg space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      KPI Adı <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={kpiFormData.name}
+                      onChange={(e) => setKpiFormData({ ...kpiFormData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Açıklama
+                    </label>
+                    <input
+                      type="text"
+                      value={kpiFormData.description}
+                      onChange={(e) => setKpiFormData({ ...kpiFormData, description: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Birim <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={kpiFormData.unit}
+                        onChange={(e) => setKpiFormData({ ...kpiFormData, unit: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="%">%</option>
+                        <option value="Adet">Adet</option>
+                        <option value="Gün">Gün</option>
+                        <option value="TL">TL</option>
+                        <option value="Saat">Saat</option>
+                        <option value="Puan">Puan</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Hedef Değer
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={kpiFormData.target_value}
+                        onChange={(e) => setKpiFormData({ ...kpiFormData, target_value: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ölçüm Sıklığı
+                      </label>
+                      <select
+                        value={kpiFormData.measurement_frequency}
+                        onChange={(e) => setKpiFormData({ ...kpiFormData, measurement_frequency: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="DAILY">Günlük</option>
+                        <option value="WEEKLY">Haftalık</option>
+                        <option value="MONTHLY">Aylık</option>
+                        <option value="QUARTERLY">Çeyrek Yıl</option>
+                        <option value="YEARLY">Yıllık</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      onClick={() => setShowKPIForm(false)}
+                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      İptal
+                    </button>
+                    <button
+                      onClick={handleSaveKPI}
+                      className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                    >
+                      {editingKPI ? 'Güncelle' : 'Ekle'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {(!managingKPIProcess.kpis || managingKPIProcess.kpis.length === 0) ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Henüz KPI eklenmemiş
+                  </div>
+                ) : (
+                  managingKPIProcess.kpis.map(kpi => (
+                    <div key={kpi.id} className="p-4 border rounded-lg bg-gray-50 hover:bg-gray-100">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">{kpi.code} - {kpi.name}</h4>
+                          {kpi.description && (
+                            <p className="text-sm text-gray-600 mt-1">{kpi.description}</p>
+                          )}
+                          <div className="mt-2 flex items-center gap-4 text-sm text-gray-700">
+                            <span>Hedef: <strong>{kpi.target_value || '-'}</strong></span>
+                            <span>Birim: <strong>{kpi.unit || '-'}</strong></span>
+                            <span>Sıklık: <strong>
+                              {kpi.measurement_frequency === 'DAILY' ? 'Günlük' :
+                               kpi.measurement_frequency === 'WEEKLY' ? 'Haftalık' :
+                               kpi.measurement_frequency === 'MONTHLY' ? 'Aylık' :
+                               kpi.measurement_frequency === 'QUARTERLY' ? 'Çeyrek Yıl' :
+                               'Yıllık'}
+                            </strong></span>
+                          </div>
+                        </div>
+                        {isAdmin && (
+                          <div className="flex items-center gap-2 ml-4">
+                            <button
+                              onClick={() => handleOpenKPIForm(kpi)}
+                              className="text-gray-600 hover:text-gray-700"
+                              title="Düzenle"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteKPI(kpi.id)}
+                              className="text-red-600 hover:text-red-700"
+                              title="Sil"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end border-t">
+              <button
+                onClick={() => setShowKPIModal(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
