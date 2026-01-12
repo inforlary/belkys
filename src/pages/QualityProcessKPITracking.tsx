@@ -195,6 +195,7 @@ export default function QualityProcessKPITracking() {
           kpi_id: editingKPI.kpi_id,
           period_year: selectedYear,
           period_month: selectedMonth,
+          period_quarter: Math.ceil(selectedMonth / 3),
           value: parseFloat(valueInput),
           notes: notesInput || null,
           entered_by: profile?.id,
@@ -231,6 +232,7 @@ export default function QualityProcessKPITracking() {
         kpi_id: kpiId,
         period_year: selectedYear,
         period_month: selectedMonth,
+        period_quarter: Math.ceil(selectedMonth / 3),
         value: parseFloat(value),
         entered_by: profile?.id,
         entered_at: new Date().toISOString()
