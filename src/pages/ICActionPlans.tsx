@@ -366,6 +366,8 @@ export default function ICActionPlans() {
   };
 
   const activePlan = actionPlans.find(p => p.status === 'ACTIVE');
+  const draftPlans = actionPlans.filter(p => p.status === 'DRAFT');
+  const completedPlans = actionPlans.filter(p => p.status === 'COMPLETED');
   const archivedPlans = actionPlans.filter(p => p.status === 'ARCHIVED');
 
   if (loading) {
@@ -525,11 +527,136 @@ export default function ICActionPlans() {
         </div>
       )}
 
+      {draftPlans.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge('DRAFT').bg} ${getStatusBadge('DRAFT').text}`}>
+              {getStatusBadge('DRAFT').icon} TASLAK PLANLAR
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {draftPlans.map((plan) => (
+              <div key={plan.id} className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
+                      {plan.name}
+                      <span className={`ml-3 inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusBadge(plan.status).bg} ${getStatusBadge(plan.status).text}`}>
+                        {getStatusLabel(plan.status)}
+                      </span>
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar className="w-4 h-4" />
+                      <span>Dönem: {new Date(plan.start_date).toLocaleDateString('tr-TR')} - {new Date(plan.end_date).toLocaleDateString('tr-TR')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-600 mb-4">
+                  Eylemler: {plan.action_count || 0} • Tamamlanan: {plan.completed_count || 0} ({plan.completion_percentage || 0}%)
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => navigate(`/internal-control/standards?plan_id=${plan.id}`)}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  >
+                    Standartlara Git
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleViewDetail(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Görüntüle
+                  </button>
+                  <button
+                    onClick={() => handleEdit(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Düzenle
+                  </button>
+                  <button
+                    onClick={() => handleCopy(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Kopyala
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {completedPlans.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge('COMPLETED').bg} ${getStatusBadge('COMPLETED').text}`}>
+              {getStatusBadge('COMPLETED').icon} TAMAMLANAN PLANLAR
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {completedPlans.map((plan) => (
+              <div key={plan.id} className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
+                      {plan.name}
+                      <span className={`ml-3 inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusBadge(plan.status).bg} ${getStatusBadge(plan.status).text}`}>
+                        {getStatusLabel(plan.status)}
+                      </span>
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar className="w-4 h-4" />
+                      <span>Dönem: {new Date(plan.start_date).toLocaleDateString('tr-TR')} - {new Date(plan.end_date).toLocaleDateString('tr-TR')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-600 mb-4">
+                  Eylemler: {plan.action_count || 0} • Tamamlanan: {plan.completed_count || 0} ({plan.completion_percentage || 0}%)
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleViewDetail(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Görüntüle
+                  </button>
+                  <button
+                    onClick={() => handleCopy(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Kopyala
+                  </button>
+                  <button
+                    onClick={() => handleArchive(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Archive className="w-4 h-4" />
+                    Arşivle
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {archivedPlans.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge('ARCHIVED').bg} ${getStatusBadge('ARCHIVED').text}`}>
-              {getStatusBadge('ARCHIVED').icon} ARŞİVLENMİŞ
+              {getStatusBadge('ARCHIVED').icon} ARŞİVLENMİŞ PLANLAR
             </span>
           </div>
 
@@ -541,7 +668,7 @@ export default function ICActionPlans() {
                     <h3 className="text-lg font-bold text-gray-900 mb-1">
                       {plan.name}
                       <span className={`ml-3 inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusBadge(plan.status).bg} ${getStatusBadge(plan.status).text}`}>
-                        [Arşiv]
+                        {getStatusLabel(plan.status)}
                       </span>
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
