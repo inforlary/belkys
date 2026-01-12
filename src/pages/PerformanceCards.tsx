@@ -471,6 +471,10 @@ export default function PerformanceCards() {
           <div class="section">
             <table>
               <tr>
+                <th style="width: 150px;">Bütçe Yılı</th>
+                <td>${fiscalYear}</td>
+              </tr>
+              <tr>
                 <th style="width: 150px;">Program Kodu</th>
                 <td>${subProgram.program_code}</td>
               </tr>
@@ -630,7 +634,8 @@ export default function PerformanceCards() {
       card.sub_programs.forEach((subProgram) => {
         html += `
           <table>
-            <tr><td style="font-weight:bold; width:200px;">Program Kodu</td><td>${subProgram.program_code}</td></tr>
+            <tr><td style="font-weight:bold; width:200px;">Bütçe Yılı</td><td>${fiscalYear}</td></tr>
+            <tr><td style="font-weight:bold;">Program Kodu</td><td>${subProgram.program_code}</td></tr>
             <tr><td style="font-weight:bold;">Program Adı</td><td>${subProgram.program_name}</td></tr>
             <tr><td style="font-weight:bold;">Alt Program Kodu</td><td>${subProgram.code}</td></tr>
             <tr><td style="font-weight:bold;">Alt Program Adı</td><td>${subProgram.name}</td></tr>
@@ -784,7 +789,7 @@ export default function PerformanceCards() {
                   <td className="py-3 px-4 font-semibold text-white bg-red-600 w-48">
                     Bütçe Yılı
                   </td>
-                  <td className="py-3 px-4">2025</td>
+                  <td className="py-3 px-4">{fiscalYear}</td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-3 px-4 font-semibold text-white bg-red-600">
