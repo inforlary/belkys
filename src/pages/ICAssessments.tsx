@@ -169,92 +169,95 @@ export default function ICAssessments() {
     try {
       setLoading(true);
 
-      const { data: componentsData, error: componentsError } = await supabase
-        .from('ic_components')
-        .select(`
-          id,
-          code,
-          name,
-          order_index
-        `)
-        .is('organization_id', null)
-        .order('order_index');
+      const [
+        { data: componentsData, error: componentsError },
+        { data: standardsData, error: standardsError },
+        { data: conditionsData, error: conditionsError },
+        { data: assessmentsData, error: assessmentsError },
+        { data: actionsData, error: actionsError }
+      ] = await Promise.all([
+        supabase
+          .from('ic_components')
+          .select('id, code, name, order_index')
+          .is('organization_id', null)
+          .order('order_index'),
+
+        supabase
+          .from('ic_standards')
+          .select('id, code, name, order_index, component_id')
+          .order('order_index'),
+
+        supabase
+          .from('ic_general_conditions')
+          .select('id, code, description, order_index, standard_id')
+          .order('order_index'),
+
+        supabase
+          .from('ic_condition_assessments')
+          .select('*')
+          .eq('action_plan_id', selectedPlanId),
+
+        supabase
+          .from('ic_actions')
+          .select('id, code, title, status, condition_id')
+          .eq('action_plan_id', selectedPlanId)
+      ]);
 
       if (componentsError) throw componentsError;
+      if (standardsError) throw standardsError;
+      if (conditionsError) throw conditionsError;
 
-      const componentsWithData: Component[] = [];
+      const assessmentsMap = new Map();
+      assessmentsData?.forEach(assessment => {
+        assessmentsMap.set(assessment.condition_id, assessment);
+      });
 
-      for (const component of componentsData || []) {
-        const { data: standardsData, error: standardsError } = await supabase
-          .from('ic_standards')
-          .select(`
-            id,
-            code,
-            name,
-            order_index,
-            component_id
-          `)
-          .eq('component_id', component.id)
-          .order('order_index');
-
-        if (standardsError) throw standardsError;
-
-        const standardsWithData: Standard[] = [];
-
-        for (const standard of standardsData || []) {
-          const { data: conditionsData, error: conditionsError } = await supabase
-            .from('ic_general_conditions')
-            .select(`
-              id,
-              code,
-              description,
-              order_index,
-              standard_id
-            `)
-            .eq('standard_id', standard.id)
-            .order('order_index');
-
-          if (conditionsError) throw conditionsError;
-
-          const conditionsWithData: GeneralCondition[] = [];
-
-          for (const condition of conditionsData || []) {
-            const { data: assessmentData } = await supabase
-              .from('ic_condition_assessments')
-              .select('*')
-              .eq('condition_id', condition.id)
-              .eq('action_plan_id', selectedPlanId)
-              .maybeSingle();
-
-            const { data: actionsData } = await supabase
-              .from('ic_actions')
-              .select('id, code, title, status')
-              .eq('condition_id', condition.id)
-              .eq('action_plan_id', selectedPlanId);
-
-            conditionsWithData.push({
-              ...condition,
-              assessment: assessmentData || undefined,
-              actions: actionsData || []
-            });
-          }
-
-          standardsWithData.push({
-            ...standard,
-            conditions: conditionsWithData
-          });
+      const actionsMap = new Map<string, ActionSummary[]>();
+      actionsData?.forEach(action => {
+        if (!actionsMap.has(action.condition_id)) {
+          actionsMap.set(action.condition_id, []);
         }
-
-        componentsWithData.push({
-          ...component,
-          standards: standardsWithData
+        actionsMap.get(action.condition_id)?.push({
+          id: action.id,
+          code: action.code,
+          title: action.title,
+          status: action.status
         });
-      }
+      });
+
+      const conditionsMap = new Map<string, GeneralCondition[]>();
+      conditionsData?.forEach(condition => {
+        if (!conditionsMap.has(condition.standard_id)) {
+          conditionsMap.set(condition.standard_id, []);
+        }
+        conditionsMap.get(condition.standard_id)?.push({
+          ...condition,
+          assessment: assessmentsMap.get(condition.id),
+          actions: actionsMap.get(condition.id) || []
+        });
+      });
+
+      const standardsMap = new Map<string, Standard[]>();
+      standardsData?.forEach(standard => {
+        if (!standardsMap.has(standard.component_id)) {
+          standardsMap.set(standard.component_id, []);
+        }
+        standardsMap.get(standard.component_id)?.push({
+          ...standard,
+          conditions: conditionsMap.get(standard.id) || []
+        });
+      });
+
+      const componentsWithData: Component[] = componentsData?.map(component => ({
+        ...component,
+        standards: standardsMap.get(component.id) || []
+      })) || [];
 
       setComponents(componentsWithData);
       calculateStatistics(componentsWithData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading assessment data:', error);
+      alert('Veri yüklenirken hata oluştu: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -340,7 +343,7 @@ export default function ICAssessments() {
     compliance_score: number;
     current_situation: string;
   }) => {
-    if (!selectedPlanId || !profile?.id) return;
+    if (!selectedPlanId || !profile?.id || !profile?.organization_id) return;
 
     try {
       setSaving(conditionId);
@@ -348,6 +351,7 @@ export default function ICAssessments() {
       const { error } = await supabase
         .from('ic_condition_assessments')
         .upsert({
+          organization_id: profile.organization_id,
           condition_id: conditionId,
           action_plan_id: selectedPlanId,
           compliance_status: data.compliance_status,
@@ -355,6 +359,8 @@ export default function ICAssessments() {
           current_situation: data.current_situation,
           assessed_by: profile.id,
           assessed_at: new Date().toISOString()
+        }, {
+          onConflict: 'organization_id,condition_id,action_plan_id'
         });
 
       if (error) throw error;
