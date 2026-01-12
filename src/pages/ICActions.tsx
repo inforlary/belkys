@@ -1428,157 +1428,234 @@ export default function ICActions() {
         <div className="flex items-center justify-center py-12">
           <div className="text-gray-500">Yükleniyor...</div>
         </div>
-      ) : hierarchicalData.length === 0 ? (
+      ) : sortedActions.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-gray-500">Eylem planı seçiniz.</p>
+          <p className="text-gray-500">Eylem bulunamadı.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden p-4">
-          <div className="space-y-2">
-            {hierarchicalData.map(componentData => {
-            const compKey = componentData.component.code;
-            const isCompExpanded = expandedComponents.has(compKey);
-
-            return (
-              <div key={compKey} className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <button
-                  onClick={() => toggleComponent(compKey)}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-3">
-                    <ChevronDown
-                      className={`w-5 h-5 text-gray-500 transition-transform ${isCompExpanded ? '' : '-rotate-90'}`}
-                    />
-                    <span className="font-semibold text-gray-900">
-                      {componentData.component.name}
-                    </span>
-                  </div>
-                </button>
-
-                {isCompExpanded && (
-                  <div className="border-t border-gray-200 pl-8">
-                    {Array.from(componentData.standards.values()).map(standardData => {
-                      const stdKey = `${compKey}-${standardData.standard.code}`;
-                      const isStdExpanded = expandedStandards.has(stdKey);
-
-                      return (
-                        <div key={stdKey} className="border-b border-gray-100 last:border-b-0">
-                          <button
-                            onClick={() => toggleStandard(stdKey)}
-                            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-blue-50 text-left"
-                          >
-                            <div className="flex items-center gap-2">
-                              <ChevronDown
-                                className={`w-4 h-4 text-blue-600 transition-transform ${isStdExpanded ? '' : '-rotate-90'}`}
-                              />
-                              <span className="text-sm font-medium text-blue-900">
-                                {standardData.standard.code} - {standardData.standard.name}
-                              </span>
-                            </div>
-                          </button>
-
-                          {isStdExpanded && (
-                            <div className="pl-6 bg-gray-50">
-                              {Array.from(standardData.conditions.values()).map(conditionData => {
-                                const condKey = `${stdKey}-${conditionData.condition.code}`;
-                                const isCondExpanded = expandedConditions.has(condKey);
-
-                                return (
-                                  <div key={condKey} className="border-t border-gray-200 py-2">
-                                    <button
-                                      onClick={() => toggleCondition(condKey)}
-                                      className="w-full px-4 py-2 flex items-center justify-between hover:bg-slate-100 text-left"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <ChevronDown
-                                          className={`w-4 h-4 text-slate-600 transition-transform ${isCondExpanded ? '' : '-rotate-90'}`}
-                                        />
-                                        <span className="text-sm text-slate-700">
-                                          {conditionData.condition.code}: {conditionData.condition.description}
-                                        </span>
-                                      </div>
-                                      <span className="text-xs text-gray-500 ml-2">
-                                        {conditionData.actions.length} eylem
-                                      </span>
-                                    </button>
-
-                                    {isCondExpanded && (
-                                      <div className="pl-6 space-y-2 mt-2">
-                                        {conditionData.actions.map(action => (
-                                          <div
-                                            key={action.id}
-                                            className={`p-3 rounded border ${action.status === 'NO_ACTION' ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}
-                                          >
-                                            <div className="flex items-start justify-between gap-4">
-                                              <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                  <span className="text-xs font-mono text-gray-500">{action.code}</span>
-                                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(action)}`}>
-                                                    {getStatusLabel(action.status)}
-                                                  </span>
-                                                </div>
-                                                <p className="text-sm font-medium text-gray-900 mb-2">{action.title}</p>
-
-                                                {action.status !== 'NO_ACTION' && (
-                                                  <div className="grid grid-cols-2 gap-3 text-xs">
-                                                    <div>
-                                                      <span className="text-gray-500">Hedef:</span>
-                                                      <span className="ml-1 text-gray-900">
-                                                        {action.is_continuous ? 'Sürekli' : (action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-')}
-                                                      </span>
-                                                    </div>
-                                                    <div>
-                                                      <span className="text-gray-500">İlerleme:</span>
-                                                      <span className="ml-1 text-gray-900">%{action.progress_percent}</span>
-                                                    </div>
-                                                  </div>
-                                                )}
-                                              </div>
-
-                                              {action.status !== 'NO_ACTION' && (
-                                                <div className="flex gap-1">
-                                                  <button
-                                                    onClick={() => handleViewDetail(action)}
-                                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                    title="Detayları Gör"
-                                                  >
-                                                    <Eye className="w-4 h-4" />
-                                                  </button>
-                                                  <button
-                                                    onClick={() => handleEdit(action)}
-                                                    className="p-1 text-amber-600 hover:bg-amber-50 rounded"
-                                                    title="Düzenle"
-                                                  >
-                                                    <Edit2 className="w-4 h-4" />
-                                                  </button>
-                                                  <button
-                                                    onClick={() => handleDelete(action)}
-                                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                                    title="Sil"
-                                                  >
-                                                    <Trash2 className="w-4 h-4" />
-                                                  </button>
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Kod
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Bileşen
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Standart
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Genel Şart
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
+                  Eylem Başlığı
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
+                  Açıklama
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
+                  Mevcut Durum Açıklaması
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
+                  Sorumlu Birimler
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
+                  İşbirliği Birimleri
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
+                  İlgili Birimler
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Durum
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  İlerleme
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Başlangıç
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Hedef Tarih
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                  Tamamlanma
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
+                  Çıktılar
+                </th>
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap sticky right-0 bg-gray-50">
+                  İşlemler
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedActions.map(action => (
+                <tr key={action.id} className={action.status === 'NO_ACTION' ? 'bg-amber-50' : 'hover:bg-gray-50'}>
+                  <td className="px-3 py-3 whitespace-nowrap">
+                    <span className="text-xs font-mono text-gray-600">{action.code}</span>
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {action.component_code}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-900">
+                    <div className="max-w-[200px]">
+                      <div className="font-medium">{action.standard_code}</div>
+                      <div className="text-xs text-gray-500 truncate">{action.standard_name}</div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-900">
+                    <div className="max-w-[200px]">
+                      <div className="font-medium">{action.condition_code}</div>
+                      <div className="text-xs text-gray-500 line-clamp-2">{action.condition_description}</div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-900">
+                    <div className="max-w-[250px]">
+                      <div className="font-medium line-clamp-2">{action.title}</div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-600">
+                    <div className="max-w-[250px] line-clamp-3">
+                      {action.description || '-'}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-600">
+                    <div className="max-w-[250px] line-clamp-3">
+                      {action.current_status_description || '-'}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-900">
+                    <div className="max-w-[200px]">
+                      {action.all_units_responsible ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          Tüm Birimler
+                        </span>
+                      ) : (
+                        <div className="space-y-1">
+                          {action.responsible_departments && action.responsible_departments.length > 0 ? (
+                            action.responsible_departments.map((dept, idx) => (
+                              <div key={idx} className="text-xs">{dept}</div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                          {action.responsible_special_units && action.responsible_special_units.length > 0 && (
+                            action.responsible_special_units.map((unit, idx) => (
+                              <div key={`special-${idx}`} className="text-xs text-purple-600">{unit}</div>
+                            ))
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-            })}
-          </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-900">
+                    <div className="max-w-[200px]">
+                      {action.all_units_collaborating ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Tüm Birimler
+                        </span>
+                      ) : (
+                        <div className="space-y-1">
+                          {action.collaborating_departments && action.collaborating_departments.length > 0 ? (
+                            action.collaborating_departments.map((dept, idx) => (
+                              <div key={idx} className="text-xs">{dept}</div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                          {action.collaborating_special_units && action.collaborating_special_units.length > 0 && (
+                            action.collaborating_special_units.map((unit, idx) => (
+                              <div key={`collab-${idx}`} className="text-xs text-purple-600">{unit}</div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-900">
+                    <div className="max-w-[200px] space-y-1">
+                      {action.related_departments && action.related_departments.length > 0 ? (
+                        action.related_departments.map((dept, idx) => (
+                          <div key={idx} className="text-xs">{dept}</div>
+                        ))
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap">
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(action)}`}>
+                      {getStatusLabel(action.status)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{ width: `${action.progress_percent}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium">{action.progress_percent}%</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {action.start_date ? new Date(action.start_date).toLocaleDateString('tr-TR') : '-'}
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {action.is_continuous ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        Sürekli
+                      </span>
+                    ) : (
+                      action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-'
+                    )}
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {action.completed_date ? (
+                      <span className="text-green-600 font-medium">
+                        {new Date(action.completed_date).toLocaleDateString('tr-TR')}
+                      </span>
+                    ) : '-'}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-600">
+                    <div className="max-w-[250px] line-clamp-3">
+                      {action.outputs || '-'}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white">
+                    {action.status !== 'NO_ACTION' && (
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleViewDetail(action)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                          title="Detayları Gör"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(action)}
+                          className="p-1.5 text-amber-600 hover:bg-amber-50 rounded"
+                          title="Düzenle"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(action)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                          title="Sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
