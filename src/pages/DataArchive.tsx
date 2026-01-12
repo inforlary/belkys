@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, ChevronDown, ChevronRight, CreditCard as Edit2, Trash2, Plus, CheckCircle, Clock, XCircle, Send, X } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, CreditCard as Edit2, Trash2, Plus, CheckCircle, Clock, XCircle, Send, X, FileSpreadsheet, FileText } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Objective {
   id: string;
@@ -605,6 +608,146 @@ export default function DataArchive() {
     }
   };
 
+  const getStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      draft: 'Taslak',
+      pending_director: 'Müdür Onayı Bekliyor',
+      pending_admin: 'Yönetici Onayı Bekliyor',
+      submitted: 'Onay Bekliyor',
+      approved: 'Onaylandı',
+      rejected: 'Reddedildi'
+    };
+    return labels[status] || status;
+  };
+
+  const exportToExcel = () => {
+    const exportData: any[] = [];
+
+    filteredObjectives.forEach(objective => {
+      objective.goals.forEach(goal => {
+        goal.indicators.forEach(indicator => {
+          const periods = getPeriodsForIndicator(indicator);
+          const targetValue = getIndicatorTarget(indicator.id, indicator);
+          const currentValue = calculateCurrentValue(indicator);
+
+          periods.forEach(period => {
+            const entry = getPeriodEntry(indicator.id, period.periodType, period.periodMonth, period.periodQuarter);
+            exportData.push({
+              'Amaç': objective.title,
+              'Hedef': goal.title,
+              'Sorumlu Birim': goal.department?.name || '-',
+              'Gösterge Kodu': indicator.code,
+              'Gösterge Adı': indicator.name,
+              'Dönem': period.label,
+              'Yıl': selectedYear,
+              'Hedef Değer': targetValue !== null ? targetValue : '-',
+              'Gerçekleşen Değer': entry ? entry.value : '-',
+              'Ölçü Birimi': indicator.unit,
+              'Durum': entry ? getStatusLabel(entry.status) : 'Girilmedi',
+              'Açıklama': entry?.notes || '-'
+            });
+          });
+        });
+      });
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Veri Arşivi');
+
+    const colWidths = [
+      { wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 15 },
+      { wch: 40 }, { wch: 12 }, { wch: 8 }, { wch: 15 },
+      { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 30 }
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.writeFile(wb, `Veri_Arsivi_${selectedYear}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Veri Arşivi', 14, 15);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Yıl: ${selectedYear}`, 14, 22);
+    if (selectedDepartmentId) {
+      const dept = departments.find(d => d.id === selectedDepartmentId);
+      if (dept) {
+        doc.text(`Birim: ${dept.name}`, 14, 28);
+      }
+    }
+    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, selectedDepartmentId ? 34 : 28);
+
+    const tableData: any[] = [];
+
+    filteredObjectives.forEach(objective => {
+      objective.goals.forEach(goal => {
+        goal.indicators.forEach(indicator => {
+          const periods = getPeriodsForIndicator(indicator);
+          const targetValue = getIndicatorTarget(indicator.id, indicator);
+
+          periods.forEach(period => {
+            const entry = getPeriodEntry(indicator.id, period.periodType, period.periodMonth, period.periodQuarter);
+            tableData.push([
+              objective.code,
+              goal.code,
+              indicator.code,
+              indicator.name.substring(0, 40) + (indicator.name.length > 40 ? '...' : ''),
+              period.label,
+              targetValue !== null ? targetValue : '-',
+              entry ? entry.value : '-',
+              indicator.unit,
+              entry ? getStatusLabel(entry.status) : 'Girilmedi'
+            ]);
+          });
+        });
+      });
+    });
+
+    autoTable(doc, {
+      head: [[
+        'Amaç',
+        'Hedef',
+        'Gösterge',
+        'Gösterge Adı',
+        'Dönem',
+        'Hedef',
+        'Değer',
+        'Birim',
+        'Durum'
+      ]],
+      body: tableData,
+      startY: selectedDepartmentId ? 40 : 34,
+      styles: {
+        fontSize: 7,
+        cellPadding: 1.5
+      },
+      headStyles: {
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 18 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 60 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 18 },
+        7: { cellWidth: 15 },
+        8: { cellWidth: 30 }
+      }
+    });
+
+    doc.save(`Veri_Arsivi_${selectedYear}.pdf`);
+  };
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { icon: any; color: string; text: string }> = {
       draft: { icon: Clock, color: 'bg-slate-100 text-slate-700', text: 'Taslak' },
@@ -695,6 +838,24 @@ export default function DataArchive() {
             <option key={year} value={year}>{year}</option>
           ))}
         </select>
+        {filteredObjectives.length > 0 && (
+          <>
+            <button
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel İndir
+            </button>
+            <button
+              onClick={exportToPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              PDF İndir
+            </button>
+          </>
+        )}
       </div>
 
       <div className="space-y-4">
