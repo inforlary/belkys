@@ -2,26 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
-import {
-  FileText,
-  Plus,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  Edit2,
-  Trash2,
-  Eye,
-  ArrowRight,
-  ChevronDown,
-  Download,
-  Filter,
-  X,
-  Search,
-  CheckSquare,
-  Square,
-  MoreVertical
-} from 'lucide-react';
+import { FileText, Plus, Calendar, CheckCircle2, Clock, AlertTriangle, CreditCard as Edit2, Trash2, Eye, ArrowRight, ChevronDown, Download, Filter, X, Search, CheckSquare, Square, MoreVertical } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
