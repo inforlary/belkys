@@ -15,6 +15,7 @@ interface Risk {
   category_id: string;
   owner_department_id: string;
   objective_id: string;
+  goal_id: string;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -29,6 +30,7 @@ interface Risk {
   categories?: Array<{ category_id: string; category: { id: string; code: string; name: string; color: string } }>;
   department?: { name: string };
   objective?: { code: string; title: string };
+  goal?: { code: string; title: string };
   identified_by?: { full_name: string };
 }
 
@@ -157,6 +159,7 @@ export default function RiskDetail() {
             categories:risk_category_mappings(category_id, category:risk_categories(id, code, name, color)),
             department:departments!owner_department_id(name),
             objective:objectives(code, title),
+            goal:goals(code, title),
             identified_by:profiles!identified_by_id(full_name)
           `)
           .eq('id', riskId)
@@ -255,26 +258,28 @@ export default function RiskDetail() {
         return 'LOW';
       };
 
+      const updateData: any = {
+        name: editFormData.name,
+        description: editFormData.description,
+        causes: editFormData.causes,
+        consequences: editFormData.consequences,
+        owner_department_id: editFormData.owner_department_id,
+        goal_id: editFormData.goal_id && editFormData.goal_id.trim() !== '' ? editFormData.goal_id : null,
+        inherent_likelihood: editFormData.inherent_likelihood,
+        inherent_impact: editFormData.inherent_impact,
+        inherent_score: inherentScore,
+        residual_likelihood: editFormData.residual_likelihood,
+        residual_impact: editFormData.residual_impact,
+        residual_score: residualScore,
+        risk_level: getRiskLevel(residualScore),
+        risk_response: editFormData.risk_response,
+        response_rationale: editFormData.response_rationale,
+        status: editFormData.status
+      };
+
       const { error: updateError } = await supabase
         .from('risks')
-        .update({
-          name: editFormData.name,
-          description: editFormData.description,
-          causes: editFormData.causes,
-          consequences: editFormData.consequences,
-          owner_department_id: editFormData.owner_department_id,
-          goal_id: editFormData.goal_id || null,
-          inherent_likelihood: editFormData.inherent_likelihood,
-          inherent_impact: editFormData.inherent_impact,
-          inherent_score: inherentScore,
-          residual_likelihood: editFormData.residual_likelihood,
-          residual_impact: editFormData.residual_impact,
-          residual_score: residualScore,
-          risk_level: getRiskLevel(residualScore),
-          risk_response: editFormData.risk_response,
-          response_rationale: editFormData.response_rationale,
-          status: editFormData.status
-        })
+        .update(updateData)
         .eq('id', riskId);
 
       if (updateError) throw updateError;
@@ -284,24 +289,27 @@ export default function RiskDetail() {
         .delete()
         .eq('risk_id', riskId);
 
-      const categoryMappings = editFormData.category_ids.map((categoryId: string) => ({
-        risk_id: riskId,
-        category_id: categoryId
-      }));
+      if (editFormData.category_ids && editFormData.category_ids.length > 0) {
+        const categoryMappings = editFormData.category_ids.map((categoryId: string) => ({
+          risk_id: riskId,
+          category_id: categoryId
+        }));
 
-      const { error: mappingError } = await supabase
-        .from('risk_category_mappings')
-        .insert(categoryMappings);
+        const { error: mappingError } = await supabase
+          .from('risk_category_mappings')
+          .insert(categoryMappings);
 
-      if (mappingError) throw mappingError;
+        if (mappingError) throw mappingError;
+      }
 
       alert('Risk başarıyla güncellendi!');
       setShowEditModal(false);
       setEditFormData(null);
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Risk güncellenirken hata:', error);
-      alert('Risk güncellenirken hata oluştu.');
+      console.error('Hata detayı:', JSON.stringify(error, null, 2));
+      alert('Risk güncellenirken hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
     }
   }
 
@@ -525,9 +533,18 @@ export default function RiskDetail() {
 
               {risk.objective && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">İlişkili Stratejik Hedef</h4>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">İlişkili Stratejik Hedef (Objective)</h4>
                   <div className="text-gray-700">
                     {risk.objective.code} - {risk.objective.title}
+                  </div>
+                </div>
+              )}
+
+              {risk.goal && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">İlişkili Hedef</h4>
+                  <div className="text-gray-700">
+                    {risk.goal.code} - {risk.goal.title}
                   </div>
                 </div>
               )}
