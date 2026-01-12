@@ -293,6 +293,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: 'internal-control/dashboard' },
         { icon: ClipboardCheck, label: 'Eylem Planları', path: 'internal-control/action-plans' },
+        { icon: ListChecks, label: 'Tüm Eylemler', path: 'internal-control/actions' },
         { icon: Scale, label: 'Öz Değerlendirmeler', path: 'internal-control/assessments' },
         { icon: Users, label: 'İKİYK Toplantıları', path: 'internal-control/ikyk', adminOnly: true },
         { icon: Award, label: 'Güvence Beyanları', path: 'internal-control/assurance', adminOnly: true },
