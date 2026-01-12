@@ -3,10 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
-import {
-  ArrowLeft, Info, BarChart3, Shield, Activity, TrendingUp, History,
-  Edit2, Trash2, Plus, X, Save, AlertTriangle, MoreVertical, ChevronDown
-} from 'lucide-react';
+import { ArrowLeft, Info, BarChart3, Shield, Activity, TrendingUp, History, CreditCard as Edit2, Trash2, Plus, X, Save, AlertTriangle, MoreVertical, ChevronDown } from 'lucide-react';
 
 interface Risk {
   id: string;
