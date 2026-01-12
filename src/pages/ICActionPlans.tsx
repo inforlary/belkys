@@ -269,8 +269,8 @@ export default function ICActionPlans() {
   };
 
   const handleDelete = async (plan: ActionPlan) => {
-    if (plan.status !== 'ARCHIVED') {
-      alert('Sadece arşivlenmiş planlar silinebilir.');
+    if (plan.status !== 'ARCHIVED' && plan.status !== 'DRAFT') {
+      alert('Sadece taslak veya arşivlenmiş planlar silinebilir.');
       return;
     }
 
@@ -555,6 +555,15 @@ export default function ICActionPlans() {
                     <Copy className="w-4 h-4" />
                     Kopyala
                   </button>
+                  {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
+                    <button
+                      onClick={() => handleDelete(plan)}
+                      className="flex items-center gap-2 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Sil
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
