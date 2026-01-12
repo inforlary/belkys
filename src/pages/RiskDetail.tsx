@@ -140,6 +140,7 @@ export default function RiskDetail() {
 
   const [departments, setDepartments] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
 
   useEffect(() => {
     if (riskId && profile?.organization_id) {
@@ -151,7 +152,7 @@ export default function RiskDetail() {
     try {
       setLoading(true);
 
-      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes] = await Promise.all([
+      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -201,7 +202,12 @@ export default function RiskDetail() {
         supabase
           .from('risk_category_mappings')
           .select('category_id')
-          .eq('risk_id', riskId)
+          .eq('risk_id', riskId),
+        supabase
+          .from('goals')
+          .select('id, code, title')
+          .eq('organization_id', profile?.organization_id)
+          .order('code')
       ]);
 
       if (riskRes.error) throw riskRes.error;
@@ -214,6 +220,7 @@ export default function RiskDetail() {
       setProfiles(profilesRes.data || []);
       setCategories(categoriesRes.data || []);
       setRiskCategories((riskCategoriesRes.data || []).map((m: any) => m.category_id));
+      setGoals(goalsRes.data || []);
     } catch (error) {
       console.error('Error loading risk:', error);
     } finally {
@@ -235,8 +242,8 @@ export default function RiskDetail() {
   async function handleSaveEdit() {
     if (!editFormData) return;
 
-    if (editFormData.category_ids.length === 0) {
-      alert('En az bir kategori seçmelisiniz.');
+    if (!editFormData.name || editFormData.category_ids.length === 0 || !editFormData.owner_department_id) {
+      alert('Lütfen zorunlu alanları doldurun! (Risk Adı, Kategori, Sorumlu Birim)');
       return;
     }
 
@@ -258,6 +265,8 @@ export default function RiskDetail() {
           description: editFormData.description,
           causes: editFormData.causes,
           consequences: editFormData.consequences,
+          owner_department_id: editFormData.owner_department_id,
+          goal_id: editFormData.goal_id || null,
           inherent_likelihood: editFormData.inherent_likelihood,
           inherent_impact: editFormData.inherent_impact,
           inherent_score: inherentScore,
@@ -373,6 +382,8 @@ export default function RiskDetail() {
                   description: risk.description || '',
                   causes: risk.causes || '',
                   consequences: risk.consequences || '',
+                  owner_department_id: risk.owner_department_id,
+                  goal_id: risk.objective_id || '',
                   inherent_likelihood: risk.inherent_likelihood,
                   inherent_impact: risk.inherent_impact,
                   residual_likelihood: risk.residual_likelihood,
@@ -1154,6 +1165,44 @@ export default function RiskDetail() {
                       </span>
                     </label>
                   ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sorumlu Birim <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editFormData.owner_department_id}
+                    onChange={(e) => setEditFormData({ ...editFormData, owner_department_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Seçiniz</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    İlgili Hedef
+                  </label>
+                  <select
+                    value={editFormData.goal_id}
+                    onChange={(e) => setEditFormData({ ...editFormData, goal_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seçiniz (Opsiyonel)</option>
+                    {goals.map((goal) => (
+                      <option key={goal.id} value={goal.id}>
+                        {goal.code} - {goal.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
