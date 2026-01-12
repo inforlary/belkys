@@ -197,7 +197,7 @@ export default function ICActions() {
     const { data, error } = await supabase
       .from('ic_components')
       .select('*')
-      .order('code');
+      .order('order_index');
 
     if (error) throw error;
     setComponents(data || []);
@@ -207,7 +207,7 @@ export default function ICActions() {
     const { data, error } = await supabase
       .from('ic_standards')
       .select('*')
-      .order('code');
+      .order('order_index');
 
     if (error) throw error;
     setStandards(data || []);
