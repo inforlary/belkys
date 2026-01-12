@@ -816,36 +816,64 @@ export default function ICStandards() {
         }}
         title={editingAction ? 'Eylem Düzenle' : 'Yeni Eylem Ekle'}
       >
-        <div className="space-y-4">
+        <div className="space-y-6 max-h-[70vh] overflow-y-auto px-1">
           {!editingAction && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-sm text-blue-900">
-                <strong>Eylem Kodu:</strong> {generateActionCode(actionConditionId)}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="text-sm font-medium text-blue-900">
+                Eylem Kodu: <span className="font-bold">{generateActionCode(actionConditionId)}</span>
               </div>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Eylem Açıklaması <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={actionForm.title}
-              onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })}
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Eylem açıklaması giriniz..."
-              required
-            />
+          <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">Temel Bilgiler</h3>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Eylem Açıklaması <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={actionForm.title}
+                onChange={(e) => setActionForm({ ...actionForm, title: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Eylem açıklaması giriniz..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Beklenen Çıktı/Sonuç
+              </label>
+              <textarea
+                value={actionForm.expected_outputs}
+                onChange={(e) => setActionForm({ ...actionForm, expected_outputs: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Beklenen çıktı veya sonuç..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Açıklama/Not
+              </label>
+              <textarea
+                value={actionForm.description}
+                onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ek açıklama veya notlar..."
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Sorumlu Birim <span className="text-red-500">*</span>
-            </label>
+          <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">Sorumlu Birimler <span className="text-red-500">*</span></h3>
 
-            <div className="mb-2">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="bg-white rounded-lg p-3 border border-slate-200">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={actionForm.all_units_responsible}
@@ -857,59 +885,64 @@ export default function ICStandards() {
                   })}
                   className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                 />
-                Tüm Birimler
+                Tüm Birimler Sorumlu
               </label>
             </div>
 
             {!actionForm.all_units_responsible && (
-              <>
-                <div className="mb-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Özel Birimler</label>
-                  <select
-                    multiple
-                    value={actionForm.special_responsible_types}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setActionForm({ ...actionForm, special_responsible_types: selected });
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    size={4}
-                  >
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Özel Birimler</label>
+                  <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
                     {SPECIAL_UNITS.map((unit) => (
-                      <option key={unit.value} value={unit.value}>{unit.label}</option>
+                      <label key={unit.value} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={actionForm.special_responsible_types.includes(unit.value)}
+                          onChange={(e) => {
+                            const newTypes = e.target.checked
+                              ? [...actionForm.special_responsible_types, unit.value]
+                              : actionForm.special_responsible_types.filter(t => t !== unit.value);
+                            setActionForm({ ...actionForm, special_responsible_types: newTypes });
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-slate-700">{unit.label}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Departmanlar</label>
-                  <select
-                    multiple
-                    value={actionForm.responsible_department_ids}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setActionForm({ ...actionForm, responsible_department_ids: selected });
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    size={5}
-                  >
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Departmanlar</label>
+                  <div className="bg-white rounded-lg border border-slate-200 max-h-40 overflow-y-auto divide-y divide-slate-100">
                     {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      <label key={dept.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={actionForm.responsible_department_ids.includes(dept.id)}
+                          onChange={(e) => {
+                            const newDepts = e.target.checked
+                              ? [...actionForm.responsible_department_ids, dept.id]
+                              : actionForm.responsible_department_ids.filter(d => d !== dept.id);
+                            setActionForm({ ...actionForm, responsible_department_ids: newDepts });
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-slate-700">{dept.name}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Ctrl/Cmd tuşu ile çoklu seçim yapabilirsiniz</p>
-              </>
+              </div>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              İş Birliği Yapılacak Birimler
-            </label>
+          <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">İş Birliği Yapılacak Birimler</h3>
 
-            <div className="mb-2">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="bg-white rounded-lg p-3 border border-slate-200">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={actionForm.all_units_collaborating}
@@ -921,140 +954,139 @@ export default function ICStandards() {
                   })}
                   className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                 />
-                Tüm Birimler
+                Tüm Birimler İşbirliği Yapacak
               </label>
             </div>
 
             {!actionForm.all_units_collaborating && (
-              <>
-                <div className="mb-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Özel Birimler</label>
-                  <select
-                    multiple
-                    value={actionForm.related_special_responsible_types}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setActionForm({ ...actionForm, related_special_responsible_types: selected });
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    size={4}
-                  >
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Özel Birimler</label>
+                  <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
                     {SPECIAL_UNITS.map((unit) => (
-                      <option key={unit.value} value={unit.value}>{unit.label}</option>
+                      <label key={unit.value} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={actionForm.related_special_responsible_types.includes(unit.value)}
+                          onChange={(e) => {
+                            const newTypes = e.target.checked
+                              ? [...actionForm.related_special_responsible_types, unit.value]
+                              : actionForm.related_special_responsible_types.filter(t => t !== unit.value);
+                            setActionForm({ ...actionForm, related_special_responsible_types: newTypes });
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-slate-700">{unit.label}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Departmanlar</label>
-                  <select
-                    multiple
-                    value={actionForm.collaborating_departments_ids}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setActionForm({ ...actionForm, collaborating_departments_ids: selected });
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    size={5}
-                  >
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Departmanlar</label>
+                  <div className="bg-white rounded-lg border border-slate-200 max-h-40 overflow-y-auto divide-y divide-slate-100">
                     {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      <label key={dept.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={actionForm.collaborating_departments_ids.includes(dept.id)}
+                          onChange={(e) => {
+                            const newDepts = e.target.checked
+                              ? [...actionForm.collaborating_departments_ids, dept.id]
+                              : actionForm.collaborating_departments_ids.filter(d => d !== dept.id);
+                            setActionForm({ ...actionForm, collaborating_departments_ids: newDepts });
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-slate-700">{dept.name}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Ctrl/Cmd tuşu ile çoklu seçim yapabilirsiniz</p>
-              </>
+              </div>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Beklenen Çıktı/Sonuç
-            </label>
-            <textarea
-              value={actionForm.expected_outputs}
-              onChange={(e) => setActionForm({ ...actionForm, expected_outputs: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Beklenen çıktı veya sonuç..."
-            />
-          </div>
+          <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">Zaman Çizelgesi</h3>
 
-          <div>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={actionForm.is_continuous}
-                onChange={(e) => setActionForm({ ...actionForm, is_continuous: e.target.checked, target_date: '' })}
-                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-slate-700">Sürekli Eylem</span>
-            </label>
-          </div>
-
-          {!actionForm.is_continuous && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Tamamlanma Tarihi <span className="text-red-500">*</span>
+            <div className="bg-white rounded-lg p-3 border border-slate-200">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={actionForm.is_continuous}
+                  onChange={(e) => setActionForm({ ...actionForm, is_continuous: e.target.checked, target_date: '' })}
+                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                />
+                Sürekli Eylem (Tamamlanma tarihi yok)
               </label>
-              <input
-                type="date"
-                value={actionForm.target_date}
-                onChange={(e) => setActionForm({ ...actionForm, target_date: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required={!actionForm.is_continuous}
-              />
             </div>
-          )}
+
+            {!actionForm.is_continuous && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Tamamlanma Tarihi <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={actionForm.target_date}
+                  onChange={(e) => setActionForm({ ...actionForm, target_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required={!actionForm.is_continuous}
+                />
+              </div>
+            )}
+          </div>
 
           {editingAction && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                İlerleme (%)
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={editingAction.progress_percent}
-                onChange={(e) => setEditingAction({ ...editingAction, progress_percent: parseInt(e.target.value) })}
-                className="w-full"
-              />
-              <div className="text-center text-lg font-bold text-blue-600 mt-2">
-                %{editingAction.progress_percent}
+            <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+              <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">İlerleme Durumu</h3>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    İlerleme Yüzdesi
+                  </label>
+                  <span className="text-2xl font-bold text-blue-600">
+                    %{editingAction.progress_percent}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={editingAction.progress_percent}
+                  onChange={(e) => setEditingAction({ ...editingAction, progress_percent: parseInt(e.target.value) })}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                  <span>0%</span>
+                  <span>25%</span>
+                  <span>50%</span>
+                  <span>75%</span>
+                  <span>100%</span>
+                </div>
               </div>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Açıklama/Not
-            </label>
-            <textarea
-              value={actionForm.description}
-              onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ek açıklama veya notlar..."
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white">
             <button
               onClick={() => {
                 setShowActionModal(false);
                 setEditingAction(null);
               }}
-              className="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg"
+              className="px-6 py-2.5 text-slate-700 hover:bg-slate-100 rounded-lg font-medium transition-colors"
             >
               İptal
             </button>
             <button
               onClick={saveAction}
               disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors shadow-sm"
             >
-              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+              {saving ? 'Kaydediliyor...' : editingAction ? 'Güncelle' : 'Kaydet'}
             </button>
           </div>
         </div>
