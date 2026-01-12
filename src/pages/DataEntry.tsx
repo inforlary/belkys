@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, CheckCircle, XCircle, Clock, Plus, CreditCard as Edit2, Trash2, Send } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, Plus, CreditCard as Edit2, Trash2, Send, FileSpreadsheet, FileText } from 'lucide-react';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Indicator {
   id: string;
@@ -471,6 +474,116 @@ export default function DataEntry() {
     }
   };
 
+  const getStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      draft: 'Taslak',
+      pending_director: 'Müdür Onayında',
+      pending_admin: 'Yönetici Onayında',
+      approved: 'Onaylandı',
+      rejected: 'Reddedildi'
+    };
+    return labels[status] || status;
+  };
+
+  const exportToExcel = () => {
+    const exportData: any[] = [];
+
+    filteredIndicators.forEach(indicator => {
+      const periods = getPeriodsForIndicator(indicator);
+      periods.forEach(period => {
+        const entry = getPeriodEntry(indicator.id, selectedYear, period.periodType, period.periodMonth, period.periodQuarter);
+        exportData.push({
+          'Gösterge Kodu': indicator.code,
+          'Gösterge Adı': indicator.name,
+          'Hedef': indicator.goal?.title || '-',
+          'Dönem': period.label,
+          'Yıl': selectedYear,
+          'Değer': entry ? entry.value : '-',
+          'Birim': indicator.unit,
+          'Durum': entry ? getStatusLabel(entry.status) : 'Girilmedi',
+          'Tarih': entry ? new Date(entry.entry_date).toLocaleDateString('tr-TR') : '-'
+        });
+      });
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Veri Girişleri');
+
+    const colWidths = [
+      { wch: 15 }, { wch: 40 }, { wch: 30 }, { wch: 12 },
+      { wch: 8 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 12 }
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.writeFile(wb, `Veri_Girisleri_${selectedYear}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Veri Girişleri', 14, 15);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Yıl: ${selectedYear}`, 14, 22);
+    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 28);
+
+    const tableData: any[] = [];
+
+    filteredIndicators.forEach(indicator => {
+      const periods = getPeriodsForIndicator(indicator);
+      periods.forEach(period => {
+        const entry = getPeriodEntry(indicator.id, selectedYear, period.periodType, period.periodMonth, period.periodQuarter);
+        tableData.push([
+          indicator.code,
+          indicator.name,
+          indicator.goal?.title || '-',
+          period.label,
+          entry ? entry.value : '-',
+          indicator.unit,
+          entry ? getStatusLabel(entry.status) : 'Girilmedi'
+        ]);
+      });
+    });
+
+    autoTable(doc, {
+      head: [[
+        'Gösterge Kodu',
+        'Gösterge Adı',
+        'Hedef',
+        'Dönem',
+        'Değer',
+        'Birim',
+        'Durum'
+      ]],
+      body: tableData,
+      startY: 34,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2
+      },
+      headStyles: {
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 60 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 30 }
+      }
+    });
+
+    doc.save(`Veri_Girisleri_${selectedYear}.pdf`);
+  };
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { icon: any; color: string; text: string }> = {
       draft: { icon: Clock, color: 'bg-slate-100 text-slate-700', text: 'Taslak' },
@@ -609,6 +722,24 @@ export default function DataEntry() {
             <option key={year} value={year}>{year}</option>
           ))}
         </select>
+        {filteredIndicators.length > 0 && (
+          <>
+            <button
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel İndir
+            </button>
+            <button
+              onClick={exportToPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              PDF İndir
+            </button>
+          </>
+        )}
       </div>
 
       <div className="space-y-4">
