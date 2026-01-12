@@ -1448,7 +1448,7 @@ export default function ICActions() {
                   Mevcut Durum
                 </th>
                 <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
-                  Kamu Kod No
+                  Eylem Kod No
                 </th>
                 <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[200px]">
                   Öngörülen Eylemler
@@ -1507,91 +1507,101 @@ export default function ICActions() {
                               </>
                             )}
                             <td className="border border-gray-300 px-2 py-2 text-xs text-center font-mono">
-                              {action.code}
+                              {action.status === 'NO_ACTION' ? '' : action.code}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs">
                               <div className="font-medium text-gray-900 mb-1">{action.title}</div>
-                              {action.description && (
+                              {action.status !== 'NO_ACTION' && action.description && (
                                 <div className="text-gray-600 text-xs">{action.description}</div>
                               )}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs">
-                              {action.all_units_responsible ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  Tüm Birimler
-                                </span>
-                              ) : (
-                                <div className="space-y-0.5">
-                                  {action.responsible_departments && action.responsible_departments.length > 0 && (
-                                    action.responsible_departments.map((dept, idx) => (
-                                      <div key={idx}>{dept}</div>
-                                    ))
-                                  )}
-                                  {action.responsible_special_units && action.responsible_special_units.length > 0 && (
-                                    action.responsible_special_units.map((unit, idx) => (
-                                      <div key={`special-${idx}`} className="text-purple-600">{unit}</div>
-                                    ))
-                                  )}
-                                  {(!action.responsible_departments || action.responsible_departments.length === 0) &&
-                                   (!action.responsible_special_units || action.responsible_special_units.length === 0) && '-'}
-                                </div>
+                              {action.status === 'NO_ACTION' ? '-' : (
+                                action.all_units_responsible ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Tüm Birimler
+                                  </span>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    {action.responsible_departments && action.responsible_departments.length > 0 && (
+                                      action.responsible_departments.map((dept, idx) => (
+                                        <div key={idx}>{dept}</div>
+                                      ))
+                                    )}
+                                    {action.responsible_special_units && action.responsible_special_units.length > 0 && (
+                                      action.responsible_special_units.map((unit, idx) => (
+                                        <div key={`special-${idx}`} className="text-purple-600">{unit}</div>
+                                      ))
+                                    )}
+                                    {(!action.responsible_departments || action.responsible_departments.length === 0) &&
+                                     (!action.responsible_special_units || action.responsible_special_units.length === 0) && '-'}
+                                  </div>
+                                )
                               )}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs">
-                              {action.all_units_collaborating ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  Tüm Birimler
-                                </span>
-                              ) : (
-                                <div className="space-y-0.5">
-                                  {action.collaborating_departments && action.collaborating_departments.length > 0 && (
-                                    action.collaborating_departments.map((dept, idx) => (
-                                      <div key={idx}>{dept}</div>
-                                    ))
-                                  )}
-                                  {action.collaborating_special_units && action.collaborating_special_units.length > 0 && (
-                                    action.collaborating_special_units.map((unit, idx) => (
-                                      <div key={`collab-${idx}`} className="text-purple-600">{unit}</div>
-                                    ))
-                                  )}
-                                  {(!action.collaborating_departments || action.collaborating_departments.length === 0) &&
-                                   (!action.collaborating_special_units || action.collaborating_special_units.length === 0) && '-'}
-                                </div>
+                              {action.status === 'NO_ACTION' ? '-' : (
+                                action.all_units_collaborating ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Tüm Birimler
+                                  </span>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    {action.collaborating_departments && action.collaborating_departments.length > 0 && (
+                                      action.collaborating_departments.map((dept, idx) => (
+                                        <div key={idx}>{dept}</div>
+                                      ))
+                                    )}
+                                    {action.collaborating_special_units && action.collaborating_special_units.length > 0 && (
+                                      action.collaborating_special_units.map((unit, idx) => (
+                                        <div key={`collab-${idx}`} className="text-purple-600">{unit}</div>
+                                      ))
+                                    )}
+                                    {(!action.collaborating_departments || action.collaborating_departments.length === 0) &&
+                                     (!action.collaborating_special_units || action.collaborating_special_units.length === 0) && '-'}
+                                  </div>
+                                )
                               )}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs">
-                              {action.expected_outputs || action.outputs || '-'}
+                              {action.status === 'NO_ACTION' ? '-' : (action.expected_outputs || action.outputs || '-')}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs text-center whitespace-nowrap">
-                              {action.is_continuous ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                  Sürekli
-                                </span>
-                              ) : action.completed_date ? (
-                                <span className="text-green-600 font-medium">
-                                  {new Date(action.completed_date).toLocaleDateString('tr-TR')}
-                                </span>
-                              ) : action.target_date ? (
-                                new Date(action.target_date).toLocaleDateString('tr-TR')
-                              ) : '-'}
+                              {action.status === 'NO_ACTION' ? '-' : (
+                                action.is_continuous ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    Sürekli
+                                  </span>
+                                ) : action.completed_date ? (
+                                  <span className="text-green-600 font-medium">
+                                    {new Date(action.completed_date).toLocaleDateString('tr-TR')}
+                                  </span>
+                                ) : action.target_date ? (
+                                  new Date(action.target_date).toLocaleDateString('tr-TR')
+                                ) : '-'
+                              )}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs">
-                              <div className="space-y-1">
-                                <div>
-                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(action)}`}>
-                                    {getStatusLabel(action.status)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                                    <div
-                                      className="bg-blue-600 h-1.5 rounded-full"
-                                      style={{ width: `${action.progress_percent}%` }}
-                                    />
+                              {action.status === 'NO_ACTION' ? (
+                                <span className="text-gray-500">-</span>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(action)}`}>
+                                      {getStatusLabel(action.status)}
+                                    </span>
                                   </div>
-                                  <span className="text-xs font-medium">{action.progress_percent}%</span>
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                      <div
+                                        className="bg-blue-600 h-1.5 rounded-full"
+                                        style={{ width: `${action.progress_percent}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-medium">{action.progress_percent}%</span>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs text-center whitespace-nowrap">
                               {action.status !== 'NO_ACTION' && (
