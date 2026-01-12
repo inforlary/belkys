@@ -1,6 +1,18 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
-export type CalculationMethod = 'standard' | 'cumulative' | 'percentage' | 'cumulative_decreasing';
+export type CalculationMethod =
+  | 'standard'
+  | 'cumulative'
+  | 'cumulative_increasing'
+  | 'cumulative_decreasing'
+  | 'percentage'
+  | 'percentage_increasing'
+  | 'percentage_decreasing'
+  | 'maintenance'
+  | 'maintenance_increasing'
+  | 'maintenance_decreasing'
+  | 'increasing'
+  | 'decreasing';
 
 interface CalculationParams {
   method: CalculationMethod;
@@ -8,63 +20,91 @@ interface CalculationParams {
   targetValue: number;
   periodValues: number[];
   currentValue: number;
+  measurementFrequencyCount?: number;
 }
 
 export function calculateIndicatorValue(params: CalculationParams): number {
-  const { method, baselineValue, targetValue, periodValues, currentValue } = params;
+  const { method, baselineValue, periodValues } = params;
+  const sum = periodValues.reduce((acc, val) => acc + val, 0);
 
   switch (method) {
-    case 'standard':
-      return currentValue;
-
-    case 'cumulative': {
-      const sum = periodValues.reduce((acc, val) => acc + val, 0);
+    case 'cumulative':
+    case 'cumulative_increasing':
+    case 'increasing':
       return baselineValue + sum;
-    }
 
-    case 'percentage': {
-      if (targetValue === 0) return 0;
-      return (currentValue / targetValue) * 100;
-    }
-
-    case 'cumulative_decreasing': {
-      const sum = periodValues.reduce((acc, val) => acc + val, 0);
+    case 'cumulative_decreasing':
+    case 'decreasing':
       return baselineValue - sum;
-    }
 
+    case 'percentage':
+    case 'percentage_increasing':
+    case 'percentage_decreasing':
+      return sum;
+
+    case 'maintenance':
+    case 'maintenance_increasing':
+    case 'maintenance_decreasing':
+      return sum;
+
+    case 'standard':
     default:
-      return currentValue;
+      return baselineValue + sum;
   }
 }
 
 export function calculatePerformancePercentage(params: CalculationParams): number {
-  const { method, baselineValue, targetValue, periodValues } = params;
+  const { method, baselineValue, targetValue, periodValues, measurementFrequencyCount = 1 } = params;
 
   if (targetValue === 0) return 0;
 
-  switch (method) {
-    case 'standard':
-      return 0;
+  const sum = periodValues.reduce((acc, val) => acc + val, 0);
 
-    case 'cumulative': {
-      const sum = periodValues.reduce((acc, val) => acc + val, 0);
-      const achieved = baselineValue + sum;
-      return (achieved / targetValue) * 100;
+  switch (method) {
+    case 'cumulative':
+    case 'cumulative_increasing':
+    case 'increasing': {
+      const currentValue = baselineValue + sum;
+      const denominator = targetValue - baselineValue;
+      if (denominator === 0) return 0;
+      return ((currentValue - baselineValue) / denominator) * 100;
     }
 
-    case 'percentage': {
-      const sum = periodValues.reduce((acc, val) => acc + val, 0);
+    case 'cumulative_decreasing':
+    case 'decreasing': {
+      const currentValue = baselineValue - sum;
+      const denominator = targetValue - baselineValue;
+      if (denominator === 0) return 0;
+      return ((currentValue - baselineValue) / denominator) * 100;
+    }
+
+    case 'percentage_increasing': {
+      const average = sum / measurementFrequencyCount;
+      return (average / targetValue) * 100;
+    }
+
+    case 'percentage_decreasing': {
+      const average = sum / measurementFrequencyCount;
+      const denominator = targetValue - baselineValue;
+      if (denominator === 0) return 0;
+      return ((average - baselineValue) / denominator) * 100;
+    }
+
+    case 'maintenance_increasing': {
       return (sum / targetValue) * 100;
     }
 
-    case 'cumulative_decreasing': {
-      const sum = periodValues.reduce((acc, val) => acc + val, 0);
-      const achieved = baselineValue - sum;
-      return (achieved / targetValue) * 100;
+    case 'maintenance_decreasing': {
+      if (sum === 0) return 0;
+      return (targetValue / sum) * 100;
     }
 
-    default:
-      return 0;
+    case 'percentage':
+    case 'maintenance':
+    case 'standard':
+    default: {
+      return (sum / targetValue) * 100;
+    }
   }
 }
 

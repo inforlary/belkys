@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Search, CheckCircle, XCircle, Clock, Plus, CreditCard as Edit2, Trash2, Send } from 'lucide-react';
+import { calculateIndicatorProgress } from '../utils/progressCalculations';
 
 interface Indicator {
   id: string;
@@ -497,33 +498,52 @@ export default function DataEntry() {
 
     if (indicatorEntries.length === 0) return 0;
 
-    const calcMethod = indicator.calculation_method || 'cumulative';
+    const calcMethod = indicator.calculation_method || 'cumulative_increasing';
+    const baselineValue = indicator.baseline_value || 0;
+    const sumOfEntries = indicatorEntries.reduce((acc, e) => acc + (e.value || 0), 0);
 
-    if (calcMethod === 'average') {
-      const sum = indicatorEntries.reduce((acc, e) => acc + (e.value || 0), 0);
-      return sum / indicatorEntries.length;
-    } else if (calcMethod === 'last_value') {
-      const sortedEntries = [...indicatorEntries].sort((a, b) => {
-        if (a.period_month && b.period_month) return b.period_month - a.period_month;
-        if (a.period_quarter && b.period_quarter) return b.period_quarter - a.period_quarter;
-        return 0;
-      });
-      return sortedEntries[0]?.value || 0;
-    } else {
-      return indicatorEntries.reduce((acc, e) => acc + (e.value || 0), 0);
+    switch (calcMethod) {
+      case 'cumulative':
+      case 'cumulative_increasing':
+      case 'increasing':
+        return baselineValue + sumOfEntries;
+
+      case 'cumulative_decreasing':
+      case 'decreasing':
+        return baselineValue - sumOfEntries;
+
+      case 'percentage_increasing':
+      case 'percentage_decreasing':
+      case 'percentage':
+        return sumOfEntries;
+
+      case 'maintenance_increasing':
+      case 'maintenance_decreasing':
+      case 'maintenance':
+        return sumOfEntries;
+
+      default:
+        return baselineValue + sumOfEntries;
     }
   };
 
   const calculateProgress = (indicator: Indicator) => {
-    const currentValue = calculateCurrentValue(indicator);
-    const baseline = indicator.baseline_value || 0;
-    const target = indicator.target_value || 0;
+    const dataEntriesForIndicator = entries
+      .filter(e => e.indicator_id === indicator.id && e.period_year === selectedYear)
+      .map(e => ({
+        indicator_id: e.indicator_id,
+        value: e.value,
+        status: e.status
+      }));
 
-    if (target === baseline) return 0;
-    if (target === 0) return 0;
-
-    const progress = ((currentValue - baseline) / (target - baseline)) * 100;
-    return Math.max(0, Math.min(100, progress));
+    return calculateIndicatorProgress(
+      {
+        ...indicator,
+        yearly_target: indicator.target_value,
+        current_value: calculateCurrentValue(indicator)
+      },
+      dataEntriesForIndicator
+    );
   };
 
   const getLatestEntryLabel = (indicator: Indicator) => {

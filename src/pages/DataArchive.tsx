@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Search, ChevronDown, ChevronRight, CreditCard as Edit2, Trash2, Plus, CheckCircle, Clock, XCircle, Send, X } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import { calculateIndicatorProgress } from '../utils/progressCalculations';
 
 interface Objective {
   id: string;
@@ -274,31 +275,22 @@ export default function DataArchive() {
   const calculateProgress = (indicator: Indicator, currentValue: number | null, targetValue: number | null) => {
     if (currentValue === null || targetValue === null) return 0;
 
-    const baselineValue = indicator.baseline_value || 0;
-    const calculationMethod = indicator.calculation_method || 'cumulative';
+    const dataEntriesForIndicator = entries
+      .filter(e => e.indicator_id === indicator.id)
+      .map(e => ({
+        indicator_id: e.indicator_id,
+        value: e.value,
+        status: e.status
+      }));
 
-    let A = baselineValue;
-    let B = targetValue;
-    let C = currentValue;
-
-    if (calculationMethod === 'percentage') {
-      A = 0;
-    }
-
-    const denominator = B - A;
-
-    if (denominator === 0) {
-      if (calculationMethod === 'maintenance') {
-        if (C === A) return 100;
-        const maintenanceProgress = (C / B) * 100;
-        return Math.max(0, Math.round(maintenanceProgress));
-      }
-      return 0;
-    }
-
-    const progress = ((C - A) / denominator) * 100;
-
-    return Math.max(0, Math.round(progress));
+    return calculateIndicatorProgress(
+      {
+        ...indicator,
+        yearly_target: targetValue,
+        current_value: currentValue
+      },
+      dataEntriesForIndicator
+    );
   };
 
   const getPeriodsForIndicator = (indicator: Indicator) => {
