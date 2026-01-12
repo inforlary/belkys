@@ -40,7 +40,8 @@ interface Action {
   responsible_department_id: string;
   related_department_ids: string[];
   condition_id: string;
-  standard_id: string;
+  standard_id?: string;
+  component_id?: string;
   action_plan_id: string;
   outputs?: string;
   is_continuous?: boolean;
@@ -237,12 +238,13 @@ export default function ICActions() {
         const condition = action.ic_general_conditions;
         let standard = null;
         let component = null;
+        const standardId = condition?.standard_id;
 
-        if (condition?.standard_id) {
+        if (standardId) {
           const { data: standardData } = await supabase
             .from('ic_standards')
             .select('code, name, component_id')
-            .eq('id', condition.standard_id)
+            .eq('id', standardId)
             .single();
 
           standard = standardData;
@@ -280,8 +282,10 @@ export default function ICActions() {
           ...action,
           condition_code: condition?.code,
           condition_description: condition?.description,
+          standard_id: standardId,
           standard_code: standard?.code,
           standard_name: standard?.name,
+          component_id: standard?.component_id,
           component_code: component?.code,
           component_name: component?.name,
           department_name: action.departments?.name,
@@ -311,18 +315,11 @@ export default function ICActions() {
     let filtered = actions;
 
     if (selectedComponentId) {
-      filtered = filtered.filter(a => {
-        const standard = standards.find(s => s.id === a.standard_id);
-        return standard?.component_id === selectedComponentId;
-      });
+      filtered = filtered.filter(a => a.component_id === selectedComponentId);
     }
 
     if (selectedStandardId) {
-      filtered = filtered.filter(a => {
-        const condition = a.condition_id;
-        const gc = actions.find(ac => ac.id === a.id);
-        return gc?.standard_id === selectedStandardId;
-      });
+      filtered = filtered.filter(a => a.standard_id === selectedStandardId);
     }
 
     if (selectedDepartmentId) {
@@ -339,7 +336,7 @@ export default function ICActions() {
     }
 
     return filtered;
-  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, searchTerm, standards]);
+  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, searchTerm]);
 
   const filteredActions = useMemo(() => {
     let filtered = baseFilteredActions;
