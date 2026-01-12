@@ -46,11 +46,12 @@ export default function MyGoals() {
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [dataEntries, setDataEntries] = useState<Record<string, DataEntry[]>>({});
   const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) {
@@ -91,12 +92,12 @@ export default function MyGoals() {
           .from('indicator_data_entries')
           .select('indicator_id, period_quarter, value, status')
           .eq('organization_id', profile.organization_id)
-          .eq('period_year', currentYear)
+          .eq('period_year', selectedYear)
           .in('status', ['approved', 'submitted']),
         supabase
           .from('indicator_targets')
           .select('indicator_id, year, target_value')
-          .eq('year', currentYear)
+          .eq('year', selectedYear)
       ]);
 
       if (indicatorsRes.error) throw indicatorsRes.error;
@@ -246,7 +247,7 @@ export default function MyGoals() {
     ];
     ws['!cols'] = colWidths;
 
-    XLSX.writeFile(wb, `Hedeflerim_${currentYear}.xlsx`);
+    XLSX.writeFile(wb, `Hedeflerim_${selectedYear}.xlsx`);
   };
 
   const exportToPDF = () => {
@@ -258,7 +259,7 @@ export default function MyGoals() {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(`Yıl: ${currentYear}`, 14, 22);
+    doc.text(`Yıl: ${selectedYear}`, 14, 22);
 
     const tableData = indicators.map(indicator => {
       const progress = calculateProgress(indicator);
@@ -320,7 +321,7 @@ export default function MyGoals() {
       }
     });
 
-    doc.save(`Hedeflerim_${currentYear}.pdf`);
+    doc.save(`Hedeflerim_${selectedYear}.pdf`);
   };
 
   if (loading) {
@@ -357,24 +358,38 @@ export default function MyGoals() {
             Müdürlüğünüze atanan hedefler ve performans göstergeleri
           </p>
         </div>
-        {indicators.length > 0 && (
-          <div className="flex gap-2">
-            <button
-              onClick={exportToExcel}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-slate-600" />
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              Excel İndir
-            </button>
-            <button
-              onClick={exportToPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              PDF İndir
-            </button>
+              {Array.from({ length: 5 }, (_, i) => currentYear - i).map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
           </div>
-        )}
+          {indicators.length > 0 && (
+            <>
+              <button
+                onClick={exportToExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel İndir
+              </button>
+              <button
+                onClick={exportToPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                PDF İndir
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {indicators.length === 0 ? (
@@ -492,7 +507,7 @@ export default function MyGoals() {
                       <div className="bg-blue-50 rounded-lg p-3">
                         <div className="flex items-center gap-2 text-blue-600 mb-1">
                           <Target className="w-4 h-4" />
-                          <span className="text-xs font-medium">Hedef ({currentYear})</span>
+                          <span className="text-xs font-medium">Hedef ({selectedYear})</span>
                         </div>
                         <div className="text-xl font-bold text-blue-900">
                           {indicator.yearly_target ? `${indicator.yearly_target} ${indicator.unit}` : 'Belirtilmemiş'}
@@ -531,7 +546,7 @@ export default function MyGoals() {
 
                     {dataEntries[indicator.id] && dataEntries[indicator.id].length > 0 && (
                       <div className="border-t border-slate-200 pt-3">
-                        <h4 className="text-sm font-medium text-slate-700 mb-2">{currentYear} Yılı Veri Girişleri</h4>
+                        <h4 className="text-sm font-medium text-slate-700 mb-2">{selectedYear} Yılı Veri Girişleri</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           {dataEntries[indicator.id]
                             .sort((a, b) => (a.period_quarter || 0) - (b.period_quarter || 0))
