@@ -1428,231 +1428,203 @@ export default function ICActions() {
         <div className="flex items-center justify-center py-12">
           <div className="text-gray-500">Yükleniyor...</div>
         </div>
-      ) : sortedActions.length === 0 ? (
+      ) : hierarchicalData.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-8 text-center">
           <p className="text-gray-500">Eylem bulunamadı.</p>
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="w-full border-collapse">
+            <thead className="bg-gray-100">
               <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Kod
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  Standart Kod No
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Bileşen
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[200px]">
+                  Kamu İç Kontrol Standardı ve Genel Şartı
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Standart
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[200px]">
+                  Mevcut Durum
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Genel Şart
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  Kamu Kod No
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
-                  Eylem Başlığı
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[200px]">
+                  Öngörülen Eylemler
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
-                  Açıklama
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
-                  Mevcut Durum Açıklaması
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[150px]">
                   Sorumlu Birimler
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
-                  İşbirliği Birimleri
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[150px]">
+                  İşbirliği Yapılacak Birim
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
-                  İlgili Birimler
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[200px]">
+                  Çıktı/Sonuç
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Durum
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  Tamamlanma Tarihi
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  İlerleme
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[200px]">
+                  Açıklama
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Başlangıç
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Hedef Tarih
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                  Tamamlanma
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
-                  Çıktılar
-                </th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap sticky right-0 bg-gray-50">
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
                   İşlemler
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedActions.map(action => (
-                <tr key={action.id} className={action.status === 'NO_ACTION' ? 'bg-amber-50' : 'hover:bg-gray-50'}>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    <span className="text-xs font-mono text-gray-600">{action.code}</span>
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                    {action.component_code}
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">
-                    <div className="max-w-[200px]">
-                      <div className="font-medium">{action.standard_code}</div>
-                      <div className="text-xs text-gray-500 truncate">{action.standard_name}</div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">
-                    <div className="max-w-[200px]">
-                      <div className="font-medium">{action.condition_code}</div>
-                      <div className="text-xs text-gray-500 line-clamp-2">{action.condition_description}</div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">
-                    <div className="max-w-[250px]">
-                      <div className="font-medium line-clamp-2">{action.title}</div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-600">
-                    <div className="max-w-[250px] line-clamp-3">
-                      {action.description || '-'}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-600">
-                    <div className="max-w-[250px] line-clamp-3">
-                      {action.current_status_description || '-'}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">
-                    <div className="max-w-[200px]">
-                      {action.all_units_responsible ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Tüm Birimler
-                        </span>
-                      ) : (
-                        <div className="space-y-1">
-                          {action.responsible_departments && action.responsible_departments.length > 0 ? (
-                            action.responsible_departments.map((dept, idx) => (
-                              <div key={idx} className="text-xs">{dept}</div>
-                            ))
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                          {action.responsible_special_units && action.responsible_special_units.length > 0 && (
-                            action.responsible_special_units.map((unit, idx) => (
-                              <div key={`special-${idx}`} className="text-xs text-purple-600">{unit}</div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">
-                    <div className="max-w-[200px]">
-                      {action.all_units_collaborating ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Tüm Birimler
-                        </span>
-                      ) : (
-                        <div className="space-y-1">
-                          {action.collaborating_departments && action.collaborating_departments.length > 0 ? (
-                            action.collaborating_departments.map((dept, idx) => (
-                              <div key={idx} className="text-xs">{dept}</div>
-                            ))
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                          {action.collaborating_special_units && action.collaborating_special_units.length > 0 && (
-                            action.collaborating_special_units.map((unit, idx) => (
-                              <div key={`collab-${idx}`} className="text-xs text-purple-600">{unit}</div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">
-                    <div className="max-w-[200px] space-y-1">
-                      {action.related_departments && action.related_departments.length > 0 ? (
-                        action.related_departments.map((dept, idx) => (
-                          <div key={idx} className="text-xs">{dept}</div>
-                        ))
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(action)}`}>
-                      {getStatusLabel(action.status)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full"
-                          style={{ width: `${action.progress_percent}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium">{action.progress_percent}%</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                    {action.start_date ? new Date(action.start_date).toLocaleDateString('tr-TR') : '-'}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                    {action.is_continuous ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        Sürekli
-                      </span>
-                    ) : (
-                      action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-'
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                    {action.completed_date ? (
-                      <span className="text-green-600 font-medium">
-                        {new Date(action.completed_date).toLocaleDateString('tr-TR')}
-                      </span>
-                    ) : '-'}
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-600">
-                    <div className="max-w-[250px] line-clamp-3">
-                      {action.outputs || '-'}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white">
-                    {action.status !== 'NO_ACTION' && (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleViewDetail(action)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Detayları Gör"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(action)}
-                          className="p-1.5 text-amber-600 hover:bg-amber-50 rounded"
-                          title="Düzenle"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(action)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                          title="Sil"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+            <tbody>
+              {hierarchicalData.map(componentData => (
+                <>
+                  <tr key={`comp-${componentData.component.code}`}>
+                    <td colSpan={11} className="border border-gray-300 bg-red-600 px-3 py-2 text-center text-white font-bold text-sm">
+                      {componentData.component.name.toUpperCase()}
+                    </td>
+                  </tr>
+                  {Array.from(componentData.standards.values()).map(standardData => (
+                    <>
+                      <tr key={`std-${standardData.standard.code}`}>
+                        <td colSpan={11} className="border border-gray-300 bg-red-500 px-3 py-2 text-white font-semibold text-sm">
+                          {standardData.standard.code} - {standardData.standard.name}
+                        </td>
+                      </tr>
+                      {Array.from(standardData.conditions.values()).map(conditionData => {
+                        const actionsCount = conditionData.actions.length;
+                        return conditionData.actions.map((action, actionIndex) => (
+                          <tr key={action.id} className={action.status === 'NO_ACTION' ? 'bg-amber-50' : 'hover:bg-gray-50'}>
+                            {actionIndex === 0 && (
+                              <>
+                                <td rowSpan={actionsCount} className="border border-gray-300 px-2 py-2 text-xs text-center align-top bg-red-100 font-medium">
+                                  {conditionData.condition.code}
+                                </td>
+                                <td rowSpan={actionsCount} className="border border-gray-300 px-2 py-2 text-xs align-top bg-blue-50">
+                                  <div className="font-semibold text-gray-900 mb-1">{conditionData.condition.code}</div>
+                                  <div className="text-gray-700">{conditionData.condition.description}</div>
+                                </td>
+                                <td rowSpan={actionsCount} className="border border-gray-300 px-2 py-2 text-xs align-top bg-pink-50">
+                                  {action.current_status_description || '-'}
+                                </td>
+                              </>
+                            )}
+                            <td className="border border-gray-300 px-2 py-2 text-xs text-center font-mono">
+                              {action.code}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs">
+                              <div className="font-medium text-gray-900 mb-1">{action.title}</div>
+                              {action.description && (
+                                <div className="text-gray-600 text-xs">{action.description}</div>
+                              )}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs">
+                              {action.all_units_responsible ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  Tüm Birimler
+                                </span>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  {action.responsible_departments && action.responsible_departments.length > 0 && (
+                                    action.responsible_departments.map((dept, idx) => (
+                                      <div key={idx}>{dept}</div>
+                                    ))
+                                  )}
+                                  {action.responsible_special_units && action.responsible_special_units.length > 0 && (
+                                    action.responsible_special_units.map((unit, idx) => (
+                                      <div key={`special-${idx}`} className="text-purple-600">{unit}</div>
+                                    ))
+                                  )}
+                                  {(!action.responsible_departments || action.responsible_departments.length === 0) &&
+                                   (!action.responsible_special_units || action.responsible_special_units.length === 0) && '-'}
+                                </div>
+                              )}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs">
+                              {action.all_units_collaborating ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  Tüm Birimler
+                                </span>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  {action.collaborating_departments && action.collaborating_departments.length > 0 && (
+                                    action.collaborating_departments.map((dept, idx) => (
+                                      <div key={idx}>{dept}</div>
+                                    ))
+                                  )}
+                                  {action.collaborating_special_units && action.collaborating_special_units.length > 0 && (
+                                    action.collaborating_special_units.map((unit, idx) => (
+                                      <div key={`collab-${idx}`} className="text-purple-600">{unit}</div>
+                                    ))
+                                  )}
+                                  {(!action.collaborating_departments || action.collaborating_departments.length === 0) &&
+                                   (!action.collaborating_special_units || action.collaborating_special_units.length === 0) && '-'}
+                                </div>
+                              )}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs">
+                              {action.outputs || '-'}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs text-center whitespace-nowrap">
+                              {action.is_continuous ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                  Sürekli
+                                </span>
+                              ) : action.completed_date ? (
+                                <span className="text-green-600 font-medium">
+                                  {new Date(action.completed_date).toLocaleDateString('tr-TR')}
+                                </span>
+                              ) : action.target_date ? (
+                                new Date(action.target_date).toLocaleDateString('tr-TR')
+                              ) : '-'}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs">
+                              <div className="space-y-1">
+                                <div>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(action)}`}>
+                                    {getStatusLabel(action.status)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                    <div
+                                      className="bg-blue-600 h-1.5 rounded-full"
+                                      style={{ width: `${action.progress_percent}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-medium">{action.progress_percent}%</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs text-center whitespace-nowrap">
+                              {action.status !== 'NO_ACTION' && (
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => handleViewDetail(action)}
+                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                    title="Detayları Gör"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleEdit(action)}
+                                    className="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                                    title="Düzenle"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(action)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                    title="Sil"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ));
+                      })}
+                    </>
+                  ))}
+                </>
               ))}
             </tbody>
           </table>
