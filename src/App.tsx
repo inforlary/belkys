@@ -81,6 +81,7 @@ import RiskDetail from './pages/RiskDetail';
 import RiskMatrix from './pages/RiskMatrix';
 import RiskIndicators from './pages/RiskIndicators';
 import RiskIndicatorEntry from './pages/RiskIndicatorEntry';
+import RiskControls from './pages/RiskControls';
 import RiskTreatments from './pages/RiskTreatments';
 import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
 import RiskCategories from './pages/RiskCategories';
@@ -349,6 +350,8 @@ const renderPage = () => {
         return <RiskRegister />;
       case 'risk-management/matrix':
         return <RiskMatrix />;
+      case 'risk-management/controls':
+        return <RiskControls />;
       case 'risk-management/treatments':
         return <RiskTreatments />;
       case 'risk-management/indicators':
