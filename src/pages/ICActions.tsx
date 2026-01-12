@@ -532,6 +532,18 @@ export default function ICActions() {
     const sorted = [...filteredActions];
 
     sorted.sort((a, b) => {
+      const componentCompare = (a.component_code || '').localeCompare(b.component_code || '');
+      if (componentCompare !== 0) return componentCompare;
+
+      const standardCompare = (a.standard_code || '').localeCompare(b.standard_code || '');
+      if (standardCompare !== 0) return standardCompare;
+
+      const conditionCompare = (a.condition_code || '').localeCompare(b.condition_code || '');
+      if (conditionCompare !== 0) return conditionCompare;
+
+      if (a.status === 'NO_ACTION' && b.status !== 'NO_ACTION') return -1;
+      if (a.status !== 'NO_ACTION' && b.status === 'NO_ACTION') return 1;
+
       if (sortColumn === 'delay') {
         const aDelay = a.delay_days || 0;
         const bDelay = b.delay_days || 0;
@@ -571,7 +583,7 @@ export default function ICActions() {
           : b.progress_percent - a.progress_percent;
       }
 
-      return 0;
+      return a.code.localeCompare(b.code);
     });
 
     return sorted;
@@ -832,31 +844,44 @@ export default function ICActions() {
 
   const exportToExcel = () => {
     const data = sortedActions.map(action => {
-      const responsibleUnits = action.all_units_responsible
-        ? 'Tüm Birimler'
-        : [
-            ...(action.responsible_special_units || []),
-            ...(action.responsible_departments || [])
-          ].join(', ') || '-';
+      const responsibleUnits = action.status === 'NO_ACTION'
+        ? '-'
+        : action.all_units_responsible
+          ? 'Tüm Birimler'
+          : [
+              ...(action.responsible_special_units || []),
+              ...(action.responsible_departments || [])
+            ].join(', ') || '-';
 
-      const collaboratingUnits = action.all_units_collaborating
-        ? 'Tüm Birimler'
-        : [
-            ...(action.collaborating_special_units || []),
-            ...(action.collaborating_departments || [])
-          ].join(', ') || '-';
+      const collaboratingUnits = action.status === 'NO_ACTION'
+        ? '-'
+        : action.all_units_collaborating
+          ? 'Tüm Birimler'
+          : [
+              ...(action.collaborating_special_units || []),
+              ...(action.collaborating_departments || [])
+            ].join(', ') || '-';
+
+      const actionTitle = action.status === 'NO_ACTION'
+        ? 'Eylem Oluşturulmamış'
+        : action.title;
+
+      const progressDisplay = action.status === 'NO_ACTION'
+        ? '-'
+        : `%${action.progress_percent}`;
 
       return {
-        'Kod': action.code,
-        'Eylem': action.title,
-        'Standart': action.standard_code || '',
-        'Genel Şart': action.condition_code || '',
+        'Bileşen': action.component_code || '-',
+        'Standart': action.standard_code || '-',
+        'Genel Şart': action.condition_code || '-',
+        'Eylem Kodu': action.status === 'NO_ACTION' ? '-' : action.code,
+        'Eylem': actionTitle,
         'Sorumlu Birimler': responsibleUnits,
         'İş Birliği Yapılacak Birimler': collaboratingUnits,
         'Mevcut Durum': action.current_status_description || '-',
-        'Hedef Tarih': action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '',
+        'Hedef Tarih': action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-',
         'Durum': getStatusLabel(action.status),
-        'İlerleme': `%${action.progress_percent}`
+        'İlerleme': progressDisplay
       };
     });
 
@@ -871,7 +896,7 @@ export default function ICActions() {
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
-    doc.text('İç Kontrol Eylemleri', 14, 15);
+    doc.text('Ic Kontrol Eylemleri', 14, 15);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
@@ -879,33 +904,85 @@ export default function ICActions() {
 
     const selectedPlan = actionPlans.find(p => p.id === selectedPlanId);
     if (selectedPlan) {
-      doc.text(`Eylem Planı: ${selectedPlan.name}`, 14, 27);
+      doc.text(`Eylem Plani: ${selectedPlan.name}`, 14, 27);
     }
 
-    doc.text(`Toplam: ${stats.total} | Tamamlanan: ${stats.completed} (%${stats.completedPercent}) | Devam Eden: ${stats.inProgress} (%${stats.inProgressPercent}) | Geciken: ${stats.delayed} (%${stats.delayedPercent})`, 14, 32);
+    doc.text(`Toplam: ${stats.total} | Tamamlanan: ${stats.completed} (%${stats.completedPercent}) | Devam Eden: ${stats.inProgress} (%${stats.inProgressPercent}) | Geciken: ${stats.delayed} (%${stats.delayedPercent}) | Eylem Yok: ${stats.noActions}`, 14, 32);
 
-    const tableData = sortedActions.map(action => [
-      action.code,
-      action.title.length > 40 ? action.title.substring(0, 37) + '...' : action.title,
-      action.standard_code || '',
-      action.department_name || '',
-      action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '',
-      `%${action.progress_percent}`,
-      getStatusLabel(action.status)
-    ]);
+    const tableData = sortedActions.map(action => {
+      const actionTitle = action.status === 'NO_ACTION'
+        ? 'Eylem Olusturulmamis'
+        : (action.title.length > 35 ? action.title.substring(0, 32) + '...' : action.title);
+
+      const progressDisplay = action.status === 'NO_ACTION' ? '-' : `%${action.progress_percent}`;
+
+      const responsibleUnits = action.status === 'NO_ACTION'
+        ? '-'
+        : action.all_units_responsible
+          ? 'Tum Birimler'
+          : [
+              ...(action.responsible_special_units || []),
+              ...(action.responsible_departments || [])
+            ].slice(0, 2).join(', ') || '-';
+
+      return [
+        action.component_code || '-',
+        action.standard_code || '-',
+        action.condition_code || '-',
+        action.status === 'NO_ACTION' ? '-' : action.code,
+        actionTitle,
+        responsibleUnits,
+        action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-',
+        progressDisplay,
+        getStatusLabel(action.status, true)
+      ];
+    });
 
     autoTable(doc, {
       startY: 37,
-      head: [['Kod', 'Eylem', 'Standart', 'Sorumlu', 'Hedef', 'İlerleme', 'Durum']],
+      head: [['Bilesen', 'Standart', 'Genel Sart', 'Eylem Kodu', 'Eylem', 'Sorumlu', 'Hedef', 'Ilerleme', 'Durum']],
       body: tableData,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [59, 130, 246] }
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+        font: 'helvetica',
+        fontStyle: 'normal'
+      },
+      headStyles: {
+        fillColor: [59, 130, 246],
+        fontStyle: 'bold',
+        fontSize: 7
+      },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 60 },
+        5: { cellWidth: 35 },
+        6: { cellWidth: 20 },
+        7: { cellWidth: 15 },
+        8: { cellWidth: 25 }
+      }
     });
 
     doc.save(`ic-eylemler-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string, forPDF: boolean = false) => {
+    if (forPDF) {
+      const pdfLabels: Record<string, string> = {
+        'NOT_STARTED': 'Baslamadi',
+        'IN_PROGRESS': 'Devam Ediyor',
+        'COMPLETED': 'Tamamlandi',
+        'DELAYED': 'Gecikmis',
+        'CANCELLED': 'Iptal',
+        'ONGOING': 'Surekli',
+        'NO_ACTION': 'Eylem Yok'
+      };
+      return pdfLabels[status] || status;
+    }
+
     const labels: Record<string, string> = {
       'NOT_STARTED': 'Başlamadı',
       'IN_PROGRESS': 'Devam Ediyor',
@@ -1293,8 +1370,29 @@ export default function ICActions() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedActions.map((action) => (
-                <tr key={action.id} className="hover:bg-gray-50">
+              {paginatedActions.map((action, index) => {
+                const prevAction = index > 0 ? paginatedActions[index - 1] : null;
+                const isNewStandard = prevAction && (
+                  prevAction.component_code !== action.component_code ||
+                  prevAction.standard_code !== action.standard_code
+                );
+                const isNewCondition = prevAction && (
+                  prevAction.component_code === action.component_code &&
+                  prevAction.standard_code === action.standard_code &&
+                  prevAction.condition_code !== action.condition_code
+                );
+
+                let rowBgClass = 'hover:bg-gray-50';
+                if (action.status === 'NO_ACTION') {
+                  rowBgClass = 'bg-amber-50 hover:bg-amber-100';
+                } else if (isNewStandard) {
+                  rowBgClass = 'bg-blue-50 hover:bg-blue-100';
+                } else if (isNewCondition) {
+                  rowBgClass = 'bg-slate-50 hover:bg-slate-100';
+                }
+
+                return (
+                <tr key={action.id} className={rowBgClass}>
                   <td className="px-6 py-4">
                     <button onClick={() => toggleSelectAction(action.id)}>
                       {selectedActionIds.has(action.id) ? (
@@ -1450,7 +1548,8 @@ export default function ICActions() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
