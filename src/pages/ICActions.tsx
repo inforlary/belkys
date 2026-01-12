@@ -55,6 +55,7 @@ interface Action {
   delay_days?: number;
   condition_code?: string;
   condition_description?: string;
+  condition_provides_reasonable_assurance?: boolean;
   standard_code?: string;
   standard_name?: string;
   component_code?: string;
@@ -135,6 +136,10 @@ export default function ICActions() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [expandedComponents, setExpandedComponents] = useState<Set<string>>(new Set());
+  const [expandedStandards, setExpandedStandards] = useState<Set<string>>(new Set());
+  const [expandedConditions, setExpandedConditions] = useState<Set<string>>(new Set());
 
   const [selectedActionIds, setSelectedActionIds] = useState<Set<string>>(new Set());
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -247,7 +252,8 @@ export default function ICActions() {
           ic_general_conditions!ic_actions_condition_id_fkey (
             code,
             description,
-            standard_id
+            standard_id,
+            provides_reasonable_assurance
           ),
           departments!ic_actions_responsible_department_id_fkey (
             name
@@ -371,6 +377,7 @@ export default function ICActions() {
           ...action,
           condition_code: condition?.code,
           condition_description: condition?.description,
+          condition_provides_reasonable_assurance: condition?.provides_reasonable_assurance,
           standard_id: standardId,
           standard_code: standard?.code,
           standard_name: standard?.name,
@@ -392,7 +399,7 @@ export default function ICActions() {
         conditionsWithoutActions.map(async (conditionId) => {
           const { data: conditionData } = await supabase
             .from('ic_general_conditions')
-            .select('code, description, standard_id')
+            .select('code, description, standard_id, provides_reasonable_assurance')
             .eq('id', conditionId)
             .single();
 
@@ -421,10 +428,14 @@ export default function ICActions() {
             }
           }
 
+          const actionTitle = conditionData.provides_reasonable_assurance
+            ? 'Makul güvenceyi sağlayan mevcut düzenleme ve uygulamalar bulunduğundan eylem öngörülmemiştir.'
+            : 'Bu genel şart için eylem oluşturulmamıştır';
+
           return {
             id: `no-action-${conditionId}`,
             code: conditionData.code,
-            title: 'Bu genel şart için eylem oluşturulmamıştır',
+            title: actionTitle,
             description: '',
             status: 'NO_ACTION',
             progress_percent: 0,
@@ -447,6 +458,7 @@ export default function ICActions() {
             delay_days: 0,
             condition_code: conditionData.code,
             condition_description: conditionData.description,
+            condition_provides_reasonable_assurance: conditionData.provides_reasonable_assurance,
             standard_code: standard?.code,
             standard_name: standard?.name,
             component_code: component?.code,
@@ -589,6 +601,61 @@ export default function ICActions() {
     return sorted;
   }, [filteredActions, sortColumn, sortDirection]);
 
+  const hierarchicalData = useMemo(() => {
+    const componentMap = new Map<string, {
+      component: { id: string; code: string; name: string };
+      standards: Map<string, {
+        standard: { id: string; code: string; name: string };
+        conditions: Map<string, {
+          condition: { id: string; code: string; description: string };
+          actions: Action[];
+        }>;
+      }>;
+    }>();
+
+    sortedActions.forEach(action => {
+      const compKey = action.component_code || 'other';
+      const compId = action.component_id || 'other';
+      const compName = action.component_name || 'Diğer';
+
+      if (!componentMap.has(compKey)) {
+        componentMap.set(compKey, {
+          component: { id: compId, code: compKey, name: compName },
+          standards: new Map()
+        });
+      }
+
+      const compData = componentMap.get(compKey)!;
+      const stdKey = action.standard_code || 'other';
+      const stdId = action.standard_id || 'other';
+      const stdName = action.standard_name || 'Diğer';
+
+      if (!compData.standards.has(stdKey)) {
+        compData.standards.set(stdKey, {
+          standard: { id: stdId, code: stdKey, name: stdName },
+          conditions: new Map()
+        });
+      }
+
+      const stdData = compData.standards.get(stdKey)!;
+      const condKey = action.condition_code || 'other';
+      const condId = action.condition_id || 'other';
+      const condDesc = action.condition_description || 'Açıklama yok';
+
+      if (!stdData.conditions.has(condKey)) {
+        stdData.conditions.set(condKey, {
+          condition: { id: condId, code: condKey, description: condDesc },
+          actions: []
+        });
+      }
+
+      stdData.conditions.get(condKey)!.actions.push(action);
+    });
+
+    return Array.from(componentMap.values())
+      .sort((a, b) => a.component.code.localeCompare(b.component.code));
+  }, [sortedActions]);
+
   const paginatedActions = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
@@ -631,6 +698,42 @@ export default function ICActions() {
       setSortColumn(column);
       setSortDirection('asc');
     }
+  };
+
+  const toggleComponent = (componentKey: string) => {
+    setExpandedComponents(prev => {
+      const next = new Set(prev);
+      if (next.has(componentKey)) {
+        next.delete(componentKey);
+      } else {
+        next.add(componentKey);
+      }
+      return next;
+    });
+  };
+
+  const toggleStandard = (standardKey: string) => {
+    setExpandedStandards(prev => {
+      const next = new Set(prev);
+      if (next.has(standardKey)) {
+        next.delete(standardKey);
+      } else {
+        next.add(standardKey);
+      }
+      return next;
+    });
+  };
+
+  const toggleCondition = (conditionKey: string) => {
+    setExpandedConditions(prev => {
+      const next = new Set(prev);
+      if (next.has(conditionKey)) {
+        next.delete(conditionKey);
+      } else {
+        next.add(conditionKey);
+      }
+      return next;
+    });
   };
 
   const handleStatusFilter = (status: string) => {
@@ -1294,312 +1397,152 @@ export default function ICActions() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left">
-                  <button onClick={toggleSelectAll}>
-                    {selectedActionIds.size === paginatedActions.length ? (
-                      <CheckSquare className="w-5 h-5 text-blue-600" />
-                    ) : (
-                      <Square className="w-5 h-5 text-gray-400" />
-                    )}
-                  </button>
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('code')}
-                >
-                  <div className="flex items-center gap-2">
-                    KOD
-                    {sortColumn === 'code' && (
-                      <ChevronDown className={`w-4 h-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} />
-                    )}
-                  </div>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  EYLEM
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('standard')}
-                >
-                  <div className="flex items-center gap-2">
-                    STANDART
-                    {sortColumn === 'standard' && (
-                      <ChevronDown className={`w-4 h-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} />
-                    )}
-                  </div>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SORUMLU BİRİMLER
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İŞ BİRLİĞİ YAPILACAK BİRİMLER
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  MEVCUT DURUM
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('target_date')}
-                >
-                  <div className="flex items-center gap-2">
-                    HEDEF TARİH
-                    {sortColumn === 'target_date' && (
-                      <ChevronDown className={`w-4 h-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} />
-                    )}
-                  </div>
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('progress')}
-                >
-                  <div className="flex items-center gap-2">
-                    İLERLEME
-                    {sortColumn === 'progress' && (
-                      <ChevronDown className={`w-4 h-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} />
-                    )}
-                  </div>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İŞLEM
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedActions.map((action, index) => {
-                const prevAction = index > 0 ? paginatedActions[index - 1] : null;
-                const isNewStandard = prevAction && (
-                  prevAction.component_code !== action.component_code ||
-                  prevAction.standard_code !== action.standard_code
-                );
-                const isNewCondition = prevAction && (
-                  prevAction.component_code === action.component_code &&
-                  prevAction.standard_code === action.standard_code &&
-                  prevAction.condition_code !== action.condition_code
-                );
+      <div className="bg-white rounded-lg shadow overflow-hidden p-4">
+        <div className="space-y-2">
+          {hierarchicalData.map(componentData => {
+            const compKey = componentData.component.code;
+            const isCompExpanded = expandedComponents.has(compKey);
 
-                let rowBgClass = 'hover:bg-gray-50';
-                if (action.status === 'NO_ACTION') {
-                  rowBgClass = 'bg-amber-50 hover:bg-amber-100';
-                } else if (isNewStandard) {
-                  rowBgClass = 'bg-blue-50 hover:bg-blue-100';
-                } else if (isNewCondition) {
-                  rowBgClass = 'bg-slate-50 hover:bg-slate-100';
-                }
+            return (
+              <div key={compKey} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <button
+                  onClick={() => toggleComponent(compKey)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <ChevronDown
+                      className={`w-5 h-5 text-gray-500 transition-transform ${isCompExpanded ? '' : '-rotate-90'}`}
+                    />
+                    <span className="font-semibold text-gray-900">
+                      {componentData.component.name}
+                    </span>
+                  </div>
+                </button>
 
-                return (
-                <tr key={action.id} className={rowBgClass}>
-                  <td className="px-6 py-4">
-                    <button onClick={() => toggleSelectAction(action.id)}>
-                      {selectedActionIds.has(action.id) ? (
-                        <CheckSquare className="w-5 h-5 text-blue-600" />
-                      ) : (
-                        <Square className="w-5 h-5 text-gray-400" />
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {action.code}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    <div className="max-w-md">
-                      <div className="font-medium truncate" title={action.title}>
-                        {action.title}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {action.standard_code || '-'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
-                    <div className="max-w-xs">
-                      {action.all_units_responsible ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Tüm Birimler
-                        </span>
-                      ) : (
-                        <div className="space-y-1">
-                          {action.responsible_special_units && action.responsible_special_units.length > 0 && (
-                            <div className="text-xs">
-                              {action.responsible_special_units.map((unit, idx) => (
-                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-purple-100 text-purple-700">
-                                  {unit}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {action.responsible_departments && action.responsible_departments.length > 0 && (
-                            <div className="text-xs">
-                              {action.responsible_departments.slice(0, 2).map((dept, idx) => (
-                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-slate-100 text-slate-700">
-                                  {dept}
-                                </span>
-                              ))}
-                              {action.responsible_departments.length > 2 && (
-                                <span className="text-xs text-gray-500">+{action.responsible_departments.length - 2} daha</span>
-                              )}
-                            </div>
-                          )}
-                          {!action.responsible_special_units?.length && !action.responsible_departments?.length && '-'}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
-                    <div className="max-w-xs">
-                      {action.all_units_collaborating ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Tüm Birimler
-                        </span>
-                      ) : (
-                        <div className="space-y-1">
-                          {action.collaborating_special_units && action.collaborating_special_units.length > 0 && (
-                            <div className="text-xs">
-                              {action.collaborating_special_units.map((unit, idx) => (
-                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-purple-100 text-purple-700">
-                                  {unit}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {action.collaborating_departments && action.collaborating_departments.length > 0 && (
-                            <div className="text-xs">
-                              {action.collaborating_departments.slice(0, 2).map((dept, idx) => (
-                                <span key={idx} className="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-slate-100 text-slate-700">
-                                  {dept}
-                                </span>
-                              ))}
-                              {action.collaborating_departments.length > 2 && (
-                                <span className="text-xs text-gray-500">+{action.collaborating_departments.length - 2} daha</span>
-                              )}
-                            </div>
-                          )}
-                          {!action.collaborating_special_units?.length && !action.collaborating_departments?.length && '-'}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
-                    <div className="max-w-xs">
-                      {action.current_status_description ? (
-                        <div className="text-xs line-clamp-2" title={action.current_status_description}>
-                          {action.current_status_description}
-                        </div>
-                      ) : '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {action.is_continuous ? (
-                      <span className="text-purple-600 font-medium">Sürekli</span>
-                    ) : (
-                      action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {getProgressDisplay(action)}
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusBadge(action)}`}>
-                        {getStatusLabel(action.status)}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-2">
-                      {action.status !== 'NO_ACTION' && (
-                        <button
-                          onClick={() => handleUpdateProgress(action)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="İlerleme Güncelle"
-                        >
-                          <Clock className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleViewDetail(action)}
-                        className="p-1 text-gray-600 hover:bg-gray-50 rounded"
-                        title="Detay"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {action.status !== 'NO_ACTION' && (
-                        <>
+                {isCompExpanded && (
+                  <div className="border-t border-gray-200 pl-8">
+                    {Array.from(componentData.standards.values()).map(standardData => {
+                      const stdKey = `${compKey}-${standardData.standard.code}`;
+                      const isStdExpanded = expandedStandards.has(stdKey);
+
+                      return (
+                        <div key={stdKey} className="border-b border-gray-100 last:border-b-0">
                           <button
-                            onClick={() => handleEdit(action)}
-                            className="p-1 text-gray-600 hover:bg-gray-50 rounded"
-                            title="Düzenle"
+                            onClick={() => toggleStandard(stdKey)}
+                            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-blue-50 text-left"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            <div className="flex items-center gap-2">
+                              <ChevronDown
+                                className={`w-4 h-4 text-blue-600 transition-transform ${isStdExpanded ? '' : '-rotate-90'}`}
+                              />
+                              <span className="text-sm font-medium text-blue-900">
+                                {standardData.standard.code} - {standardData.standard.name}
+                              </span>
+                            </div>
                           </button>
-                          {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
-                            <button
-                              onClick={() => handleDelete(action)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
-                              title="Sil"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
 
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="flex-1 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700">
-                  Sayfa başına:
-                </span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-                <span className="text-sm text-gray-700">
-                  Toplam {sortedActions.length} kayıt
-                </span>
+                          {isStdExpanded && (
+                            <div className="pl-6 bg-gray-50">
+                              {Array.from(standardData.conditions.values()).map(conditionData => {
+                                const condKey = `${stdKey}-${conditionData.condition.code}`;
+                                const isCondExpanded = expandedConditions.has(condKey);
+
+                                return (
+                                  <div key={condKey} className="border-t border-gray-200 py-2">
+                                    <button
+                                      onClick={() => toggleCondition(condKey)}
+                                      className="w-full px-4 py-2 flex items-center justify-between hover:bg-slate-100 text-left"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <ChevronDown
+                                          className={`w-4 h-4 text-slate-600 transition-transform ${isCondExpanded ? '' : '-rotate-90'}`}
+                                        />
+                                        <span className="text-sm text-slate-700">
+                                          {conditionData.condition.code}: {conditionData.condition.description}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-gray-500 ml-2">
+                                        {conditionData.actions.length} eylem
+                                      </span>
+                                    </button>
+
+                                    {isCondExpanded && (
+                                      <div className="pl-6 space-y-2 mt-2">
+                                        {conditionData.actions.map(action => (
+                                          <div
+                                            key={action.id}
+                                            className={`p-3 rounded border ${action.status === 'NO_ACTION' ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}
+                                          >
+                                            <div className="flex items-start justify-between gap-4">
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                  <span className="text-xs font-mono text-gray-500">{action.code}</span>
+                                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(action)}`}>
+                                                    {getStatusLabel(action.status)}
+                                                  </span>
+                                                </div>
+                                                <p className="text-sm font-medium text-gray-900 mb-2">{action.title}</p>
+
+                                                {action.status !== 'NO_ACTION' && (
+                                                  <div className="grid grid-cols-2 gap-3 text-xs">
+                                                    <div>
+                                                      <span className="text-gray-500">Hedef:</span>
+                                                      <span className="ml-1 text-gray-900">
+                                                        {action.is_continuous ? 'Sürekli' : (action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-')}
+                                                      </span>
+                                                    </div>
+                                                    <div>
+                                                      <span className="text-gray-500">İlerleme:</span>
+                                                      <span className="ml-1 text-gray-900">%{action.progress_percent}</span>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {action.status !== 'NO_ACTION' && (
+                                                <div className="flex gap-1">
+                                                  <button
+                                                    onClick={() => handleViewDetails(action)}
+                                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                                    title="Detayları Gör"
+                                                  >
+                                                    <Eye className="w-4 h-4" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleEditClick(action)}
+                                                    className="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                                                    title="Düzenle"
+                                                  >
+                                                    <Edit2 className="w-4 h-4" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleDeleteAction(action.id)}
+                                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                                    title="Sil"
+                                                  >
+                                                    <Trash2 className="w-4 h-4" />
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  Önceki
-                </button>
-                <span className="px-3 py-1 text-sm text-gray-700">
-                  {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  Sonraki
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
 
       <Modal
