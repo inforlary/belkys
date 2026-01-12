@@ -315,13 +315,16 @@ Gerçekleşen: ${editingKPI.actual_value} ${editingKPI.unit}
 Sapma: ${editingKPI.variance} ${editingKPI.unit}`;
 
       const { error } = await supabase
-        .from('quality_dof')
+        .from('qm_nonconformities')
         .insert({
           organization_id: profile?.organization_id,
           title: `KPI Hedef Altı: ${editingKPI.kpi_name}`,
           description,
           source: 'PROCESS_KPI',
+          source_reference: `${editingKPI.process_code} - ${monthNames[selectedMonth - 1]} ${selectedYear}`,
           process_id: process?.id || null,
+          department_id: profile?.department_id || null,
+          detected_date: new Date().toISOString().split('T')[0],
           status: 'OPEN',
           severity: 'MEDIUM',
           created_by: profile?.id
