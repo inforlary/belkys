@@ -202,7 +202,7 @@ export default function RiskDetail() {
           .eq('risk_id', riskId),
         supabase
           .from('goals')
-          .select('id, code, title')
+          .select('id, code, title, department_id')
           .eq('organization_id', profile?.organization_id)
           .order('code')
       ]);
@@ -380,7 +380,7 @@ export default function RiskDetail() {
                   causes: risk.causes || '',
                   consequences: risk.consequences || '',
                   owner_department_id: risk.owner_department_id,
-                  goal_id: risk.objective_id || '',
+                  goal_id: risk.goal_id || '',
                   inherent_likelihood: risk.inherent_likelihood,
                   inherent_impact: risk.inherent_impact,
                   residual_likelihood: risk.residual_likelihood,
@@ -1231,16 +1231,18 @@ export default function RiskDetail() {
                       value={editFormData.goal_id}
                       onChange={(e) => setEditFormData({ ...editFormData, goal_id: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={!editFormData.owner_department_id}
                     >
-                      <option value="">
-                        {editFormData.owner_department_id ? 'Seçiniz...' : 'Önce sorumlu birim seçiniz'}
-                      </option>
-                      {goals
-                        .filter(goal => goal.department_id === editFormData.owner_department_id)
-                        .map(goal => (
-                          <option key={goal.id} value={goal.id}>{goal.code} - {goal.title}</option>
-                        ))}
+                      <option value="">Seçiniz (Opsiyonel)</option>
+                      {editFormData.owner_department_id
+                        ? goals
+                            .filter(goal => goal.department_id === editFormData.owner_department_id)
+                            .map(goal => (
+                              <option key={goal.id} value={goal.id}>{goal.code} - {goal.title}</option>
+                            ))
+                        : goals.map(goal => (
+                            <option key={goal.id} value={goal.id}>{goal.code} - {goal.title}</option>
+                          ))
+                      }
                     </select>
                     {editFormData.owner_department_id && goals.filter(g => g.department_id === editFormData.owner_department_id).length === 0 && (
                       <p className="mt-1 text-sm text-amber-600">Bu birime ait hedef bulunamadı</p>
