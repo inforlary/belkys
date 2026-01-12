@@ -15,6 +15,7 @@ import StandardProgramsManager from '../components/superadmin/StandardProgramsMa
 import OrganizationLicenseManager from '../components/superadmin/OrganizationLicenseManager';
 import OrganizationModuleManager from '../components/superadmin/OrganizationModuleManager';
 import ICComponentsManager from '../components/superadmin/ICComponentsManager';
+import ICStandardsManager from '../components/superadmin/ICStandardsManager';
 
 interface Organization {
   id: string;
@@ -663,7 +664,10 @@ export default function SuperAdmin() {
       )}
 
       {activeTab === 'ic-components' && (
-        <ICComponentsManager />
+        <div className="space-y-8">
+          <ICComponentsManager />
+          <ICStandardsManager />
+        </div>
       )}
 
       {activeTab === 'organization-licenses' && (

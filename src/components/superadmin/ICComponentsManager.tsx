@@ -102,7 +102,8 @@ export default function ICComponentsManager() {
 
       setShowModal(false);
       setEditingItem(null);
-      loadComponents();
+      setFormData({ code: '', name: '', order_index: 0 });
+      await loadComponents();
     } catch (error: any) {
       console.error('Bileşen kaydedilirken hata:', error);
       alert(`Hata: ${error?.message || 'Bilinmeyen hata'}`);
@@ -125,7 +126,7 @@ export default function ICComponentsManager() {
       if (error) throw error;
 
       alert('Bileşen başarıyla silindi');
-      loadComponents();
+      await loadComponents();
     } catch (error: any) {
       console.error('Bileşen silinirken hata:', error);
       alert(`Hata: ${error?.message || 'Bilinmeyen hata'}`);
