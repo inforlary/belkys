@@ -365,7 +365,7 @@ export default function ICActionPlans() {
     return labels[status] || status;
   };
 
-  const activePlan = actionPlans.find(p => p.status === 'ACTIVE');
+  const activePlans = actionPlans.filter(p => p.status === 'ACTIVE');
   const draftPlans = actionPlans.filter(p => p.status === 'DRAFT');
   const completedPlans = actionPlans.filter(p => p.status === 'COMPLETED');
   const archivedPlans = actionPlans.filter(p => p.status === 'ARCHIVED');
@@ -397,132 +397,101 @@ export default function ICActionPlans() {
         </button>
       </div>
 
-      {activePlan && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <Shield className="w-5 h-5 text-green-600" />
-              <h3 className="font-semibold text-gray-900">AKTİF PLAN</h3>
-            </div>
-            <p className="text-lg font-bold text-gray-900 mb-2">{activePlan.name}</p>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Calendar className="w-4 h-4" />
-              <span>
-                {new Date(activePlan.start_date).toLocaleDateString('tr-TR')} - {new Date(activePlan.end_date).toLocaleDateString('tr-TR')}
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-gray-900">TOPLAM EYLEM</h3>
-            </div>
-            <p className="text-3xl font-bold text-gray-900 mb-2">{activePlan.action_count || 0}</p>
-            <p className="text-sm text-gray-600">Bu plandaki eylem sayısı</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <TrendingUp className="w-5 h-5 text-green-600" />
-              <h3 className="font-semibold text-gray-900">GENEL İLERLEME</h3>
-            </div>
-            <p className="text-3xl font-bold text-gray-900 mb-2">%{activePlan.completion_percentage || 0}</p>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-              <div
-                className="bg-green-600 h-2 rounded-full"
-                style={{ width: `${activePlan.completion_percentage || 0}%` }}
-              />
-            </div>
-            <p className="text-sm text-gray-600">{activePlan.completed_count || 0} Tamamlandı</p>
-          </div>
-        </div>
-      )}
-
-      {activePlan && (
+      {activePlans.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge('ACTIVE').bg} ${getStatusBadge('ACTIVE').text}`}>
-              {getStatusBadge('ACTIVE').icon} AKTİF
+              {getStatusBadge('ACTIVE').icon} AKTİF PLANLAR
             </span>
           </div>
 
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
-            <div className="mb-4">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{activePlan.name}</h3>
-              <div className="flex items-center gap-6 text-sm text-gray-600 mb-3">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  <span>Dönem: {new Date(activePlan.start_date).toLocaleDateString('tr-TR')} - {new Date(activePlan.end_date).toLocaleDateString('tr-TR')}</span>
-                </div>
-              </div>
-              {activePlan.description && (
-                <p className="text-gray-600">{activePlan.description}</p>
-              )}
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-gray-700">Eylemler</h4>
-                <h4 className="font-semibold text-gray-700">İlerleme</h4>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Toplam:</span>
-                  <span className="font-semibold">{activePlan.action_count || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tamamlanan:</span>
-                  <span className="font-semibold text-green-600">{activePlan.completed_count || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Devam Eden:</span>
-                  <span className="font-semibold text-blue-600">{activePlan.in_progress_count || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Geciken:</span>
-                  <span className="font-semibold text-red-600">{activePlan.delayed_count || 0}</span>
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div
-                    className="bg-green-600 h-3 rounded-full flex items-center justify-end px-2"
-                    style={{ width: `${activePlan.completion_percentage || 0}%` }}
-                  >
-                    <span className="text-xs text-white font-medium">%{activePlan.completion_percentage || 0}</span>
+          <div className="space-y-4">
+            {activePlans.map((plan) => (
+              <div key={plan.id} className="bg-white rounded-lg shadow-lg border-2 border-green-200 p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
+                      {plan.name}
+                      <span className={`ml-3 inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusBadge(plan.status).bg} ${getStatusBadge(plan.status).text}`}>
+                        {getStatusLabel(plan.status)}
+                      </span>
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar className="w-4 h-4" />
+                      <span>Dönem: {new Date(plan.start_date).toLocaleDateString('tr-TR')} - {new Date(plan.end_date).toLocaleDateString('tr-TR')}</span>
+                    </div>
                   </div>
                 </div>
+
+                {plan.description && (
+                  <p className="text-gray-600 mb-4">{plan.description}</p>
+                )}
+
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                    <div>
+                      <div className="text-gray-600 mb-1">Toplam Eylem</div>
+                      <div className="text-xl font-bold text-gray-900">{plan.action_count || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600 mb-1">Tamamlanan</div>
+                      <div className="text-xl font-bold text-green-600">{plan.completed_count || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600 mb-1">Devam Eden</div>
+                      <div className="text-xl font-bold text-blue-600">{plan.in_progress_count || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600 mb-1">Geciken</div>
+                      <div className="text-xl font-bold text-red-600">{plan.delayed_count || 0}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-1 text-sm">
+                      <span className="text-gray-600">Genel İlerleme</span>
+                      <span className="font-semibold text-gray-900">%{plan.completion_percentage || 0}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-green-600 h-3 rounded-full transition-all"
+                        style={{ width: `${plan.completion_percentage || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => navigate(`/internal-control/standards?plan_id=${plan.id}`)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  >
+                    Standartlara Git
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleViewDetail(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Görüntüle
+                  </button>
+                  <button
+                    onClick={() => handleEdit(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Düzenle
+                  </button>
+                  <button
+                    onClick={() => handleArchive(plan)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Archive className="w-4 h-4" />
+                    Arşivle
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div className="text-sm text-gray-600 mb-4">
-              Oluşturan: {activePlan.created_by} • Tarih: {new Date(activePlan.created_at).toLocaleDateString('tr-TR')}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate(`/internal-control/standards?plan_id=${activePlan.id}`)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Standartlara Git
-                <ArrowRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleEdit(activePlan)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                <Edit2 className="w-4 h-4" />
-                Düzenle
-              </button>
-              <button
-                onClick={() => handleArchive(activePlan)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                <Archive className="w-4 h-4" />
-                Arşivle
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       )}
