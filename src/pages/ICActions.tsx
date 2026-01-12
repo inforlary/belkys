@@ -656,6 +656,33 @@ export default function ICActions() {
       .sort((a, b) => a.component.code.localeCompare(b.component.code));
   }, [sortedActions]);
 
+  useEffect(() => {
+    if (hierarchicalData.length > 0) {
+      const allComponents = new Set<string>();
+      const allStandards = new Set<string>();
+      const allConditions = new Set<string>();
+
+      hierarchicalData.forEach(compData => {
+        const compKey = compData.component.code;
+        allComponents.add(compKey);
+
+        Array.from(compData.standards.values()).forEach(stdData => {
+          const stdKey = `${compKey}-${stdData.standard.code}`;
+          allStandards.add(stdKey);
+
+          Array.from(stdData.conditions.values()).forEach(condData => {
+            const condKey = `${stdKey}-${condData.condition.code}`;
+            allConditions.add(condKey);
+          });
+        });
+      });
+
+      setExpandedComponents(allComponents);
+      setExpandedStandards(allStandards);
+      setExpandedConditions(allConditions);
+    }
+  }, [hierarchicalData]);
+
   const paginatedActions = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
@@ -1397,9 +1424,18 @@ export default function ICActions() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden p-4">
-        <div className="space-y-2">
-          {hierarchicalData.map(componentData => {
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">Yükleniyor...</div>
+        </div>
+      ) : hierarchicalData.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <p className="text-gray-500">Eylem planı seçiniz.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden p-4">
+          <div className="space-y-2">
+            {hierarchicalData.map(componentData => {
             const compKey = componentData.component.code;
             const isCompExpanded = expandedComponents.has(compKey);
 
@@ -1502,21 +1538,21 @@ export default function ICActions() {
                                               {action.status !== 'NO_ACTION' && (
                                                 <div className="flex gap-1">
                                                   <button
-                                                    onClick={() => handleViewDetails(action)}
+                                                    onClick={() => handleViewDetail(action)}
                                                     className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                                                     title="Detayları Gör"
                                                   >
                                                     <Eye className="w-4 h-4" />
                                                   </button>
                                                   <button
-                                                    onClick={() => handleEditClick(action)}
+                                                    onClick={() => handleEdit(action)}
                                                     className="p-1 text-amber-600 hover:bg-amber-50 rounded"
                                                     title="Düzenle"
                                                   >
                                                     <Edit2 className="w-4 h-4" />
                                                   </button>
                                                   <button
-                                                    onClick={() => handleDeleteAction(action.id)}
+                                                    onClick={() => handleDelete(action)}
                                                     className="p-1 text-red-600 hover:bg-red-50 rounded"
                                                     title="Sil"
                                                   >
@@ -1541,9 +1577,10 @@ export default function ICActions() {
                 )}
               </div>
             );
-          })}
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <Modal
         isOpen={showProgressModal}
