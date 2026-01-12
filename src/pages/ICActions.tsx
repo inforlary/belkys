@@ -257,23 +257,28 @@ export default function ICActions() {
 
       if (error) throw error;
 
-      const conditionIds = [...new Set(actionsData?.map(a => a.condition_id).filter(Boolean))];
+      const actionConditionIds = new Set((actionsData || []).map(a => a.condition_id).filter(Boolean));
       const assessmentsMap = new Map<string, string>();
 
-      if (conditionIds.length > 0) {
-        const { data: assessmentsData } = await supabase
-          .from('ic_condition_assessments')
-          .select('condition_id, current_situation')
-          .eq('action_plan_id', selectedPlanId)
-          .in('condition_id', conditionIds);
+      const { data: allAssessmentsData } = await supabase
+        .from('ic_condition_assessments')
+        .select('condition_id, current_situation')
+        .eq('action_plan_id', selectedPlanId)
+        .neq('current_situation', '')
+        .not('current_situation', 'is', null);
 
-        if (assessmentsData) {
-          assessmentsData.forEach(a => {
-            if (a.current_situation) {
-              assessmentsMap.set(a.condition_id, a.current_situation);
+      const conditionsWithoutActions: string[] = [];
+
+      if (allAssessmentsData) {
+        allAssessmentsData.forEach(a => {
+          if (a.current_situation) {
+            assessmentsMap.set(a.condition_id, a.current_situation);
+
+            if (!actionConditionIds.has(a.condition_id)) {
+              conditionsWithoutActions.push(a.condition_id);
             }
-          });
-        }
+          }
+        });
       }
 
       const enrichedActions = await Promise.all((actionsData || []).map(async (action) => {
@@ -383,7 +388,87 @@ export default function ICActions() {
         };
       }));
 
-      setActions(enrichedActions);
+      const conditionsWithoutActionsData = await Promise.all(
+        conditionsWithoutActions.map(async (conditionId) => {
+          const { data: conditionData } = await supabase
+            .from('ic_general_conditions')
+            .select('code, description, standard_id')
+            .eq('id', conditionId)
+            .single();
+
+          if (!conditionData) return null;
+
+          let standard = null;
+          let component = null;
+
+          if (conditionData.standard_id) {
+            const { data: standardData } = await supabase
+              .from('ic_standards')
+              .select('code, name, component_id')
+              .eq('id', conditionData.standard_id)
+              .single();
+
+            standard = standardData;
+
+            if (standardData?.component_id) {
+              const { data: componentData } = await supabase
+                .from('ic_components')
+                .select('code, name')
+                .eq('id', standardData.component_id)
+                .single();
+
+              component = componentData;
+            }
+          }
+
+          return {
+            id: `no-action-${conditionId}`,
+            code: conditionData.code,
+            title: 'Bu genel şart için eylem oluşturulmamıştır',
+            description: '',
+            status: 'NO_ACTION',
+            progress_percent: 0,
+            target_date: '',
+            start_date: '',
+            responsible_department_id: '',
+            responsible_department_ids: [],
+            related_department_ids: [],
+            collaborating_departments_ids: [],
+            special_responsible_types: [],
+            related_special_responsible_types: [],
+            all_units_responsible: false,
+            all_units_collaborating: false,
+            condition_id: conditionId,
+            standard_id: conditionData.standard_id,
+            component_id: standard?.component_id,
+            action_plan_id: selectedPlanId,
+            outputs: '',
+            is_continuous: false,
+            delay_days: 0,
+            condition_code: conditionData.code,
+            condition_description: conditionData.description,
+            standard_code: standard?.code,
+            standard_name: standard?.name,
+            component_code: component?.code,
+            component_name: component?.name,
+            department_name: '',
+            related_departments: [],
+            responsible_departments: [],
+            collaborating_departments: [],
+            responsible_special_units: [],
+            collaborating_special_units: [],
+            current_status_description: assessmentsMap.get(conditionId) || ''
+          };
+        })
+      );
+
+      const validConditionsWithoutActions = conditionsWithoutActionsData.filter(
+        (item): item is Action => item !== null
+      );
+
+      const allActionsAndConditions = [...enrichedActions, ...validConditionsWithoutActions];
+
+      setActions(allActionsAndConditions);
     } catch (error) {
       console.error('Eylemler yüklenirken hata:', error);
     }
@@ -501,17 +586,21 @@ export default function ICActions() {
   const totalPages = Math.ceil(sortedActions.length / pageSize);
 
   const stats = useMemo(() => {
-    const total = baseFilteredActions.length;
-    const completed = baseFilteredActions.filter(a => a.status === 'COMPLETED').length;
-    const inProgress = baseFilteredActions.filter(a => a.status === 'IN_PROGRESS').length;
-    const notStarted = baseFilteredActions.filter(a => a.status === 'NOT_STARTED').length;
-    const delayed = baseFilteredActions.filter(a =>
+    const actualActions = baseFilteredActions.filter(a => a.status !== 'NO_ACTION');
+    const noActions = baseFilteredActions.filter(a => a.status === 'NO_ACTION').length;
+
+    const total = actualActions.length;
+    const completed = actualActions.filter(a => a.status === 'COMPLETED').length;
+    const inProgress = actualActions.filter(a => a.status === 'IN_PROGRESS').length;
+    const notStarted = actualActions.filter(a => a.status === 'NOT_STARTED').length;
+    const delayed = actualActions.filter(a =>
       a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
     ).length;
-    const ongoing = baseFilteredActions.filter(a => a.status === 'ONGOING').length;
+    const ongoing = actualActions.filter(a => a.status === 'ONGOING').length;
 
     return {
       total,
+      noActions,
       completed,
       completedPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
       inProgress: inProgress + ongoing,
@@ -823,12 +912,16 @@ export default function ICActions() {
       'COMPLETED': 'Tamamlandı',
       'DELAYED': 'Gecikmiş',
       'CANCELLED': 'İptal',
-      'ONGOING': 'Sürekli'
+      'ONGOING': 'Sürekli',
+      'NO_ACTION': 'Eylem Yok'
     };
     return labels[status] || status;
   };
 
   const getStatusBadge = (action: Action) => {
+    if (action.status === 'NO_ACTION') {
+      return 'bg-amber-100 text-amber-800';
+    }
     if (action.status === 'COMPLETED') {
       return 'bg-green-100 text-green-800';
     }
@@ -947,7 +1040,7 @@ export default function ICActions() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <button
           onClick={() => handleStatusFilter('')}
           className={`p-4 rounded-lg border-2 transition-all ${
@@ -1012,6 +1105,20 @@ export default function ICActions() {
           <div className="text-xs text-red-600 mt-1 flex items-center justify-center gap-1">
             <AlertTriangle className="w-3 h-3" />
             %{stats.delayedPercent}
+          </div>
+        </button>
+
+        <button
+          onClick={() => handleStatusFilter('NO_ACTION')}
+          className={`p-4 rounded-lg border-2 transition-all ${
+            selectedStatus === 'NO_ACTION' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
+          <div className="text-3xl font-bold text-amber-600">{stats.noActions}</div>
+          <div className="text-sm text-gray-600 mt-1">EYLEM YOK</div>
+          <div className="text-xs text-amber-600 mt-1 flex items-center justify-center gap-1">
+            <FileText className="w-3 h-3" />
+            Mevcut Durum
           </div>
         </button>
       </div>
@@ -1304,13 +1411,15 @@ export default function ICActions() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleUpdateProgress(action)}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        title="İlerleme Güncelle"
-                      >
-                        <Clock className="w-4 h-4" />
-                      </button>
+                      {action.status !== 'NO_ACTION' && (
+                        <button
+                          onClick={() => handleUpdateProgress(action)}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          title="İlerleme Güncelle"
+                        >
+                          <Clock className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleViewDetail(action)}
                         className="p-1 text-gray-600 hover:bg-gray-50 rounded"
@@ -1318,21 +1427,25 @@ export default function ICActions() {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleEdit(action)}
-                        className="p-1 text-gray-600 hover:bg-gray-50 rounded"
-                        title="Düzenle"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
-                        <button
-                          onClick={() => handleDelete(action)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          title="Sil"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      {action.status !== 'NO_ACTION' && (
+                        <>
+                          <button
+                            onClick={() => handleEdit(action)}
+                            className="p-1 text-gray-600 hover:bg-gray-50 rounded"
+                            title="Düzenle"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
+                            <button
+                              onClick={() => handleDelete(action)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              title="Sil"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
@@ -1498,13 +1611,32 @@ export default function ICActions() {
       >
         {selectedAction && (
           <div className="space-y-6">
+            {selectedAction.status === 'NO_ACTION' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-amber-900 text-sm mb-1">Eylem Oluşturulmamış</h4>
+                    <p className="text-sm text-amber-800">
+                      Bu genel şart için henüz bir eylem tanımlanmamıştır. Ancak mevcut durum açıklaması girilmiştir.
+                      Eylem Planları sayfasından bu genel şart için eylem ekleyebilirsiniz.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-3">EYLEM BİLGİLERİ</h3>
               <div className="space-y-2 text-sm">
-                <div><strong>Eylem Kodu:</strong> {selectedAction.code}</div>
-                <div><strong>Eylem Başlığı:</strong> {selectedAction.title}</div>
-                {selectedAction.description && (
-                  <div><strong>Açıklama:</strong> {selectedAction.description}</div>
+                <div><strong>Genel Şart Kodu:</strong> {selectedAction.code}</div>
+                {selectedAction.status !== 'NO_ACTION' && (
+                  <>
+                    <div><strong>Eylem Başlığı:</strong> {selectedAction.title}</div>
+                    {selectedAction.description && (
+                      <div><strong>Açıklama:</strong> {selectedAction.description}</div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
