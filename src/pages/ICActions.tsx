@@ -307,7 +307,7 @@ export default function ICActions() {
     return standards.filter(s => s.component_id === selectedComponentId);
   }, [selectedComponentId, standards]);
 
-  const filteredActions = useMemo(() => {
+  const baseFilteredActions = useMemo(() => {
     let filtered = actions;
 
     if (selectedComponentId) {
@@ -329,10 +329,6 @@ export default function ICActions() {
       filtered = filtered.filter(a => a.responsible_department_id === selectedDepartmentId);
     }
 
-    if (selectedStatus) {
-      filtered = filtered.filter(a => a.status === selectedStatus);
-    }
-
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(a =>
@@ -343,7 +339,23 @@ export default function ICActions() {
     }
 
     return filtered;
-  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, selectedStatus, searchTerm, standards]);
+  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, searchTerm, standards]);
+
+  const filteredActions = useMemo(() => {
+    let filtered = baseFilteredActions;
+
+    if (selectedStatus) {
+      if (selectedStatus === 'DELAYED') {
+        filtered = filtered.filter(a =>
+          a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
+        );
+      } else {
+        filtered = filtered.filter(a => a.status === selectedStatus);
+      }
+    }
+
+    return filtered;
+  }, [baseFilteredActions, selectedStatus]);
 
   const sortedActions = useMemo(() => {
     const sorted = [...filteredActions];
@@ -403,14 +415,14 @@ export default function ICActions() {
   const totalPages = Math.ceil(sortedActions.length / pageSize);
 
   const stats = useMemo(() => {
-    const total = filteredActions.length;
-    const completed = filteredActions.filter(a => a.status === 'COMPLETED').length;
-    const inProgress = filteredActions.filter(a => a.status === 'IN_PROGRESS').length;
-    const notStarted = filteredActions.filter(a => a.status === 'NOT_STARTED').length;
-    const delayed = filteredActions.filter(a =>
+    const total = baseFilteredActions.length;
+    const completed = baseFilteredActions.filter(a => a.status === 'COMPLETED').length;
+    const inProgress = baseFilteredActions.filter(a => a.status === 'IN_PROGRESS').length;
+    const notStarted = baseFilteredActions.filter(a => a.status === 'NOT_STARTED').length;
+    const delayed = baseFilteredActions.filter(a =>
       a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
     ).length;
-    const ongoing = filteredActions.filter(a => a.status === 'ONGOING').length;
+    const ongoing = baseFilteredActions.filter(a => a.status === 'ONGOING').length;
 
     return {
       total,
@@ -423,7 +435,7 @@ export default function ICActions() {
       delayed,
       delayedPercent: total > 0 ? Math.round((delayed / total) * 100) : 0
     };
-  }, [filteredActions]);
+  }, [baseFilteredActions]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -858,14 +870,7 @@ export default function ICActions() {
         </button>
 
         <button
-          onClick={() => {
-            const delayedActions = filteredActions.filter(a =>
-              a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
-            );
-            if (delayedActions.length > 0) {
-              setSelectedStatus('DELAYED');
-            }
-          }}
+          onClick={() => handleStatusFilter('DELAYED')}
           className={`p-4 rounded-lg border-2 transition-all ${
             selectedStatus === 'DELAYED' ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
           }`}
