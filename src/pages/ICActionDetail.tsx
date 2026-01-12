@@ -71,6 +71,8 @@ export default function ICActionDetail() {
   const planId = pathParts[pathParts.indexOf('action-plans') + 1];
   const actionId = pathParts[pathParts.length - 1];
 
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+
   const [action, setAction] = useState<Action | null>(null);
   const [progressHistory, setProgressHistory] = useState<ProgressEntry[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -395,6 +397,25 @@ export default function ICActionDetail() {
     }
   };
 
+  const handleDeleteProgress = async (progressId: string) => {
+    if (!confirm('Bu ilerleme kaydını silmek istediğinizden emin misiniz?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('ic_action_progress')
+        .delete()
+        .eq('id', progressId);
+
+      if (error) throw error;
+
+      setToast({ message: 'İlerleme kaydı başarıyla silindi', type: 'success' });
+      loadData();
+    } catch (error) {
+      console.error('İlerleme kaydı silinirken hata:', error);
+      setToast({ message: 'İlerleme kaydı silinirken hata oluştu', type: 'error' });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, string> = {
       NOT_STARTED: 'bg-slate-100 text-slate-800',
@@ -688,9 +709,20 @@ export default function ICActionDetail() {
                           {new Date(entry.report_date).toLocaleDateString('tr-TR')} - {entry.profiles?.full_name}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600">İlerleme:</span>
-                        <span className="font-bold text-green-600">{entry.new_progress}%</span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-600">İlerleme:</span>
+                          <span className="font-bold text-green-600">{entry.new_progress}%</span>
+                        </div>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteProgress(entry.id)}
+                            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                            title="İlerleme kaydını sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="border-t border-slate-200 pt-3 space-y-2">
