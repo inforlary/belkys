@@ -515,6 +515,7 @@ export default function ICActionPlans() {
             <input
               type="text"
               required
+              maxLength={1000}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Örn: 2024-2026 İç Kontrol Eylem Planı"
@@ -642,6 +643,7 @@ export default function ICActionPlans() {
             <input
               type="text"
               required
+              maxLength={1000}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Örn: 2024-2026 İç Kontrol Eylem Planı"
