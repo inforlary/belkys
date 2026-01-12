@@ -73,7 +73,7 @@ export default function ICActionPlans() {
     try {
       const { data: plansData, error: plansError } = await supabase
         .from('ic_action_plans')
-        .select('*, profiles!ic_action_plans_created_by_fkey(full_name)')
+        .select('*')
         .eq('organization_id', profile?.organization_id)
         .order('start_date', { ascending: false });
 
@@ -84,6 +84,18 @@ export default function ICActionPlans() {
           .from('ic_actions')
           .select('status')
           .eq('action_plan_id', plan.id);
+
+        let createdByName = 'Bilinmiyor';
+        if (plan.prepared_by_id) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', plan.prepared_by_id)
+            .single();
+          if (profileData) {
+            createdByName = profileData.full_name;
+          }
+        }
 
         const actionCount = actionsData?.length || 0;
         const completedCount = actionsData?.filter(a => a.status === 'COMPLETED').length || 0;
@@ -102,7 +114,7 @@ export default function ICActionPlans() {
           not_started_count: notStartedCount,
           ongoing_count: ongoingCount,
           completion_percentage: completionPercentage,
-          created_by: (plan as any).profiles?.full_name || 'Bilinmiyor'
+          created_by: createdByName
         };
       }));
 
@@ -128,7 +140,7 @@ export default function ICActionPlans() {
           start_date: formData.start_date,
           end_date: formData.end_date,
           status: formData.status,
-          created_by: profile?.id
+          prepared_by_id: profile?.id
         })
         .select()
         .single();
@@ -187,8 +199,7 @@ export default function ICActionPlans() {
             start_date: action.start_date,
             target_date: action.target_date,
             status: 'NOT_STARTED',
-            progress_percent: 0,
-            created_by: profile?.id
+            progress_percent: 0
           }));
 
           await supabase.from('ic_actions').insert(newActions);
