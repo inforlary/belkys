@@ -136,7 +136,7 @@ export default function RiskRegister() {
     name: '',
     description: '',
     causes: '',
-    category_id: '',
+    category_ids: [] as string[],
     owner_department_id: '',
     owner_id: '',
     goal_id: '',
@@ -294,7 +294,7 @@ export default function RiskRegister() {
       name: '',
       description: '',
       causes: '',
-      category_id: '',
+      category_ids: [] as string[],
       owner_department_id: '',
       owner_id: '',
       goal_id: '',
@@ -335,7 +335,7 @@ export default function RiskRegister() {
   }
 
   async function handleSave(saveStatus: string) {
-    if (!formData.code || !formData.name || !formData.category_id || !formData.owner_department_id) {
+    if (!formData.code || !formData.name || formData.category_ids.length === 0 || !formData.owner_department_id) {
       alert('Lütfen zorunlu alanları doldurun!');
       return;
     }
@@ -358,7 +358,7 @@ export default function RiskRegister() {
           name: formData.name,
           description: formData.description,
           causes: formData.causes,
-          category_id: formData.category_id,
+          category_id: formData.category_ids[0],
           owner_department_id: formData.owner_department_id,
           goal_id: formData.goal_id || null,
           inherent_likelihood: formData.inherent_likelihood,
@@ -375,6 +375,17 @@ export default function RiskRegister() {
         .single();
 
       if (riskError) throw riskError;
+
+      const categoryMappings = formData.category_ids.map(categoryId => ({
+        risk_id: riskData.id,
+        category_id: categoryId
+      }));
+
+      const { error: mappingError } = await supabase
+        .from('risk_category_mappings')
+        .insert(categoryMappings);
+
+      if (mappingError) throw mappingError;
 
       if (controls.length > 0) {
         const controlsToInsert = controls.map(ctrl => ({
@@ -867,19 +878,28 @@ export default function RiskRegister() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Kategori <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
                     </label>
-                    <select
-                      value={formData.category_id}
-                      onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Seçiniz...</option>
+                    <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
                       {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        <label key={cat.id} className="flex items-center space-x-2 py-1.5 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.category_ids.includes(cat.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({ ...formData, category_ids: [...formData.category_ids, cat.id] });
+                              } else {
+                                setFormData({ ...formData, category_ids: formData.category_ids.filter(id => id !== cat.id) });
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{cat.name}</span>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 </div>
 
