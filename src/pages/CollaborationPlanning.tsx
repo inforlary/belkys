@@ -88,6 +88,24 @@ interface TransferredRisk {
   risk_id: string;
 }
 
+interface RiskCriterion {
+  id: string;
+  criteria_type: 'LIKELIHOOD' | 'IMPACT';
+  level: number;
+  name: string;
+  description: string;
+  percentage_min: number | null;
+  percentage_max: number | null;
+}
+
+interface RiskControl {
+  id?: string;
+  name: string;
+  description: string;
+  control_type: string;
+  effectiveness: string;
+}
+
 export default function CollaborationPlanning() {
   const { user, profile } = useAuth();
   const [plans, setPlans] = useState<CollaborationPlan[]>([]);
@@ -107,12 +125,24 @@ export default function CollaborationPlanning() {
   const [transferringRisk, setTransferringRisk] = useState<{ item: PlanItem; plan: CollaborationPlan } | null>(null);
   const [riskCategories, setRiskCategories] = useState<RiskCategory[]>([]);
   const [transferredRisks, setTransferredRisks] = useState<TransferredRisk[]>([]);
+  const [criteria, setCriteria] = useState<RiskCriterion[]>([]);
+  const [controls, setControls] = useState<RiskControl[]>([]);
+  const [showControlForm, setShowControlForm] = useState(false);
+  const [newControl, setNewControl] = useState<RiskControl>({
+    name: '',
+    description: '',
+    control_type: 'PREVENTIVE',
+    effectiveness: 'EFFECTIVE'
+  });
   const [transferFormData, setTransferFormData] = useState({
     category_ids: [] as string[],
-    status: 'IDENTIFIED',
+    status: 'ACTIVE',
     inherent_likelihood: 3,
     inherent_impact: 3,
+    residual_likelihood: 2,
+    residual_impact: 2,
     risk_response: 'MITIGATE',
+    response_rationale: '',
     additional_description: ''
   });
 
@@ -142,7 +172,7 @@ export default function CollaborationPlanning() {
     try {
       setLoading(true);
 
-      const [plansRes, goalsRes, depsRes, planRes, categoriesRes, transferredRes] = await Promise.all([
+      const [plansRes, goalsRes, depsRes, planRes, categoriesRes, transferredRes, criteriaRes] = await Promise.all([
         supabase
           .from('collaboration_plans')
           .select(`
@@ -186,7 +216,14 @@ export default function CollaborationPlanning() {
           .from('risks')
           .select('id, collaboration_item_id')
           .eq('organization_id', profile.organization_id)
-          .not('collaboration_item_id', 'is', null)
+          .not('collaboration_item_id', 'is', null),
+
+        supabase
+          .from('risk_criteria')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .order('criteria_type')
+          .order('level')
       ]);
 
       if (plansRes.error) throw plansRes.error;
@@ -199,6 +236,20 @@ export default function CollaborationPlanning() {
       setStrategicPlan(planRes.data);
       setRiskCategories(categoriesRes.data || []);
       setTransferredRisks(transferredRes.data || []);
+      setCriteria(criteriaRes.data || []);
+
+      if (criteriaRes.data?.length === 0) {
+        await supabase.rpc('initialize_default_risk_criteria', {
+          org_id: profile?.organization_id
+        });
+        const { data: newCriteria } = await supabase
+          .from('risk_criteria')
+          .select('*')
+          .eq('organization_id', profile?.organization_id)
+          .order('criteria_type')
+          .order('level');
+        setCriteria(newCriteria || []);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -512,12 +563,18 @@ export default function CollaborationPlanning() {
     setTransferringRisk({ item: riskItem, plan });
     setTransferFormData({
       category_ids: [],
-      status: 'IDENTIFIED',
+      status: 'ACTIVE',
       inherent_likelihood: 3,
       inherent_impact: 3,
+      residual_likelihood: 2,
+      residual_impact: 2,
       risk_response: 'MITIGATE',
+      response_rationale: '',
       additional_description: ''
     });
+    setControls([]);
+    setShowControlForm(false);
+    setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
     setShowTransferModal(true);
   };
 
@@ -535,6 +592,9 @@ export default function CollaborationPlanning() {
         ? `İşbirliği planından aktarılan risk: ${transferringRisk.plan.title}\n\n${transferFormData.additional_description}`
         : `İşbirliği planından aktarılan risk: ${transferringRisk.plan.title}`;
 
+      const inherentScore = transferFormData.inherent_likelihood * transferFormData.inherent_impact;
+      const residualScore = transferFormData.residual_likelihood * transferFormData.residual_impact;
+
       const { data: riskData, error: riskError } = await supabase
         .from('risks')
         .insert({
@@ -547,10 +607,13 @@ export default function CollaborationPlanning() {
           owner_department_id: transferringRisk.plan.responsible_department_id,
           inherent_likelihood: transferFormData.inherent_likelihood,
           inherent_impact: transferFormData.inherent_impact,
-          residual_likelihood: transferFormData.inherent_likelihood,
-          residual_impact: transferFormData.inherent_impact,
-          risk_level: calculateRiskLevel(transferFormData.inherent_likelihood * transferFormData.inherent_impact),
+          inherent_score: inherentScore,
+          residual_likelihood: transferFormData.residual_likelihood,
+          residual_impact: transferFormData.residual_impact,
+          residual_score: residualScore,
+          risk_level: calculateRiskLevel(residualScore),
           risk_response: transferFormData.risk_response,
+          response_rationale: transferFormData.response_rationale,
           status: transferFormData.status,
           is_active: true,
           identified_date: new Date().toISOString().split('T')[0],
@@ -572,6 +635,23 @@ export default function CollaborationPlanning() {
 
       if (mappingError) throw mappingError;
 
+      if (controls.length > 0) {
+        const controlInserts = controls.map(control => ({
+          risk_id: riskData.id,
+          name: control.name,
+          description: control.description,
+          control_type: control.control_type,
+          effectiveness: control.effectiveness,
+          organization_id: profile.organization_id
+        }));
+
+        const { error: controlsError } = await supabase
+          .from('risk_controls')
+          .insert(controlInserts);
+
+        if (controlsError) throw controlsError;
+      }
+
       alert('Risk başarıyla Risk Yönetimi sistemine aktarıldı!');
       setShowTransferModal(false);
       setTransferringRisk(null);
@@ -580,6 +660,46 @@ export default function CollaborationPlanning() {
       console.error('Risk aktarılırken hata:', error);
       alert('Risk aktarılırken hata oluştu: ' + (error?.message || 'Bilinmeyen hata'));
     }
+  };
+
+  const handleAddControl = () => {
+    if (!newControl.name || !newControl.description) {
+      alert('Kontrol adı ve açıklaması zorunludur.');
+      return;
+    }
+    setControls([...controls, { ...newControl }]);
+    setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+    setShowControlForm(false);
+  };
+
+  const handleRemoveControl = (index: number) => {
+    setControls(controls.filter((_, i) => i !== index));
+  };
+
+  const getLikelihoodLabel = (level: number) => {
+    const criterion = criteria.find(c => c.criteria_type === 'LIKELIHOOD' && c.level === level);
+    return criterion ? criterion.name : `Seviye ${level}`;
+  };
+
+  const getImpactLabel = (level: number) => {
+    const criterion = criteria.find(c => c.criteria_type === 'IMPACT' && c.level === level);
+    return criterion ? criterion.name : `Seviye ${level}`;
+  };
+
+  const getRiskScoreColor = (score: number) => {
+    if (score >= 20) return 'text-red-700 font-bold';
+    if (score >= 15) return 'text-orange-600 font-bold';
+    if (score >= 10) return 'text-yellow-600 font-bold';
+    if (score >= 5) return 'text-blue-600 font-bold';
+    return 'text-green-600 font-bold';
+  };
+
+  const getRiskScoreLabel = (score: number) => {
+    if (score >= 20) return 'Kritik';
+    if (score >= 15) return 'Çok Yüksek';
+    if (score >= 10) return 'Yüksek';
+    if (score >= 5) return 'Orta';
+    return 'Düşük';
   };
 
   const calculateRiskLevel = (score: number): string => {
@@ -1336,161 +1456,445 @@ export default function CollaborationPlanning() {
       )}
 
       {showTransferModal && transferringRisk && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-5xl w-full my-8">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Risk Yönetimine Aktar</h2>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Risk Yönetimine Aktar</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Risk: <span className="font-medium">{transferringRisk.item.content}</span>
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowTransferModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Risk: <span className="font-medium">{transferringRisk.item.content}</span>
-              </p>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                  {riskCategories.map((category) => (
-                    <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={transferFormData.category_ids.includes(category.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setTransferFormData(prev => ({
-                              ...prev,
-                              category_ids: [...prev.category_ids, category.id]
-                            }));
-                          } else {
-                            setTransferFormData(prev => ({
-                              ...prev,
-                              category_ids: prev.category_ids.filter(id => id !== category.id)
-                            }));
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {category.code} - {category.name}
-                        <span className="text-xs text-gray-500 ml-1">({category.type})</span>
-                      </span>
+            <div className="px-6 py-6 space-y-8 max-h-[calc(90vh-200px)] overflow-y-auto">
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Temel Bilgiler</h3>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-gray-300 rounded-lg p-4">
+                    {riskCategories.map((category) => (
+                      <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={transferFormData.category_ids.includes(category.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setTransferFormData(prev => ({
+                                ...prev,
+                                category_ids: [...prev.category_ids, category.id]
+                              }));
+                            } else {
+                              setTransferFormData(prev => ({
+                                ...prev,
+                                category_ids: prev.category_ids.filter(id => id !== category.id)
+                              }));
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {category.code} - {category.name}
+                          <span className="text-xs text-gray-500 ml-1">({category.type})</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Durumu <span className="text-red-500">*</span>
                     </label>
-                  ))}
-                </div>
-              </div>
+                    <select
+                      value={transferFormData.status}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="DRAFT">Taslak</option>
+                      <option value="ACTIVE">Aktif</option>
+                      <option value="IDENTIFIED">Tespit Edildi</option>
+                      <option value="ASSESSING">Değerlendiriliyor</option>
+                      <option value="TREATING">Tedavi Ediliyor</option>
+                      <option value="MONITORING">İzlemede</option>
+                      <option value="CLOSED">Kapatıldı</option>
+                    </select>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Risk Durumu <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={transferFormData.status}
-                    onChange={(e) => setTransferFormData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="IDENTIFIED">Tespit Edildi</option>
-                    <option value="ASSESSING">Değerlendiriliyor</option>
-                    <option value="TREATING">Tedavi Ediliyor</option>
-                    <option value="MONITORING">İzleniyor</option>
-                    <option value="CLOSED">Kapatıldı</option>
-                  </select>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Yanıt Stratejisi <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={transferFormData.risk_response}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_response: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="ACCEPT">Kabul Et</option>
+                      <option value="MITIGATE">Azalt</option>
+                      <option value="TRANSFER">Transfer Et</option>
+                      <option value="AVOID">Kaçın</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
+                <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Risk Yanıtı <span className="text-red-500">*</span>
+                    Yanıt Gerekçesi
                   </label>
-                  <select
-                    value={transferFormData.risk_response}
-                    onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_response: e.target.value }))}
+                  <textarea
+                    value={transferFormData.response_rationale}
+                    onChange={(e) => setTransferFormData(prev => ({ ...prev, response_rationale: e.target.value }))}
+                    rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="ACCEPT">Kabul Et</option>
-                    <option value="MITIGATE">Azalt</option>
-                    <option value="TRANSFER">Transfer Et</option>
-                    <option value="AVOID">Kaçın</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    İçsel Olasılık (1-5) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={transferFormData.inherent_likelihood}
-                    onChange={(e) => setTransferFormData(prev => ({ ...prev, inherent_likelihood: parseInt(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Risk yanıt stratejisinin gerekçesi..."
                   />
-                  <p className="text-xs text-gray-500 mt-1">1=Çok Düşük, 5=Çok Yüksek</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    İçsel Etki (1-5) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={transferFormData.inherent_impact}
-                    onChange={(e) => setTransferFormData(prev => ({ ...prev, inherent_impact: parseInt(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">1=Çok Düşük, 5=Çok Yüksek</p>
                 </div>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <p className="text-sm font-medium text-gray-700">Risk Skoru:</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {transferFormData.inherent_likelihood * transferFormData.inherent_impact}
-                  <span className="text-sm font-normal text-gray-600 ml-2">
-                    ({calculateRiskLevel(transferFormData.inherent_likelihood * transferFormData.inherent_impact)})
-                  </span>
-                </p>
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Doğal Risk Değerlendirmesi</h3>
+                <p className="text-sm text-gray-600 mb-4">Kontrol önlemleri olmadan riskin değerlendirmesi</p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Olasılık <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <label
+                          key={level}
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            transferFormData.inherent_likelihood === level
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="inherent_likelihood"
+                            value={level}
+                            checked={transferFormData.inherent_likelihood === level}
+                            onChange={() => setTransferFormData(prev => ({ ...prev, inherent_likelihood: level }))}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{level} - {getLikelihoodLabel(level)}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Etki <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <label
+                          key={level}
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            transferFormData.inherent_impact === level
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="inherent_impact"
+                            value={level}
+                            checked={transferFormData.inherent_impact === level}
+                            onChange={() => setTransferFormData(prev => ({ ...prev, inherent_impact: level }))}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{level} - {getImpactLabel(level)}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-2 border-blue-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700">Doğal Risk Skoru:</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl font-bold text-gray-900">
+                        {transferFormData.inherent_likelihood * transferFormData.inherent_impact}
+                      </span>
+                      <span className={`text-lg ${getRiskScoreColor(transferFormData.inherent_likelihood * transferFormData.inherent_impact)}`}>
+                        ({getRiskScoreLabel(transferFormData.inherent_likelihood * transferFormData.inherent_impact)})
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ek Açıklama
-                </label>
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Mevcut Kontroller</h3>
+                    <p className="text-sm text-gray-600 mt-1">Riskin yönetimi için uygulanmakta olan kontrol önlemleri</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowControlForm(!showControlForm)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Kontrol Ekle
+                  </button>
+                </div>
+
+                {showControlForm && (
+                  <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Kontrol Adı <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newControl.name}
+                          onChange={(e) => setNewControl({ ...newControl, name: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="Kontrol önleminin adı"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Kontrol Tipi <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={newControl.control_type}
+                          onChange={(e) => setNewControl({ ...newControl, control_type: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="PREVENTIVE">Önleyici</option>
+                          <option value="DETECTIVE">Tespit Edici</option>
+                          <option value="CORRECTIVE">Düzeltici</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Açıklama <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={newControl.description}
+                          onChange={(e) => setNewControl({ ...newControl, description: e.target.value })}
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="Kontrol önleminin detaylı açıklaması"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Etkinlik <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={newControl.effectiveness}
+                          onChange={(e) => setNewControl({ ...newControl, effectiveness: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="EFFECTIVE">Etkili</option>
+                          <option value="PARTIALLY_EFFECTIVE">Kısmen Etkili</option>
+                          <option value="INEFFECTIVE">Etkisiz</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowControlForm(false);
+                          setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+                        }}
+                        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        İptal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddControl}
+                        className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      >
+                        Ekle
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {controls.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                    Henüz kontrol önlemi eklenmemiş
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {controls.map((control, index) => (
+                      <div key={index} className="p-4 bg-white border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-semibold text-gray-900">{control.name}</h4>
+                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                {control.control_type === 'PREVENTIVE' ? 'Önleyici' : control.control_type === 'DETECTIVE' ? 'Tespit Edici' : 'Düzeltici'}
+                              </span>
+                              <span className={`px-2 py-1 text-xs rounded ${
+                                control.effectiveness === 'EFFECTIVE' ? 'bg-green-100 text-green-800' :
+                                control.effectiveness === 'PARTIALLY_EFFECTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {control.effectiveness === 'EFFECTIVE' ? 'Etkili' : control.effectiveness === 'PARTIALLY_EFFECTIVE' ? 'Kısmen Etkili' : 'Etkisiz'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600">{control.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveControl(index)}
+                            className="ml-3 p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Artık Risk Değerlendirmesi</h3>
+                <p className="text-sm text-gray-600 mb-4">Kontrol önlemleri uygulandıktan sonra kalan risk</p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Olasılık <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <label
+                          key={level}
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            transferFormData.residual_likelihood === level
+                              ? 'border-orange-500 bg-orange-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="residual_likelihood"
+                            value={level}
+                            checked={transferFormData.residual_likelihood === level}
+                            onChange={() => setTransferFormData(prev => ({ ...prev, residual_likelihood: level }))}
+                            className="w-4 h-4 text-orange-600"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{level} - {getLikelihoodLabel(level)}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Etki <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <label
+                          key={level}
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            transferFormData.residual_impact === level
+                              ? 'border-orange-500 bg-orange-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="residual_impact"
+                            value={level}
+                            checked={transferFormData.residual_impact === level}
+                            onChange={() => setTransferFormData(prev => ({ ...prev, residual_impact: level }))}
+                            className="w-4 h-4 text-orange-600"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{level} - {getImpactLabel(level)}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700">Artık Risk Skoru:</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl font-bold text-gray-900">
+                        {transferFormData.residual_likelihood * transferFormData.residual_impact}
+                      </span>
+                      <span className={`text-lg ${getRiskScoreColor(transferFormData.residual_likelihood * transferFormData.residual_impact)}`}>
+                        ({getRiskScoreLabel(transferFormData.residual_likelihood * transferFormData.residual_impact)})
+                      </span>
+                    </div>
+                  </div>
+                  {(transferFormData.inherent_likelihood * transferFormData.inherent_impact) >
+                   (transferFormData.residual_likelihood * transferFormData.residual_impact) && (
+                    <div className="mt-3 pt-3 border-t border-orange-300 flex items-center gap-2 text-sm text-green-700">
+                      <TrendingDown className="w-5 h-5" />
+                      <span className="font-medium">
+                        Risk {(transferFormData.inherent_likelihood * transferFormData.inherent_impact) -
+                        (transferFormData.residual_likelihood * transferFormData.residual_impact)} puan azaltıldı
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Ek Açıklama</h3>
                 <textarea
                   value={transferFormData.additional_description}
                   onChange={(e) => setTransferFormData(prev => ({ ...prev, additional_description: e.target.value }))}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Risk hakkında ek bilgiler..."
+                  placeholder="Risk hakkında ek bilgiler ve notlar..."
                 />
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg flex justify-end gap-3">
               <button
                 onClick={() => setShowTransferModal(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 İptal
               </button>
               <button
                 onClick={handleTransferRisk}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
-                <Shield className="w-4 h-4" />
+                <Shield className="w-5 h-5" />
                 Risk Yönetimine Aktar
               </button>
             </div>
