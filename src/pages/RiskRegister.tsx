@@ -167,6 +167,22 @@ export default function RiskRegister() {
   }, [profile?.organization_id]);
 
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.dropdown-menu-container')) {
+          setMenuOpen(null);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
     const level = searchParams.get('level');
     const department = searchParams.get('department');
 
@@ -766,7 +782,7 @@ export default function RiskRegister() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="relative inline-block text-left">
+                        <div className="relative inline-block text-left dropdown-menu-container">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -777,7 +793,7 @@ export default function RiskRegister() {
                             <MoreVertical className="w-5 h-5" />
                           </button>
                           {menuOpen === risk.id && (
-                            <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                            <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
                               <div className="py-1">
                                 <button
                                   onClick={(e) => {
