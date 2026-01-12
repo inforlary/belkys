@@ -37,7 +37,6 @@ export default function RiskRegisterNew() {
       loadCategories();
       loadDepartments();
       loadGoals();
-      generateNextCode();
     }
   }, [profile?.organization_id]);
 
@@ -55,33 +54,6 @@ export default function RiskRegisterNew() {
     }
   }, [formData.owner_department_id, goals]);
 
-  const generateNextCode = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('risks')
-        .select('code')
-        .eq('organization_id', profile?.organization_id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-
-      let nextNumber = 1;
-      if (data && data.length > 0) {
-        const lastCode = data[0].code;
-        const match = lastCode.match(/R-(\d+)/);
-        if (match) {
-          nextNumber = parseInt(match[1]) + 1;
-        }
-      }
-
-      const nextCode = `R-${nextNumber.toString().padStart(3, '0')}`;
-      setFormData(prev => ({ ...prev, code: nextCode }));
-    } catch (error) {
-      console.error('Kod oluşturulurken hata:', error);
-      setFormData(prev => ({ ...prev, code: 'R-001' }));
-    }
-  };
 
   const loadCategories = async () => {
     try {
@@ -143,7 +115,7 @@ export default function RiskRegisterNew() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.code || !formData.name) {
+    if (!formData.name) {
       alert('Lütfen zorunlu alanları doldurun!');
       return;
     }
@@ -162,7 +134,6 @@ export default function RiskRegisterNew() {
           objective_id: formData.objective_id || null,
           goal_id: formData.goal_id || null,
           owner_department_id: formData.owner_department_id || null,
-          code: formData.code,
           name: formData.name,
           description: formData.description,
           causes: formData.causes,
@@ -236,24 +207,10 @@ export default function RiskRegisterNew() {
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Temel Bilgiler</h3>
 
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Risk Kodu <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
-                </label>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
+              </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-slate-300 rounded-lg p-4">
                   {categories.map((category) => (
                     <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
@@ -282,7 +239,6 @@ export default function RiskRegisterNew() {
                     </label>
                   ))}
                 </div>
-              </div>
             </div>
 
             <div className="mt-4">

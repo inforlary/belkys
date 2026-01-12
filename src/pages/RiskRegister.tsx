@@ -276,34 +276,6 @@ export default function RiskRegister() {
     }
   }
 
-  async function generateNextCode() {
-    try {
-      const { data, error } = await supabase
-        .from('risks')
-        .select('code')
-        .eq('organization_id', profile?.organization_id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-
-      let nextNumber = 1;
-      if (data && data.length > 0) {
-        const lastCode = data[0].code;
-        const match = lastCode.match(/R-(\d+)/);
-        if (match) {
-          nextNumber = parseInt(match[1]) + 1;
-        }
-      }
-
-      const nextCode = `R-${nextNumber.toString().padStart(3, '0')}`;
-      setFormData(prev => ({ ...prev, code: nextCode }));
-    } catch (error) {
-      console.error('Error generating code:', error);
-      setFormData(prev => ({ ...prev, code: 'R-001' }));
-    }
-  }
-
   function openNewRiskModal() {
     setFormData({
       code: '',
@@ -326,7 +298,6 @@ export default function RiskRegister() {
     setControls([]);
     setShowControlForm(false);
     setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
-    generateNextCode();
     setShowModal(true);
   }
 
@@ -351,7 +322,7 @@ export default function RiskRegister() {
   }
 
   async function handleSave(saveStatus: string) {
-    if (!formData.code || !formData.name || formData.category_ids.length === 0 || !formData.owner_department_id) {
+    if (!formData.name || formData.category_ids.length === 0 || !formData.owner_department_id) {
       alert('Lütfen zorunlu alanları doldurun!');
       return;
     }
@@ -370,7 +341,6 @@ export default function RiskRegister() {
         .from('risks')
         .insert({
           organization_id: profile?.organization_id,
-          code: formData.code,
           name: formData.name,
           description: formData.description,
           causes: formData.causes,
