@@ -55,7 +55,7 @@ export default function DepartmentRiskReport({ onClose }: { onClose: () => void 
           .from('risks')
           .select('*')
           .eq('organization_id', profile.organization_id)
-          .eq('department_id', selectedDept),
+          .eq('owner_department_id', selectedDept),
         supabase
           .from('risk_treatments')
           .select('*')
@@ -63,14 +63,14 @@ export default function DepartmentRiskReport({ onClose }: { onClose: () => void 
           .eq('responsible_department', selectedDept),
         supabase
           .from('risk_indicators')
-          .select('*, risk:risks!inner(department_id)')
+          .select('*, risk:risks!inner(owner_department_id)')
           .eq('organization_id', profile.organization_id)
       ]);
 
       if (risksRes.data) setRisks(risksRes.data);
       if (treatmentsRes.data) setTreatments(treatmentsRes.data);
       if (indicatorsRes.data) {
-        const deptIndicators = indicatorsRes.data.filter(i => i.risk?.department_id === selectedDept);
+        const deptIndicators = indicatorsRes.data.filter(i => i.risk?.owner_department_id === selectedDept);
         setIndicators(deptIndicators);
       }
     } catch (error) {

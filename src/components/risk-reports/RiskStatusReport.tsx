@@ -56,7 +56,7 @@ export default function RiskStatusReport({ onClose }: { onClose: () => void }) {
       const [risksRes, categoriesRes, deptRes] = await Promise.all([
         supabase
           .from('risks')
-          .select('id, code, title, category_id, inherent_score, residual_score, response_strategy, status, department_id')
+          .select('id, code, title, category_id, inherent_score, residual_score, response_strategy, status, owner_department_id')
           .eq('organization_id', profile.organization_id),
         supabase
           .from('risk_categories')

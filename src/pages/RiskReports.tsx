@@ -159,22 +159,25 @@ export default function RiskReports() {
   const loadMetrics = async () => {
     let risksQuery = supabase
       .from('risks')
-      .select('*, risk_treatments(*)')
+      .select('*, risk_treatments(*), risk_category_mappings(category_id)')
       .eq('organization_id', profile?.organization_id);
 
     if (filterDepartment !== 'all') {
-      risksQuery = risksQuery.eq('department_id', filterDepartment);
-    }
-
-    if (filterCategory !== 'all') {
-      risksQuery = risksQuery.contains('categories', [filterCategory]);
+      risksQuery = risksQuery.eq('owner_department_id', filterDepartment);
     }
 
     const { data: risks, error: risksError } = await risksQuery;
     if (risksError) throw risksError;
 
+    let filteredRisks = risks || [];
+    if (filterCategory !== 'all') {
+      filteredRisks = filteredRisks.filter((risk: any) =>
+        risk.risk_category_mappings?.some((m: any) => m.category_id === filterCategory)
+      );
+    }
+
     const now = new Date();
-    const totalRisks = risks?.length || 0;
+    const totalRisks = filteredRisks?.length || 0;
 
     let criticalRisks = 0;
     let highRisks = 0;
@@ -189,8 +192,8 @@ export default function RiskReports() {
     let risksWithinAppetite = 0;
     let risksExceedingAppetite = 0;
 
-    risks?.forEach(risk => {
-      const score = risk.residual_risk_score || risk.inherent_risk_score || 0;
+    filteredRisks?.forEach(risk => {
+      const score = risk.residual_score || risk.inherent_score || 0;
 
       if (score >= 20) criticalRisks++;
       else if (score >= 15) highRisks++;
@@ -198,8 +201,8 @@ export default function RiskReports() {
       else if (score >= 5) lowRisks++;
       else veryLowRisks++;
 
-      totalInherent += risk.inherent_risk_score || 0;
-      totalResidual += risk.residual_risk_score || 0;
+      totalInherent += risk.inherent_score || 0;
+      totalResidual += risk.residual_score || 0;
 
       if (risk.risk_appetite_max_score) {
         if (score <= parseInt(risk.risk_appetite_max_score)) {
@@ -266,7 +269,7 @@ export default function RiskReports() {
 
     const { data: risks } = await supabase
       .from('risks')
-      .select('created_at, residual_risk_score, inherent_risk_score')
+      .select('created_at, residual_score, inherent_score')
       .eq('organization_id', profile?.organization_id)
       .gte('created_at', sixMonthsAgo.toISOString());
 
@@ -281,7 +284,7 @@ export default function RiskReports() {
       }
 
       const data = monthlyData.get(monthKey)!;
-      const score = risk.residual_risk_score || risk.inherent_risk_score || 0;
+      const score = risk.residual_score || risk.inherent_score || 0;
 
       if (score >= 20) data.critical++;
       else if (score >= 15) data.high++;
@@ -307,7 +310,7 @@ export default function RiskReports() {
 
     const { data: risks } = await supabase
       .from('risks')
-      .select('categories, residual_risk_score, inherent_risk_score')
+      .select('id, residual_score, inherent_score, risk_category_mappings(category_id)')
       .eq('organization_id', profile?.organization_id);
 
     const categoryMap = new Map<string, { count: number; totalScore: number }>();
@@ -317,8 +320,9 @@ export default function RiskReports() {
     });
 
     risks?.forEach(risk => {
-      const score = risk.residual_risk_score || risk.inherent_risk_score || 0;
-      risk.categories?.forEach((catId: string) => {
+      const score = risk.residual_score || risk.inherent_score || 0;
+      risk.risk_category_mappings?.forEach((mapping: any) => {
+        const catId = mapping.category_id;
         if (categoryMap.has(catId)) {
           const data = categoryMap.get(catId)!;
           data.count++;
