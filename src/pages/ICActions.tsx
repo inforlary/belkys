@@ -69,6 +69,10 @@ interface Standard {
   code: string;
   name: string;
   component_id: string;
+  order_index?: number;
+  component?: {
+    order_index: number;
+  };
 }
 
 interface Department {
@@ -208,11 +212,25 @@ export default function ICActions() {
   const loadStandards = async () => {
     const { data, error } = await supabase
       .from('ic_standards')
-      .select('*')
-      .order('order_index');
+      .select(`
+        *,
+        component:ic_components!component_id(order_index)
+      `);
 
     if (error) throw error;
-    setStandards(data || []);
+
+    const sortedData = (data || []).sort((a, b) => {
+      const componentOrderA = a.component?.order_index || 999;
+      const componentOrderB = b.component?.order_index || 999;
+
+      if (componentOrderA !== componentOrderB) {
+        return componentOrderA - componentOrderB;
+      }
+
+      return (a.order_index || 999) - (b.order_index || 999);
+    });
+
+    setStandards(sortedData);
   };
 
   const loadDepartments = async () => {
