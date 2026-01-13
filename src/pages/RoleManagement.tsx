@@ -93,22 +93,32 @@ export default function RoleManagement() {
       setLoading(true);
       const { data: rolesData, error } = await supabase
         .from('roles')
-        .select(`
-          *,
-          user_roles(count),
-          role_permissions(count)
-        `)
+        .select('*')
         .eq('organization_id', user.organization_id)
         .order('is_system', { ascending: false })
         .order('name');
 
       if (error) throw error;
 
-      const rolesWithCounts = rolesData?.map(role => ({
-        ...role,
-        user_count: role.user_roles?.[0]?.count || 0,
-        permission_count: role.role_permissions?.[0]?.count || 0,
-      })) || [];
+      const rolesWithCounts = await Promise.all(
+        (rolesData || []).map(async (role) => {
+          const { count: userCount } = await supabase
+            .from('user_roles')
+            .select('*', { count: 'exact', head: true })
+            .eq('role_id', role.id);
+
+          const { count: permCount } = await supabase
+            .from('role_permissions')
+            .select('*', { count: 'exact', head: true })
+            .eq('role_id', role.id);
+
+          return {
+            ...role,
+            user_count: userCount || 0,
+            permission_count: permCount || 0,
+          };
+        })
+      );
 
       setRoles(rolesWithCounts);
       if (rolesWithCounts.length > 0 && !selectedRole) {
