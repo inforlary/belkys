@@ -253,6 +253,7 @@ export default function ICActions() {
   const loadActions = async () => {
     if (!selectedPlanId) return;
 
+    setLoading(true);
     try {
       const { data: actionsData, error } = await supabase
         .from('ic_actions')
@@ -513,6 +514,8 @@ export default function ICActions() {
       setActions(allActionsAndConditions);
     } catch (error) {
       console.error('Eylemler yüklenirken hata:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1008,6 +1011,29 @@ export default function ICActions() {
     } catch (error) {
       console.error('Eylem güncellenirken hata:', error);
       alert('Eylem güncellenirken bir hata oluştu');
+    }
+  };
+
+  const handleDeleteProgressEntry = async (entryId: string) => {
+    if (!confirm('Bu ilerleme kaydını silmek istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ic_action_progress')
+        .delete()
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      alert('İlerleme kaydı başarıyla silindi');
+      if (selectedAction) {
+        await loadProgressHistory(selectedAction.id);
+      }
+    } catch (error) {
+      console.error('İlerleme kaydı silinirken hata:', error);
+      alert('İlerleme kaydı silinirken bir hata oluştu');
     }
   };
 
@@ -2002,13 +2028,24 @@ export default function ICActions() {
                 <h3 className="text-sm font-medium text-gray-500 mb-3">İLERLEME GEÇMİŞİ</h3>
                 <div className="space-y-3">
                   {progressHistory.map((entry) => (
-                    <div key={entry.id} className="border-l-2 border-blue-500 pl-3 text-sm">
-                      <div className="font-medium">
-                        {new Date(entry.report_date).toLocaleDateString('tr-TR')} - {entry.reporter_name}
+                    <div key={entry.id} className="border-l-2 border-blue-500 pl-3 text-sm flex items-start justify-between group">
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {new Date(entry.report_date).toLocaleDateString('tr-TR')} - {entry.reporter_name}
+                        </div>
+                        <div className="text-gray-600">
+                          %{entry.previous_progress} → %{entry.new_progress} | {entry.description}
+                        </div>
                       </div>
-                      <div className="text-gray-600">
-                        %{entry.previous_progress} → %{entry.new_progress} | {entry.description}
-                      </div>
+                      {(profile?.role === 'admin' || profile?.role === 'director') && (
+                        <button
+                          onClick={() => handleDeleteProgressEntry(entry.id)}
+                          className="ml-2 p-1 text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="İlerleme Kaydını Sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
