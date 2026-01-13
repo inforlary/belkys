@@ -11,10 +11,10 @@ interface Indicator {
   name: string;
   unit_of_measure: string;
   measurement_frequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-  direction: 'DOWN' | 'UP';
-  threshold_green: number;
-  threshold_yellow: number;
-  threshold_red: number;
+  direction: 'LOWER_BETTER' | 'HIGHER_BETTER' | 'TARGET';
+  green_threshold: number;
+  yellow_threshold: number;
+  red_threshold: number;
   is_active: boolean;
 }
 
@@ -88,9 +88,9 @@ export default function RiskIndicatorEntry() {
           unit_of_measure,
           measurement_frequency,
           direction,
-          threshold_green,
-          threshold_yellow,
-          threshold_red,
+          green_threshold,
+          yellow_threshold,
+          red_threshold,
           is_active,
           risk:risks!inner(organization_id)
         `)
@@ -137,13 +137,18 @@ export default function RiskIndicatorEntry() {
   }
 
   function calculateStatus(value: number, indicator: Indicator): 'GREEN' | 'YELLOW' | 'RED' {
-    if (indicator.direction === 'DOWN') {
-      if (value < indicator.threshold_green) return 'GREEN';
-      if (value < indicator.threshold_yellow) return 'YELLOW';
+    if (indicator.direction === 'LOWER_BETTER') {
+      if (value < indicator.green_threshold) return 'GREEN';
+      if (value < indicator.yellow_threshold) return 'YELLOW';
+      return 'RED';
+    } else if (indicator.direction === 'HIGHER_BETTER') {
+      if (value > indicator.green_threshold) return 'GREEN';
+      if (value > indicator.yellow_threshold) return 'YELLOW';
       return 'RED';
     } else {
-      if (value > indicator.threshold_green) return 'GREEN';
-      if (value > indicator.threshold_yellow) return 'YELLOW';
+      const deviation = Math.abs(value - indicator.green_threshold);
+      if (deviation <= indicator.yellow_threshold) return 'GREEN';
+      if (deviation <= indicator.red_threshold) return 'YELLOW';
       return 'RED';
     }
   }
@@ -269,10 +274,12 @@ export default function RiskIndicatorEntry() {
   }
 
   function getThresholdDisplay(indicator: Indicator) {
-    if (indicator.direction === 'DOWN') {
-      return `🟢<${indicator.threshold_green} 🟡${indicator.threshold_green}-${indicator.threshold_yellow} 🔴>${indicator.threshold_yellow}`;
+    if (indicator.direction === 'LOWER_BETTER') {
+      return `🟢<${indicator.green_threshold} 🟡${indicator.green_threshold}-${indicator.yellow_threshold} 🔴>${indicator.yellow_threshold}`;
+    } else if (indicator.direction === 'HIGHER_BETTER') {
+      return `🟢>${indicator.green_threshold} 🟡${indicator.yellow_threshold}-${indicator.green_threshold} 🔴<${indicator.yellow_threshold}`;
     } else {
-      return `🟢>${indicator.threshold_green} 🟡${indicator.threshold_yellow}-${indicator.threshold_green} 🔴<${indicator.threshold_yellow}`;
+      return `🎯=${indicator.green_threshold} 🟡±${indicator.yellow_threshold} 🔴±${indicator.red_threshold}`;
     }
   }
 
