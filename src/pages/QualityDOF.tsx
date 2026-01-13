@@ -725,11 +725,12 @@ function NCDetailModal({ nonconformity, onClose, onUpdate, departments, processe
     responsible_department_id: nonconformity.responsible_department_id || '',
     target_date: nonconformity.target_date || '',
     status: nonconformity.status || 'OPEN',
-    root_cause: nonconformity.root_cause || '',
+    root_cause_analysis: nonconformity.root_cause_analysis || '',
+    root_causes: nonconformity.root_causes || '',
     corrective_action: nonconformity.corrective_action || '',
     preventive_action: nonconformity.preventive_action || '',
     verification_result: nonconformity.verification_result || '',
-    effectiveness_result: nonconformity.effectiveness_result || ''
+    effectiveness_notes: nonconformity.effectiveness_notes || ''
   });
   const [saving, setSaving] = useState(false);
 
@@ -874,11 +875,22 @@ function NCDetailModal({ nonconformity, onClose, onUpdate, departments, processe
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Kök Neden Analizi</label>
               <textarea
-                value={formData.root_cause}
-                onChange={(e) => setFormData({ ...formData, root_cause: e.target.value })}
+                value={formData.root_cause_analysis}
+                onChange={(e) => setFormData({ ...formData, root_cause_analysis: e.target.value })}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                placeholder="Uygunsuzluğun kök nedeni..."
+                placeholder="Kök neden analizi açıklaması..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kök Nedenler</label>
+              <textarea
+                value={formData.root_causes}
+                onChange={(e) => setFormData({ ...formData, root_causes: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Tespit edilen kök nedenler..."
               />
             </div>
 
@@ -918,8 +930,8 @@ function NCDetailModal({ nonconformity, onClose, onUpdate, departments, processe
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Etkinlik Değerlendirme</label>
               <textarea
-                value={formData.effectiveness_result}
-                onChange={(e) => setFormData({ ...formData, effectiveness_result: e.target.value })}
+                value={formData.effectiveness_notes}
+                onChange={(e) => setFormData({ ...formData, effectiveness_notes: e.target.value })}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                 placeholder="Alınan aksiyonların etkinliği..."
@@ -986,11 +998,20 @@ function NCDetailModal({ nonconformity, onClose, onUpdate, departments, processe
               </div>
             )}
 
-            {nonconformity.root_cause && (
+            {nonconformity.root_cause_analysis && (
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">KÖK NEDEN ANALİZİ</h4>
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-900">{nonconformity.root_cause}</p>
+                  <p className="text-gray-900">{nonconformity.root_cause_analysis}</p>
+                </div>
+              </div>
+            )}
+
+            {nonconformity.root_causes && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">KÖK NEDENLER</h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-900">{nonconformity.root_causes}</p>
                 </div>
               </div>
             )}
@@ -1009,6 +1030,24 @@ function NCDetailModal({ nonconformity, onClose, onUpdate, departments, processe
                 <h4 className="text-sm font-medium text-gray-700 mb-2">ÖNLEYİCİ FAALİYET</h4>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-gray-900">{nonconformity.preventive_action}</p>
+                </div>
+              </div>
+            )}
+
+            {nonconformity.verification_result && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">DOĞRULAMA SONUCU</h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-900">{nonconformity.verification_result}</p>
+                </div>
+              </div>
+            )}
+
+            {nonconformity.effectiveness_notes && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">ETKİNLİK DEĞERLENDİRME</h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-900">{nonconformity.effectiveness_notes}</p>
                 </div>
               </div>
             )}
