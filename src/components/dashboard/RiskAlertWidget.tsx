@@ -9,7 +9,7 @@ interface RiskAlert {
   code: string;
   name: string;
   risk_level: string;
-  residual_risk_score?: number;
+  residual_score?: number;
   created_at: string;
 }
 
@@ -35,10 +35,10 @@ export default function RiskAlertWidget() {
     try {
       const { data: risksData, error } = await supabase
         .from('risks')
-        .select('id, code, name, risk_level, residual_risk_score, created_at')
+        .select('id, code, name, risk_level, residual_score, created_at')
         .eq('organization_id', profile.organization_id)
         .in('risk_level', ['high', 'critical'])
-        .order('residual_risk_score', { ascending: false })
+        .order('residual_score', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -98,9 +98,9 @@ export default function RiskAlertWidget() {
                         <span className={`text-xs font-medium ${config.color}`}>
                           {config.label}
                         </span>
-                        {alert.residual_risk_score && (
+                        {alert.residual_score && (
                           <span className="text-xs font-semibold text-gray-700">
-                            Skor: {alert.residual_risk_score}
+                            Skor: {alert.residual_score}
                           </span>
                         )}
                         <span className="text-xs text-gray-500">

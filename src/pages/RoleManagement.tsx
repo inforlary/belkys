@@ -167,10 +167,10 @@ export default function RoleManagement() {
         .from('user_roles')
         .select(`
           *,
-          user:profiles(
+          user:profiles!user_roles_user_id_fkey(
             full_name,
             email,
-            department:departments(name)
+            department:departments!profiles_department_id_fkey(name)
           )
         `)
         .eq('role_id', roleId);
@@ -192,7 +192,7 @@ export default function RoleManagement() {
           id,
           full_name,
           email,
-          department:departments(name)
+          department:departments!profiles_department_id_fkey(name)
         `)
         .eq('organization_id', profile.organization_id);
 
