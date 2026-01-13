@@ -558,11 +558,31 @@ export default function ICActions() {
     return filtered;
   }, [baseFilteredActions, selectedStatus]);
 
+  const compareComponentCodes = (codeA: string, codeB: string): number => {
+    const matchA = codeA.match(/^([A-Za-z]+)\s*(\d+)/);
+    const matchB = codeB.match(/^([A-Za-z]+)\s*(\d+)/);
+
+    if (!matchA || !matchB) {
+      return codeA.localeCompare(codeB);
+    }
+
+    const prefixA = matchA[1];
+    const prefixB = matchB[1];
+
+    if (prefixA !== prefixB) {
+      return prefixA.localeCompare(prefixB);
+    }
+
+    const numA = parseInt(matchA[2], 10);
+    const numB = parseInt(matchB[2], 10);
+    return numA - numB;
+  };
+
   const sortedActions = useMemo(() => {
     const sorted = [...filteredActions];
 
     sorted.sort((a, b) => {
-      const componentCompare = (a.component_code || '').localeCompare(b.component_code || '', undefined, { numeric: true, sensitivity: 'base' });
+      const componentCompare = compareComponentCodes(a.component_code || '', b.component_code || '');
       if (componentCompare !== 0) return componentCompare;
 
       const standardCompare = (a.standard_code || '').localeCompare(b.standard_code || '', undefined, { numeric: true, sensitivity: 'base' });
@@ -671,7 +691,7 @@ export default function ICActions() {
     });
 
     return Array.from(componentMap.values())
-      .sort((a, b) => a.component.code.localeCompare(b.component.code, undefined, { numeric: true, sensitivity: 'base' }));
+      .sort((a, b) => compareComponentCodes(a.component.code, b.component.code));
   }, [sortedActions]);
 
   useEffect(() => {
