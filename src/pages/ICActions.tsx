@@ -111,6 +111,8 @@ export default function ICActions() {
   const [selectedComponentId, setSelectedComponentId] = useState<string>('');
   const [selectedStandardId, setSelectedStandardId] = useState<string>('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedResponsibleDeptId, setSelectedResponsibleDeptId] = useState<string>('');
+  const [selectedCollaboratingDeptId, setSelectedCollaboratingDeptId] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -516,6 +518,18 @@ export default function ICActions() {
       filtered = filtered.filter(a => a.responsible_department_id === selectedDepartmentId);
     }
 
+    if (selectedResponsibleDeptId) {
+      filtered = filtered.filter(a =>
+        a.responsible_department_ids?.includes(selectedResponsibleDeptId)
+      );
+    }
+
+    if (selectedCollaboratingDeptId) {
+      filtered = filtered.filter(a =>
+        a.collaborating_departments_ids?.includes(selectedCollaboratingDeptId)
+      );
+    }
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(a =>
@@ -526,7 +540,7 @@ export default function ICActions() {
     }
 
     return filtered;
-  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, searchTerm]);
+  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, selectedResponsibleDeptId, selectedCollaboratingDeptId, searchTerm]);
 
   const filteredActions = useMemo(() => {
     let filtered = baseFilteredActions;
@@ -775,6 +789,8 @@ export default function ICActions() {
     setSelectedComponentId('');
     setSelectedStandardId('');
     setSelectedDepartmentId('');
+    setSelectedResponsibleDeptId('');
+    setSelectedCollaboratingDeptId('');
     setSelectedStatus('');
     setSearchTerm('');
   };
@@ -1353,7 +1369,7 @@ export default function ICActions() {
             </select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <select
               value={selectedComponentId}
               onChange={(e) => {
@@ -1379,6 +1395,30 @@ export default function ICActions() {
               ))}
             </select>
 
+            <select
+              value={selectedResponsibleDeptId}
+              onChange={(e) => setSelectedResponsibleDeptId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Tüm Sorumlu Birimler</option>
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedCollaboratingDeptId}
+              onChange={(e) => setSelectedCollaboratingDeptId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Tüm İşbirliği Birimleri</option>
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <select
               value={selectedDepartmentId}
               onChange={(e) => setSelectedDepartmentId(e.target.value)}
