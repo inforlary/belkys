@@ -460,6 +460,30 @@ export default function ICActions() {
 
       const allActionsAndConditions = [...enrichedActions, ...validConditionsWithoutActions];
 
+      allActionsAndConditions.sort((a, b) => {
+        const codeA = a.condition_code || '';
+        const codeB = b.condition_code || '';
+
+        const partsA = codeA.split(/[\s.]+/);
+        const partsB = codeB.split(/[\s.]+/);
+
+        for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+          const partA = partsA[i] || '';
+          const partB = partsB[i] || '';
+
+          const numA = parseInt(partA);
+          const numB = parseInt(partB);
+
+          if (!isNaN(numA) && !isNaN(numB)) {
+            if (numA !== numB) return numA - numB;
+          } else {
+            if (partA !== partB) return partA.localeCompare(partB);
+          }
+        }
+
+        return 0;
+      });
+
       setActions(allActionsAndConditions);
     } catch (error) {
       console.error('Eylemler yüklenirken hata:', error);
