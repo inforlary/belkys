@@ -167,6 +167,12 @@ export default function ICActions() {
     }
   }, [profile?.organization_id]);
 
+  useEffect(() => {
+    if (selectedPlanId) {
+      loadActions();
+    }
+  }, [selectedPlanId]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -509,12 +515,6 @@ export default function ICActions() {
       console.error('Eylemler yüklenirken hata:', error);
     }
   };
-
-  useEffect(() => {
-    if (selectedPlanId) {
-      loadActions();
-    }
-  }, [selectedPlanId]);
 
   const filteredStandards = useMemo(() => {
     if (!selectedComponentId) return standards;
