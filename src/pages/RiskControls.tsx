@@ -227,9 +227,9 @@ export default function RiskControls() {
 
       closeModal();
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Kontrol kaydedilirken hata:', error);
-      alert('Kontrol kaydedilemedi');
+      alert(`Kontrol kaydedilemedi: ${error.message || 'Bilinmeyen hata'}`);
     }
   }
 
