@@ -28,7 +28,7 @@ interface Indicator {
   description?: string;
   unit_of_measure: string;
   measurement_frequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-  direction: 'DOWN' | 'UP';
+  direction: 'LOWER_BETTER' | 'HIGHER_BETTER' | 'TARGET';
   green_threshold: number;
   yellow_threshold: number;
   red_threshold: number;
@@ -106,7 +106,7 @@ export default function RiskIndicators() {
     risk_id: '',
     unit_of_measure: 'Adet',
     measurement_frequency: 'MONTHLY' as 'MONTHLY' | 'QUARTERLY' | 'ANNUAL',
-    direction: 'DOWN' as 'DOWN' | 'UP',
+    direction: 'LOWER_BETTER' as 'LOWER_BETTER' | 'HIGHER_BETTER' | 'TARGET',
     green_threshold: '',
     yellow_threshold: '',
     red_threshold: '',
@@ -221,7 +221,7 @@ export default function RiskIndicators() {
         risk_id: '',
         unit_of_measure: 'Adet',
         measurement_frequency: 'MONTHLY',
-        direction: 'DOWN',
+        direction: 'LOWER_BETTER',
         green_threshold: '',
         yellow_threshold: '',
         red_threshold: '',
@@ -267,7 +267,7 @@ export default function RiskIndicators() {
     const yellowValue = formData.yellow_threshold ? parseFloat(formData.yellow_threshold) : 0;
     const redValue = formData.red_threshold ? parseFloat(formData.red_threshold) : 0;
 
-    if (isNaN(greenValue) || isNaN(yellowValue) || isNaN(redValue)) {
+    if (isNaN(greenValue) || isNaN(yellowValue)) {
       alert('Lütfen geçerli eşik değerleri girin');
       return;
     }
@@ -277,7 +277,14 @@ export default function RiskIndicators() {
       return;
     }
 
+    if (formData.direction === 'TARGET' && (isNaN(redValue) || redValue === 0)) {
+      alert('Hedef tip için kırmızı tolerans değerini girin');
+      return;
+    }
+
     try {
+      const finalRedValue = formData.direction === 'TARGET' ? redValue : yellowValue;
+
       const indicatorData = {
         organization_id: profile?.organization_id,
         risk_id: formData.risk_id,
@@ -288,7 +295,7 @@ export default function RiskIndicators() {
         direction: formData.direction,
         green_threshold: greenValue,
         yellow_threshold: yellowValue,
-        red_threshold: redValue,
+        red_threshold: finalRedValue,
         responsible_department_id: formData.responsible_department_id || null,
         is_active: formData.is_active
       };
@@ -383,10 +390,12 @@ export default function RiskIndicators() {
   }
 
   function getThresholdDisplay(indicator: Indicator) {
-    if (indicator.direction === 'DOWN') {
+    if (indicator.direction === 'LOWER_BETTER') {
       return `🟢 <${indicator.green_threshold} 🟡 ${indicator.green_threshold}-${indicator.yellow_threshold} 🔴 >${indicator.yellow_threshold}`;
-    } else {
+    } else if (indicator.direction === 'HIGHER_BETTER') {
       return `🟢 >${indicator.green_threshold} 🟡 ${indicator.yellow_threshold}-${indicator.green_threshold} 🔴 <${indicator.yellow_threshold}`;
+    } else {
+      return `🟢 =${indicator.green_threshold} 🟡 ±${indicator.yellow_threshold} 🔴 >${indicator.red_threshold}`;
     }
   }
 
@@ -844,8 +853,8 @@ export default function RiskIndicators() {
               <label className="flex items-center">
                 <input
                   type="radio"
-                  value="UP"
-                  checked={formData.direction === 'UP'}
+                  value="HIGHER_BETTER"
+                  checked={formData.direction === 'HIGHER_BETTER'}
                   onChange={(e) => setFormData({ ...formData, direction: e.target.value as any })}
                   className="mr-2"
                 />
@@ -854,12 +863,22 @@ export default function RiskIndicators() {
               <label className="flex items-center">
                 <input
                   type="radio"
-                  value="DOWN"
-                  checked={formData.direction === 'DOWN'}
+                  value="LOWER_BETTER"
+                  checked={formData.direction === 'LOWER_BETTER'}
                   onChange={(e) => setFormData({ ...formData, direction: e.target.value as any })}
                   className="mr-2"
                 />
                 Aşağı iyi (değer azaldıkça iyi)
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="TARGET"
+                  checked={formData.direction === 'TARGET'}
+                  onChange={(e) => setFormData({ ...formData, direction: e.target.value as any })}
+                  className="mr-2"
+                />
+                Hedefe ulaşma (belirli bir değere yaklaşmak iyi)
               </label>
             </div>
           </div>
@@ -867,7 +886,7 @@ export default function RiskIndicators() {
           <div className="border-t pt-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">EŞİK DEĞERLERİ</h3>
 
-            {formData.direction === 'DOWN' ? (
+            {formData.direction === 'LOWER_BETTER' ? (
               <div className="space-y-3 text-sm">
                 <div>
                   <label className="block text-gray-700 mb-1">
@@ -908,7 +927,7 @@ export default function RiskIndicators() {
                   />
                 </div>
               </div>
-            ) : (
+            ) : formData.direction === 'HIGHER_BETTER' ? (
               <div className="space-y-3 text-sm">
                 <div>
                   <label className="block text-gray-700 mb-1">
@@ -946,6 +965,48 @@ export default function RiskIndicators() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-100"
                     disabled
                     placeholder="Otomatik (yellow_threshold)"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <p className="text-gray-600 mb-3 text-xs">Hedef değer için tolerans aralığı tanımlayın</p>
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🎯 Hedef Değer <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.green_threshold}
+                    onChange={(e) => setFormData({ ...formData, green_threshold: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🟡 Sarı Tolerans (±) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.yellow_threshold}
+                    onChange={(e) => setFormData({ ...formData, yellow_threshold: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Örn: hedef ±5 ise 5 girin"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">
+                    🔴 Kırmızı Tolerans (±) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.red_threshold}
+                    onChange={(e) => setFormData({ ...formData, red_threshold: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Örn: hedef ±10 ise 10 girin"
                   />
                 </div>
               </div>
