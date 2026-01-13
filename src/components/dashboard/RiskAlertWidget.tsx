@@ -7,7 +7,7 @@ import { AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react';
 interface RiskAlert {
   id: string;
   code: string;
-  title: string;
+  name: string;
   risk_level: string;
   residual_risk_score?: number;
   created_at: string;
@@ -35,7 +35,7 @@ export default function RiskAlertWidget() {
     try {
       const { data: risksData, error } = await supabase
         .from('risks')
-        .select('id, code, title, risk_level, residual_risk_score, created_at')
+        .select('id, code, name, risk_level, residual_risk_score, created_at')
         .eq('organization_id', profile.organization_id)
         .in('risk_level', ['high', 'critical'])
         .order('residual_risk_score', { ascending: false })
@@ -108,7 +108,7 @@ export default function RiskAlertWidget() {
                         </span>
                       </div>
                       <p className="text-sm font-medium text-gray-900 mb-1">
-                        {alert.code} - {alert.title}
+                        {alert.code} - {alert.name}
                       </p>
                     </div>
                   </div>

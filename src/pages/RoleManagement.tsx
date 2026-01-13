@@ -42,7 +42,7 @@ interface UserRole {
 }
 
 export default function RoleManagement() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -78,7 +78,7 @@ export default function RoleManagement() {
   useEffect(() => {
     loadRoles();
     loadPermissions();
-  }, [user]);
+  }, [profile]);
 
   useEffect(() => {
     if (selectedRole) {
@@ -87,14 +87,14 @@ export default function RoleManagement() {
   }, [selectedRole]);
 
   const loadRoles = async () => {
-    if (!user?.organization_id) return;
+    if (!profile?.organization_id) return;
 
     try {
       setLoading(true);
       const { data: rolesData, error } = await supabase
         .from('roles')
         .select('*')
-        .eq('organization_id', user.organization_id)
+        .eq('organization_id', profile.organization_id)
         .order('is_system', { ascending: false })
         .order('name');
 
@@ -183,7 +183,7 @@ export default function RoleManagement() {
   };
 
   const loadAvailableUsers = async (roleId: string) => {
-    if (!user?.organization_id) return;
+    if (!profile?.organization_id) return;
 
     try {
       const { data: allUsers, error: usersError } = await supabase
@@ -194,7 +194,7 @@ export default function RoleManagement() {
           email,
           department:departments(name)
         `)
-        .eq('organization_id', user.organization_id);
+        .eq('organization_id', profile.organization_id);
 
       if (usersError) throw usersError;
 
@@ -214,14 +214,14 @@ export default function RoleManagement() {
   };
 
   const handleCreateRole = async () => {
-    if (!user?.organization_id || !newRoleData.code || !newRoleData.name) return;
+    if (!profile?.organization_id || !newRoleData.code || !newRoleData.name) return;
 
     try {
       setSaving(true);
       const { data: newRole, error: roleError } = await supabase
         .from('roles')
         .insert({
-          organization_id: user.organization_id,
+          organization_id: profile.organization_id,
           code: newRoleData.code.toUpperCase(),
           name: newRoleData.name,
           description: newRoleData.description || null,
