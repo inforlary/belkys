@@ -562,13 +562,13 @@ export default function ICActions() {
     const sorted = [...filteredActions];
 
     sorted.sort((a, b) => {
-      const componentCompare = (a.component_code || '').localeCompare(b.component_code || '');
+      const componentCompare = (a.component_code || '').localeCompare(b.component_code || '', undefined, { numeric: true, sensitivity: 'base' });
       if (componentCompare !== 0) return componentCompare;
 
-      const standardCompare = (a.standard_code || '').localeCompare(b.standard_code || '');
+      const standardCompare = (a.standard_code || '').localeCompare(b.standard_code || '', undefined, { numeric: true, sensitivity: 'base' });
       if (standardCompare !== 0) return standardCompare;
 
-      const conditionCompare = (a.condition_code || '').localeCompare(b.condition_code || '');
+      const conditionCompare = (a.condition_code || '').localeCompare(b.condition_code || '', undefined, { numeric: true, sensitivity: 'base' });
       if (conditionCompare !== 0) return conditionCompare;
 
       if (a.status === 'NO_ACTION' && b.status !== 'NO_ACTION') return -1;
@@ -587,16 +587,16 @@ export default function ICActions() {
 
       if (sortColumn === 'code') {
         return sortDirection === 'asc'
-          ? a.code.localeCompare(b.code)
-          : b.code.localeCompare(a.code);
+          ? a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' })
+          : b.code.localeCompare(a.code, undefined, { numeric: true, sensitivity: 'base' });
       }
 
       if (sortColumn === 'standard') {
         const aStd = a.standard_code || '';
         const bStd = b.standard_code || '';
         return sortDirection === 'asc'
-          ? aStd.localeCompare(bStd)
-          : bStd.localeCompare(aStd);
+          ? aStd.localeCompare(bStd, undefined, { numeric: true, sensitivity: 'base' })
+          : bStd.localeCompare(aStd, undefined, { numeric: true, sensitivity: 'base' });
       }
 
       if (sortColumn === 'target_date') {
@@ -613,7 +613,7 @@ export default function ICActions() {
           : b.progress_percent - a.progress_percent;
       }
 
-      return a.code.localeCompare(b.code);
+      return a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' });
     });
 
     return sorted;
@@ -671,7 +671,7 @@ export default function ICActions() {
     });
 
     return Array.from(componentMap.values())
-      .sort((a, b) => a.component.code.localeCompare(b.component.code));
+      .sort((a, b) => a.component.code.localeCompare(b.component.code, undefined, { numeric: true, sensitivity: 'base' }));
   }, [sortedActions]);
 
   useEffect(() => {
@@ -1526,14 +1526,18 @@ export default function ICActions() {
                       {componentData.component.name.toUpperCase()}
                     </td>
                   </tr>
-                  {Array.from(componentData.standards.values()).map(standardData => (
+                  {Array.from(componentData.standards.values())
+                    .sort((a, b) => a.standard.code.localeCompare(b.standard.code, undefined, { numeric: true, sensitivity: 'base' }))
+                    .map(standardData => (
                     <>
                       <tr key={`std-${standardData.standard.code}`}>
                         <td colSpan={11} className="border border-gray-300 bg-red-500 px-3 py-2 text-white font-semibold text-sm">
                           {standardData.standard.code} - {standardData.standard.name}
                         </td>
                       </tr>
-                      {Array.from(standardData.conditions.values()).map(conditionData => {
+                      {Array.from(standardData.conditions.values())
+                        .sort((a, b) => a.condition.code.localeCompare(b.condition.code, undefined, { numeric: true, sensitivity: 'base' }))
+                        .map(conditionData => {
                         const actionsCount = conditionData.actions.length;
                         return conditionData.actions.map((action, actionIndex) => (
                           <tr key={action.id} className={action.status === 'NO_ACTION' ? 'bg-amber-50' : 'hover:bg-gray-50'}>
