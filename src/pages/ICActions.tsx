@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
@@ -579,7 +579,7 @@ export default function ICActions() {
     return filtered;
   }, [baseFilteredActions, selectedStatus]);
 
-  const compareComponentCodes = (codeA: string, codeB: string): number => {
+  const compareComponentCodes = useCallback((codeA: string, codeB: string): number => {
     const componentOrder = ['KOS', 'RDS', 'KFS', 'BIS', 'IS'];
 
     const cleanA = codeA.trim().toUpperCase();
@@ -596,7 +596,7 @@ export default function ICActions() {
     if (indexB !== -1) return 1;
 
     return codeA.localeCompare(codeB, 'tr');
-  };
+  }, []);
 
   const sortedActions = useMemo(() => {
     const sorted = [...filteredActions];
@@ -712,7 +712,7 @@ export default function ICActions() {
 
     return Array.from(componentMap.values())
       .sort((a, b) => compareComponentCodes(a.component.code, b.component.code));
-  }, [sortedActions]);
+  }, [sortedActions, compareComponentCodes]);
 
   useEffect(() => {
     if (hierarchicalData.length > 0) {
@@ -1058,51 +1058,97 @@ export default function ICActions() {
   };
 
   const exportToExcel = () => {
-    const data = sortedActions.map(action => {
-      const responsibleUnits = action.status === 'NO_ACTION'
-        ? '-'
-        : action.all_units_responsible
-          ? 'Tüm Birimler'
-          : [
-              ...(action.responsible_special_units || []),
-              ...(action.responsible_departments || [])
-            ].join(', ') || '-';
+    const rows: any[][] = [];
 
-      const collaboratingUnits = action.status === 'NO_ACTION'
-        ? '-'
-        : action.all_units_collaborating
-          ? 'Tüm Birimler'
-          : [
-              ...(action.collaborating_special_units || []),
-              ...(action.collaborating_departments || [])
-            ].join(', ') || '-';
+    rows.push([
+      'Standart Kod No',
+      'Kamu İç Kontrol Standardı ve Genel Şartı',
+      'Mevcut Durum',
+      'Eylem Kod No',
+      'Öngörülen Eylemler',
+      'Sorumlu Birimler',
+      'İşbirliği Yapılacak Birim',
+      'Çıktı/Sonuç',
+      'Tamamlanma Tarihi',
+      'Durum ve İlerleme'
+    ]);
 
-      const actionTitle = action.status === 'NO_ACTION'
-        ? 'Eylem Oluşturulmamış'
-        : action.title;
+    hierarchicalData.forEach(componentData => {
+      rows.push([componentData.component.name.toUpperCase(), '', '', '', '', '', '', '', '', '']);
 
-      const progressDisplay = action.status === 'NO_ACTION'
-        ? '-'
-        : `%${action.progress_percent}`;
+      Array.from(componentData.standards.values())
+        .sort((a, b) => a.standard.code.localeCompare(b.standard.code, undefined, { numeric: true }))
+        .forEach(standardData => {
+          rows.push([`${standardData.standard.code} - ${standardData.standard.name}`, '', '', '', '', '', '', '', '', '']);
 
-      return {
-        'Bileşen': action.component_code || '-',
-        'Standart': action.standard_code || '-',
-        'Genel Şart': action.condition_code || '-',
-        'Eylem Kodu': action.status === 'NO_ACTION' ? '-' : action.code,
-        'Eylem': actionTitle,
-        'Sorumlu Birimler': responsibleUnits,
-        'İş Birliği Yapılacak Birimler': collaboratingUnits,
-        'Mevcut Durum': action.current_status_description || '-',
-        'Hedef Tarih': action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-',
-        'Durum': getStatusLabel(action.status),
-        'İlerleme': progressDisplay
-      };
+          Array.from(standardData.conditions.values())
+            .sort((a, b) => a.condition.code.localeCompare(b.condition.code, undefined, { numeric: true }))
+            .forEach(conditionData => {
+              const actions = conditionData.actions;
+
+              actions.forEach((action, actionIndex) => {
+                const responsibleUnits = action.status === 'NO_ACTION'
+                  ? '-'
+                  : action.all_units_responsible
+                    ? 'Tüm Birimler'
+                    : [
+                        ...(action.responsible_special_units || []),
+                        ...(action.responsible_departments || [])
+                      ].join(', ') || '-';
+
+                const collaboratingUnits = action.status === 'NO_ACTION'
+                  ? '-'
+                  : action.all_units_collaborating
+                    ? 'Tüm Birimler'
+                    : [
+                        ...(action.collaborating_special_units || []),
+                        ...(action.collaborating_departments || [])
+                      ].join(', ') || '-';
+
+                const row = [
+                  actionIndex === 0 ? conditionData.condition.code : '',
+                  actionIndex === 0 ? `${conditionData.condition.code} - ${conditionData.condition.description}` : '',
+                  actionIndex === 0 ? (action.current_status_description || '-') : '',
+                  action.status === 'NO_ACTION' ? '' : action.code,
+                  action.status === 'NO_ACTION' ? 'Eylem Oluşturulmamış' : action.title,
+                  responsibleUnits,
+                  collaboratingUnits,
+                  action.status === 'NO_ACTION' ? '-' : (action.expected_outputs || action.outputs || '-'),
+                  action.status === 'NO_ACTION' ? '-' : (
+                    action.is_continuous
+                      ? 'Sürekli'
+                      : action.completed_date
+                        ? new Date(action.completed_date).toLocaleDateString('tr-TR')
+                        : action.target_date
+                          ? new Date(action.target_date).toLocaleDateString('tr-TR')
+                          : '-'
+                  ),
+                  action.status === 'NO_ACTION' ? '-' : `${getStatusLabel(action.status)} - %${action.progress_percent}`
+                ];
+
+                rows.push(row);
+              });
+            });
+        });
     });
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    ws['!cols'] = [
+      { wch: 12 },
+      { wch: 40 },
+      { wch: 35 },
+      { wch: 12 },
+      { wch: 40 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 25 }
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Eylemler');
+    XLSX.utils.book_append_sheet(wb, ws, 'İç Kontrol Eylemleri');
     XLSX.writeFile(wb, `ic-eylemler-${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -1124,60 +1170,127 @@ export default function ICActions() {
 
     doc.text(`Toplam: ${stats.total} | Tamamlanan: ${stats.completed} (%${stats.completedPercent}) | Devam Eden: ${stats.inProgress} (%${stats.inProgressPercent}) | Geciken: ${stats.delayed} (%${stats.delayedPercent}) | Eylem Yok: ${stats.noActions}`, 14, 32);
 
-    const tableData = sortedActions.map(action => {
-      const actionTitle = action.status === 'NO_ACTION'
-        ? 'Eylem Olusturulmamis'
-        : (action.title.length > 35 ? action.title.substring(0, 32) + '...' : action.title);
+    const tableData: any[] = [];
 
-      const progressDisplay = action.status === 'NO_ACTION' ? '-' : `%${action.progress_percent}`;
+    hierarchicalData.forEach(componentData => {
+      tableData.push({
+        content: componentData.component.name.toUpperCase(),
+        colSpan: 10,
+        styles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 8 }
+      });
 
-      const responsibleUnits = action.status === 'NO_ACTION'
-        ? '-'
-        : action.all_units_responsible
-          ? 'Tum Birimler'
-          : [
-              ...(action.responsible_special_units || []),
-              ...(action.responsible_departments || [])
-            ].slice(0, 2).join(', ') || '-';
+      Array.from(componentData.standards.values())
+        .sort((a, b) => a.standard.code.localeCompare(b.standard.code, undefined, { numeric: true }))
+        .forEach(standardData => {
+          tableData.push({
+            content: `${standardData.standard.code} - ${standardData.standard.name}`,
+            colSpan: 10,
+            styles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold', halign: 'left', fontSize: 7 }
+          });
 
-      return [
-        action.component_code || '-',
-        action.standard_code || '-',
-        action.condition_code || '-',
-        action.status === 'NO_ACTION' ? '-' : action.code,
-        actionTitle,
-        responsibleUnits,
-        action.target_date ? new Date(action.target_date).toLocaleDateString('tr-TR') : '-',
-        progressDisplay,
-        getStatusLabel(action.status, true)
-      ];
+          Array.from(standardData.conditions.values())
+            .sort((a, b) => a.condition.code.localeCompare(b.condition.code, undefined, { numeric: true }))
+            .forEach(conditionData => {
+              const actions = conditionData.actions;
+
+              actions.forEach((action, actionIndex) => {
+                const responsibleUnits = action.status === 'NO_ACTION'
+                  ? '-'
+                  : action.all_units_responsible
+                    ? 'Tum Birimler'
+                    : [
+                        ...(action.responsible_special_units || []),
+                        ...(action.responsible_departments || [])
+                      ].slice(0, 2).join(', ') || '-';
+
+                const collaboratingUnits = action.status === 'NO_ACTION'
+                  ? '-'
+                  : action.all_units_collaborating
+                    ? 'Tum Birimler'
+                    : [
+                        ...(action.collaborating_special_units || []),
+                        ...(action.collaborating_departments || [])
+                      ].slice(0, 2).join(', ') || '-';
+
+                const actionTitle = action.status === 'NO_ACTION'
+                  ? 'Eylem Olusturulmamis'
+                  : (action.title.length > 40 ? action.title.substring(0, 37) + '...' : action.title);
+
+                const row = [
+                  actionIndex === 0 ? conditionData.condition.code : '',
+                  actionIndex === 0 ? `${conditionData.condition.code} - ${conditionData.condition.description.substring(0, 50)}${conditionData.condition.description.length > 50 ? '...' : ''}` : '',
+                  actionIndex === 0 ? (action.current_status_description?.substring(0, 40) || '-') : '',
+                  action.status === 'NO_ACTION' ? '' : action.code,
+                  actionTitle,
+                  responsibleUnits,
+                  collaboratingUnits,
+                  action.status === 'NO_ACTION' ? '-' : (
+                    action.expected_outputs?.substring(0, 30) || action.outputs?.substring(0, 30) || '-'
+                  ),
+                  action.status === 'NO_ACTION' ? '-' : (
+                    action.is_continuous
+                      ? 'Surekli'
+                      : action.completed_date
+                        ? new Date(action.completed_date).toLocaleDateString('tr-TR')
+                        : action.target_date
+                          ? new Date(action.target_date).toLocaleDateString('tr-TR')
+                          : '-'
+                  ),
+                  action.status === 'NO_ACTION' ? '-' : `${getStatusLabel(action.status, true)} %${action.progress_percent}`
+                ];
+
+                tableData.push(row);
+              });
+            });
+        });
     });
 
     autoTable(doc, {
       startY: 37,
-      head: [['Bilesen', 'Standart', 'Genel Sart', 'Eylem Kodu', 'Eylem', 'Sorumlu', 'Hedef', 'Ilerleme', 'Durum']],
+      head: [[
+        'Standart\nKod No',
+        'Kamu Ic Kontrol\nStandardi ve Genel Sarti',
+        'Mevcut\nDurum',
+        'Eylem\nKod No',
+        'Ongorulen\nEylemler',
+        'Sorumlu\nBirimler',
+        'Isbirligi\nYapilacak Birim',
+        'Cikti/\nSonuc',
+        'Tamamlanma\nTarihi',
+        'Durum ve\nIlerleme'
+      ]],
       body: tableData,
       styles: {
-        fontSize: 7,
-        cellPadding: 2,
+        fontSize: 6,
+        cellPadding: 1.5,
         font: 'helvetica',
-        fontStyle: 'normal'
+        fontStyle: 'normal',
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1
       },
       headStyles: {
-        fillColor: [59, 130, 246],
+        fillColor: [156, 163, 175],
         fontStyle: 'bold',
-        fontSize: 7
+        fontSize: 6,
+        halign: 'center',
+        valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 60 },
-        5: { cellWidth: 35 },
-        6: { cellWidth: 20 },
-        7: { cellWidth: 15 },
-        8: { cellWidth: 25 }
+        0: { cellWidth: 12, halign: 'center', valign: 'top' },
+        1: { cellWidth: 45, valign: 'top' },
+        2: { cellWidth: 35, valign: 'top' },
+        3: { cellWidth: 12, halign: 'center', valign: 'top' },
+        4: { cellWidth: 45, valign: 'top' },
+        5: { cellWidth: 25, valign: 'top' },
+        6: { cellWidth: 25, valign: 'top' },
+        7: { cellWidth: 30, valign: 'top' },
+        8: { cellWidth: 18, halign: 'center', valign: 'top' },
+        9: { cellWidth: 28, valign: 'top' }
+      },
+      didParseCell: (data) => {
+        if (data.row.index > 0 && data.cell.raw && typeof data.cell.raw === 'object' && 'colSpan' in data.cell.raw) {
+          data.cell.styles.cellPadding = 2;
+        }
       }
     });
 
