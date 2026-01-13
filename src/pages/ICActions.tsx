@@ -580,23 +580,22 @@ export default function ICActions() {
   }, [baseFilteredActions, selectedStatus]);
 
   const compareComponentCodes = (codeA: string, codeB: string): number => {
-    const matchA = codeA.match(/^([A-Za-z]+)\s*(\d+)/);
-    const matchB = codeB.match(/^([A-Za-z]+)\s*(\d+)/);
+    const componentOrder = ['KOS', 'RDS', 'KFS', 'BIS', 'IS'];
 
-    if (!matchA || !matchB) {
-      return codeA.localeCompare(codeB);
+    const cleanA = codeA.trim().toUpperCase();
+    const cleanB = codeB.trim().toUpperCase();
+
+    const indexA = componentOrder.indexOf(cleanA);
+    const indexB = componentOrder.indexOf(cleanB);
+
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
     }
 
-    const prefixA = matchA[1];
-    const prefixB = matchB[1];
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
 
-    if (prefixA !== prefixB) {
-      return prefixA.localeCompare(prefixB);
-    }
-
-    const numA = parseInt(matchA[2], 10);
-    const numB = parseInt(matchB[2], 10);
-    return numA - numB;
+    return codeA.localeCompare(codeB, 'tr');
   };
 
   const sortedActions = useMemo(() => {
