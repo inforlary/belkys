@@ -6,11 +6,10 @@ import { AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface RiskAlert {
   id: string;
-  indicator_id: string;
-  indicator_name?: string;
+  code: string;
+  title: string;
   risk_level: string;
-  risk_type: string;
-  message: string;
+  residual_risk_score?: number;
   created_at: string;
 }
 
@@ -34,30 +33,18 @@ export default function RiskAlertWidget() {
     if (!profile?.organization_id) return;
 
     try {
-      const { data: alertsData, error } = await supabase
-        .from('risk_alerts')
-        .select('*')
+      const { data: risksData, error } = await supabase
+        .from('risks')
+        .select('id, code, title, risk_level, residual_risk_score, created_at')
         .eq('organization_id', profile.organization_id)
-        .eq('is_resolved', false)
+        .in('risk_level', ['high', 'critical'])
+        .order('residual_risk_score', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(5);
 
       if (error) throw error;
 
-      if (alertsData) {
-        const indicatorIds = [...new Set(alertsData.map(a => a.indicator_id))];
-        const { data: indicators } = await supabase
-          .from('indicators')
-          .select('id, name')
-          .in('id', indicatorIds);
-
-        const enrichedAlerts = alertsData.map(alert => ({
-          ...alert,
-          indicator_name: indicators?.find(i => i.id === alert.indicator_id)?.name
-        }));
-
-        setAlerts(enrichedAlerts);
-      }
+      setAlerts(risksData || []);
     } catch (error) {
       console.error('Error loading alerts:', error);
     } finally {
@@ -111,15 +98,17 @@ export default function RiskAlertWidget() {
                         <span className={`text-xs font-medium ${config.color}`}>
                           {config.label}
                         </span>
+                        {alert.residual_risk_score && (
+                          <span className="text-xs font-semibold text-gray-700">
+                            Skor: {alert.residual_risk_score}
+                          </span>
+                        )}
                         <span className="text-xs text-gray-500">
                           {new Date(alert.created_at).toLocaleDateString('tr-TR')}
                         </span>
                       </div>
                       <p className="text-sm font-medium text-gray-900 mb-1">
-                        {alert.indicator_name}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {alert.message}
+                        {alert.code} - {alert.title}
                       </p>
                     </div>
                   </div>
