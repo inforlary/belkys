@@ -476,14 +476,23 @@ function AddNCModal({ onClose, onSuccess, departments, processes, users, profile
 
     setSaving(true);
     try {
+      const insertData = {
+        ...formData,
+        organization_id: profile.organization_id,
+        created_by: profile.id,
+        status: 'OPEN',
+        process_id: formData.process_id || null,
+        department_id: formData.department_id || null,
+        detected_by: formData.detected_by || null,
+        responsible_id: formData.responsible_id || null,
+        responsible_department_id: formData.responsible_department_id || null,
+        detected_date: formData.detected_date || null,
+        target_date: formData.target_date || null
+      };
+
       const { data, error } = await supabase
         .from('qm_nonconformities')
-        .insert([{
-          ...formData,
-          organization_id: profile.organization_id,
-          created_by: profile.id,
-          status: 'OPEN'
-        }])
+        .insert([insertData])
         .select();
 
       if (error) {
@@ -737,9 +746,19 @@ function NCDetailModal({ nonconformity, onClose, onUpdate, departments, processe
   const handleSave = async () => {
     setSaving(true);
     try {
+      const updateData = {
+        ...formData,
+        process_id: formData.process_id || null,
+        department_id: formData.department_id || null,
+        responsible_id: formData.responsible_id || null,
+        responsible_department_id: formData.responsible_department_id || null,
+        detected_date: formData.detected_date || null,
+        target_date: formData.target_date || null
+      };
+
       const { error } = await supabase
         .from('qm_nonconformities')
-        .update(formData)
+        .update(updateData)
         .eq('id', nonconformity.id);
 
       if (error) throw error;
