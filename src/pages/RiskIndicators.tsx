@@ -313,9 +313,10 @@ export default function RiskIndicators() {
 
       closeIndicatorModal();
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving indicator:', error);
-      alert('Gösterge kaydedilirken hata oluştu');
+      const errorMessage = error?.message || error?.error_description || 'Bilinmeyen hata';
+      alert(`Gösterge kaydedilirken hata oluştu: ${errorMessage}`);
     }
   }
 
