@@ -797,6 +797,7 @@ export default function ICActions() {
       a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
     ).length;
     const ongoing = actualActions.filter(a => a.status === 'ONGOING').length;
+    const continuousActions = actualActions.filter(a => a.is_continuous === true).length;
 
     return {
       total,
@@ -808,7 +809,8 @@ export default function ICActions() {
       notStarted,
       notStartedPercent: total > 0 ? Math.round((notStarted / total) * 100) : 0,
       delayed,
-      delayedPercent: total > 0 ? Math.round((delayed / total) * 100) : 0
+      delayedPercent: total > 0 ? Math.round((delayed / total) * 100) : 0,
+      continuousActions
     };
   }, [baseFilteredActions]);
 
@@ -1550,59 +1552,7 @@ export default function ICActions() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 shadow-sm">
-          <div className="text-2xl font-bold text-blue-900">{detailedStats.totalComponents}</div>
-          <div className="text-xs text-blue-700 mt-1 font-medium">İç Kontrol</div>
-          <div className="text-xs text-blue-600">Bileşeni</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200 shadow-sm">
-          <div className="text-2xl font-bold text-indigo-900">{detailedStats.totalStandards}</div>
-          <div className="text-xs text-indigo-700 mt-1 font-medium">Standart</div>
-          <div className="text-xs text-indigo-600">Toplam</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200 shadow-sm">
-          <div className="text-2xl font-bold text-purple-900">{detailedStats.totalConditions}</div>
-          <div className="text-xs text-purple-700 mt-1 font-medium">Genel Şart</div>
-          <div className="text-xs text-purple-600">Toplam</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200 shadow-sm">
-          <div className="text-2xl font-bold text-green-900">{detailedStats.conditionsWithReasonableAssurance}</div>
-          <div className="text-xs text-green-700 mt-1 font-medium">Sağlanan Şart</div>
-          <div className="text-xs text-green-600">Makul Güvence</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200 shadow-sm">
-          <div className="text-2xl font-bold text-orange-900">{detailedStats.totalActions}</div>
-          <div className="text-xs text-orange-700 mt-1 font-medium">Toplam Eylem</div>
-          <div className="text-xs text-orange-600">Tanımlı</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-lg border border-teal-200 shadow-sm">
-          <div className="text-2xl font-bold text-teal-900">{detailedStats.startedActions}</div>
-          <div className="text-xs text-teal-700 mt-1 font-medium">Başlayan Eylem</div>
-          <div className="text-xs text-teal-600">
-            %{detailedStats.totalActions > 0 ? Math.round((detailedStats.startedActions / detailedStats.totalActions) * 100) : 0}
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-lg border border-cyan-200 shadow-sm">
-          <div className="text-2xl font-bold text-cyan-900">{detailedStats.continuousActions}</div>
-          <div className="text-xs text-cyan-700 mt-1 font-medium">Sürekli Eylem</div>
-          <div className="text-xs text-cyan-600">Devam Eden</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-rose-50 to-rose-100 p-4 rounded-lg border border-rose-200 shadow-sm">
-          <div className="text-2xl font-bold text-rose-900">{detailedStats.conditionsWithoutReasonableAssurance}</div>
-          <div className="text-xs text-rose-700 mt-1 font-medium">İyileştirme</div>
-          <div className="text-xs text-rose-600">Gerekli Şart</div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         <button
           onClick={() => handleStatusFilter('')}
           className={`p-4 rounded-lg border-2 transition-all ${
@@ -1673,16 +1623,25 @@ export default function ICActions() {
         <button
           onClick={() => handleStatusFilter('NO_ACTION')}
           className={`p-4 rounded-lg border-2 transition-all ${
-            selectedStatus === 'NO_ACTION' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 bg-white hover:border-gray-300'
+            selectedStatus === 'NO_ACTION' ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white hover:border-gray-300'
           }`}
         >
-          <div className="text-3xl font-bold text-amber-600">{stats.noActions}</div>
-          <div className="text-sm text-gray-600 mt-1">EYLEM YOK</div>
-          <div className="text-xs text-amber-600 mt-1 flex items-center justify-center gap-1">
-            <FileText className="w-3 h-3" />
-            Mevcut Durum
+          <div className="text-3xl font-bold text-green-600">{stats.noActions}</div>
+          <div className="text-sm text-gray-600 mt-1">MEVCUT DURUM</div>
+          <div className="text-xs text-green-600 mt-1 flex items-center justify-center gap-1">
+            <CheckCircle2 className="w-3 h-3" />
+            Sağlanıyor
           </div>
         </button>
+
+        <div className="p-4 rounded-lg border-2 border-teal-200 bg-teal-50">
+          <div className="text-3xl font-bold text-teal-600">{stats.continuousActions}</div>
+          <div className="text-sm text-gray-600 mt-1">SÜREKLİ</div>
+          <div className="text-xs text-teal-600 mt-1 flex items-center justify-center gap-1">
+            <ArrowRight className="w-3 h-3" />
+            Eylemler
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
