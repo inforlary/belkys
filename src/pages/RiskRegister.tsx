@@ -16,6 +16,7 @@ interface Risk {
   goal_id: string;
   risk_source: string;
   risk_relation: string;
+  control_level: string;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -114,6 +115,15 @@ function getRiskRelationBadge(relation: string) {
   return relationMap[relation] || relationMap['OPERATIONAL'];
 }
 
+function getControlLevelBadge(level: string) {
+  const levelMap: Record<string, { color: string; emoji: string; label: string }> = {
+    CONTROLLABLE: { color: 'bg-green-100 text-green-700', emoji: '✅', label: 'Kontrol Edilebilir' },
+    PARTIAL: { color: 'bg-yellow-100 text-yellow-700', emoji: '⚠️', label: 'Kısmen Kontrol' },
+    UNCONTROLLABLE: { color: 'bg-red-100 text-red-700', emoji: '❌', label: 'Kontrol Dışı' }
+  };
+  return levelMap[level] || levelMap['CONTROLLABLE'];
+}
+
 export default function RiskRegister() {
   const { navigate, currentPath, searchParams } = useLocation();
   const { profile } = useAuth();
@@ -137,6 +147,7 @@ export default function RiskRegister() {
     status: '',
     riskSource: '',
     riskRelation: '',
+    controlLevel: '',
     search: ''
   });
 
@@ -156,6 +167,7 @@ export default function RiskRegister() {
     goal_id: '',
     risk_source: 'INTERNAL',
     risk_relation: 'OPERATIONAL',
+    control_level: 'CONTROLLABLE',
     inherent_likelihood: 3,
     inherent_impact: 3,
     residual_likelihood: 2,
@@ -304,6 +316,7 @@ export default function RiskRegister() {
       goal_id: '',
       risk_source: 'INTERNAL',
       risk_relation: 'OPERATIONAL',
+      control_level: 'CONTROLLABLE',
       inherent_likelihood: 3,
       inherent_impact: 3,
       residual_likelihood: 2,
@@ -367,6 +380,7 @@ export default function RiskRegister() {
           goal_id: formData.goal_id || null,
           risk_source: formData.risk_source,
           risk_relation: formData.risk_relation,
+          control_level: formData.control_level,
           inherent_likelihood: formData.inherent_likelihood,
           inherent_impact: formData.inherent_impact,
           residual_likelihood: formData.residual_likelihood,
@@ -440,6 +454,7 @@ export default function RiskRegister() {
     if (filters.status && risk.status !== filters.status) return false;
     if (filters.riskSource && risk.risk_source !== filters.riskSource) return false;
     if (filters.riskRelation && risk.risk_relation !== filters.riskRelation) return false;
+    if (filters.controlLevel && risk.control_level !== filters.controlLevel) return false;
     if (filters.level) {
       const [min, max] = filters.level.split('-').map(Number);
       if (risk.residual_score < min || risk.residual_score > max) return false;
@@ -512,7 +527,7 @@ export default function RiskRegister() {
 
       <Card>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-8 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-9 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Kategori
@@ -635,6 +650,22 @@ export default function RiskRegister() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Kontrol
+              </label>
+              <select
+                value={filters.controlLevel}
+                onChange={(e) => setFilters({ ...filters, controlLevel: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Tümü</option>
+                <option value="CONTROLLABLE">Kontrol Edilebilir</option>
+                <option value="PARTIAL">Kısmen Kontrol</option>
+                <option value="UNCONTROLLABLE">Kontrol Dışı</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Arama
               </label>
               <div className="relative">
@@ -659,7 +690,7 @@ export default function RiskRegister() {
           </div>
 
           <button
-            onClick={() => setFilters({ category: '', department: '', goal: '', level: '', status: '', riskSource: '', riskRelation: '', search: '' })}
+            onClick={() => setFilters({ category: '', department: '', goal: '', level: '', status: '', riskSource: '', riskRelation: '', controlLevel: '', search: '' })}
             className="text-sm text-blue-600 hover:text-blue-700"
           >
             Filtreleri Temizle
@@ -696,6 +727,9 @@ export default function RiskRegister() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   İlişki
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Kontrol
+                </th>
                 <th
                   onClick={() => handleSort('inherent_score')}
                   className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -719,7 +753,7 @@ export default function RiskRegister() {
             <tbody className="bg-white divide-y divide-gray-200 relative">
               {sortedRisks.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <AlertTriangle className="w-12 h-12 text-gray-300" />
                       <p>Henüz risk kaydı bulunmuyor.</p>
@@ -803,6 +837,17 @@ export default function RiskRegister() {
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${relationBadge.color}`}>
                               <span>{relationBadge.emoji}</span>
                               <span>{relationBadge.label}</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {(() => {
+                          const controlBadge = getControlLevelBadge(risk.control_level);
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${controlBadge.color}`}>
+                              <span>{controlBadge.emoji}</span>
+                              <span>{controlBadge.label}</span>
                             </span>
                           );
                         })()}
@@ -1007,7 +1052,7 @@ export default function RiskRegister() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-3">
                       Risk Kaynağı <span className="text-red-500">*</span>
@@ -1026,7 +1071,7 @@ export default function RiskRegister() {
                           <span className="text-lg">🏠</span>
                           <div>
                             <div className="font-medium text-sm">İç Risk</div>
-                            <div className="text-xs text-gray-600">Kurum içinden kaynaklanan</div>
+                            <div className="text-xs text-gray-600">Kurum içinden</div>
                           </div>
                         </div>
                       </label>
@@ -1043,7 +1088,7 @@ export default function RiskRegister() {
                           <span className="text-lg">🌍</span>
                           <div>
                             <div className="font-medium text-sm">Dış Risk</div>
-                            <div className="text-xs text-gray-600">Kurum dışından kaynaklanan</div>
+                            <div className="text-xs text-gray-600">Kurum dışından</div>
                           </div>
                         </div>
                       </label>
@@ -1068,7 +1113,7 @@ export default function RiskRegister() {
                           <span className="text-lg">🎯</span>
                           <div>
                             <div className="font-medium text-sm">Stratejik</div>
-                            <div className="text-xs text-gray-600">Hedefe/faaliyete bağlı</div>
+                            <div className="text-xs text-gray-600">Hedefe bağlı</div>
                           </div>
                         </div>
                       </label>
@@ -1119,7 +1164,66 @@ export default function RiskRegister() {
                           <span className="text-lg">🏛️</span>
                           <div>
                             <div className="font-medium text-sm">Kurumsal</div>
-                            <div className="text-xs text-gray-600">Tüm kurumu etkiler</div>
+                            <div className="text-xs text-gray-600">Bağımsız</div>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Kontrol Düzeyi <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="control_level"
+                          value="CONTROLLABLE"
+                          checked={formData.control_level === 'CONTROLLABLE'}
+                          onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">✅</span>
+                          <div>
+                            <div className="font-medium text-sm">Kontrol Edilebilir</div>
+                            <div className="text-xs text-gray-600">Tamamen kontrol</div>
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="control_level"
+                          value="PARTIAL"
+                          checked={formData.control_level === 'PARTIAL'}
+                          onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">⚠️</span>
+                          <div>
+                            <div className="font-medium text-sm">Kısmen Kontrol</div>
+                            <div className="text-xs text-gray-600">Etki azaltılabilir</div>
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="control_level"
+                          value="UNCONTROLLABLE"
+                          checked={formData.control_level === 'UNCONTROLLABLE'}
+                          onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">❌</span>
+                          <div>
+                            <div className="font-medium text-sm">Kontrol Dışı</div>
+                            <div className="text-xs text-gray-600">Sadece izleme</div>
                           </div>
                         </div>
                       </label>
