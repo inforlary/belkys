@@ -1160,17 +1160,13 @@ export default function RiskDetail() {
                         <div className="flex-1">
                           <h4 className="font-medium text-gray-900">{control.name}</h4>
                           <p className="text-sm text-gray-600 mt-1">{control.description}</p>
-                          <div className="flex items-center gap-4 mt-2 text-sm">
+
+                          <div className="flex items-center gap-4 mt-3 text-sm">
                             <span className="text-gray-600">
                               Tür: <span className="font-medium">
                                 {control.control_type === 'PREVENTIVE' && 'Önleyici'}
                                 {control.control_type === 'DETECTIVE' && 'Tespit Edici'}
                                 {control.control_type === 'CORRECTIVE' && 'Düzeltici'}
-                              </span>
-                            </span>
-                            <span className="text-gray-600">
-                              Etkinlik: <span className={`font-medium ${control.operating_effectiveness >= 4 ? 'text-green-600' : control.operating_effectiveness >= 3 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                {control.operating_effectiveness >= 4 ? 'Etkin ✓' : control.operating_effectiveness >= 3 ? 'Kısmen Etkin ⚠️' : 'Etkin Değil ✗'}
                               </span>
                             </span>
                             {control.responsible_department && (
@@ -1179,6 +1175,68 @@ export default function RiskDetail() {
                               </span>
                             )}
                           </div>
+
+                          {(control.design_effectiveness || control.operating_effectiveness) && (
+                            <div className="mt-4 space-y-3">
+                              <div className="text-xs font-semibold text-gray-700 mb-2">Etkinlik Değerlendirmesi</div>
+
+                              {control.design_effectiveness && (
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs text-gray-600">Tasarım Etkinliği</span>
+                                    <span className={`text-xs font-semibold ${
+                                      control.design_effectiveness >= 4 ? 'text-green-600' :
+                                      control.design_effectiveness >= 3 ? 'text-yellow-600' :
+                                      'text-red-600'
+                                    }`}>
+                                      {control.design_effectiveness}/5
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className={`h-2 rounded-full ${
+                                        control.design_effectiveness >= 4 ? 'bg-green-500' :
+                                        control.design_effectiveness >= 3 ? 'bg-yellow-500' :
+                                        'bg-red-500'
+                                      }`}
+                                      style={{ width: `${(control.design_effectiveness / 5) * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {control.operating_effectiveness && (
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs text-gray-600">Çalışma Etkinliği</span>
+                                    <span className={`text-xs font-semibold ${
+                                      control.operating_effectiveness >= 4 ? 'text-green-600' :
+                                      control.operating_effectiveness >= 3 ? 'text-yellow-600' :
+                                      'text-red-600'
+                                    }`}>
+                                      {control.operating_effectiveness}/5
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className={`h-2 rounded-full ${
+                                        control.operating_effectiveness >= 4 ? 'bg-green-500' :
+                                        control.operating_effectiveness >= 3 ? 'bg-yellow-500' :
+                                        'bg-red-500'
+                                      }`}
+                                      style={{ width: `${(control.operating_effectiveness / 5) * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {control.effectiveness_notes && (
+                                <div className="text-xs text-gray-600 mt-2 italic">
+                                  Not: {control.effectiveness_notes}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         {isAdmin && (
                           <div className="relative">
@@ -2419,13 +2477,15 @@ export default function RiskDetail() {
 }
 
 function ControlModal({ isOpen, onClose, riskId, departments, onSuccess, editingControl }: any) {
+  const { profile } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     control_type: 'PREVENTIVE',
     control_nature: 'MANUAL',
-    design_effectiveness: 3,
-    operating_effectiveness: 3,
+    design_effectiveness: null as number | null,
+    operating_effectiveness: null as number | null,
+    effectiveness_notes: '',
     responsible_department_id: '',
     frequency: 'Çeyreklik',
     evidence: ''
@@ -2439,8 +2499,9 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess, editing
         description: editingControl.description || '',
         control_type: editingControl.control_type || 'PREVENTIVE',
         control_nature: editingControl.control_nature || 'MANUAL',
-        design_effectiveness: editingControl.design_effectiveness || 3,
-        operating_effectiveness: editingControl.operating_effectiveness || 3,
+        design_effectiveness: editingControl.design_effectiveness || null,
+        operating_effectiveness: editingControl.operating_effectiveness || null,
+        effectiveness_notes: editingControl.effectiveness_notes || '',
         responsible_department_id: editingControl.responsible_department_id || '',
         frequency: 'Çeyreklik',
         evidence: ''
@@ -2451,8 +2512,9 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess, editing
         description: '',
         control_type: 'PREVENTIVE',
         control_nature: 'MANUAL',
-        design_effectiveness: 3,
-        operating_effectiveness: 3,
+        design_effectiveness: null,
+        operating_effectiveness: null,
+        effectiveness_notes: '',
         responsible_department_id: '',
         frequency: 'Çeyreklik',
         evidence: ''
@@ -2467,10 +2529,16 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess, editing
     setSaving(true);
 
     try {
+      const dataToSave = {
+        ...formData,
+        last_effectiveness_review: (formData.design_effectiveness || formData.operating_effectiveness) ? new Date().toISOString().split('T')[0] : null,
+        reviewed_by: (formData.design_effectiveness || formData.operating_effectiveness) ? profile?.id : null
+      };
+
       if (editingControl) {
         const { error } = await supabase
           .from('risk_controls')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', editingControl.id);
 
         if (error) throw error;
@@ -2478,7 +2546,7 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess, editing
       } else {
         const { error } = await supabase.from('risk_controls').insert({
           risk_id: riskId,
-          ...formData
+          ...dataToSave
         });
 
         if (error) throw error;
@@ -2559,31 +2627,82 @@ function ControlModal({ isOpen, onClose, riskId, departments, onSuccess, editing
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tasarım Etkinliği (1-5)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="5"
-                value={formData.design_effectiveness}
-                onChange={e => setFormData({ ...formData, design_effectiveness: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-base font-semibold text-gray-900 mb-3">Etkinlik Değerlendirmesi</h4>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tasarım Etkinliği
+                </label>
+                <p className="text-xs text-gray-500 mb-2">Kontrol doğru tasarlanmış mı?</p>
+                <div className="space-y-2">
+                  {[
+                    { value: 1, label: 'Çok Zayıf', desc: 'Kontrol tasarımı yetersiz' },
+                    { value: 2, label: 'Zayıf', desc: 'Önemli eksiklikler var' },
+                    { value: 3, label: 'Orta', desc: 'Kısmen yeterli' },
+                    { value: 4, label: 'İyi', desc: 'Büyük ölçüde yeterli' },
+                    { value: 5, label: 'Çok İyi', desc: 'Tam yeterli' }
+                  ].map(option => (
+                    <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="design_effectiveness"
+                        value={option.value}
+                        checked={formData.design_effectiveness === option.value}
+                        onChange={e => setFormData({ ...formData, design_effectiveness: parseInt(e.target.value) })}
+                        className="text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">
+                        <span className="font-medium">{option.value} - {option.label}:</span>
+                        <span className="text-gray-600 ml-1">{option.desc}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Çalışma Etkinliği
+                </label>
+                <p className="text-xs text-gray-500 mb-2">Kontrol pratikte çalışıyor mu?</p>
+                <div className="space-y-2">
+                  {[
+                    { value: 1, label: 'Çok Zayıf', desc: 'Uygulanmıyor' },
+                    { value: 2, label: 'Zayıf', desc: 'Nadiren uygulanıyor' },
+                    { value: 3, label: 'Orta', desc: 'Bazen uygulanıyor' },
+                    { value: 4, label: 'İyi', desc: 'Genellikle uygulanıyor' },
+                    { value: 5, label: 'Çok İyi', desc: 'Her zaman uygulanıyor' }
+                  ].map(option => (
+                    <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="operating_effectiveness"
+                        value={option.value}
+                        checked={formData.operating_effectiveness === option.value}
+                        onChange={e => setFormData({ ...formData, operating_effectiveness: parseInt(e.target.value) })}
+                        className="text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">
+                        <span className="font-medium">{option.value} - {option.label}:</span>
+                        <span className="text-gray-600 ml-1">{option.desc}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div>
+            <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Çalışma Etkinliği (1-5)
+                Etkinlik Değerlendirme Notu
               </label>
-              <input
-                type="number"
-                min="1"
-                max="5"
-                value={formData.operating_effectiveness}
-                onChange={e => setFormData({ ...formData, operating_effectiveness: parseInt(e.target.value) })}
+              <textarea
+                value={formData.effectiveness_notes}
+                onChange={e => setFormData({ ...formData, effectiveness_notes: e.target.value })}
+                rows={3}
+                placeholder="Etkinlik değerlendirmesi ile ilgili notlarınızı yazabilirsiniz..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>

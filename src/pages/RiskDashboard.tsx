@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
-import { AlertTriangle, TrendingUp, Clock, Bell, ChevronRight } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Clock, Bell, ChevronRight, Shield } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 interface DashboardStats {
@@ -11,6 +11,7 @@ interface DashboardStats {
   openTreatments: number;
   alarmIndicators: number;
   reviewPendingRisks: number;
+  lowEffectivenessControls: number;
 }
 
 interface MatrixCell {
@@ -51,6 +52,16 @@ interface AlarmIndicator {
   threshold: string;
 }
 
+interface LowEffectivenessControl {
+  control_id: string;
+  control_name: string;
+  risk_code: string;
+  risk_title: string;
+  design_effectiveness: number;
+  operating_effectiveness: number;
+  responsible_department_name: string;
+}
+
 export default function RiskDashboard() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
@@ -60,6 +71,7 @@ export default function RiskDashboard() {
   const [criticalRisks, setCriticalRisks] = useState<CriticalRisk[]>([]);
   const [delayedTreatments, setDelayedTreatments] = useState<DelayedTreatment[]>([]);
   const [alarmIndicators, setAlarmIndicators] = useState<AlarmIndicator[]>([]);
+  const [lowEffectivenessControls, setLowEffectivenessControls] = useState<LowEffectivenessControl[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -116,7 +128,6 @@ export default function RiskDashboard() {
         return reviewDate <= today;
       }).length || 0;
 
-      setStats({ totalRisks, criticalRisks, openTreatments, alarmIndicators, reviewPendingRisks });
 
       const matrix: MatrixCell[] = [];
       const matrixMap = new Map<string, number>();
@@ -196,6 +207,23 @@ export default function RiskDashboard() {
         .sort((a, b) => (a.status === 'RED' ? -1 : 1));
       setAlarmIndicators(alarms.slice(0, 5));
 
+      const lowEffectivenessResult = await supabase.rpc('get_low_effectiveness_controls', {
+        p_organization_id: orgId,
+        p_threshold: 3
+      });
+      setLowEffectivenessControls(lowEffectivenessResult.data?.slice(0, 5) || []);
+
+      const lowEffectivenessCount = lowEffectivenessResult.data?.length || 0;
+
+      setStats({
+        totalRisks,
+        criticalRisks,
+        openTreatments,
+        alarmIndicators: alarms.length,
+        reviewPendingRisks,
+        lowEffectivenessControls: lowEffectivenessCount
+      });
+
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -234,7 +262,7 @@ export default function RiskDashboard() {
         <p className="mt-2 text-gray-600">Kurumsal risk durumu özeti</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div
           onClick={() => navigate('/risk-management/risks')}
           className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
@@ -299,6 +327,22 @@ export default function RiskDashboard() {
           <div className="mt-2 text-xs text-gray-500">(kırmızı)</div>
           <div className="mt-1 flex items-center text-sm text-red-600">
             <span className="mr-1">🔴</span> Alarm
+          </div>
+        </div>
+
+        <div
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600">ETKİNLİĞİ DÜŞÜK KONTROL</span>
+            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-orange-600" />
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-gray-900">{stats?.lowEffectivenessControls || 0}</div>
+          <div className="mt-2 text-xs text-gray-500">(puan &lt; 3)</div>
+          <div className="mt-1 flex items-center text-sm text-orange-600">
+            <span className="mr-1">🟠</span> Dikkat
           </div>
         </div>
       </div>
@@ -510,38 +554,123 @@ export default function RiskDashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Gösterge Alarmları</h2>
-          <button
-            onClick={() => navigate('/risk-management/indicators')}
-            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-          >
-            Tüm Göstergeler <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="space-y-2">
-          {alarmIndicators.length > 0 ? (
-            alarmIndicators.map(indicator => (
-              <div
-                key={indicator.id}
-                onClick={() => navigate('/risk-management/indicators')}
-                className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{indicator.status === 'RED' ? '🔴' : '🟡'}</span>
-                  <div>
-                    <div className="font-medium text-gray-900">{indicator.code} {indicator.name}</div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      Değer: {indicator.value} {indicator.unit_of_measure} | Eşik: {indicator.threshold}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Gösterge Alarmları</h2>
+            <button
+              onClick={() => navigate('/risk-management/indicators')}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              Tüm Göstergeler <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-2">
+            {alarmIndicators.length > 0 ? (
+              alarmIndicators.map(indicator => (
+                <div
+                  key={indicator.id}
+                  onClick={() => navigate('/risk-management/indicators')}
+                  className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{indicator.status === 'RED' ? '🔴' : '🟡'}</span>
+                    <div>
+                      <div className="font-medium text-gray-900">{indicator.code} {indicator.name}</div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        Değer: {indicator.value} {indicator.unit_of_measure} | Eşik: {indicator.threshold}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">Alarm durumu yok</div>
-          )}
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">Alarm durumu yok</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Etkinliği Düşük Kontroller</h2>
+          </div>
+          <div className="space-y-2">
+            {lowEffectivenessControls.length > 0 ? (
+              lowEffectivenessControls.map((control, index) => (
+                <div
+                  key={control.control_id}
+                  className="p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-orange-600" />
+                      <span className="text-sm font-medium text-gray-900">{control.control_name}</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2">
+                    Risk: <span className="font-medium">{control.risk_code}</span> - {control.risk_title}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {control.design_effectiveness && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-500">Tasarım</span>
+                          <span className={`text-xs font-semibold ${
+                            control.design_effectiveness >= 4 ? 'text-green-600' :
+                            control.design_effectiveness >= 3 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {control.design_effectiveness}/5
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${
+                              control.design_effectiveness >= 4 ? 'bg-green-500' :
+                              control.design_effectiveness >= 3 ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${(control.design_effectiveness / 5) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {control.operating_effectiveness && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-500">Çalışma</span>
+                          <span className={`text-xs font-semibold ${
+                            control.operating_effectiveness >= 4 ? 'text-green-600' :
+                            control.operating_effectiveness >= 3 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {control.operating_effectiveness}/5
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${
+                              control.operating_effectiveness >= 4 ? 'bg-green-500' :
+                              control.operating_effectiveness >= 3 ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${(control.operating_effectiveness / 5) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {control.responsible_department_name && (
+                    <div className="text-xs text-gray-500 mt-2">
+                      Sorumlu: {control.responsible_department_name}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">Düşük etkinlikli kontrol yok</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
