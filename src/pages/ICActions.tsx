@@ -867,7 +867,7 @@ export default function ICActions() {
       const actionList = comp.actions;
       const continuousCount = actionList.filter(a => a.is_continuous === true).length;
       const notStartedCount = actionList.filter(a => a.is_continuous !== true && a.status === 'NOT_STARTED').length;
-      const ongoingCount = actionList.filter(a => a.is_continuous !== true && a.status === 'ONGOING').length;
+      const ongoingCount = actionList.filter(a => a.is_continuous !== true && a.status === 'IN_PROGRESS').length;
       const delayedCount = actionList.filter(a =>
         a.is_continuous !== true &&
         a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
@@ -1828,10 +1828,11 @@ export default function ICActions() {
             >
               <option value="">Tüm Durumlar</option>
               <option value="NOT_STARTED">Başlamadı</option>
-              <option value="ONGOING">Devam Ediyor</option>
+              <option value="IN_PROGRESS">Devam Ediyor</option>
               <option value="COMPLETED">Tamamlandı</option>
               <option value="DELAYED">Geciken</option>
               <option value="CONTINUOUS">Sürekli</option>
+              <option value="ONGOING">Sürekli (ONGOING)</option>
               <option value="NO_ACTION">Mevcut Durum Sağlanıyor</option>
             </select>
 
