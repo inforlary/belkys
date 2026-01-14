@@ -12,6 +12,8 @@ interface DashboardStats {
   alarmIndicators: number;
   reviewPendingRisks: number;
   lowEffectivenessControls: number;
+  risksAchievingTarget: number;
+  risksBehindTarget: number;
 }
 
 interface MatrixCell {
@@ -215,13 +217,25 @@ export default function RiskDashboard() {
 
       const lowEffectivenessCount = lowEffectivenessResult.data?.length || 0;
 
+      const achievingTargetResult = await supabase.rpc('get_risks_achieving_target', {
+        p_organization_id: orgId
+      });
+      const risksAchievingTarget = achievingTargetResult.data?.length || 0;
+
+      const behindTargetResult = await supabase.rpc('get_risks_behind_target', {
+        p_organization_id: orgId
+      });
+      const risksBehindTarget = behindTargetResult.data?.length || 0;
+
       setStats({
         totalRisks,
         criticalRisks,
         openTreatments,
         alarmIndicators: alarms.length,
         reviewPendingRisks,
-        lowEffectivenessControls: lowEffectivenessCount
+        lowEffectivenessControls: lowEffectivenessCount,
+        risksAchievingTarget,
+        risksBehindTarget
       });
 
     } catch (error) {
@@ -262,7 +276,7 @@ export default function RiskDashboard() {
         <p className="mt-2 text-gray-600">Kurumsal risk durumu özeti</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div
           onClick={() => navigate('/risk-management/risks')}
           className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
@@ -334,15 +348,66 @@ export default function RiskDashboard() {
           className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">ETKİNLİĞİ DÜŞÜK KONTROL</span>
+            <span className="text-sm font-medium text-gray-600">HEDEFE ULAŞAN</span>
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-gray-900">{stats?.risksAchievingTarget || 0}</div>
+          <div className="mt-2 text-xs text-gray-500">(hedef ≥ artık)</div>
+          <div className="mt-1 flex items-center text-sm text-green-600">
+            <span className="mr-1">✓</span> Başarılı
+          </div>
+        </div>
+
+        <div
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600">HEDEFİN GERİSİNDE</span>
             <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-orange-600" />
+              <AlertTriangle className="w-5 h-5 text-orange-600" />
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-gray-900">{stats?.risksBehindTarget || 0}</div>
+          <div className="mt-2 text-xs text-gray-500">(hedef &lt; artık)</div>
+          <div className="mt-1 flex items-center text-sm text-orange-600">
+            <span className="mr-1">⚠</span> Dikkat
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600">ETKİNLİĞİ DÜŞÜK KONTROL</span>
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-red-600" />
             </div>
           </div>
           <div className="text-3xl font-bold text-gray-900">{stats?.lowEffectivenessControls || 0}</div>
           <div className="mt-2 text-xs text-gray-500">(puan &lt; 3)</div>
-          <div className="mt-1 flex items-center text-sm text-orange-600">
-            <span className="mr-1">🟠</span> Dikkat
+          <div className="mt-1 flex items-center text-sm text-red-600">
+            <span className="mr-1">🔴</span> Kritik
+          </div>
+        </div>
+
+        <div
+          onClick={() => navigate('/risk-management/risks?review=pending')}
+          className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600">GÖZDEN GEÇİRME BEKLEYEN</span>
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-gray-900">{stats?.reviewPendingRisks || 0}</div>
+          <div className="mt-2 text-xs text-gray-500">(tarihi geçmiş)</div>
+          <div className="mt-1 flex items-center text-sm text-blue-600">
+            <span className="mr-1">🔵</span> Bekliyor
           </div>
         </div>
       </div>

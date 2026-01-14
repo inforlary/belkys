@@ -430,6 +430,9 @@ export default function RiskDetail() {
         inherent_impact: editFormData.inherent_impact,
         residual_likelihood: editFormData.residual_likelihood,
         residual_impact: editFormData.residual_impact,
+        target_probability: editFormData.target_probability || null,
+        target_impact: editFormData.target_impact || null,
+        target_date: editFormData.target_date || null,
         risk_level: getRiskLevel(residualScore),
         risk_response: editFormData.risk_response,
         response_rationale: editFormData.response_rationale,
@@ -630,6 +633,9 @@ export default function RiskDetail() {
                   inherent_impact: risk.inherent_impact,
                   residual_likelihood: risk.residual_likelihood,
                   residual_impact: risk.residual_impact,
+                  target_probability: (risk as any).target_probability || null,
+                  target_impact: (risk as any).target_impact || null,
+                  target_date: (risk as any).target_date || '',
                   risk_response: risk.risk_response,
                   response_rationale: risk.response_rationale || '',
                   status: risk.status,
@@ -1004,9 +1010,10 @@ export default function RiskDetail() {
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900">Risk Değerlendirmesi</h3>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div className="bg-blue-50 rounded-lg p-6">
-                  <h4 className="font-semibold text-gray-900 mb-4">Doğal Risk (Kontrol öncesi)</h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-3 text-sm">Doğal Risk</h4>
+                  <p className="text-xs text-gray-600 mb-3">(Kontrol öncesi)</p>
                   <div className="space-y-3">
                     <div>
                       <span className="text-sm text-gray-600">Olasılık:</span>
@@ -1055,8 +1062,9 @@ export default function RiskDetail() {
                   </div>
                 </div>
 
-                <div className="bg-green-50 rounded-lg p-6">
-                  <h4 className="font-semibold text-gray-900 mb-4">Artık Risk (Kontrol sonrası)</h4>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-3 text-sm">Artık Risk</h4>
+                  <p className="text-xs text-gray-600 mb-3">(Kontrol sonrası)</p>
                   <div className="space-y-3">
                     <div>
                       <span className="text-sm text-gray-600">Olasılık:</span>
@@ -1104,7 +1112,142 @@ export default function RiskDetail() {
                     </div>
                   </div>
                 </div>
+
+                {(risk as any).target_probability && (risk as any).target_impact ? (
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Hedef Risk</h4>
+                    <p className="text-xs text-gray-600 mb-3">(Ulaşmak istediğimiz seviye)</p>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-sm text-gray-600">Olasılık:</span>
+                        <span className="ml-2 font-medium">{(risk as any).target_probability} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][(risk as any).target_probability]}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Etki:</span>
+                        <span className="ml-2 font-medium">{(risk as any).target_impact} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][(risk as any).target_impact]}</span>
+                      </div>
+                      <div className="pt-3 border-t border-purple-200">
+                        <span className="text-sm text-gray-600">Skor:</span>
+                        <span className={`ml-2 text-xl font-bold inline-flex items-center gap-1 ${getRiskScoreBadge((risk as any).target_score || ((risk as any).target_probability * (risk as any).target_impact)).color} px-3 py-1 rounded`}>
+                          <span>{getRiskScoreBadge((risk as any).target_score || ((risk as any).target_probability * (risk as any).target_impact)).emoji}</span>
+                          <span>{(risk as any).target_score || ((risk as any).target_probability * (risk as any).target_impact)}</span>
+                          <span className="text-sm">({getRiskScoreBadge((risk as any).target_score || ((risk as any).target_probability * (risk as any).target_impact)).label})</span>
+                        </span>
+                      </div>
+                      {(risk as any).target_date && (
+                        <div className="pt-3 border-t border-purple-200">
+                          <span className="text-sm text-gray-600">Hedef Tarih:</span>
+                          <span className="ml-2 font-medium">{new Date((risk as any).target_date).toLocaleDateString('tr-TR')}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-6">
+                      <div className="text-xs text-gray-600 mb-2 text-center">ETKİ →</div>
+                      <div className="grid grid-cols-6 gap-1">
+                        <div className="text-xs text-gray-600 flex items-center justify-center">↓ O</div>
+                        {[1, 2, 3, 4, 5].map(i => (
+                          <div key={i} className="text-xs text-center text-gray-600">{i}</div>
+                        ))}
+                        {[5, 4, 3, 2, 1].map(likelihood => (
+                          <>
+                            <div key={`l${likelihood}`} className="text-xs flex items-center justify-center text-gray-600">{likelihood}</div>
+                            {[1, 2, 3, 4, 5].map(impact => {
+                              const isSelected = likelihood === (risk as any).target_probability && impact === (risk as any).target_impact;
+                              const score = likelihood * impact;
+                              const badge = getRiskScoreBadge(score);
+                              return (
+                                <div
+                                  key={`${likelihood}-${impact}`}
+                                  className={`aspect-square rounded ${isSelected ? 'ring-2 ring-purple-600' : ''} ${badge.color} flex items-center justify-center text-xs font-bold`}
+                                >
+                                  {isSelected && '●'}
+                                </div>
+                              );
+                            })}
+                          </>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Hedef risk belirlenmemiş</p>
+                      <p className="text-xs text-gray-500 mt-1">Risk düzenleyerek hedef belirleyebilirsiniz</p>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {(risk as any).target_score && (
+                <div className="bg-white rounded-lg border-2 border-blue-200 p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4">Risk Azaltma İlerlemesi</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Doğal → Artık Risk</span>
+                        <span className="text-sm font-bold text-green-600">
+                          {Math.round(((risk.inherent_score - risk.residual_score) / risk.inherent_score) * 100)}% azalma
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-green-500 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, ((risk.inherent_score - risk.residual_score) / risk.inherent_score) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600 mt-1">
+                        <span>Skor: {risk.inherent_score}</span>
+                        <span>Skor: {risk.residual_score}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Artık → Hedef Risk</span>
+                        {risk.residual_score <= (risk as any).target_score ? (
+                          <span className="text-sm font-bold text-green-600 flex items-center gap-1">
+                            ✓ Hedefe ulaşıldı
+                          </span>
+                        ) : (
+                          <span className="text-sm font-bold text-orange-600">
+                            {Math.round(((risk.residual_score - (risk as any).target_score) / risk.residual_score) * 100)}% azalma gerekli
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className={`h-3 rounded-full transition-all duration-500 ${
+                            risk.residual_score <= (risk as any).target_score ? 'bg-green-500' : 'bg-orange-500'
+                          }`}
+                          style={{
+                            width: risk.residual_score <= (risk as any).target_score
+                              ? '100%'
+                              : `${Math.min(100, ((risk.residual_score - (risk as any).target_score) / risk.residual_score) * 100)}%`
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600 mt-1">
+                        <span>Skor: {risk.residual_score}</span>
+                        <span>Hedef: {(risk as any).target_score}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Toplam İlerleme</span>
+                        <span className="text-lg font-bold text-blue-600">
+                          {Math.round(((risk.inherent_score - risk.residual_score) / (risk.inherent_score - (risk as any).target_score)) * 100)}%
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        Hedefimize ulaşmak için yolun {Math.round(((risk.inherent_score - risk.residual_score) / (risk.inherent_score - (risk as any).target_score)) * 100)}%'ini tamamladık
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-gray-50 rounded-lg p-6">
                 <h4 className="font-semibold text-gray-900 mb-4">Risk Yanıtı</h4>
@@ -2349,6 +2492,105 @@ export default function RiskDetail() {
                       Uyarı: Artık risk skoru, doğal risk skorundan büyük olamaz!
                     </div>
                   )}
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">3.5. Hedef Risk Değerlendirmesi</h3>
+                <p className="text-sm text-gray-600 mb-4">Ulaşmak istediğimiz risk seviyesi</p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Hedef Olasılık
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(level => (
+                        <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-blue-100">
+                          <input
+                            type="radio"
+                            name="edit_target_probability"
+                            value={level}
+                            checked={editFormData.target_probability === level}
+                            onChange={(e) => setEditFormData({ ...editFormData, target_probability: parseInt(e.target.value) })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
+                          </div>
+                        </label>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setEditFormData({ ...editFormData, target_probability: null })}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline"
+                      >
+                        Hedef belirlenmedi
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Hedef Etki
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(level => (
+                        <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-blue-100">
+                          <input
+                            type="radio"
+                            name="edit_target_impact"
+                            value={level}
+                            checked={editFormData.target_impact === level}
+                            onChange={(e) => setEditFormData({ ...editFormData, target_impact: parseInt(e.target.value) })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
+                          </div>
+                        </label>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setEditFormData({ ...editFormData, target_impact: null })}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline"
+                      >
+                        Hedef belirlenmedi
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {editFormData.target_probability && editFormData.target_impact && (
+                  <div className="mt-4 p-4 bg-white rounded-lg border-2 border-blue-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">HEDEF RİSK SKORU:</span>
+                      <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(editFormData.target_probability * editFormData.target_impact).color} px-4 py-2 rounded-lg`}>
+                        <span>{getRiskScoreBadge(editFormData.target_probability * editFormData.target_impact).emoji}</span>
+                        <span>{editFormData.target_probability * editFormData.target_impact}</span>
+                        <span className="text-sm">({getRiskScoreBadge(editFormData.target_probability * editFormData.target_impact).label})</span>
+                      </span>
+                    </div>
+                    {(editFormData.target_probability * editFormData.target_impact) > (editFormData.residual_likelihood * editFormData.residual_impact) && (
+                      <div className="mt-2 text-sm text-orange-600 flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        Uyarı: Hedef risk skoru, artık risk skorundan büyük olamaz!
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hedef Tarih
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">Bu seviyeye ne zaman ulaşmayı hedefliyoruz?</p>
+                  <input
+                    type="date"
+                    value={editFormData.target_date}
+                    onChange={(e) => setEditFormData({ ...editFormData, target_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
 
