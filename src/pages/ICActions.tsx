@@ -942,6 +942,10 @@ export default function ICActions() {
     setSelectedStatus(selectedStatus === status ? '' : status);
   };
 
+  const handleComponentFilter = (componentId: string) => {
+    setSelectedComponentId(selectedComponentId === componentId ? '' : componentId);
+  };
+
   const clearFilters = () => {
     setSelectedComponentId('');
     setSelectedStandardId('');
@@ -1322,7 +1326,7 @@ export default function ICActions() {
       doc.text(`Eylem Plani: ${selectedPlan.name}`, 14, 27);
     }
 
-    doc.text(`Toplam: ${stats.total} | Tamamlanan: ${stats.completed} (%${stats.completedPercent}) | Devam Eden: ${stats.inProgress} (%${stats.inProgressPercent}) | Geciken: ${stats.delayed} (%${stats.delayedPercent}) | Eylem Yok: ${stats.noActions}`, 14, 32);
+    doc.text(`Toplam: ${stats.total} | Tamamlanan: ${stats.completed} (%${stats.completedPercent}) | Devam Eden: ${stats.inProgress} (%${stats.inProgressPercent}) | Surekli: ${stats.continuousActions} | Geciken: ${stats.delayed} (%${stats.delayedPercent}) | Eylem Yok: ${stats.noActions}`, 14, 32);
 
     const tableData: any[] = [];
 
@@ -1599,7 +1603,7 @@ export default function ICActions() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <button
           onClick={() => handleStatusFilter('')}
           className={`p-4 rounded-lg border-2 transition-all ${
@@ -1626,16 +1630,16 @@ export default function ICActions() {
         </button>
 
         <button
-          onClick={() => handleStatusFilter('ONGOING')}
+          onClick={() => handleStatusFilter('IN_PROGRESS')}
           className={`p-4 rounded-lg border-2 transition-all ${
-            selectedStatus === 'ONGOING' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+            selectedStatus === 'IN_PROGRESS' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
           }`}
         >
-          <div className="text-3xl font-bold text-blue-600">{stats.ongoing}</div>
+          <div className="text-3xl font-bold text-blue-600">{stats.inProgress}</div>
           <div className="text-sm text-gray-600 mt-1">DEVAM EDEN</div>
           <div className="text-xs text-blue-600 mt-1 flex items-center justify-center gap-1">
             <Clock className="w-3 h-3" />
-            %{stats.ongoingPercent}
+            %{stats.inProgressPercent}
           </div>
         </button>
 
@@ -1681,14 +1685,19 @@ export default function ICActions() {
           </div>
         </button>
 
-        <div className="p-4 rounded-lg border-2 border-teal-200 bg-teal-50">
+        <button
+          onClick={() => handleStatusFilter('CONTINUOUS')}
+          className={`p-4 rounded-lg border-2 transition-all ${
+            selectedStatus === 'CONTINUOUS' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
           <div className="text-3xl font-bold text-teal-600">{stats.continuousActions}</div>
           <div className="text-sm text-gray-600 mt-1">SÜREKLİ</div>
           <div className="text-xs text-teal-600 mt-1 flex items-center justify-center gap-1">
             <ArrowRight className="w-3 h-3" />
             Eylemler
           </div>
-        </div>
+        </button>
       </div>
 
       {componentStats.length > 0 && (
@@ -1696,7 +1705,13 @@ export default function ICActions() {
           <h2 className="text-lg font-semibold text-gray-900">Bileşen Bazlı Özet</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {componentStats.map(comp => (
-              <div key={comp.id} className="bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+              <button
+                key={comp.id}
+                onClick={() => handleComponentFilter(comp.id)}
+                className={`bg-white border-2 rounded-lg p-4 hover:border-blue-400 transition-all text-left ${
+                  selectedComponentId === comp.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                }`}
+              >
                 <div className="font-bold text-sm text-gray-900 mb-3" title={comp.name}>
                   {comp.name}
                 </div>
@@ -1737,7 +1752,7 @@ export default function ICActions() {
                     )}
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
