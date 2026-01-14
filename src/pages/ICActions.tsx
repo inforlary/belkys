@@ -1721,11 +1721,11 @@ export default function ICActions() {
                     <span className="text-gray-600">{comp.standardCount} Standart</span>
                   </div>
 
-                  <div className="flex justify-between items-start">
+                  <div>
                     <span className="text-gray-600">{comp.conditionCount} Genel Şart</span>
                     {comp.conditionsWithReasonableAssurance > 0 && (
-                      <span className="text-green-600 font-medium text-right">
-                        ({comp.conditionsWithReasonableAssurance} Mevcut Durum Sağlanıyor)
+                      <span className="text-green-600 font-medium">
+                        {' '}({comp.conditionsWithReasonableAssurance} Mevcut Durum Sağlanıyor)
                       </span>
                     )}
                   </div>
