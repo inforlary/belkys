@@ -605,10 +605,12 @@ export default function ICActions() {
     if (selectedStatus) {
       if (selectedStatus === 'DELAYED') {
         filtered = filtered.filter(a =>
-          a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
+          a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING', 'IN_PROGRESS'].includes(a.status)
         );
       } else if (selectedStatus === 'CONTINUOUS') {
         filtered = filtered.filter(a => a.is_continuous === true);
+      } else if (selectedStatus === 'IN_PROGRESS') {
+        filtered = filtered.filter(a => ['IN_PROGRESS', 'ONGOING'].includes(a.status));
       } else {
         filtered = filtered.filter(a => a.status === selectedStatus);
       }
@@ -793,12 +795,11 @@ export default function ICActions() {
 
     const total = actualActions.length;
     const completed = actualActions.filter(a => a.status === 'COMPLETED').length;
-    const inProgress = actualActions.filter(a => a.status === 'IN_PROGRESS').length;
+    const inProgress = actualActions.filter(a => ['IN_PROGRESS', 'ONGOING'].includes(a.status)).length;
     const notStarted = actualActions.filter(a => a.status === 'NOT_STARTED').length;
     const delayed = actualActions.filter(a =>
-      a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
+      a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING', 'IN_PROGRESS'].includes(a.status)
     ).length;
-    const ongoing = actualActions.filter(a => a.status === 'ONGOING').length;
     const continuousActions = actualActions.filter(a => a.is_continuous === true).length;
 
     return {
@@ -812,8 +813,6 @@ export default function ICActions() {
       notStartedPercent: total > 0 ? Math.round((notStarted / total) * 100) : 0,
       delayed,
       delayedPercent: total > 0 ? Math.round((delayed / total) * 100) : 0,
-      ongoing,
-      ongoingPercent: total > 0 ? Math.round((ongoing / total) * 100) : 0,
       continuousActions
     };
   }, [baseFilteredActions]);
@@ -825,7 +824,7 @@ export default function ICActions() {
       name: string;
       standards: Set<string>;
       conditions: Set<string>;
-      conditionsWithReasonableAssurance: number;
+      reasonableAssuranceConditions: Set<string>;
       actions: any[];
     }>();
 
@@ -839,7 +838,7 @@ export default function ICActions() {
           name: action.component_name,
           standards: new Set(),
           conditions: new Set(),
-          conditionsWithReasonableAssurance: 0,
+          reasonableAssuranceConditions: new Set(),
           actions: []
         });
       }
@@ -854,7 +853,7 @@ export default function ICActions() {
         comp.conditions.add(action.condition_id);
 
         if (action.status === 'NO_ACTION' && action.condition_provides_reasonable_assurance) {
-          comp.conditionsWithReasonableAssurance++;
+          comp.reasonableAssuranceConditions.add(action.condition_id);
         }
       }
 
@@ -867,10 +866,10 @@ export default function ICActions() {
       const actionList = comp.actions;
       const continuousCount = actionList.filter(a => a.is_continuous === true).length;
       const notStartedCount = actionList.filter(a => a.is_continuous !== true && a.status === 'NOT_STARTED').length;
-      const ongoingCount = actionList.filter(a => a.is_continuous !== true && a.status === 'IN_PROGRESS').length;
+      const ongoingCount = actionList.filter(a => a.is_continuous !== true && ['IN_PROGRESS', 'ONGOING'].includes(a.status)).length;
       const delayedCount = actionList.filter(a =>
         a.is_continuous !== true &&
-        a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
+        a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING', 'IN_PROGRESS'].includes(a.status)
       ).length;
 
       return {
@@ -879,7 +878,7 @@ export default function ICActions() {
         name: comp.name,
         standardCount: comp.standards.size,
         conditionCount: comp.conditions.size,
-        conditionsWithReasonableAssurance: comp.conditionsWithReasonableAssurance,
+        conditionsWithReasonableAssurance: comp.reasonableAssuranceConditions.size,
         actionCount: actionList.length,
         continuousCount,
         notStartedCount,
@@ -1847,7 +1846,6 @@ export default function ICActions() {
               <option value="COMPLETED">Tamamlandı</option>
               <option value="DELAYED">Geciken</option>
               <option value="CONTINUOUS">Sürekli</option>
-              <option value="ONGOING">Sürekli (ONGOING)</option>
               <option value="NO_ACTION">Mevcut Durum Sağlanıyor</option>
             </select>
 
@@ -2164,7 +2162,6 @@ export default function ICActions() {
                 <option value="IN_PROGRESS">Devam Ediyor</option>
                 <option value="COMPLETED">Tamamlandı</option>
                 <option value="CANCELLED">İptal</option>
-                <option value="ONGOING">Sürekli</option>
               </select>
             </div>
 
