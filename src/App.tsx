@@ -173,7 +173,13 @@ const renderPage = () => {
     if (currentPath.startsWith('quality-management/processes/') && currentPath !== 'quality-management/processes') {
       return <QualityProcessDetail />;
     }
+    if (currentPath.startsWith('internal-control/processes/') && currentPath !== 'internal-control/processes') {
+      return <QualityProcessDetail />;
+    }
     if (currentPath.startsWith('quality-management/dof/') && currentPath !== 'quality-management/dof') {
+      return <QualityDOFDetail />;
+    }
+    if (currentPath.startsWith('internal-control/dof/') && currentPath !== 'internal-control/dof') {
       return <QualityDOFDetail />;
     }
     if (currentPath.startsWith('quality-management/audits/') && currentPath !== 'quality-management/audits') {
@@ -395,6 +401,12 @@ const renderPage = () => {
         return <ICMeetings />;
       case 'internal-control/assurance':
         return <ICAssuranceStatements />;
+      case 'internal-control/processes':
+        return <QualityProcesses />;
+      case 'internal-control/process-kpis':
+        return <QualityProcessKPITracking />;
+      case 'internal-control/dof':
+        return <QualityDOF />;
       case 'internal-control/reports':
         return <ICReports />;
       case 'settings':

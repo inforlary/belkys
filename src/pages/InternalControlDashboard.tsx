@@ -10,7 +10,10 @@ import {
   TrendingUp,
   Award,
   ArrowRight,
-  BarChart3
+  BarChart3,
+  FileText,
+  ClipboardCheck,
+  Star
 } from 'lucide-react';
 import {
   RadarChart,
@@ -80,6 +83,19 @@ interface AssuranceStats {
   executive_status: string;
 }
 
+interface QualityDashboardStats {
+  openDOF: number;
+  inProgressDOF: number;
+  closedDOF: number;
+  plannedAudits: number;
+  completedAudits: number;
+  inProgressAudits: number;
+  totalProcesses: number;
+  overdueActions: number;
+  averageSatisfaction: number;
+  totalFeedback: number;
+}
+
 export default function InternalControlDashboard() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
@@ -92,6 +108,7 @@ export default function InternalControlDashboard() {
   const [meetingInfo, setMeetingInfo] = useState<MeetingInfo | null>(null);
   const [assuranceStats, setAssuranceStats] = useState<AssuranceStats | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [qualityStats, setQualityStats] = useState<QualityDashboardStats | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -127,7 +144,8 @@ export default function InternalControlDashboard() {
         fetchActionStatus(orgId, planId),
         fetchStandardsCompliance(orgId, planId),
         fetchIKYKDecisions(orgId),
-        fetchAssuranceStats(orgId)
+        fetchAssuranceStats(orgId),
+        fetchQualityStats(orgId)
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -389,6 +407,66 @@ export default function InternalControlDashboard() {
       pending_departments: pendingDepts,
       executive_status: executiveStatement?.status || 'Beklemede'
     });
+  };
+
+  const fetchQualityStats = async (orgId: string) => {
+    try {
+      const [dofCounts, auditCounts, processCount, feedbackData] = await Promise.all([
+        supabase
+          .from('qm_nonconformities')
+          .select('status')
+          .eq('organization_id', orgId),
+        supabase
+          .from('qm_audits')
+          .select('status')
+          .eq('organization_id', orgId)
+          .then(res => res.error ? { data: [] } : res),
+        supabase
+          .from('qm_processes')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', orgId)
+          .eq('status', 'ACTIVE')
+          .then(res => res.error ? { count: 0 } : res),
+        supabase
+          .from('qm_customer_feedback')
+          .select('satisfaction_score')
+          .eq('organization_id', orgId)
+          .then(res => res.error ? { data: [] } : res)
+      ]);
+
+      const openDOF = dofCounts.data?.filter(d => d.status === 'OPEN' || d.status === 'ANALYSIS').length || 0;
+      const inProgressDOF = dofCounts.data?.filter(d =>
+        d.status === 'IN_PROGRESS' ||
+        d.status === 'ACTION_PLANNED' ||
+        d.status === 'VERIFICATION' ||
+        d.status === 'EFFECTIVENESS'
+      ).length || 0;
+      const closedDOF = dofCounts.data?.filter(d => d.status === 'CLOSED').length || 0;
+
+      const plannedAudits = auditCounts.data?.filter(a => a.status === 'PLANNED').length || 0;
+      const inProgressAudits = auditCounts.data?.filter(a => a.status === 'IN_PROGRESS').length || 0;
+      const completedAudits = auditCounts.data?.filter(a => a.status === 'COMPLETED').length || 0;
+
+      const scores = feedbackData.data?.filter(f => f.satisfaction_score).map(f => f.satisfaction_score) || [];
+      const averageSatisfaction = scores.length > 0
+        ? scores.reduce((a, b) => a + b, 0) / scores.length
+        : 0;
+
+      setQualityStats({
+        openDOF,
+        inProgressDOF,
+        closedDOF,
+        plannedAudits,
+        completedAudits,
+        inProgressAudits,
+        totalProcesses: processCount.count || 0,
+        overdueActions: 0,
+        averageSatisfaction: Math.round(averageSatisfaction * 10) / 10,
+        totalFeedback: feedbackData.data?.length || 0
+      });
+    } catch (error) {
+      console.error('Error loading quality stats:', error);
+    }
   };
 
   if (loading) {
@@ -733,6 +811,180 @@ export default function InternalControlDashboard() {
             Güvence beyanı verisi bulunamadı
           </div>
         )}
+      </div>
+
+      <div className="border-t-4 border-blue-100 pt-6 mt-8">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Süreç Yönetimi</h2>
+          <p className="text-gray-600">Kalite yönetim sistemi durum özeti</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600">Açık DÖF</span>
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
+            <div className="text-3xl font-bold text-gray-900">{qualityStats?.openDOF || 0}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                <span>Devam: {qualityStats?.inProgressDOF || 0}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span>Kapalı: {qualityStats?.closedDOF || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600">Tetkikler</span>
+              <ClipboardCheck className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="text-3xl font-bold text-gray-900">
+              {qualityStats?.completedAudits || 0} / {(qualityStats?.plannedAudits || 0) + (qualityStats?.inProgressAudits || 0) + (qualityStats?.completedAudits || 0)}
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              Tamamlanan / Toplam
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600">Aktif Süreçler</span>
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="text-3xl font-bold text-gray-900">{qualityStats?.totalProcesses || 0}</div>
+            <p className="mt-2 text-xs text-gray-500">Tanımlı süreç</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600">Memnuniyet Skoru</span>
+              <Star className="w-5 h-5 text-yellow-500" />
+            </div>
+            <div className="text-3xl font-bold text-gray-900">{qualityStats?.averageSatisfaction || 0}</div>
+            <p className="mt-2 text-xs text-gray-500">5 üzerinden ortalama</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">DÖF Durum Özeti</h2>
+              <button
+                onClick={() => navigate('/internal-control/dof')}
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                Tümünü Gör
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <span className="font-medium text-gray-900">Açık</span>
+                </div>
+                <span className="text-2xl font-bold text-red-600">{qualityStats?.openDOF || 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-yellow-600" />
+                  <span className="font-medium text-gray-900">Devam Ediyor</span>
+                </div>
+                <span className="text-2xl font-bold text-yellow-600">{qualityStats?.inProgressDOF || 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <span className="font-medium text-gray-900">Kapatıldı</span>
+                </div>
+                <span className="text-2xl font-bold text-green-600">{qualityStats?.closedDOF || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Tetkik Durumu</h2>
+              <button
+                onClick={() => navigate('/quality-management/audits')}
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                Tümünü Gör
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-gray-900">Planlanan</span>
+                </div>
+                <span className="text-2xl font-bold text-blue-600">{qualityStats?.plannedAudits || 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-yellow-600" />
+                  <span className="font-medium text-gray-900">Devam Ediyor</span>
+                </div>
+                <span className="text-2xl font-bold text-yellow-600">{qualityStats?.inProgressAudits || 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <span className="font-medium text-gray-900">Tamamlandı</span>
+                </div>
+                <span className="text-2xl font-bold text-green-600">{qualityStats?.completedAudits || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6 mt-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Hızlı Erişim</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => navigate('/internal-control/processes')}
+              className="text-left p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
+            >
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-6 h-6 text-blue-600" />
+                <div>
+                  <div className="font-medium text-gray-900">Süreç Yönetimi</div>
+                  <div className="text-sm text-gray-600">{qualityStats?.totalProcesses || 0} aktif süreç</div>
+                </div>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/quality-management/documents')}
+              className="text-left p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-green-600" />
+                <div>
+                  <div className="font-medium text-gray-900">Doküman Yönetimi</div>
+                  <div className="text-sm text-gray-600">Prosedür ve talimatlar</div>
+                </div>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/quality-management/customer-satisfaction')}
+              className="text-left p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
+            >
+              <div className="flex items-center gap-3">
+                <Star className="w-6 h-6 text-yellow-600" />
+                <div>
+                  <div className="font-medium text-gray-900">Müşteri Memnuniyeti</div>
+                  <div className="text-sm text-gray-600">{qualityStats?.totalFeedback || 0} geri bildirim</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
