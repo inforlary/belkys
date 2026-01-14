@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { ArrowLeft, Info, BarChart3, Shield, Activity, TrendingUp, History, CreditCard as Edit2, Trash2, Plus, X, Save, AlertTriangle, MoreVertical, ChevronDown, Users } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Risk {
   id: string;
@@ -54,6 +55,20 @@ interface Risk {
   related_goal?: { code: string; title: string };
   related_activity?: { code: string; name: string };
   related_process?: { code: string; name: string };
+}
+
+interface RiskAssessment {
+  id: string;
+  assessed_at: string;
+  assessed_by: string;
+  assessed_by_name?: string;
+  inherent_probability: number;
+  inherent_impact: number;
+  inherent_score: number;
+  residual_probability: number;
+  residual_impact: number;
+  residual_score: number;
+  notes: string | null;
 }
 
 interface RiskControl {
@@ -231,6 +246,7 @@ export default function RiskDetail() {
   const [departmentImpacts, setDepartmentImpacts] = useState<DepartmentImpact[]>([]);
   const [treatments, setTreatments] = useState<RiskTreatment[]>([]);
   const [indicators, setIndicators] = useState<RiskIndicator[]>([]);
+  const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -266,7 +282,7 @@ export default function RiskDetail() {
     try {
       setLoading(true);
 
-      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, departmentImpactsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes] = await Promise.all([
+      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, departmentImpactsRes, assessmentsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -312,6 +328,14 @@ export default function RiskDetail() {
           .eq('risk_id', riskId)
           .order('impact_level', { ascending: false }),
         supabase
+          .from('rm_risk_assessments')
+          .select(`
+            *,
+            assessed_by_profile:profiles!assessed_by(full_name)
+          `)
+          .eq('risk_id', riskId)
+          .order('assessed_at', { ascending: false }),
+        supabase
           .from('departments')
           .select('*')
           .eq('organization_id', profile?.organization_id)
@@ -342,6 +366,12 @@ export default function RiskDetail() {
 
       setRisk(riskRes.data);
       setControls(controlsRes.data || []);
+
+      const assessmentsData = (assessmentsRes.data || []).map((a: any) => ({
+        ...a,
+        assessed_by_name: a.assessed_by_profile?.full_name
+      }));
+      setAssessments(assessmentsData);
       setTreatments(treatmentsRes.data || []);
       setIndicators(indicatorsRes.data || []);
       setDepartmentImpacts(departmentImpactsRes.data || []);
@@ -516,11 +546,11 @@ export default function RiskDetail() {
   const tabs = [
     { id: 'general', label: 'Genel Bilgiler', icon: Info },
     { id: 'assessment', label: 'Değerlendirme', icon: BarChart3 },
+    { id: 'history', label: 'Değerlendirme Tarihçesi', icon: History },
     { id: 'controls', label: 'Kontroller', icon: Shield },
     { id: 'treatments', label: 'Faaliyetler', icon: Activity },
     ...(risk?.risk_relation === 'CORPORATE' ? [{ id: 'impacts', label: 'Birim Etkileri', icon: Users }] : []),
-    { id: 'indicators', label: 'Göstergeler', icon: TrendingUp },
-    { id: 'history', label: 'Tarihçe', icon: History }
+    { id: 'indicators', label: 'Göstergeler', icon: TrendingUp }
   ];
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'director';
@@ -1510,11 +1540,130 @@ export default function RiskDetail() {
           )}
 
           {activeTab === 'history' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Değişiklik Geçmişi</h3>
-              <div className="text-center py-12 text-gray-500">
-                <History className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                <p>Değişiklik geçmişi yakında eklenecek</p>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Değerlendirme Tarihçesi</h3>
+
+                {assessments.length > 0 ? (
+                  <>
+                    <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm text-gray-600">Son Değerlendirme</div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {new Date(assessments[0].assessed_at).toLocaleDateString('tr-TR', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Değerlendiren</div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {assessments[0].assessed_by_name || '-'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Artık Risk Skoru</div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            {assessments[0].residual_score}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+                      <h4 className="text-base font-semibold text-gray-900 mb-4">Risk Skoru Değişim Grafiği</h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart
+                          data={[...assessments].reverse().map(a => ({
+                            date: new Date(a.assessed_at).toLocaleDateString('tr-TR', { month: 'short', day: 'numeric' }),
+                            'Doğal Risk': a.inherent_score,
+                            'Artık Risk': a.residual_score
+                          }))}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis domain={[0, 25]} />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="Doğal Risk" stroke="#ef4444" strokeWidth={2} />
+                          <Line type="monotone" dataKey="Artık Risk" stroke="#3b82f6" strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Tarih
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Değerlendiren
+                            </th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Doğal Risk
+                            </th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Artık Risk
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Not
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {assessments.map((assessment) => (
+                            <tr key={assessment.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {new Date(assessment.assessed_at).toLocaleDateString('tr-TR', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {assessment.assessed_by_name || '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <div className="text-sm text-gray-900">
+                                  {assessment.inherent_probability} × {assessment.inherent_impact} =
+                                  <span className="ml-2 font-semibold text-red-600">
+                                    {assessment.inherent_score}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <div className="text-sm text-gray-900">
+                                  {assessment.residual_probability} × {assessment.residual_impact} =
+                                  <span className="ml-2 font-semibold text-blue-600">
+                                    {assessment.residual_score}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {assessment.notes || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <History className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>Henüz değerlendirme tarihçesi bulunmuyor</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
