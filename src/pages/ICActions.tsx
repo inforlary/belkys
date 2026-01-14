@@ -607,6 +607,8 @@ export default function ICActions() {
         filtered = filtered.filter(a =>
           a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
         );
+      } else if (selectedStatus === 'CONTINUOUS') {
+        filtered = filtered.filter(a => a.is_continuous === true);
       } else {
         filtered = filtered.filter(a => a.status === selectedStatus);
       }
@@ -864,9 +866,10 @@ export default function ICActions() {
     return Array.from(componentMap.values()).map(comp => {
       const actionList = comp.actions;
       const continuousCount = actionList.filter(a => a.is_continuous === true).length;
-      const notStartedCount = actionList.filter(a => a.status === 'NOT_STARTED').length;
-      const ongoingCount = actionList.filter(a => a.status === 'ONGOING').length;
+      const notStartedCount = actionList.filter(a => a.is_continuous !== true && a.status === 'NOT_STARTED').length;
+      const ongoingCount = actionList.filter(a => a.is_continuous !== true && a.status === 'ONGOING').length;
       const delayedCount = actionList.filter(a =>
+        a.is_continuous !== true &&
         a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
       ).length;
 
@@ -1819,17 +1822,16 @@ export default function ICActions() {
             </select>
 
             <select
-              value={selectedStatus === 'NO_ACTION' ? 'NO_ACTION' : ''}
-              onChange={(e) => {
-                if (e.target.value === 'NO_ACTION') {
-                  handleStatusFilter('NO_ACTION');
-                } else {
-                  handleStatusFilter('');
-                }
-              }}
+              value={selectedStatus}
+              onChange={(e) => handleStatusFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Tüm Durumlar</option>
+              <option value="NOT_STARTED">Başlamadı</option>
+              <option value="ONGOING">Devam Ediyor</option>
+              <option value="COMPLETED">Tamamlandı</option>
+              <option value="DELAYED">Geciken</option>
+              <option value="CONTINUOUS">Sürekli</option>
               <option value="NO_ACTION">Mevcut Durum Sağlanıyor</option>
             </select>
 
