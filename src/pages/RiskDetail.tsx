@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
-import { ArrowLeft, Info, BarChart3, Shield, Activity, TrendingUp, History, CreditCard as Edit2, Trash2, Plus, X, Save, AlertTriangle, MoreVertical, ChevronDown, Users } from 'lucide-react';
+import { ArrowLeft, Info, BarChart3, Shield, Activity, TrendingUp, History, CreditCard as Edit2, Trash2, Plus, X, Save, AlertTriangle, MoreVertical, ChevronDown, Users, Network, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Risk {
@@ -69,6 +69,18 @@ interface RiskAssessment {
   residual_impact: number;
   residual_score: number;
   notes: string | null;
+}
+
+interface RiskRelation {
+  id: string;
+  relation_type: string;
+  description: string | null;
+  direction: 'OUTGOING' | 'INCOMING';
+  related_risk_id: string;
+  related_risk_code: string;
+  related_risk_name: string;
+  related_risk_level: string;
+  related_risk_score: number;
 }
 
 interface RiskControl {
@@ -272,6 +284,15 @@ export default function RiskDetail() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
 
+  const [riskRelations, setRiskRelations] = useState<RiskRelation[]>([]);
+  const [showRelationModal, setShowRelationModal] = useState(false);
+  const [relationFormData, setRelationFormData] = useState({
+    target_risk_id: '',
+    relation_type: 'TRIGGERS',
+    description: ''
+  });
+  const [availableRisks, setAvailableRisks] = useState<any[]>([]);
+
   useEffect(() => {
     if (riskId && profile?.organization_id) {
       loadData();
@@ -282,7 +303,7 @@ export default function RiskDetail() {
     try {
       setLoading(true);
 
-      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, departmentImpactsRes, assessmentsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes] = await Promise.all([
+      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, departmentImpactsRes, assessmentsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes, relationsRes, availableRisksRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -359,6 +380,14 @@ export default function RiskDetail() {
           .from('goals')
           .select('id, code, title, department_id')
           .eq('organization_id', profile?.organization_id)
+          .order('code'),
+        supabase.rpc('get_related_risks', { p_risk_id: riskId }),
+        supabase
+          .from('risks')
+          .select('id, code, name, risk_level, residual_score')
+          .eq('organization_id', profile?.organization_id)
+          .eq('is_active', true)
+          .neq('id', riskId)
           .order('code')
       ]);
 
@@ -380,6 +409,8 @@ export default function RiskDetail() {
       setCategories(categoriesRes.data || []);
       setRiskCategories((riskCategoriesRes.data || []).map((m: any) => m.category_id));
       setGoals(goalsRes.data || []);
+      setRiskRelations(relationsRes.data || []);
+      setAvailableRisks(availableRisksRes.data || []);
     } catch (error) {
       console.error('Error loading risk:', error);
     } finally {
@@ -553,7 +584,8 @@ export default function RiskDetail() {
     { id: 'controls', label: 'Kontroller', icon: Shield },
     { id: 'treatments', label: 'Faaliyetler', icon: Activity },
     ...(risk?.risk_relation === 'CORPORATE' ? [{ id: 'impacts', label: 'Birim Etkileri', icon: Users }] : []),
-    { id: 'indicators', label: 'Göstergeler', icon: TrendingUp }
+    { id: 'indicators', label: 'Göstergeler', icon: TrendingUp },
+    { id: 'relations', label: 'Risk İlişkileri', icon: Network }
   ];
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'director';
@@ -1868,8 +1900,336 @@ export default function RiskDetail() {
               </div>
             </div>
           )}
+
+          {activeTab === 'relations' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Risk İlişkileri</h3>
+                  <p className="text-sm text-gray-600 mt-1">Bu risk ile diğer riskler arasındaki ilişkiler</p>
+                </div>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      setRelationFormData({
+                        target_risk_id: '',
+                        relation_type: 'TRIGGERS',
+                        description: ''
+                      });
+                      setShowRelationModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                    İlişki Ekle
+                  </button>
+                )}
+              </div>
+
+              {riskRelations.length > 0 ? (
+                <>
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="grid grid-cols-2 gap-6 p-6">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <ArrowRight className="w-4 h-4 text-green-600" />
+                          Bu Riskten Etkilenen
+                        </h4>
+                        <div className="space-y-3">
+                          {riskRelations
+                            .filter(r => r.direction === 'OUTGOING')
+                            .map(relation => (
+                              <div key={relation.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-900">{relation.related_risk_code}</span>
+                                      <span className={`text-xs px-2 py-0.5 rounded ${getRiskScoreBadge(relation.related_risk_score).color}`}>
+                                        {relation.related_risk_level}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mt-1">{relation.related_risk_name}</p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <span className="text-xs font-medium text-blue-600">
+                                        {relation.relation_type === 'TRIGGERS' && '→ Tetikler'}
+                                        {relation.relation_type === 'INCREASES' && '↗ Artırır'}
+                                        {relation.relation_type === 'DECREASES' && '↘ Azaltır'}
+                                        {relation.relation_type === 'RELATED' && '↔ İlişkili'}
+                                      </span>
+                                      {relation.description && (
+                                        <span className="text-xs text-gray-500">• {relation.description}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {isAdmin && (
+                                    <button
+                                      onClick={async () => {
+                                        if (confirm('Bu ilişkiyi silmek istediğinize emin misiniz?')) {
+                                          try {
+                                            const { error } = await supabase
+                                              .from('rm_risk_relations')
+                                              .delete()
+                                              .eq('id', relation.id);
+                                            if (error) throw error;
+                                            await loadData();
+                                          } catch (error) {
+                                            console.error('Error deleting relation:', error);
+                                            alert('İlişki silinemedi!');
+                                          }
+                                        }
+                                      }}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          {riskRelations.filter(r => r.direction === 'OUTGOING').length === 0 && (
+                            <p className="text-sm text-gray-500 italic">Başka risk tetiklemiyor</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <ArrowRight className="w-4 h-4 text-orange-600 transform rotate-180" />
+                          Bu Riski Etkileyen
+                        </h4>
+                        <div className="space-y-3">
+                          {riskRelations
+                            .filter(r => r.direction === 'INCOMING')
+                            .map(relation => (
+                              <div key={relation.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-900">{relation.related_risk_code}</span>
+                                      <span className={`text-xs px-2 py-0.5 rounded ${getRiskScoreBadge(relation.related_risk_score).color}`}>
+                                        {relation.related_risk_level}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mt-1">{relation.related_risk_name}</p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <span className="text-xs font-medium text-orange-600">
+                                        {relation.relation_type === 'TRIGGERS' && '← Tarafından tetiklenir'}
+                                        {relation.relation_type === 'TRIGGERED_BY' && '← Tetiklenir'}
+                                        {relation.relation_type === 'INCREASES' && '↗ Tarafından artırılır'}
+                                        {relation.relation_type === 'DECREASES' && '↘ Tarafından azaltılır'}
+                                        {relation.relation_type === 'RELATED' && '↔ İlişkili'}
+                                      </span>
+                                      {relation.description && (
+                                        <span className="text-xs text-gray-500">• {relation.description}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {isAdmin && (
+                                    <button
+                                      onClick={async () => {
+                                        if (confirm('Bu ilişkiyi silmek istediğinize emin misiniz?')) {
+                                          try {
+                                            const { error } = await supabase
+                                              .from('rm_risk_relations')
+                                              .delete()
+                                              .eq('id', relation.id);
+                                            if (error) throw error;
+                                            await loadData();
+                                          } catch (error) {
+                                            console.error('Error deleting relation:', error);
+                                            alert('İlişki silinemedi!');
+                                          }
+                                        }
+                                      }}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          {riskRelations.filter(r => r.direction === 'INCOMING').length === 0 && (
+                            <p className="text-sm text-gray-500 italic">Başka risk tarafından etkilenmiyor</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(riskRelations.filter(r => r.direction === 'OUTGOING' && r.relation_type === 'TRIGGERS').length > 0) && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-orange-900">
+                            Dikkat: Bu risk gerçekleşirse {riskRelations.filter(r => r.direction === 'OUTGOING' && r.relation_type === 'TRIGGERS').length} risk daha tetiklenebilir!
+                          </p>
+                          <p className="text-xs text-orange-700 mt-1">
+                            Bu riskin gerçekleşme olasılığını azaltmak, diğer risklerin de önüne geçecektir.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <Network className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-500">Henüz risk ilişkisi tanımlanmamış</p>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setShowRelationModal(true)}
+                      className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      İlk ilişkiyi oluştur
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Card>
+
+      {showRelationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Risk İlişkisi Ekle</h3>
+              <button
+                onClick={() => {
+                  setShowRelationModal(false);
+                  setRelationFormData({
+                    target_risk_id: '',
+                    relation_type: 'TRIGGERS',
+                    description: ''
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  İlişkili Risk <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={relationFormData.target_risk_id}
+                  onChange={(e) => setRelationFormData({ ...relationFormData, target_risk_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Risk Seçin --</option>
+                  {availableRisks.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.code} - {r.name} ({r.risk_level})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  İlişki Türü <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={relationFormData.relation_type}
+                  onChange={(e) => setRelationFormData({ ...relationFormData, relation_type: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="TRIGGERS">Bu risk şunu tetikler</option>
+                  <option value="TRIGGERED_BY">Bu risk şundan tetiklenir</option>
+                  <option value="INCREASES">Bu risk şunu artırır</option>
+                  <option value="DECREASES">Bu risk şunu azaltır</option>
+                  <option value="RELATED">İlişkili</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {relationFormData.relation_type === 'TRIGGERS' && 'Bu risk gerçekleşirse seçilen risk de gerçekleşebilir'}
+                  {relationFormData.relation_type === 'TRIGGERED_BY' && 'Seçilen risk gerçekleşirse bu risk de gerçekleşebilir'}
+                  {relationFormData.relation_type === 'INCREASES' && 'Bu risk, seçilen riskin olasılığını veya etkisini artırır'}
+                  {relationFormData.relation_type === 'DECREASES' && 'Bu risk, seçilen riskin olasılığını veya etkisini azaltır'}
+                  {relationFormData.relation_type === 'RELATED' && 'İki risk birbiriyle ilişkili'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Açıklama (Opsiyonel)
+                </label>
+                <textarea
+                  value={relationFormData.description}
+                  onChange={(e) => setRelationFormData({ ...relationFormData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="İlişkinin detaylarını açıklayın..."
+                />
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setShowRelationModal(false);
+                  setRelationFormData({
+                    target_risk_id: '',
+                    relation_type: 'TRIGGERS',
+                    description: ''
+                  });
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={async () => {
+                  if (!relationFormData.target_risk_id) {
+                    alert('Lütfen bir risk seçin!');
+                    return;
+                  }
+
+                  try {
+                    const { error } = await supabase
+                      .from('rm_risk_relations')
+                      .insert({
+                        organization_id: profile?.organization_id,
+                        source_risk_id: riskId,
+                        target_risk_id: relationFormData.target_risk_id,
+                        relation_type: relationFormData.relation_type,
+                        description: relationFormData.description || null,
+                        created_by: profile?.id
+                      });
+
+                    if (error) throw error;
+
+                    alert('İlişki başarıyla eklendi!');
+                    setShowRelationModal(false);
+                    setRelationFormData({
+                      target_risk_id: '',
+                      relation_type: 'TRIGGERS',
+                      description: ''
+                    });
+                    await loadData();
+                  } catch (error: any) {
+                    console.error('Error creating relation:', error);
+                    if (error.message?.includes('circular')) {
+                      alert('Bu ilişki dairesel bir bağımlılık oluşturacağı için eklenemez!');
+                    } else {
+                      alert('İlişki eklenirken bir hata oluştu!');
+                    }
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <Save className="w-4 h-4" />
+                İlişki Ekle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">

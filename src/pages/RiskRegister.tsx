@@ -69,6 +69,7 @@ interface Risk {
     code: string;
     name: string;
   };
+  relation_count?: number;
 }
 
 interface RiskCriterion {
@@ -311,7 +312,7 @@ export default function RiskRegister() {
     try {
       setLoading(true);
 
-      const [risksRes, categoriesRes, departmentsRes, objectivesRes, goalsRes, activitiesRes, processesRes, profilesRes, criteriaRes] = await Promise.all([
+      const [risksRes, categoriesRes, departmentsRes, objectivesRes, goalsRes, activitiesRes, processesRes, profilesRes, criteriaRes, relationCountsRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -366,7 +367,11 @@ export default function RiskRegister() {
           .select('*')
           .eq('organization_id', profile?.organization_id)
           .order('criteria_type')
-          .order('level')
+          .order('level'),
+        supabase
+          .from('rm_risk_relations')
+          .select('source_risk_id, target_risk_id')
+          .eq('organization_id', profile?.organization_id)
       ]);
 
       if (risksRes.error) throw risksRes.error;
@@ -378,7 +383,18 @@ export default function RiskRegister() {
       if (processesRes.error) throw processesRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
-      setRisks(risksRes.data || []);
+      const relationCounts = new Map<string, number>();
+      (relationCountsRes.data || []).forEach((rel: any) => {
+        relationCounts.set(rel.source_risk_id, (relationCounts.get(rel.source_risk_id) || 0) + 1);
+        relationCounts.set(rel.target_risk_id, (relationCounts.get(rel.target_risk_id) || 0) + 1);
+      });
+
+      const risksWithRelations = (risksRes.data || []).map((risk: Risk) => ({
+        ...risk,
+        relation_count: relationCounts.get(risk.id) || 0
+      }));
+
+      setRisks(risksWithRelations);
       setCategories(categoriesRes.data || []);
       setDepartments(departmentsRes.data || []);
       setObjectives(objectivesRes.data || []);
@@ -935,6 +951,12 @@ export default function RiskRegister() {
                   Kontrol
                 </th>
                 <th
+                  onClick={() => handleSort('relation_count')}
+                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  İlişkiler {sortConfig.key === 'relation_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
                   onClick={() => handleSort('inherent_score')}
                   className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 >
@@ -960,7 +982,7 @@ export default function RiskRegister() {
             <tbody className="bg-white divide-y divide-gray-200 relative">
               {sortedRisks.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <AlertTriangle className="w-12 h-12 text-gray-300" />
                       <p>Henüz risk kaydı bulunmuyor.</p>
@@ -1059,6 +1081,16 @@ export default function RiskRegister() {
                             </span>
                           );
                         })()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {risk.relation_count && risk.relation_count > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                            <span>🔗</span>
+                            <span>{risk.relation_count}</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span
