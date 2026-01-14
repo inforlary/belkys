@@ -84,6 +84,8 @@ interface ActivityCost {
   program_id: string;
   program_code: string;
   program_name: string;
+  department_id?: string;
+  department_name?: string;
   amount_2026: number;
   amount_2027: number;
   amount_2028: number;
@@ -304,10 +306,14 @@ export default function BudgetPerformanceInformation() {
       const program = programs.get(subProgram.program_id);
       if (!program) return;
 
+      const department = departments.find(d => d.id === just.department_id);
+
       const items = just.budget_needs?.items || [];
 
-      if (!activityCostsMap.has(activity.id)) {
-        activityCostsMap.set(activity.id, {
+      const uniqueKey = `${activity.id}_${just.department_id}`;
+
+      if (!activityCostsMap.has(uniqueKey)) {
+        activityCostsMap.set(uniqueKey, {
           activity_id: activity.id,
           activity_code: activity.activity_code,
           activity_name: activity.activity_name,
@@ -317,6 +323,8 @@ export default function BudgetPerformanceInformation() {
           program_id: program.id,
           program_code: program.code,
           program_name: program.name,
+          department_id: just.department_id,
+          department_name: department?.name || 'Bilinmeyen Müdürlük',
           amount_2026: 0,
           amount_2027: 0,
           amount_2028: 0,
@@ -324,7 +332,7 @@ export default function BudgetPerformanceInformation() {
         });
       }
 
-      const actCost = activityCostsMap.get(activity.id)!;
+      const actCost = activityCostsMap.get(uniqueKey)!;
 
       items.forEach(item => {
         actCost.amount_2026 += item.amount_2026 || 0;
@@ -841,6 +849,21 @@ export default function BudgetPerformanceInformation() {
   const programSummary = getProgramSummary();
   const subProgramSummary = getSubProgramSummary();
 
+  const getCounts = () => {
+    const activityCosts = getActivityCosts();
+    const uniquePrograms = new Set(activityCosts.map(ac => ac.program_id));
+    const uniqueSubPrograms = new Set(activityCosts.map(ac => ac.sub_program_id));
+    const uniqueActivities = new Set(activityCosts.map(ac => ac.activity_id));
+
+    return {
+      programCount: uniquePrograms.size,
+      subProgramCount: uniqueSubPrograms.size,
+      activityCount: uniqueActivities.size
+    };
+  };
+
+  const counts = getCounts();
+
   return (
     <div className="p-6 space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -923,6 +946,44 @@ export default function BudgetPerformanceInformation() {
               <option value="program-subprogram">Program + Alt Program</option>
               <option value="program-subprogram-activity">Program + Alt Program + Faaliyet</option>
             </select>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Program Sayısı</p>
+                <p className="text-2xl font-bold text-blue-700 mt-1">{counts.programCount}</p>
+              </div>
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <FileText className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-600 font-medium">Alt Program Sayısı</p>
+                <p className="text-2xl font-bold text-green-700 mt-1">{counts.subProgramCount}</p>
+              </div>
+              <div className="bg-green-100 p-3 rounded-lg">
+                <FileText className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-purple-600 font-medium">Faaliyet Sayısı</p>
+                <p className="text-2xl font-bold text-purple-700 mt-1">{counts.activityCount}</p>
+              </div>
+              <div className="bg-purple-100 p-3 rounded-lg">
+                <FileText className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1031,6 +1092,9 @@ export default function BudgetPerformanceInformation() {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Müdürlük
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Program
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1045,8 +1109,11 @@ export default function BudgetPerformanceInformation() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {activityCosts.map((ac) => (
-                          <tr key={ac.activity_id} className="hover:bg-gray-50">
+                        {activityCosts.map((ac, idx) => (
+                          <tr key={`${ac.activity_id}_${ac.department_id}_${idx}`} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-700">
+                              {ac.department_name}
+                            </td>
                             <td className="px-6 py-4 text-sm text-gray-700">
                               {ac.program_code} - {ac.program_name}
                             </td>
@@ -1066,7 +1133,7 @@ export default function BudgetPerformanceInformation() {
                           </tr>
                         ))}
                         <tr className="bg-purple-50 font-bold">
-                          <td colSpan={3} className="px-6 py-4 text-sm text-gray-900">
+                          <td colSpan={4} className="px-6 py-4 text-sm text-gray-900">
                             TOPLAM
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-purple-700">
@@ -1315,6 +1382,9 @@ export default function BudgetPerformanceInformation() {
                                         <thead className="bg-gray-100">
                                           <tr>
                                             <th className="px-10 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                              Müdürlük
+                                            </th>
+                                            <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                               Faaliyet Kodu
                                             </th>
                                             <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1326,9 +1396,12 @@ export default function BudgetPerformanceInformation() {
                                           </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-100">
-                                          {subProgramActivities.map((ac) => (
-                                            <tr key={ac.activity_id} className="hover:bg-gray-50">
-                                              <td className="px-10 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                          {subProgramActivities.map((ac, idx) => (
+                                            <tr key={`${ac.activity_id}_${ac.department_id}_${idx}`} className="hover:bg-gray-50">
+                                              <td className="px-10 py-3 text-sm text-gray-700">
+                                                {ac.department_name}
+                                              </td>
+                                              <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 {ac.activity_code}
                                               </td>
                                               <td className="px-6 py-3 text-sm text-gray-700">
