@@ -17,6 +17,7 @@ interface Risk {
   objective_id: string;
   goal_id: string;
   risk_source: string;
+  risk_relation: string;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -110,6 +111,16 @@ function getTreatmentStatusBadge(status: string) {
     CANCELLED: { color: 'bg-gray-500 text-white', emoji: '⚫', label: 'İptal' }
   };
   return statusMap[status] || statusMap['PLANNED'];
+}
+
+function getRiskRelationBadge(relation: string) {
+  const relationMap: Record<string, { color: string; emoji: string; label: string }> = {
+    STRATEGIC: { color: 'bg-blue-100 text-blue-700', emoji: '🎯', label: 'Stratejik' },
+    OPERATIONAL: { color: 'bg-gray-100 text-gray-700', emoji: '⚙️', label: 'Operasyonel' },
+    PROJECT: { color: 'bg-orange-100 text-orange-700', emoji: '📋', label: 'Proje' },
+    CORPORATE: { color: 'bg-purple-100 text-purple-700', emoji: '🏛️', label: 'Kurumsal' }
+  };
+  return relationMap[relation] || relationMap['OPERATIONAL'];
 }
 
 export default function RiskDetail() {
@@ -268,6 +279,7 @@ export default function RiskDetail() {
         owner_department_id: editFormData.owner_department_id,
         goal_id: editFormData.goal_id && editFormData.goal_id.trim() !== '' ? editFormData.goal_id : null,
         risk_source: editFormData.risk_source,
+        risk_relation: editFormData.risk_relation,
         inherent_likelihood: editFormData.inherent_likelihood,
         inherent_impact: editFormData.inherent_impact,
         residual_likelihood: editFormData.residual_likelihood,
@@ -391,6 +403,7 @@ export default function RiskDetail() {
                   owner_department_id: risk.owner_department_id,
                   goal_id: risk.goal_id || '',
                   risk_source: risk.risk_source || 'INTERNAL',
+                  risk_relation: risk.risk_relation || 'OPERATIONAL',
                   inherent_likelihood: risk.inherent_likelihood,
                   inherent_impact: risk.inherent_impact,
                   residual_likelihood: risk.residual_likelihood,
@@ -504,6 +517,20 @@ export default function RiskDetail() {
                     <div className="text-base font-medium text-gray-900 flex items-center gap-2">
                       <span>{risk.risk_source === 'EXTERNAL' ? '🌍' : '🏠'}</span>
                       <span>{risk.risk_source === 'EXTERNAL' ? 'Dış Risk' : 'İç Risk'}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">İlişki Türü</div>
+                    <div className="text-base font-medium">
+                      {(() => {
+                        const relationBadge = getRiskRelationBadge(risk.risk_relation);
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium ${relationBadge.color}`}>
+                            <span>{relationBadge.emoji}</span>
+                            <span>{relationBadge.label}</span>
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div>
@@ -1275,45 +1302,123 @@ export default function RiskDetail() {
                   />
                 </div>
 
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Risk Kaynağı <span className="text-red-500">*</span>
-                  </label>
-                  <div className="space-y-3">
-                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-50">
-                      <input
-                        type="radio"
-                        name="edit_risk_source"
-                        value="INTERNAL"
-                        checked={editFormData.risk_source === 'INTERNAL'}
-                        onChange={(e) => setEditFormData({ ...editFormData, risk_source: e.target.value })}
-                        className="mt-1"
-                      />
-                      <div className="flex items-start gap-2">
-                        <span className="text-xl">🏠</span>
-                        <div>
-                          <div className="font-medium">İç Risk</div>
-                          <div className="text-sm text-gray-600">Kurum içinden kaynaklanan riskler</div>
-                        </div>
-                      </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Risk Kaynağı <span className="text-red-500">*</span>
                     </label>
-                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-50">
-                      <input
-                        type="radio"
-                        name="edit_risk_source"
-                        value="EXTERNAL"
-                        checked={editFormData.risk_source === 'EXTERNAL'}
-                        onChange={(e) => setEditFormData({ ...editFormData, risk_source: e.target.value })}
-                        className="mt-1"
-                      />
-                      <div className="flex items-start gap-2">
-                        <span className="text-xl">🌍</span>
-                        <div>
-                          <div className="font-medium">Dış Risk</div>
-                          <div className="text-sm text-gray-600">Kurum dışından kaynaklanan riskler</div>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="edit_risk_source"
+                          value="INTERNAL"
+                          checked={editFormData.risk_source === 'INTERNAL'}
+                          onChange={(e) => setEditFormData({ ...editFormData, risk_source: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">🏠</span>
+                          <div>
+                            <div className="font-medium text-sm">İç Risk</div>
+                            <div className="text-xs text-gray-600">Kurum içinden kaynaklanan</div>
+                          </div>
                         </div>
-                      </div>
+                      </label>
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="edit_risk_source"
+                          value="EXTERNAL"
+                          checked={editFormData.risk_source === 'EXTERNAL'}
+                          onChange={(e) => setEditFormData({ ...editFormData, risk_source: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">🌍</span>
+                          <div>
+                            <div className="font-medium text-sm">Dış Risk</div>
+                            <div className="text-xs text-gray-600">Kurum dışından kaynaklanan</div>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      İlişki Türü <span className="text-red-500">*</span>
                     </label>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="edit_risk_relation"
+                          value="STRATEGIC"
+                          checked={editFormData.risk_relation === 'STRATEGIC'}
+                          onChange={(e) => setEditFormData({ ...editFormData, risk_relation: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">🎯</span>
+                          <div>
+                            <div className="font-medium text-sm">Stratejik</div>
+                            <div className="text-xs text-gray-600">Hedefe/faaliyete bağlı</div>
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="edit_risk_relation"
+                          value="OPERATIONAL"
+                          checked={editFormData.risk_relation === 'OPERATIONAL'}
+                          onChange={(e) => setEditFormData({ ...editFormData, risk_relation: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">⚙️</span>
+                          <div>
+                            <div className="font-medium text-sm">Operasyonel</div>
+                            <div className="text-xs text-gray-600">Sürece bağlı</div>
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="edit_risk_relation"
+                          value="PROJECT"
+                          checked={editFormData.risk_relation === 'PROJECT'}
+                          onChange={(e) => setEditFormData({ ...editFormData, risk_relation: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">📋</span>
+                          <div>
+                            <div className="font-medium text-sm">Proje</div>
+                            <div className="text-xs text-gray-600">Projeye bağlı</div>
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-gray-200 hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="edit_risk_relation"
+                          value="CORPORATE"
+                          checked={editFormData.risk_relation === 'CORPORATE'}
+                          onChange={(e) => setEditFormData({ ...editFormData, risk_relation: e.target.value })}
+                          className="mt-1"
+                        />
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">🏛️</span>
+                          <div>
+                            <div className="font-medium text-sm">Kurumsal</div>
+                            <div className="text-xs text-gray-600">Tüm kurumu etkiler</div>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
