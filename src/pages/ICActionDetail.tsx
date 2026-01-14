@@ -82,6 +82,28 @@ export default function ICActionDetail() {
   const [linkedControl, setLinkedControl] = useState<any>(null);
   const [linkedActivity, setLinkedActivity] = useState<any>(null);
 
+  const [riskModuleData, setRiskModuleData] = useState<{
+    standard6?: {
+      totalRisks: number;
+      strategic: number;
+      operational: number;
+      project: number;
+      corporate: number;
+      assessed: number;
+      lastUpdate: string | null;
+    };
+    standard7?: {
+      totalControls: number;
+      effective: number;
+      partiallyEffective: number;
+      ineffective: number;
+      totalActivities: number;
+      completed: number;
+      inProgress: number;
+      pending: number;
+    };
+  }>({});
+
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'details' | 'progress' | 'documents' | 'relations'>('details');
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -118,6 +140,94 @@ export default function ICActionDetail() {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  const loadRiskModuleData = async (standardCode: string) => {
+    try {
+      if (standardCode === 'KIKS.6') {
+        const { data: risks } = await supabase
+          .from('risks')
+          .select('id, risk_relation, created_at, updated_at')
+          .eq('organization_id', profile?.organization_id)
+          .eq('is_active', true);
+
+        const totalRisks = risks?.length || 0;
+        const strategic = risks?.filter(r => r.risk_relation === 'STRATEGIC').length || 0;
+        const operational = risks?.filter(r => r.risk_relation === 'OPERATIONAL').length || 0;
+        const project = risks?.filter(r => r.risk_relation === 'PROJECT').length || 0;
+        const corporate = risks?.filter(r => r.risk_relation === 'CORPORATE').length || 0;
+
+        const { data: assessments } = await supabase
+          .from('rm_risk_assessments')
+          .select('risk_id')
+          .eq('organization_id', profile?.organization_id);
+
+        const assessed = new Set(assessments?.map(a => a.risk_id) || []).size;
+
+        const lastUpdate = risks && risks.length > 0
+          ? new Date(Math.max(...risks.map(r => new Date(r.updated_at || r.created_at).getTime()))).toLocaleDateString('tr-TR')
+          : null;
+
+        setRiskModuleData(prev => ({
+          ...prev,
+          standard6: {
+            totalRisks,
+            strategic,
+            operational,
+            project,
+            corporate,
+            assessed,
+            lastUpdate
+          }
+        }));
+      }
+
+      if (standardCode === 'KIKS.7') {
+        const [controlsRes, activitiesRes] = await Promise.all([
+          supabase
+            .from('risk_controls')
+            .select('id, design_effectiveness, operating_effectiveness')
+            .eq('organization_id', profile?.organization_id),
+          supabase
+            .from('risk_treatments')
+            .select('id, status')
+            .eq('organization_id', profile?.organization_id)
+        ]);
+
+        const totalControls = controlsRes.data?.length || 0;
+        const effective = controlsRes.data?.filter(c =>
+          c.design_effectiveness >= 80 && c.operating_effectiveness >= 80
+        ).length || 0;
+        const partiallyEffective = controlsRes.data?.filter(c =>
+          (c.design_effectiveness >= 50 && c.design_effectiveness < 80) ||
+          (c.operating_effectiveness >= 50 && c.operating_effectiveness < 80)
+        ).length || 0;
+        const ineffective = controlsRes.data?.filter(c =>
+          c.design_effectiveness < 50 || c.operating_effectiveness < 50
+        ).length || 0;
+
+        const totalActivities = activitiesRes.data?.length || 0;
+        const completed = activitiesRes.data?.filter(a => a.status === 'COMPLETED').length || 0;
+        const inProgress = activitiesRes.data?.filter(a => a.status === 'IN_PROGRESS').length || 0;
+        const pending = activitiesRes.data?.filter(a => a.status === 'PENDING').length || 0;
+
+        setRiskModuleData(prev => ({
+          ...prev,
+          standard7: {
+            totalControls,
+            effective,
+            partiallyEffective,
+            ineffective,
+            totalActivities,
+            completed,
+            inProgress,
+            pending
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Risk modülü verileri yüklenirken hata:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -202,6 +312,10 @@ export default function ICActionDetail() {
         new_progress: actionRes.data.progress_percent || 0,
         new_status: actionRes.data.status
       });
+
+      if (actionRes.data.ic_standards?.code) {
+        await loadRiskModuleData(actionRes.data.ic_standards.code);
+      }
     } catch (error) {
       console.error('Veriler yüklenirken hata:', error);
     } finally {
@@ -613,6 +727,145 @@ export default function ICActionDetail() {
         <div className="p-6">
           {activeTab === 'details' && (
             <div className="space-y-6">
+              {action.ic_standards?.code === 'KIKS.6' && riskModuleData.standard6 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      📊 Risk Modülü Verileri (Otomatik)
+                    </h3>
+                    <button
+                      onClick={() => navigate.navigate('/risk-management/risks')}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Risk Modülüne Git
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-sm font-medium text-slate-700 mb-2">
+                        Toplam Tanımlı Risk: <span className="text-2xl font-bold text-blue-600">{riskModuleData.standard6.totalRisks}</span>
+                      </div>
+                      <div className="pl-4 space-y-1 text-sm text-slate-600">
+                        <div className="flex items-center justify-between">
+                          <span>├── Stratejik:</span>
+                          <span className="font-semibold">{riskModuleData.standard6.strategic}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>├── Operasyonel:</span>
+                          <span className="font-semibold">{riskModuleData.standard6.operational}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>├── Proje:</span>
+                          <span className="font-semibold">{riskModuleData.standard6.project}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>└── Kurumsal:</span>
+                          <span className="font-semibold">{riskModuleData.standard6.corporate}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-blue-200">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-700 font-medium">Değerlendirilen Risk:</span>
+                        <span className="text-lg font-bold text-green-600">{riskModuleData.standard6.assessed}</span>
+                      </div>
+                    </div>
+
+                    {riskModuleData.standard6.lastUpdate && (
+                      <div className="pt-2 text-xs text-slate-500">
+                        Son Güncelleme: {riskModuleData.standard6.lastUpdate}
+                      </div>
+                    )}
+
+                    {riskModuleData.standard6.totalRisks === 0 && (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                        ⚠️ Henüz risk tanımlanmamış. Lütfen Risk Modülünde risk tanımlamaya başlayın.
+                      </div>
+                    )}
+
+                    {riskModuleData.standard6.totalRisks > 0 && (
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                        ✅ Bu standart için Risk Modülü verileri mevcut. Tamamlanma: %100
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {action.ic_standards?.code === 'KIKS.7' && riskModuleData.standard7 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      📊 Risk Modülü Verileri (Otomatik)
+                    </h3>
+                    <button
+                      onClick={() => navigate.navigate('/risk-management/treatments')}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Risk Faaliyetlerine Git
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-sm font-medium text-slate-700 mb-2">
+                        Toplam Kontrol: <span className="text-2xl font-bold text-green-600">{riskModuleData.standard7.totalControls}</span>
+                      </div>
+                      <div className="pl-4 space-y-1 text-sm text-slate-600">
+                        <div className="flex items-center justify-between">
+                          <span>├── Etkin:</span>
+                          <span className="font-semibold text-green-600">{riskModuleData.standard7.effective}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>├── Kısmen Etkin:</span>
+                          <span className="font-semibold text-yellow-600">{riskModuleData.standard7.partiallyEffective}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>└── Etkin Değil:</span>
+                          <span className="font-semibold text-red-600">{riskModuleData.standard7.ineffective}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-green-200">
+                      <div className="text-sm font-medium text-slate-700 mb-2">
+                        Toplam Faaliyet: <span className="text-2xl font-bold text-green-600">{riskModuleData.standard7.totalActivities}</span>
+                      </div>
+                      <div className="pl-4 space-y-1 text-sm text-slate-600">
+                        <div className="flex items-center justify-between">
+                          <span>├── Tamamlanan:</span>
+                          <span className="font-semibold text-green-600">{riskModuleData.standard7.completed}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>├── Devam Eden:</span>
+                          <span className="font-semibold text-blue-600">{riskModuleData.standard7.inProgress}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>└── Bekleyen:</span>
+                          <span className="font-semibold text-gray-600">{riskModuleData.standard7.pending}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {riskModuleData.standard7.totalActivities > 0 && (
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                        ✅ Tamamlanma Oranı: {Math.round((riskModuleData.standard7.completed / riskModuleData.standard7.totalActivities) * 100)}%
+                      </div>
+                    )}
+
+                    {riskModuleData.standard7.totalActivities === 0 && (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                        ⚠️ Henüz risk faaliyeti tanımlanmamış. Lütfen Risk Modülünde faaliyet tanımlamaya başlayın.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">Açıklama</h3>
                 <p className="text-slate-700 whitespace-pre-wrap">{action.description || 'Açıklama girilmemiş.'}</p>
