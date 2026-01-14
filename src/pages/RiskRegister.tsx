@@ -17,6 +17,10 @@ interface Risk {
   risk_source: string;
   risk_relation: string;
   control_level: string;
+  related_goal_id: string | null;
+  related_activity_id: string | null;
+  related_process_id: string | null;
+  related_project_id: string | null;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -41,6 +45,18 @@ interface Risk {
     };
   }>;
   department?: {
+    name: string;
+  };
+  related_goal?: {
+    code: string;
+    title: string;
+  };
+  related_activity?: {
+    code: string;
+    name: string;
+  };
+  related_process?: {
+    code: string;
     name: string;
   };
 }
@@ -132,6 +148,8 @@ export default function RiskRegister() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [objectives, setObjectives] = useState<any[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [processes, setProcesses] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [criteria, setCriteria] = useState<RiskCriterion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +186,10 @@ export default function RiskRegister() {
     risk_source: 'INTERNAL',
     risk_relation: 'OPERATIONAL',
     control_level: 'CONTROLLABLE',
+    related_goal_id: '',
+    related_activity_id: '',
+    related_process_id: '',
+    related_project_id: '',
     inherent_likelihood: 3,
     inherent_impact: 3,
     residual_likelihood: 2,
@@ -226,14 +248,17 @@ export default function RiskRegister() {
     try {
       setLoading(true);
 
-      const [risksRes, categoriesRes, departmentsRes, objectivesRes, goalsRes, profilesRes, criteriaRes] = await Promise.all([
+      const [risksRes, categoriesRes, departmentsRes, objectivesRes, goalsRes, activitiesRes, processesRes, profilesRes, criteriaRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
             *,
             category:risk_categories(name, color),
             categories:risk_category_mappings(category_id, category:risk_categories(id, name, code, color)),
-            department:departments!owner_department_id(name)
+            department:departments!owner_department_id(name),
+            related_goal:goals!related_goal_id(code, title),
+            related_activity:activities!related_activity_id(code, name),
+            related_process:qm_processes!related_process_id(code, name)
           `)
           .eq('organization_id', profile?.organization_id)
           .order('code', { ascending: true }),
@@ -258,6 +283,16 @@ export default function RiskRegister() {
           .eq('organization_id', profile?.organization_id)
           .order('code', { ascending: true }),
         supabase
+          .from('activities')
+          .select('id, code, name, goal_id')
+          .eq('organization_id', profile?.organization_id)
+          .order('code', { ascending: true }),
+        supabase
+          .from('qm_processes')
+          .select('id, code, name')
+          .eq('organization_id', profile?.organization_id)
+          .order('code', { ascending: true }),
+        supabase
           .from('profiles')
           .select('id, full_name, department_id')
           .eq('organization_id', profile?.organization_id)
@@ -275,6 +310,8 @@ export default function RiskRegister() {
       if (departmentsRes.error) throw departmentsRes.error;
       if (objectivesRes.error) throw objectivesRes.error;
       if (goalsRes.error) throw goalsRes.error;
+      if (activitiesRes.error) throw activitiesRes.error;
+      if (processesRes.error) throw processesRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
       setRisks(risksRes.data || []);
@@ -282,6 +319,8 @@ export default function RiskRegister() {
       setDepartments(departmentsRes.data || []);
       setObjectives(objectivesRes.data || []);
       setGoals(goalsRes.data || []);
+      setActivities(activitiesRes.data || []);
+      setProcesses(processesRes.data || []);
       setProfiles(profilesRes.data || []);
       setCriteria(criteriaRes.data || []);
 
@@ -317,6 +356,10 @@ export default function RiskRegister() {
       risk_source: 'INTERNAL',
       risk_relation: 'OPERATIONAL',
       control_level: 'CONTROLLABLE',
+      related_goal_id: '',
+      related_activity_id: '',
+      related_process_id: '',
+      related_project_id: '',
       inherent_likelihood: 3,
       inherent_impact: 3,
       residual_likelihood: 2,
@@ -358,6 +401,16 @@ export default function RiskRegister() {
       return;
     }
 
+    if (formData.risk_relation === 'STRATEGIC' && !formData.related_goal_id) {
+      alert('Stratejik risk için bağlı hedef seçimi zorunludur');
+      return;
+    }
+
+    if (formData.risk_relation === 'OPERATIONAL' && !formData.related_process_id) {
+      alert('Operasyonel risk için bağlı süreç seçimi zorunludur');
+      return;
+    }
+
     const inherentScore = formData.inherent_likelihood * formData.inherent_impact;
     const residualScore = formData.residual_likelihood * formData.residual_impact;
 
@@ -381,6 +434,10 @@ export default function RiskRegister() {
           risk_source: formData.risk_source,
           risk_relation: formData.risk_relation,
           control_level: formData.control_level,
+          related_goal_id: formData.related_goal_id || null,
+          related_activity_id: formData.related_activity_id || null,
+          related_process_id: formData.related_process_id || null,
+          related_project_id: formData.related_project_id || null,
           inherent_likelihood: formData.inherent_likelihood,
           inherent_impact: formData.inherent_impact,
           residual_likelihood: formData.residual_likelihood,
@@ -1276,6 +1333,93 @@ export default function RiskRegister() {
                     )}
                   </div>
                 </div>
+
+                {formData.risk_relation === 'STRATEGIC' && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-3">Stratejik İlişki Bağlantıları</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Bağlı Hedef <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={formData.related_goal_id}
+                          onChange={(e) => setFormData({ ...formData, related_goal_id: e.target.value, related_activity_id: '' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Hedef seçiniz...</option>
+                          {goals.map(goal => (
+                            <option key={goal.id} value={goal.id}>{goal.code} - {goal.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Bağlı Faaliyet (Opsiyonel)
+                        </label>
+                        <select
+                          value={formData.related_activity_id}
+                          onChange={(e) => setFormData({ ...formData, related_activity_id: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          disabled={!formData.related_goal_id}
+                        >
+                          <option value="">
+                            {formData.related_goal_id ? 'Faaliyet seçiniz (opsiyonel)...' : 'Önce hedef seçiniz'}
+                          </option>
+                          {activities
+                            .filter(activity => activity.goal_id === formData.related_goal_id)
+                            .map(activity => (
+                              <option key={activity.id} value={activity.id}>{activity.code} - {activity.name}</option>
+                            ))}
+                        </select>
+                        {formData.related_goal_id && activities.filter(a => a.goal_id === formData.related_goal_id).length === 0 && (
+                          <p className="mt-1 text-sm text-gray-500">Bu hedefe ait faaliyet bulunamadı</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {formData.risk_relation === 'OPERATIONAL' && (
+                  <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Operasyonel İlişki Bağlantısı</h4>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Bağlı Süreç <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.related_process_id}
+                        onChange={(e) => setFormData({ ...formData, related_process_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Süreç seçiniz...</option>
+                        {processes.map(process => (
+                          <option key={process.id} value={process.id}>{process.code} - {process.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {formData.risk_relation === 'PROJECT' && (
+                  <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <h4 className="text-sm font-semibold text-orange-900 mb-2">Proje İlişkisi</h4>
+                    <div className="flex items-start gap-2 text-sm text-orange-700">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <p>Proje modülü yakında eklenecektir. Şu an için proje bağlantısı yapılamıyor.</p>
+                    </div>
+                  </div>
+                )}
+
+                {formData.risk_relation === 'CORPORATE' && (
+                  <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <h4 className="text-sm font-semibold text-purple-900 mb-2">Kurumsal Risk</h4>
+                    <div className="flex items-start gap-2 text-sm text-purple-700">
+                      <div className="text-lg">🏛️</div>
+                      <p>Bu risk tüm kurumu etkiler ve belirli bir hedef, faaliyet veya sürece bağlı değildir.</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="bg-blue-50 rounded-lg p-6">

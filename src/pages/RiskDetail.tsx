@@ -19,6 +19,10 @@ interface Risk {
   risk_source: string;
   risk_relation: string;
   control_level: string;
+  related_goal_id: string | null;
+  related_activity_id: string | null;
+  related_process_id: string | null;
+  related_project_id: string | null;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -35,6 +39,9 @@ interface Risk {
   objective?: { code: string; title: string };
   goal?: { code: string; title: string };
   identified_by?: { full_name: string };
+  related_goal?: { code: string; title: string };
+  related_activity?: { code: string; name: string };
+  related_process?: { code: string; name: string };
 }
 
 interface RiskControl {
@@ -184,7 +191,10 @@ export default function RiskDetail() {
             department:departments!owner_department_id(name),
             objective:objectives(code, title),
             goal:goals(code, title),
-            identified_by:profiles!identified_by_id(full_name)
+            identified_by:profiles!identified_by_id(full_name),
+            related_goal:goals!related_goal_id(code, title),
+            related_activity:activities!related_activity_id(code, name),
+            related_process:qm_processes!related_process_id(code, name)
           `)
           .eq('id', riskId)
           .single(),
@@ -583,6 +593,47 @@ export default function RiskDetail() {
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-2">Risk Nedeni</h4>
                   <p className="text-gray-700 whitespace-pre-wrap">{risk.causes}</p>
+                </div>
+              )}
+
+              {(risk.related_goal || risk.related_activity || risk.related_process) && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">İlişkili Kayıtlar</h4>
+                  <div className="space-y-2">
+                    {risk.related_goal && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-medium text-gray-600">Bağlı Hedef:</span>
+                        <button
+                          onClick={() => navigate(`/goals`)}
+                          className="text-blue-600 hover:text-blue-700 hover:underline"
+                        >
+                          {risk.related_goal.code} - {risk.related_goal.title}
+                        </button>
+                      </div>
+                    )}
+                    {risk.related_activity && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-medium text-gray-600">Bağlı Faaliyet:</span>
+                        <button
+                          onClick={() => navigate(`/activities`)}
+                          className="text-blue-600 hover:text-blue-700 hover:underline"
+                        >
+                          {risk.related_activity.code} - {risk.related_activity.name}
+                        </button>
+                      </div>
+                    )}
+                    {risk.related_process && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-medium text-gray-600">Bağlı Süreç:</span>
+                        <button
+                          onClick={() => navigate(`/quality/processes`)}
+                          className="text-blue-600 hover:text-blue-700 hover:underline"
+                        >
+                          {risk.related_process.code} - {risk.related_process.name}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
