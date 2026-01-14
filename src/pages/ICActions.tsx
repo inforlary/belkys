@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
-import { FileText, Plus, Calendar, CheckCircle2, Clock, AlertTriangle, CreditCard as Edit2, Trash2, Eye, ArrowRight, ChevronDown, Download, Filter, X, Search, CheckSquare, Square, MoreVertical } from 'lucide-react';
+import { FileText, Plus, Calendar, CheckCircle2, Clock, AlertTriangle, CreditCard as Edit2, Trash2, Eye, ArrowRight, ChevronDown, Download, Filter, X, Search, CheckSquare, Square, MoreVertical, Upload, Paperclip } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -140,7 +140,8 @@ export default function ICActions() {
     new_progress: 0,
     new_status: '',
     completed_date: '',
-    description: ''
+    description: '',
+    attachment: null as File | null
   });
 
   const [editForm, setEditForm] = useState({
@@ -929,6 +930,36 @@ export default function ICActions() {
     }
 
     try {
+      let documentId: string | null = null;
+
+      if (progressForm.attachment) {
+        const fileExt = progressForm.attachment.name.split('.').pop();
+        const fileName = `${selectedAction.id}/progress/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('ic-action-documents')
+          .upload(fileName, progressForm.attachment);
+
+        if (uploadError) throw uploadError;
+
+        const { data: docData, error: docError } = await supabase
+          .from('ic_action_documents')
+          .insert({
+            action_id: selectedAction.id,
+            name: progressForm.attachment.name,
+            file_url: fileName,
+            file_size: progressForm.attachment.size,
+            file_type: progressForm.attachment.type || 'application/octet-stream',
+            uploaded_by_id: profile?.id,
+            document_type: 'progress'
+          })
+          .select('id')
+          .single();
+
+        if (docError) throw docError;
+        documentId = docData?.id;
+      }
+
       const { error: updateError } = await supabase
         .from('ic_actions')
         .update({
@@ -956,8 +987,15 @@ export default function ICActions() {
 
       if (logError) throw logError;
 
-      alert('İlerleme başarıyla güncellendi');
+      alert('İlerleme başarıyla güncellendi' + (documentId ? ' ve evrak yüklendi' : ''));
       setShowProgressModal(false);
+      setProgressForm({
+        new_progress: 0,
+        new_status: '',
+        completed_date: '',
+        description: '',
+        attachment: null
+      });
       loadActions();
     } catch (error) {
       console.error('İlerleme güncellenirken hata:', error);
@@ -1948,6 +1986,46 @@ export default function ICActions() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Yapılan işlemler ve güncellemeler..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Paperclip className="w-4 h-4 inline mr-1" />
+                Evrak Ekle (Opsiyonel)
+              </label>
+              <div className="space-y-2">
+                <input
+                  type="file"
+                  id="progress-attachment"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setProgressForm({ ...progressForm, attachment: file });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                />
+                {progressForm.attachment && (
+                  <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                    <FileText className="w-4 h-4" />
+                    <span className="flex-1 truncate">{progressForm.attachment.name}</span>
+                    <span className="text-xs">({(progressForm.attachment.size / 1024).toFixed(1)} KB)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProgressForm({ ...progressForm, attachment: null });
+                        const input = document.getElementById('progress-attachment') as HTMLInputElement;
+                        if (input) input.value = '';
+                      }}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Desteklenen formatlar: PDF, Word, Excel, JPG, PNG (Maks. 10MB)
+              </p>
             </div>
 
             <div className="flex gap-2 justify-end">
