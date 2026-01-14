@@ -804,47 +804,91 @@ export default function ICActions() {
       noActions,
       completed,
       completedPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
-      inProgress: inProgress + ongoing,
-      inProgressPercent: total > 0 ? Math.round(((inProgress + ongoing) / total) * 100) : 0,
+      inProgress,
+      inProgressPercent: total > 0 ? Math.round((inProgress / total) * 100) : 0,
       notStarted,
       notStartedPercent: total > 0 ? Math.round((notStarted / total) * 100) : 0,
       delayed,
       delayedPercent: total > 0 ? Math.round((delayed / total) * 100) : 0,
+      ongoing,
+      ongoingPercent: total > 0 ? Math.round((ongoing / total) * 100) : 0,
       continuousActions
     };
   }, [baseFilteredActions]);
 
-  const detailedStats = useMemo(() => {
-    const uniqueComponents = new Set(standards.map(s => s.component_id).filter(Boolean));
-    const uniqueStandards = new Set(standards.map(s => s.id));
-    const totalConditions = generalConditions.length;
+  const componentStats = useMemo(() => {
+    const componentMap = new Map<string, {
+      id: string;
+      code: string;
+      name: string;
+      standards: Set<string>;
+      conditions: Set<string>;
+      conditionsWithReasonableAssurance: number;
+      actions: any[];
+    }>();
 
-    const conditionsWithReasonableAssurance = generalConditions.filter(
-      c => c.provides_reasonable_assurance === true &&
-      c.current_situation &&
-      c.current_situation.toLowerCase().includes('sağlan')
-    ).length;
+    actions.forEach(action => {
+      if (!action.component_id || !action.component_code || !action.component_name) return;
 
-    const actualActions = actions.filter(a => a.status !== 'NO_ACTION');
-    const startedActions = actualActions.filter(a =>
-      a.status === 'IN_PROGRESS' ||
-      a.status === 'COMPLETED' ||
-      a.status === 'ONGOING'
-    ).length;
+      if (!componentMap.has(action.component_id)) {
+        componentMap.set(action.component_id, {
+          id: action.component_id,
+          code: action.component_code,
+          name: action.component_name,
+          standards: new Set(),
+          conditions: new Set(),
+          conditionsWithReasonableAssurance: 0,
+          actions: []
+        });
+      }
 
-    const continuousActions = actualActions.filter(a => a.is_continuous === true).length;
+      const comp = componentMap.get(action.component_id)!;
 
-    return {
-      totalComponents: uniqueComponents.size,
-      totalStandards: uniqueStandards.size,
-      totalConditions,
-      totalActions: actualActions.length,
-      startedActions,
-      continuousActions,
-      conditionsWithReasonableAssurance,
-      conditionsWithoutReasonableAssurance: totalConditions - conditionsWithReasonableAssurance
-    };
-  }, [standards, generalConditions, actions]);
+      if (action.standard_id) {
+        comp.standards.add(action.standard_id);
+      }
+
+      if (action.condition_id) {
+        comp.conditions.add(action.condition_id);
+
+        if (action.status === 'NO_ACTION' && action.condition_provides_reasonable_assurance) {
+          comp.conditionsWithReasonableAssurance++;
+        }
+      }
+
+      if (action.status !== 'NO_ACTION') {
+        comp.actions.push(action);
+      }
+    });
+
+    return Array.from(componentMap.values()).map(comp => {
+      const actionList = comp.actions;
+      const continuousCount = actionList.filter(a => a.is_continuous === true).length;
+      const notStartedCount = actionList.filter(a => a.status === 'NOT_STARTED').length;
+      const ongoingCount = actionList.filter(a => a.status === 'ONGOING').length;
+      const delayedCount = actionList.filter(a =>
+        a.delay_days && a.delay_days > 0 && !['COMPLETED', 'CANCELLED', 'ONGOING'].includes(a.status)
+      ).length;
+
+      return {
+        id: comp.id,
+        code: comp.code,
+        name: comp.name,
+        standardCount: comp.standards.size,
+        conditionCount: comp.conditions.size,
+        conditionsWithReasonableAssurance: comp.conditionsWithReasonableAssurance,
+        actionCount: actionList.length,
+        continuousCount,
+        notStartedCount,
+        ongoingCount,
+        delayedCount
+      };
+    }).sort((a, b) => {
+      const codeA = a.code.match(/KİKS-(\d+)/)?.[1] || '0';
+      const codeB = b.code.match(/KİKS-(\d+)/)?.[1] || '0';
+      return parseInt(codeA) - parseInt(codeB);
+    });
+  }, [actions]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -1579,16 +1623,16 @@ export default function ICActions() {
         </button>
 
         <button
-          onClick={() => handleStatusFilter('IN_PROGRESS')}
+          onClick={() => handleStatusFilter('ONGOING')}
           className={`p-4 rounded-lg border-2 transition-all ${
-            selectedStatus === 'IN_PROGRESS' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+            selectedStatus === 'ONGOING' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
           }`}
         >
-          <div className="text-3xl font-bold text-blue-600">{stats.inProgress}</div>
+          <div className="text-3xl font-bold text-blue-600">{stats.ongoing}</div>
           <div className="text-sm text-gray-600 mt-1">DEVAM EDEN</div>
           <div className="text-xs text-blue-600 mt-1 flex items-center justify-center gap-1">
             <Clock className="w-3 h-3" />
-            %{stats.inProgressPercent}
+            %{stats.ongoingPercent}
           </div>
         </button>
 
@@ -1643,6 +1687,58 @@ export default function ICActions() {
           </div>
         </div>
       </div>
+
+      {componentStats.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Bileşen Bazlı Özet</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {componentStats.map(comp => (
+              <div key={comp.id} className="bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                <div className="font-bold text-sm text-gray-900 mb-3" title={comp.name}>
+                  {comp.name}
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">{comp.standardCount} Standart</span>
+                  </div>
+
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600">{comp.conditionCount} Genel Şart</span>
+                    {comp.conditionsWithReasonableAssurance > 0 && (
+                      <span className="text-green-600 font-medium text-right">
+                        ({comp.conditionsWithReasonableAssurance} Mevcut Durum Sağlanıyor)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-gray-900 font-medium">{comp.actionCount} Eylem</span>
+                    </div>
+                    {(comp.continuousCount > 0 || comp.notStartedCount > 0 || comp.ongoingCount > 0 || comp.delayedCount > 0) && (
+                      <div className="flex flex-wrap gap-1 text-xs">
+                        {comp.continuousCount > 0 && (
+                          <span className="text-blue-600">({comp.continuousCount} Sürekli</span>
+                        )}
+                        {comp.notStartedCount > 0 && (
+                          <span className="text-orange-600">{comp.notStartedCount} Başlamadı</span>
+                        )}
+                        {comp.ongoingCount > 0 && (
+                          <span className="text-teal-600">{comp.ongoingCount} Devam Ediyor</span>
+                        )}
+                        {comp.delayedCount > 0 && (
+                          <span className="text-red-600">{comp.delayedCount} Geciken)</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-4">
@@ -1710,7 +1806,7 @@ export default function ICActions() {
             </select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <select
               value={selectedDepartmentId}
               onChange={(e) => setSelectedDepartmentId(e.target.value)}
@@ -1720,6 +1816,21 @@ export default function ICActions() {
               {departments.map(dept => (
                 <option key={dept.id} value={dept.id}>{dept.name}</option>
               ))}
+            </select>
+
+            <select
+              value={selectedStatus === 'NO_ACTION' ? 'NO_ACTION' : ''}
+              onChange={(e) => {
+                if (e.target.value === 'NO_ACTION') {
+                  handleStatusFilter('NO_ACTION');
+                } else {
+                  handleStatusFilter('');
+                }
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Tüm Durumlar</option>
+              <option value="NO_ACTION">Mevcut Durum Sağlanıyor</option>
             </select>
 
             <div className="relative">
