@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
-import { ArrowLeft, Info, BarChart3, Shield, Activity, TrendingUp, History, CreditCard as Edit2, Trash2, Plus, X, Save, AlertTriangle, MoreVertical, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Info, BarChart3, Shield, Activity, TrendingUp, History, CreditCard as Edit2, Trash2, Plus, X, Save, AlertTriangle, MoreVertical, ChevronDown, Users } from 'lucide-react';
 
 interface Risk {
   id: string;
@@ -93,6 +93,16 @@ interface RiskIndicator {
   target_value: number;
 }
 
+interface DepartmentImpact {
+  id: string;
+  department_id: string;
+  impact_level: number;
+  impact_description: string;
+  affected_processes: string;
+  specific_controls: string;
+  department: { name: string };
+}
+
 function getRiskScoreBadge(score: number) {
   if (score >= 20) return { color: 'bg-gray-800 text-white', emoji: '⬛', label: 'Kritik' };
   if (score >= 15) return { color: 'bg-red-500 text-white', emoji: '🔴', label: 'Çok Yüksek' };
@@ -152,6 +162,7 @@ export default function RiskDetail() {
   const [activeTab, setActiveTab] = useState('general');
   const [risk, setRisk] = useState<Risk | null>(null);
   const [controls, setControls] = useState<RiskControl[]>([]);
+  const [departmentImpacts, setDepartmentImpacts] = useState<DepartmentImpact[]>([]);
   const [treatments, setTreatments] = useState<RiskTreatment[]>([]);
   const [indicators, setIndicators] = useState<RiskIndicator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +197,7 @@ export default function RiskDetail() {
     try {
       setLoading(true);
 
-      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes] = await Promise.all([
+      const [riskRes, controlsRes, treatmentsRes, indicatorsRes, departmentImpactsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -223,6 +234,14 @@ export default function RiskDetail() {
           .select('*')
           .eq('risk_id', riskId),
         supabase
+          .from('rm_risk_department_impacts')
+          .select(`
+            *,
+            department:departments(name)
+          `)
+          .eq('risk_id', riskId)
+          .order('impact_level', { ascending: false }),
+        supabase
           .from('departments')
           .select('*')
           .eq('organization_id', profile?.organization_id)
@@ -255,6 +274,7 @@ export default function RiskDetail() {
       setControls(controlsRes.data || []);
       setTreatments(treatmentsRes.data || []);
       setIndicators(indicatorsRes.data || []);
+      setDepartmentImpacts(departmentImpactsRes.data || []);
       setDepartments(deptsRes.data || []);
       setProfiles(profilesRes.data || []);
       setCategories(categoriesRes.data || []);
@@ -357,6 +377,7 @@ export default function RiskDetail() {
     { id: 'assessment', label: 'Değerlendirme', icon: BarChart3 },
     { id: 'controls', label: 'Kontroller', icon: Shield },
     { id: 'treatments', label: 'Faaliyetler', icon: Activity },
+    ...(risk?.risk_relation === 'CORPORATE' ? [{ id: 'impacts', label: 'Birim Etkileri', icon: Users }] : []),
     { id: 'indicators', label: 'Göstergeler', icon: TrendingUp },
     { id: 'history', label: 'Tarihçe', icon: History }
   ];
@@ -1033,6 +1054,91 @@ export default function RiskDetail() {
                     );
                   })}
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'impacts' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Birim Etki Analizi</h3>
+                <p className="text-sm text-gray-600 mb-6">
+                  Bu kurumsal riskin farklı birimlere olan etkilerini görüntüleyin.
+                </p>
+              </div>
+
+              {departmentImpacts.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Henüz birim etki analizi yapılmamış</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+                    {[0, 1, 2, 3, 4, 5].map(level => {
+                      const count = departmentImpacts.filter(i => i.impact_level === level).length;
+                      const labels = ['Etkilenmez', 'Minimal', 'Düşük', 'Orta', 'Yüksek', 'Kritik'];
+                      const colors = ['bg-gray-100 text-gray-700', 'bg-green-100 text-green-700', 'bg-yellow-100 text-yellow-700', 'bg-orange-100 text-orange-700', 'bg-red-100 text-red-700', 'bg-red-200 text-red-900'];
+
+                      return (
+                        <Card key={level} className={`p-4 text-center ${colors[level]}`}>
+                          <div className="text-2xl font-bold mb-1">{count}</div>
+                          <div className="text-xs font-medium">{labels[level]}</div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  <div className="space-y-4">
+                    {departmentImpacts.map(impact => {
+                      const impactLabel = ['Etkilenmez', 'Minimal', 'Düşük', 'Orta', 'Yüksek', 'Kritik'][impact.impact_level];
+                      const impactColor = ['bg-gray-200', 'bg-green-200', 'bg-yellow-200', 'bg-orange-300', 'bg-red-400', 'bg-red-600'][impact.impact_level];
+                      const impactTextColor = ['text-gray-700', 'text-green-700', 'text-yellow-700', 'text-orange-700', 'text-red-700', 'text-red-900'][impact.impact_level];
+
+                      return (
+                        <Card key={impact.id} className="p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">{impact.department.name}</h4>
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 max-w-[200px] bg-gray-200 rounded-full h-3">
+                                  <div
+                                    className={`${impactColor} h-3 rounded-full transition-all`}
+                                    style={{ width: `${(impact.impact_level / 5) * 100}%` }}
+                                  />
+                                </div>
+                                <span className={`text-sm font-semibold ${impactTextColor}`}>
+                                  {impactLabel} ({impact.impact_level}/5)
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {impact.impact_description && (
+                            <div className="mb-4">
+                              <h5 className="text-sm font-semibold text-gray-700 mb-1">Etki Açıklaması</h5>
+                              <p className="text-sm text-gray-600 whitespace-pre-wrap">{impact.impact_description}</p>
+                            </div>
+                          )}
+
+                          {impact.affected_processes && (
+                            <div className="mb-4">
+                              <h5 className="text-sm font-semibold text-gray-700 mb-1">Etkilenen Süreçler</h5>
+                              <p className="text-sm text-gray-600 whitespace-pre-wrap">{impact.affected_processes}</p>
+                            </div>
+                          )}
+
+                          {impact.specific_controls && (
+                            <div>
+                              <h5 className="text-sm font-semibold text-gray-700 mb-1">Birime Özel Önlemler</h5>
+                              <p className="text-sm text-gray-600 whitespace-pre-wrap">{impact.specific_controls}</p>
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}

@@ -85,6 +85,16 @@ interface RiskControl {
   effectiveness: string;
 }
 
+interface DepartmentImpact {
+  id?: string;
+  department_id: string;
+  department_name?: string;
+  impact_level: number;
+  impact_description: string;
+  affected_processes: string;
+  specific_controls: string;
+}
+
 const statusOptions = [
   { value: '', label: 'Tümü' },
   { value: 'DRAFT', label: 'Taslak' },
@@ -210,14 +220,24 @@ export default function RiskRegister() {
   });
 
   const [controls, setControls] = useState<RiskControl[]>([]);
+  const [departmentImpacts, setDepartmentImpacts] = useState<DepartmentImpact[]>([]);
   const [saving, setSaving] = useState(false);
   const [showControlForm, setShowControlForm] = useState(false);
+  const [showDepartmentImpactForm, setShowDepartmentImpactForm] = useState(false);
   const [newControl, setNewControl] = useState<RiskControl>({
     name: '',
     description: '',
     control_type: 'PREVENTIVE',
     effectiveness: 'EFFECTIVE'
   });
+  const [newDepartmentImpact, setNewDepartmentImpact] = useState<DepartmentImpact>({
+    department_id: '',
+    impact_level: 3,
+    impact_description: '',
+    affected_processes: '',
+    specific_controls: ''
+  });
+  const [editingDepartmentImpact, setEditingDepartmentImpact] = useState<DepartmentImpact | null>(null);
 
   useEffect(() => {
     if (profile?.organization_id) {
@@ -383,8 +403,12 @@ export default function RiskRegister() {
       status: 'ACTIVE'
     });
     setControls([]);
+    setDepartmentImpacts([]);
     setShowControlForm(false);
+    setShowDepartmentImpactForm(false);
     setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+    setNewDepartmentImpact({ department_id: '', impact_level: 3, impact_description: '', affected_processes: '', specific_controls: '' });
+    setEditingDepartmentImpact(null);
     setShowModal(true);
   }
 
@@ -506,10 +530,31 @@ export default function RiskRegister() {
         if (controlsError) throw controlsError;
       }
 
+      if (departmentImpacts.length > 0) {
+        const impactsToInsert = departmentImpacts.map(impact => ({
+          organization_id: profile?.organization_id,
+          risk_id: riskData.id,
+          department_id: impact.department_id,
+          impact_level: impact.impact_level,
+          impact_description: impact.impact_description || null,
+          affected_processes: impact.affected_processes || null,
+          specific_controls: impact.specific_controls || null
+        }));
+
+        const { error: impactsError } = await supabase
+          .from('rm_risk_department_impacts')
+          .insert(impactsToInsert);
+
+        if (impactsError) throw impactsError;
+      }
+
       alert(saveStatus === 'DRAFT' ? 'Risk taslak olarak kaydedildi!' : 'Risk başarıyla kaydedildi!');
       setShowModal(false);
       setShowControlForm(false);
+      setShowDepartmentImpactForm(false);
       setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
+      setNewDepartmentImpact({ department_id: '', impact_level: 3, impact_description: '', affected_processes: '', specific_controls: '' });
+      setEditingDepartmentImpact(null);
       loadData();
     } catch (error) {
       console.error('Error saving risk:', error);
@@ -1438,13 +1483,92 @@ export default function RiskRegister() {
                 )}
 
                 {formData.risk_relation === 'CORPORATE' && (
-                  <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                    <h4 className="text-sm font-semibold text-purple-900 mb-2">Kurumsal Risk</h4>
-                    <div className="flex items-start gap-2 text-sm text-purple-700">
-                      <div className="text-lg">🏛️</div>
-                      <p>Bu risk tüm kurumu etkiler ve belirli bir hedef, faaliyet veya sürece bağlı değildir.</p>
+                  <>
+                    <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                      <h4 className="text-sm font-semibold text-purple-900 mb-2">Kurumsal Risk</h4>
+                      <div className="flex items-start gap-2 text-sm text-purple-700">
+                        <div className="text-lg">🏛️</div>
+                        <p>Bu risk tüm kurumu etkiler ve belirli bir hedef, faaliyet veya sürece bağlı değildir.</p>
+                      </div>
                     </div>
-                  </div>
+
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-blue-900">Birim Etki Analizi</h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingDepartmentImpact(null);
+                            setNewDepartmentImpact({ department_id: '', impact_level: 3, impact_description: '', affected_processes: '', specific_controls: '' });
+                            setShowDepartmentImpactForm(true);
+                          }}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Birim Ekle
+                        </button>
+                      </div>
+                      <p className="text-xs text-blue-700 mb-3">
+                        Bu riskin farklı birimlere olan etkilerini belirleyebilirsiniz.
+                      </p>
+
+                      {departmentImpacts.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">Henüz birim etkisi eklenmedi.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {departmentImpacts.map((impact, index) => {
+                            const dept = departments.find(d => d.id === impact.department_id);
+                            const impactLabel = ['Etkilenmez', 'Minimal', 'Düşük', 'Orta', 'Yüksek', 'Kritik'][impact.impact_level];
+                            const impactColor = ['bg-gray-200', 'bg-green-200', 'bg-yellow-200', 'bg-orange-300', 'bg-red-400', 'bg-red-600'][impact.impact_level];
+
+                            return (
+                              <div key={index} className="bg-white p-3 rounded border border-blue-200">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-sm text-gray-900">{dept?.name}</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[120px]">
+                                        <div
+                                          className={`${impactColor} h-2 rounded-full transition-all`}
+                                          style={{ width: `${(impact.impact_level / 5) * 100}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs font-medium text-gray-700">{impactLabel} ({impact.impact_level}/5)</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingDepartmentImpact(impact);
+                                        setNewDepartmentImpact(impact);
+                                        setShowDepartmentImpactForm(true);
+                                      }}
+                                      className="text-blue-600 hover:text-blue-800"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDepartmentImpacts(departmentImpacts.filter((_, i) => i !== index));
+                                      }}
+                                      className="text-red-600 hover:text-red-800"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                                {impact.impact_description && (
+                                  <p className="text-xs text-gray-600 mt-1">{impact.impact_description}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {(formData.control_level === 'PARTIALLY_CONTROLLABLE' || formData.control_level === 'UNCONTROLLABLE') && (
@@ -1866,6 +1990,157 @@ export default function RiskRegister() {
                 </div>
               </div>
             </div>
+
+            {showDepartmentImpactForm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                  <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">
+                      {editingDepartmentImpact ? 'Birim Etkisini Düzenle' : 'Birim Etkisi Ekle'}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowDepartmentImpactForm(false);
+                        setNewDepartmentImpact({ department_id: '', impact_level: 3, impact_description: '', affected_processes: '', specific_controls: '' });
+                        setEditingDepartmentImpact(null);
+                      }}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Birim <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={newDepartmentImpact.department_id}
+                        onChange={(e) => setNewDepartmentImpact({ ...newDepartmentImpact, department_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={!!editingDepartmentImpact}
+                      >
+                        <option value="">Birim seçiniz...</option>
+                        {departments
+                          .filter(dept => !departmentImpacts.some(impact => impact.department_id === dept.id && impact !== editingDepartmentImpact))
+                          .map(dept => (
+                            <option key={dept.id} value={dept.id}>{dept.name}</option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Etki Seviyesi <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2">
+                        {[
+                          { level: 0, label: 'Etkilenmez', color: 'bg-gray-100 hover:bg-gray-200', textColor: 'text-gray-800' },
+                          { level: 1, label: 'Minimal', color: 'bg-green-100 hover:bg-green-200', textColor: 'text-green-800' },
+                          { level: 2, label: 'Düşük', color: 'bg-yellow-100 hover:bg-yellow-200', textColor: 'text-yellow-800' },
+                          { level: 3, label: 'Orta', color: 'bg-orange-100 hover:bg-orange-200', textColor: 'text-orange-800' },
+                          { level: 4, label: 'Yüksek', color: 'bg-red-100 hover:bg-red-200', textColor: 'text-red-800' },
+                          { level: 5, label: 'Kritik', color: 'bg-red-200 hover:bg-red-300', textColor: 'text-red-900' }
+                        ].map(option => (
+                          <label key={option.level} className={`flex items-center gap-3 cursor-pointer p-3 rounded border-2 transition ${newDepartmentImpact.impact_level === option.level ? 'border-blue-500 ' + option.color : 'border-gray-200 ' + option.color}`}>
+                            <input
+                              type="radio"
+                              name="impact_level"
+                              value={option.level}
+                              checked={newDepartmentImpact.impact_level === option.level}
+                              onChange={(e) => setNewDepartmentImpact({ ...newDepartmentImpact, impact_level: parseInt(e.target.value) })}
+                              className="w-4 h-4"
+                            />
+                            <div className="flex-1 flex items-center justify-between">
+                              <span className={`font-medium ${option.textColor}`}>{option.label}</span>
+                              <span className="text-sm text-gray-500">({option.level}/5)</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Etki Açıklaması
+                      </label>
+                      <textarea
+                        value={newDepartmentImpact.impact_description}
+                        onChange={(e) => setNewDepartmentImpact({ ...newDepartmentImpact, impact_description: e.target.value })}
+                        placeholder="Bu riskin birime etkisini açıklayın..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Etkilenen Süreçler
+                      </label>
+                      <textarea
+                        value={newDepartmentImpact.affected_processes}
+                        onChange={(e) => setNewDepartmentImpact({ ...newDepartmentImpact, affected_processes: e.target.value })}
+                        placeholder="Etkilenen süreçleri listeleyin..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Birime Özel Önlemler
+                      </label>
+                      <textarea
+                        value={newDepartmentImpact.specific_controls}
+                        onChange={(e) => setNewDepartmentImpact({ ...newDepartmentImpact, specific_controls: e.target.value })}
+                        placeholder="Birime özel kontrol ve önlemleri belirtin..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setShowDepartmentImpactForm(false);
+                        setNewDepartmentImpact({ department_id: '', impact_level: 3, impact_description: '', affected_processes: '', specific_controls: '' });
+                        setEditingDepartmentImpact(null);
+                      }}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                      İptal
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!newDepartmentImpact.department_id) {
+                          alert('Lütfen birim seçin');
+                          return;
+                        }
+
+                        if (editingDepartmentImpact) {
+                          const index = departmentImpacts.findIndex(i => i === editingDepartmentImpact);
+                          const updated = [...departmentImpacts];
+                          updated[index] = newDepartmentImpact;
+                          setDepartmentImpacts(updated);
+                        } else {
+                          setDepartmentImpacts([...departmentImpacts, newDepartmentImpact]);
+                        }
+
+                        setShowDepartmentImpactForm(false);
+                        setNewDepartmentImpact({ department_id: '', impact_level: 3, impact_description: '', affected_processes: '', specific_controls: '' });
+                        setEditingDepartmentImpact(null);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingDepartmentImpact ? 'Güncelle' : 'Ekle'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg flex items-center justify-between">
               <button
