@@ -107,8 +107,8 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         currentPath.startsWith('department-program-mapping') ||
         currentPath.startsWith('budget-performance') ||
         currentPath === 'program-mapping') {
-      if (!expandedSections.includes('Bütçe ve Performans')) {
-        setExpandedSections(prev => [...prev, 'Bütçe ve Performans']);
+      if (!expandedSections.includes('Bütçe PP')) {
+        setExpandedSections(prev => [...prev, 'Bütçe PP']);
       }
     }
   }, [currentPath]);
@@ -263,7 +263,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       ],
     },
     {
-      label: 'Bütçe ve Performans',
+      label: 'Bütçe PP',
       icon: TrendingUp,
       items: [
         { icon: Clock, label: 'Bütçe Dönemi Yönetimi', path: 'budget-period-management', adminOnly: true },
@@ -384,7 +384,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     if (section.label === 'Stratejik Plan') return moduleAccess.strategic_planning;
     if (section.label === 'Faaliyet Raporu') return moduleAccess.activity_reports;
     if (section.label === 'Bütçe Yönetimi') return moduleAccess.budget_performance;
-    if (section.label === 'Bütçe ve Performans') return moduleAccess.budget_performance;
+    if (section.label === 'Bütçe PP') return moduleAccess.budget_performance;
     if (section.label === 'İç Kontrol') return moduleAccess.internal_control;
     if (section.label === 'Risk Yönetimi') return moduleAccess.risk_management;
     if (section.label === 'Kalite Yönetimi') return moduleAccess.quality_management;
@@ -444,6 +444,17 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
                 const SectionIcon = section.icon;
                 const hasActiveItem = section.items.some(item => item.path === currentPath);
 
+                const mainModules = ['Stratejik Plan', 'Faaliyet Raporu', 'Bütçe PP', 'Risk Yönetimi', 'İç Kontrol'];
+                const isMainModule = mainModules.includes(section.label);
+
+                const moduleColors: { [key: string]: string } = {
+                  'Stratejik Plan': 'border-l-4 border-blue-400',
+                  'Faaliyet Raporu': 'border-l-4 border-green-400',
+                  'Bütçe PP': 'border-l-4 border-yellow-400',
+                  'Risk Yönetimi': 'border-l-4 border-red-400',
+                  'İç Kontrol': 'border-l-4 border-purple-400'
+                };
+
                 return (
                   <div key={sectionKey} className="mb-0.5">
                     <button
@@ -452,7 +463,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
                         hasActiveItem
                           ? 'bg-slate-800 text-white'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
+                      } ${isMainModule ? moduleColors[section.label] + ' font-semibold' : ''}`}
                     >
                       <div className="flex items-center space-x-3">
                         <SectionIcon className="w-5 h-5" />
