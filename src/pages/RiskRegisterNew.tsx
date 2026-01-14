@@ -112,17 +112,15 @@ export default function RiskRegisterNew() {
     return 'LOW';
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const saveRisk = async (approvalStatus: string = 'DRAFT') => {
     if (!formData.name) {
       alert('Lütfen zorunlu alanları doldurun!');
-      return;
+      return null;
     }
 
     if (formData.category_ids.length === 0) {
       alert('En az bir risk kategorisi seçmelisiniz!');
-      return;
+      return null;
     }
 
     setLoading(true);
@@ -146,6 +144,7 @@ export default function RiskRegisterNew() {
           risk_response: formData.risk_response,
           response_rationale: formData.response_rationale,
           status: 'ACTIVE',
+          approval_status: approvalStatus,
           is_active: true,
           identified_date: new Date().toISOString().split('T')[0],
           identified_by_id: profile?.id,
@@ -166,13 +165,31 @@ export default function RiskRegisterNew() {
 
       if (mappingError) throw mappingError;
 
-      alert('Risk başarıyla kaydedildi!');
-      navigate('risks/register');
+      return riskData;
     } catch (error) {
       console.error('Risk kaydedilirken hata:', error);
       alert('Risk kaydedilemedi!');
+      return null;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = await saveRisk('DRAFT');
+    if (result) {
+      alert('Risk taslak olarak kaydedildi!');
+      navigate('risks/register');
+    }
+  };
+
+  const handleSubmitAndSendToApproval = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const result = await saveRisk('PENDING_APPROVAL');
+    if (result) {
+      alert('Risk başarıyla kaydedildi ve onaya gönderildi!');
+      navigate('risks/register');
     }
   };
 
@@ -501,10 +518,19 @@ export default function RiskRegisterNew() {
             <button
               type="submit"
               disabled={loading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <Save className="w-5 h-5" />
-              {loading ? 'Kaydediliyor...' : 'Kaydet'}
+              {loading ? 'Kaydediliyor...' : 'Taslak Olarak Kaydet'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmitAndSendToApproval}
+              disabled={loading}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <AlertTriangle className="w-5 h-5" />
+              {loading ? 'Kaydediliyor...' : 'Kaydet ve Onaya Gönder'}
             </button>
             <button
               type="button"

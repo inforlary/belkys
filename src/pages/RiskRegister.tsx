@@ -137,10 +137,10 @@ function getApprovalStatusBadge(status: string) {
   const statusMap: Record<string, { color: string; emoji: string; label: string }> = {
     DRAFT: { color: 'bg-gray-200 text-gray-800', emoji: '📝', label: 'Taslak' },
     IN_REVIEW: { color: 'bg-blue-100 text-blue-700', emoji: '👀', label: 'İncelemede' },
-    PENDING_APPROVAL: { color: 'bg-orange-100 text-orange-700', emoji: '⏳', label: 'Onay Bekliyor' },
+    PENDING_APPROVAL: { color: 'bg-yellow-100 text-yellow-700', emoji: '⏳', label: 'Onay Bekliyor' },
     APPROVED: { color: 'bg-green-100 text-green-700', emoji: '✅', label: 'Onaylandı' },
     REJECTED: { color: 'bg-red-100 text-red-700', emoji: '❌', label: 'Reddedildi' },
-    CLOSED: { color: 'bg-gray-800 text-white', emoji: '🔒', label: 'Kapandı' }
+    CLOSED: { color: 'bg-purple-600 text-white', emoji: '🔒', label: 'Kapandı' }
   };
   return statusMap[status] || { color: 'bg-gray-200 text-gray-800', emoji: '❓', label: status };
 }
