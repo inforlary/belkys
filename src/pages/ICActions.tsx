@@ -100,6 +100,15 @@ const SPECIAL_UNITS = [
   { value: 'INTERNAL_AUDIT_COORDINATION_BOARD', label: 'İç Denetim Koordinasyon Kurulu' }
 ];
 
+interface GeneralCondition {
+  id: string;
+  code: string;
+  description: string;
+  standard_id: string;
+  provides_reasonable_assurance?: boolean;
+  current_situation?: string;
+}
+
 export default function ICActions() {
   const { profile } = useAuth();
   const { navigate } = useLocation();
@@ -109,6 +118,7 @@ export default function ICActions() {
   const [components, setComponents] = useState<Component[]>([]);
   const [standards, setStandards] = useState<Standard[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [generalConditions, setGeneralConditions] = useState<GeneralCondition[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
@@ -513,6 +523,31 @@ export default function ICActions() {
       });
 
       setActions(allActionsAndConditions);
+
+      const { data: conditionsData } = await supabase
+        .from('ic_general_conditions')
+        .select('id, code, description, standard_id, provides_reasonable_assurance')
+        .eq('action_plan_id', selectedPlanId);
+
+      if (conditionsData) {
+        const conditionsWithStatus = await Promise.all(
+          conditionsData.map(async (condition) => {
+            const { data: assessment } = await supabase
+              .from('ic_condition_assessments')
+              .select('current_situation')
+              .eq('condition_id', condition.id)
+              .eq('action_plan_id', selectedPlanId)
+              .maybeSingle();
+
+            return {
+              ...condition,
+              current_situation: assessment?.current_situation || ''
+            };
+          })
+        );
+
+        setGeneralConditions(conditionsWithStatus);
+      }
     } catch (error) {
       console.error('Eylemler yüklenirken hata:', error);
     } finally {
@@ -776,6 +811,38 @@ export default function ICActions() {
       delayedPercent: total > 0 ? Math.round((delayed / total) * 100) : 0
     };
   }, [baseFilteredActions]);
+
+  const detailedStats = useMemo(() => {
+    const uniqueComponents = new Set(standards.map(s => s.component_id).filter(Boolean));
+    const uniqueStandards = new Set(standards.map(s => s.id));
+    const totalConditions = generalConditions.length;
+
+    const conditionsWithReasonableAssurance = generalConditions.filter(
+      c => c.provides_reasonable_assurance === true &&
+      c.current_situation &&
+      c.current_situation.toLowerCase().includes('sağlan')
+    ).length;
+
+    const actualActions = actions.filter(a => a.status !== 'NO_ACTION');
+    const startedActions = actualActions.filter(a =>
+      a.status === 'IN_PROGRESS' ||
+      a.status === 'COMPLETED' ||
+      a.status === 'ONGOING'
+    ).length;
+
+    const continuousActions = actualActions.filter(a => a.is_continuous === true).length;
+
+    return {
+      totalComponents: uniqueComponents.size,
+      totalStandards: uniqueStandards.size,
+      totalConditions,
+      totalActions: actualActions.length,
+      startedActions,
+      continuousActions,
+      conditionsWithReasonableAssurance,
+      conditionsWithoutReasonableAssurance: totalConditions - conditionsWithReasonableAssurance
+    };
+  }, [standards, generalConditions, actions]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -1480,6 +1547,58 @@ export default function ICActions() {
             <Download className="w-4 h-4" />
             PDF İndir
           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 shadow-sm">
+          <div className="text-2xl font-bold text-blue-900">{detailedStats.totalComponents}</div>
+          <div className="text-xs text-blue-700 mt-1 font-medium">İç Kontrol</div>
+          <div className="text-xs text-blue-600">Bileşeni</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200 shadow-sm">
+          <div className="text-2xl font-bold text-indigo-900">{detailedStats.totalStandards}</div>
+          <div className="text-xs text-indigo-700 mt-1 font-medium">Standart</div>
+          <div className="text-xs text-indigo-600">Toplam</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200 shadow-sm">
+          <div className="text-2xl font-bold text-purple-900">{detailedStats.totalConditions}</div>
+          <div className="text-xs text-purple-700 mt-1 font-medium">Genel Şart</div>
+          <div className="text-xs text-purple-600">Toplam</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200 shadow-sm">
+          <div className="text-2xl font-bold text-green-900">{detailedStats.conditionsWithReasonableAssurance}</div>
+          <div className="text-xs text-green-700 mt-1 font-medium">Sağlanan Şart</div>
+          <div className="text-xs text-green-600">Makul Güvence</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200 shadow-sm">
+          <div className="text-2xl font-bold text-orange-900">{detailedStats.totalActions}</div>
+          <div className="text-xs text-orange-700 mt-1 font-medium">Toplam Eylem</div>
+          <div className="text-xs text-orange-600">Tanımlı</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-lg border border-teal-200 shadow-sm">
+          <div className="text-2xl font-bold text-teal-900">{detailedStats.startedActions}</div>
+          <div className="text-xs text-teal-700 mt-1 font-medium">Başlayan Eylem</div>
+          <div className="text-xs text-teal-600">
+            %{detailedStats.totalActions > 0 ? Math.round((detailedStats.startedActions / detailedStats.totalActions) * 100) : 0}
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-lg border border-cyan-200 shadow-sm">
+          <div className="text-2xl font-bold text-cyan-900">{detailedStats.continuousActions}</div>
+          <div className="text-xs text-cyan-700 mt-1 font-medium">Sürekli Eylem</div>
+          <div className="text-xs text-cyan-600">Devam Eden</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-rose-50 to-rose-100 p-4 rounded-lg border border-rose-200 shadow-sm">
+          <div className="text-2xl font-bold text-rose-900">{detailedStats.conditionsWithoutReasonableAssurance}</div>
+          <div className="text-xs text-rose-700 mt-1 font-medium">İyileştirme</div>
+          <div className="text-xs text-rose-600">Gerekli Şart</div>
         </div>
       </div>
 
