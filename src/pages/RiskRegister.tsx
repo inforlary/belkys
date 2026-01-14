@@ -21,6 +21,9 @@ interface Risk {
   related_activity_id: string | null;
   related_process_id: string | null;
   related_project_id: string | null;
+  external_organization: string | null;
+  external_contact: string | null;
+  coordination_department_id: string | null;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -45,6 +48,9 @@ interface Risk {
     };
   }>;
   department?: {
+    name: string;
+  };
+  coordination_department?: {
     name: string;
   };
   related_goal?: {
@@ -190,6 +196,9 @@ export default function RiskRegister() {
     related_activity_id: '',
     related_process_id: '',
     related_project_id: '',
+    external_organization: '',
+    external_contact: '',
+    coordination_department_id: '',
     inherent_likelihood: 3,
     inherent_impact: 3,
     residual_likelihood: 2,
@@ -256,6 +265,7 @@ export default function RiskRegister() {
             category:risk_categories(name, color),
             categories:risk_category_mappings(category_id, category:risk_categories(id, name, code, color)),
             department:departments!owner_department_id(name),
+            coordination_department:departments!coordination_department_id(name),
             related_goal:goals!related_goal_id(code, title),
             related_activity:activities!related_activity_id(code, name),
             related_process:qm_processes!related_process_id(code, name)
@@ -360,6 +370,9 @@ export default function RiskRegister() {
       related_activity_id: '',
       related_process_id: '',
       related_project_id: '',
+      external_organization: '',
+      external_contact: '',
+      coordination_department_id: '',
       inherent_likelihood: 3,
       inherent_impact: 3,
       residual_likelihood: 2,
@@ -411,6 +424,16 @@ export default function RiskRegister() {
       return;
     }
 
+    if ((formData.control_level === 'PARTIALLY_CONTROLLABLE' || formData.control_level === 'UNCONTROLLABLE') && !formData.external_organization) {
+      alert('Kontrol dışı/kısmen kontrol edilebilir riskler için yetkili dış kurum bilgisi zorunludur');
+      return;
+    }
+
+    if ((formData.control_level === 'PARTIALLY_CONTROLLABLE' || formData.control_level === 'UNCONTROLLABLE') && !formData.coordination_department_id) {
+      alert('Kontrol dışı/kısmen kontrol edilebilir riskler için koordinasyon birimi seçimi zorunludur');
+      return;
+    }
+
     const inherentScore = formData.inherent_likelihood * formData.inherent_impact;
     const residualScore = formData.residual_likelihood * formData.residual_impact;
 
@@ -438,6 +461,9 @@ export default function RiskRegister() {
           related_activity_id: formData.related_activity_id || null,
           related_process_id: formData.related_process_id || null,
           related_project_id: formData.related_project_id || null,
+          external_organization: formData.external_organization || null,
+          external_contact: formData.external_contact || null,
+          coordination_department_id: formData.coordination_department_id || null,
           inherent_likelihood: formData.inherent_likelihood,
           inherent_impact: formData.inherent_impact,
           residual_likelihood: formData.residual_likelihood,
@@ -1417,6 +1443,57 @@ export default function RiskRegister() {
                     <div className="flex items-start gap-2 text-sm text-purple-700">
                       <div className="text-lg">🏛️</div>
                       <p>Bu risk tüm kurumu etkiler ve belirli bir hedef, faaliyet veya sürece bağlı değildir.</p>
+                    </div>
+                  </div>
+                )}
+
+                {(formData.control_level === 'PARTIALLY_CONTROLLABLE' || formData.control_level === 'UNCONTROLLABLE') && (
+                  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <h4 className="text-sm font-semibold text-amber-900 mb-3">Dış Kurum Bilgileri</h4>
+                    <p className="text-xs text-amber-700 mb-4">
+                      Bu risk {formData.control_level === 'UNCONTROLLABLE' ? 'kontrol dışı' : 'kısmen kontrol edilebilir'} olduğu için dış kurum bilgileri gereklidir.
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Yetkili Dış Kurum <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.external_organization}
+                          onChange={(e) => setFormData({ ...formData, external_organization: e.target.value })}
+                          placeholder="Örn: Kocaeli Büyükşehir Belediyesi"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          İletişim Bilgisi
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.external_contact}
+                          onChange={(e) => setFormData({ ...formData, external_contact: e.target.value })}
+                          placeholder="Örn: Çevre Dairesi - 0262 XXX XX XX"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Koordinasyon Birimimiz <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={formData.coordination_department_id}
+                          onChange={(e) => setFormData({ ...formData, coordination_department_id: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        >
+                          <option value="">Koordinasyon birimini seçiniz...</option>
+                          {departments.map(dept => (
+                            <option key={dept.id} value={dept.id}>{dept.name}</option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">Dış kurumla iletişimi sağlayacak birim</p>
+                      </div>
                     </div>
                   </div>
                 )}

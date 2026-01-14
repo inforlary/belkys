@@ -23,6 +23,9 @@ interface Risk {
   related_activity_id: string | null;
   related_process_id: string | null;
   related_project_id: string | null;
+  external_organization: string | null;
+  external_contact: string | null;
+  coordination_department_id: string | null;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -36,6 +39,7 @@ interface Risk {
   identified_by_id: string;
   categories?: Array<{ category_id: string; category: { id: string; code: string; name: string; color: string } }>;
   department?: { name: string };
+  coordination_department?: { name: string };
   objective?: { code: string; title: string };
   goal?: { code: string; title: string };
   identified_by?: { full_name: string };
@@ -189,6 +193,7 @@ export default function RiskDetail() {
             *,
             categories:risk_category_mappings(category_id, category:risk_categories(id, code, name, color)),
             department:departments!owner_department_id(name),
+            coordination_department:departments!coordination_department_id(name),
             objective:objectives(code, title),
             goal:goals(code, title),
             identified_by:profiles!identified_by_id(full_name),
@@ -658,6 +663,33 @@ export default function RiskDetail() {
                   <h4 className="text-sm font-semibold text-gray-900 mb-2">İlişkili Hedef</h4>
                   <div className="text-gray-700">
                     {risk.goal.code} - {risk.goal.title}
+                  </div>
+                </div>
+              )}
+
+              {(risk.control_level === 'PARTIALLY_CONTROLLABLE' || risk.control_level === 'UNCONTROLLABLE') &&
+               (risk.external_organization || risk.external_contact || risk.coordination_department) && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <h4 className="text-sm font-semibold text-amber-900 mb-3">Dış Kurum Bilgileri</h4>
+                  <div className="space-y-2">
+                    {risk.external_organization && (
+                      <div>
+                        <span className="text-xs font-medium text-gray-600">Yetkili Dış Kurum:</span>
+                        <p className="text-sm text-gray-900 mt-1">{risk.external_organization}</p>
+                      </div>
+                    )}
+                    {risk.external_contact && (
+                      <div>
+                        <span className="text-xs font-medium text-gray-600">İletişim Bilgisi:</span>
+                        <p className="text-sm text-gray-900 mt-1">{risk.external_contact}</p>
+                      </div>
+                    )}
+                    {risk.coordination_department && (
+                      <div>
+                        <span className="text-xs font-medium text-gray-600">Koordinasyon Birimimiz:</span>
+                        <p className="text-sm text-gray-900 mt-1">{risk.coordination_department.name}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
