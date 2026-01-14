@@ -34,6 +34,10 @@ interface Risk {
   response_rationale: string;
   status: string;
   review_date: string;
+  review_period: string | null;
+  last_review_date: string | null;
+  next_review_date: string | null;
+  approval_status: string;
   category?: {
     name: string;
     color: string;
@@ -114,6 +118,12 @@ const approvalStatusOptions = [
   { value: 'APPROVED', label: 'Onaylandı' },
   { value: 'REJECTED', label: 'Reddedildi' },
   { value: 'CLOSED', label: 'Kapandı' }
+];
+
+const reviewStatusOptions = [
+  { value: '', label: 'Tüm Riskler' },
+  { value: 'overdue', label: 'Gözden Geçirme Gecikmiş' },
+  { value: 'upcoming', label: 'Yakında Gözden Geçirilecek (7 gün)' }
 ];
 
 const riskLevelOptions = [
@@ -205,6 +215,7 @@ export default function RiskRegister() {
     riskSource: '',
     riskRelation: '',
     controlLevel: '',
+    reviewStatus: '',
     search: ''
   });
 
@@ -607,6 +618,17 @@ export default function RiskRegister() {
     if (filters.riskSource && risk.risk_source !== filters.riskSource) return false;
     if (filters.riskRelation && risk.risk_relation !== filters.riskRelation) return false;
     if (filters.controlLevel && risk.control_level !== filters.controlLevel) return false;
+    if (filters.reviewStatus) {
+      if (!risk.next_review_date) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const reviewDate = new Date(risk.next_review_date);
+      reviewDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((reviewDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (filters.reviewStatus === 'overdue' && diffDays >= 0) return false;
+      if (filters.reviewStatus === 'upcoming' && (diffDays < 0 || diffDays > 7)) return false;
+    }
     if (filters.level) {
       const [min, max] = filters.level.split('-').map(Number);
       if (risk.residual_score < min || risk.residual_score > max) return false;
@@ -826,6 +848,21 @@ export default function RiskRegister() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {approvalStatusOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gözden Geçirme
+              </label>
+              <select
+                value={filters.reviewStatus}
+                onChange={(e) => setFilters({ ...filters, reviewStatus: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {reviewStatusOptions.map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>

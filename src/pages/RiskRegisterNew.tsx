@@ -30,6 +30,9 @@ export default function RiskRegisterNew() {
     residual_impact: 2,
     risk_response: 'REDUCE',
     response_rationale: '',
+    review_period: 'QUARTERLY',
+    last_review_date: new Date().toISOString().split('T')[0],
+    next_review_date: '',
   });
 
   useEffect(() => {
@@ -54,6 +57,38 @@ export default function RiskRegisterNew() {
     }
   }, [formData.owner_department_id, goals]);
 
+  useEffect(() => {
+    if (formData.review_period && formData.last_review_date) {
+      const lastDate = new Date(formData.last_review_date);
+      let nextDate: Date;
+
+      switch (formData.review_period) {
+        case 'MONTHLY':
+          nextDate = new Date(lastDate);
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          break;
+        case 'QUARTERLY':
+          nextDate = new Date(lastDate);
+          nextDate.setMonth(nextDate.getMonth() + 3);
+          break;
+        case 'SEMI_ANNUAL':
+          nextDate = new Date(lastDate);
+          nextDate.setMonth(nextDate.getMonth() + 6);
+          break;
+        case 'ANNUAL':
+          nextDate = new Date(lastDate);
+          nextDate.setFullYear(nextDate.getFullYear() + 1);
+          break;
+        default:
+          return;
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        next_review_date: nextDate.toISOString().split('T')[0],
+      }));
+    }
+  }, [formData.review_period, formData.last_review_date]);
 
   const loadCategories = async () => {
     try {
@@ -148,6 +183,9 @@ export default function RiskRegisterNew() {
           is_active: true,
           identified_date: new Date().toISOString().split('T')[0],
           identified_by_id: profile?.id,
+          review_period: formData.review_period || null,
+          last_review_date: formData.last_review_date || null,
+          next_review_date: formData.next_review_date || null,
         })
         .select()
         .single();
@@ -511,6 +549,53 @@ export default function RiskRegisterNew() {
                 placeholder="Risk yanıt stratejisinin gerekçesi..."
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Gözden Geçirme Ayarları</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Gözden Geçirme Periyodu
+                </label>
+                <select
+                  value={formData.review_period}
+                  onChange={(e) => setFormData({ ...formData, review_period: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="MONTHLY">Aylık</option>
+                  <option value="QUARTERLY">Çeyreklik (3 ay)</option>
+                  <option value="SEMI_ANNUAL">6 Aylık</option>
+                  <option value="ANNUAL">Yıllık</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Son Gözden Geçirme Tarihi
+                </label>
+                <input
+                  type="date"
+                  value={formData.last_review_date}
+                  onChange={(e) => setFormData({ ...formData, last_review_date: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Sonraki Gözden Geçirme Tarihi
+                </label>
+                <input
+                  type="date"
+                  value={formData.next_review_date}
+                  onChange={(e) => setFormData({ ...formData, next_review_date: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50"
+                />
+                <p className="text-xs text-slate-500 mt-1">Otomatik hesaplanır, düzenlenebilir</p>
+              </div>
             </div>
           </div>
 

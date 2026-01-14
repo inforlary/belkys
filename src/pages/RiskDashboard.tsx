@@ -10,6 +10,7 @@ interface DashboardStats {
   criticalRisks: number;
   openTreatments: number;
   alarmIndicators: number;
+  reviewPendingRisks: number;
 }
 
 interface MatrixCell {
@@ -106,7 +107,16 @@ export default function RiskDashboard() {
 
       const alarmIndicators = Array.from(indicatorsByIndicator.values()).filter(v => v.status === 'RED').length;
 
-      setStats({ totalRisks, criticalRisks, openTreatments, alarmIndicators });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const reviewPendingRisks = risksData.data?.filter(r => {
+        if (!r.next_review_date) return false;
+        const reviewDate = new Date(r.next_review_date);
+        reviewDate.setHours(0, 0, 0, 0);
+        return reviewDate <= today;
+      }).length || 0;
+
+      setStats({ totalRisks, criticalRisks, openTreatments, alarmIndicators, reviewPendingRisks });
 
       const matrix: MatrixCell[] = [];
       const matrixMap = new Map<string, number>();
@@ -291,6 +301,42 @@ export default function RiskDashboard() {
             <span className="mr-1">🔴</span> Alarm
           </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Gözden Geçirme Bekleyen Riskler</h2>
+          <button
+            onClick={() => navigate('/risk-management/risks?reviewStatus=overdue')}
+            className="text-sm text-orange-600 hover:text-orange-700 flex items-center gap-1"
+          >
+            Tümünü Gör <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        {stats && stats.reviewPendingRisks > 0 ? (
+          <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                <Clock className="w-6 h-6 text-orange-600" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{stats.reviewPendingRisks}</div>
+                <div className="text-sm text-gray-600">Risk gözden geçirme tarihini geçmiş</div>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/risk-management/risks?reviewStatus=overdue')}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              Gözden Geçir
+            </button>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <Clock className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <p>Gözden geçirme bekleyen risk bulunmuyor</p>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

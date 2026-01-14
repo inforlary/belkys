@@ -39,6 +39,9 @@ interface Risk {
   approved_by: string | null;
   approved_at: string | null;
   rejection_reason: string | null;
+  review_period: string | null;
+  last_review_date: string | null;
+  next_review_date: string | null;
   identified_date: string;
   identified_by_id: string;
   categories?: Array<{ category_id: string; category: { id: string; code: string; name: string; color: string } }>;
@@ -150,6 +153,52 @@ function getTreatmentStatusBadge(status: string) {
     CANCELLED: { color: 'bg-gray-500 text-white', emoji: '⚫', label: 'İptal' }
   };
   return statusMap[status] || statusMap['PLANNED'];
+}
+
+function getReviewPeriodLabel(period: string | null) {
+  const periodMap: Record<string, string> = {
+    MONTHLY: 'Aylık',
+    QUARTERLY: 'Çeyreklik (3 ay)',
+    SEMI_ANNUAL: '6 Aylık',
+    ANNUAL: 'Yıllık'
+  };
+  return period ? periodMap[period] || period : '-';
+}
+
+function getReviewStatus(nextReviewDate: string | null) {
+  if (!nextReviewDate) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const reviewDate = new Date(nextReviewDate);
+  reviewDate.setHours(0, 0, 0, 0);
+
+  const diffTime = reviewDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return {
+      status: 'overdue',
+      message: `${Math.abs(diffDays)} gün gecikmiş`,
+      color: 'bg-red-100 border-red-300 text-red-800',
+      icon: '🔴'
+    };
+  } else if (diffDays <= 7) {
+    return {
+      status: 'warning',
+      message: `${diffDays} gün kaldı`,
+      color: 'bg-yellow-100 border-yellow-300 text-yellow-800',
+      icon: '⚠️'
+    };
+  }
+
+  return {
+    status: 'ok',
+    message: `${diffDays} gün kaldı`,
+    color: 'bg-green-100 border-green-300 text-green-800',
+    icon: '✅'
+  };
 }
 
 function getRiskRelationBadge(relation: string) {
@@ -772,6 +821,45 @@ export default function RiskDetail() {
                   </div>
                 </div>
               </div>
+
+              {(risk.review_period || risk.next_review_date) && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Gözden Geçirme Bilgileri</h3>
+                    {risk.next_review_date && getReviewStatus(risk.next_review_date) && (
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border font-medium ${getReviewStatus(risk.next_review_date)?.color}`}>
+                        <span>{getReviewStatus(risk.next_review_date)?.icon}</span>
+                        <span>{getReviewStatus(risk.next_review_date)?.message}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    {risk.review_period && (
+                      <div>
+                        <div className="text-sm text-gray-600">Periyot</div>
+                        <div className="text-base font-medium text-gray-900">{getReviewPeriodLabel(risk.review_period)}</div>
+                      </div>
+                    )}
+                    {risk.last_review_date && (
+                      <div>
+                        <div className="text-sm text-gray-600">Son Gözden Geçirme</div>
+                        <div className="text-base font-medium text-gray-900">
+                          {new Date(risk.last_review_date).toLocaleDateString('tr-TR')}
+                        </div>
+                      </div>
+                    )}
+                    {risk.next_review_date && (
+                      <div>
+                        <div className="text-sm text-gray-600">Sonraki Gözden Geçirme</div>
+                        <div className="text-base font-medium text-gray-900">
+                          {new Date(risk.next_review_date).toLocaleDateString('tr-TR')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {risk.description && (
                 <div>
