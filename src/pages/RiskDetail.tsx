@@ -16,6 +16,7 @@ interface Risk {
   owner_department_id: string;
   objective_id: string;
   goal_id: string;
+  risk_source: string;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -266,6 +267,7 @@ export default function RiskDetail() {
         consequences: editFormData.consequences,
         owner_department_id: editFormData.owner_department_id,
         goal_id: editFormData.goal_id && editFormData.goal_id.trim() !== '' ? editFormData.goal_id : null,
+        risk_source: editFormData.risk_source,
         inherent_likelihood: editFormData.inherent_likelihood,
         inherent_impact: editFormData.inherent_impact,
         residual_likelihood: editFormData.residual_likelihood,
@@ -388,6 +390,7 @@ export default function RiskDetail() {
                   consequences: risk.consequences || '',
                   owner_department_id: risk.owner_department_id,
                   goal_id: risk.goal_id || '',
+                  risk_source: risk.risk_source || 'INTERNAL',
                   inherent_likelihood: risk.inherent_likelihood,
                   inherent_impact: risk.inherent_impact,
                   residual_likelihood: risk.residual_likelihood,
@@ -497,6 +500,13 @@ export default function RiskDetail() {
                     <div className="text-base font-medium text-gray-900">{risk.department?.name || '-'}</div>
                   </div>
                   <div>
+                    <div className="text-sm text-gray-600">Risk Kaynağı</div>
+                    <div className="text-base font-medium text-gray-900 flex items-center gap-2">
+                      <span>{risk.risk_source === 'EXTERNAL' ? '🌍' : '🏠'}</span>
+                      <span>{risk.risk_source === 'EXTERNAL' ? 'Dış Risk' : 'İç Risk'}</span>
+                    </div>
+                  </div>
+                  <div>
                     <div className="text-sm text-gray-600">Tanımlama Tarihi</div>
                     <div className="text-base font-medium text-gray-900">
                       {risk.identified_date ? new Date(risk.identified_date).toLocaleDateString('tr-TR') : '-'}
@@ -518,7 +528,7 @@ export default function RiskDetail() {
 
               {risk.causes && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Risk Kaynağı</h4>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Risk Nedeni</h4>
                   <p className="text-gray-700 whitespace-pre-wrap">{risk.causes}</p>
                 </div>
               )}
@@ -1254,7 +1264,7 @@ export default function RiskDetail() {
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Risk Kaynağı
+                    Risk Nedeni
                   </label>
                   <textarea
                     value={editFormData.causes}
@@ -1263,6 +1273,48 @@ export default function RiskDetail() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Riskin ortaya çıkma nedeni..."
                   />
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Risk Kaynağı <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="edit_risk_source"
+                        value="INTERNAL"
+                        checked={editFormData.risk_source === 'INTERNAL'}
+                        onChange={(e) => setEditFormData({ ...editFormData, risk_source: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">🏠</span>
+                        <div>
+                          <div className="font-medium">İç Risk</div>
+                          <div className="text-sm text-gray-600">Kurum içinden kaynaklanan riskler</div>
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="edit_risk_source"
+                        value="EXTERNAL"
+                        checked={editFormData.risk_source === 'EXTERNAL'}
+                        onChange={(e) => setEditFormData({ ...editFormData, risk_source: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">🌍</span>
+                        <div>
+                          <div className="font-medium">Dış Risk</div>
+                          <div className="text-sm text-gray-600">Kurum dışından kaynaklanan riskler</div>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="mt-4">

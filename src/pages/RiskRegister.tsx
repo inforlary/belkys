@@ -14,6 +14,7 @@ interface Risk {
   category_id: string;
   owner_department_id: string;
   goal_id: string;
+  risk_source: string;
   inherent_likelihood: number;
   inherent_impact: number;
   inherent_score: number;
@@ -123,6 +124,7 @@ export default function RiskRegister() {
     goal: '',
     level: '',
     status: '',
+    riskSource: '',
     search: ''
   });
 
@@ -140,6 +142,7 @@ export default function RiskRegister() {
     owner_department_id: '',
     owner_id: '',
     goal_id: '',
+    risk_source: 'INTERNAL',
     inherent_likelihood: 3,
     inherent_impact: 3,
     residual_likelihood: 2,
@@ -286,6 +289,7 @@ export default function RiskRegister() {
       owner_department_id: '',
       owner_id: '',
       goal_id: '',
+      risk_source: 'INTERNAL',
       inherent_likelihood: 3,
       inherent_impact: 3,
       residual_likelihood: 2,
@@ -347,6 +351,7 @@ export default function RiskRegister() {
           category_id: formData.category_ids[0],
           owner_department_id: formData.owner_department_id,
           goal_id: formData.goal_id || null,
+          risk_source: formData.risk_source,
           inherent_likelihood: formData.inherent_likelihood,
           inherent_impact: formData.inherent_impact,
           residual_likelihood: formData.residual_likelihood,
@@ -418,6 +423,7 @@ export default function RiskRegister() {
     if (filters.department && risk.owner_department_id !== filters.department) return false;
     if (filters.goal && risk.goal_id !== filters.goal) return false;
     if (filters.status && risk.status !== filters.status) return false;
+    if (filters.riskSource && risk.risk_source !== filters.riskSource) return false;
     if (filters.level) {
       const [min, max] = filters.level.split('-').map(Number);
       if (risk.residual_score < min || risk.residual_score > max) return false;
@@ -490,7 +496,7 @@ export default function RiskRegister() {
 
       <Card>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Kategori
@@ -581,6 +587,21 @@ export default function RiskRegister() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Kaynak
+              </label>
+              <select
+                value={filters.riskSource}
+                onChange={(e) => setFilters({ ...filters, riskSource: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Tümü</option>
+                <option value="INTERNAL">İç Risk</option>
+                <option value="EXTERNAL">Dış Risk</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Arama
               </label>
               <div className="relative">
@@ -605,7 +626,7 @@ export default function RiskRegister() {
           </div>
 
           <button
-            onClick={() => setFilters({ category: '', department: '', goal: '', level: '', status: '', search: '' })}
+            onClick={() => setFilters({ category: '', department: '', goal: '', level: '', status: '', riskSource: '', search: '' })}
             className="text-sm text-blue-600 hover:text-blue-700"
           >
             Filtreleri Temizle
@@ -636,6 +657,9 @@ export default function RiskRegister() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Birim
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Kaynak
+                </th>
                 <th
                   onClick={() => handleSort('inherent_score')}
                   className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -659,7 +683,7 @@ export default function RiskRegister() {
             <tbody className="bg-white divide-y divide-gray-200 relative">
               {sortedRisks.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <AlertTriangle className="w-12 h-12 text-gray-300" />
                       <p>Henüz risk kaydı bulunmuyor.</p>
@@ -727,6 +751,14 @@ export default function RiskRegister() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {risk.department?.name || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className="inline-flex items-center gap-1">
+                          <span>{risk.risk_source === 'EXTERNAL' ? '🌍' : '🏠'}</span>
+                          <span className="text-gray-700">
+                            {risk.risk_source === 'EXTERNAL' ? 'Dış Risk' : 'İç Risk'}
+                          </span>
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span
@@ -917,7 +949,7 @@ export default function RiskRegister() {
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Risk Kaynağı
+                    Risk Nedeni
                   </label>
                   <textarea
                     value={formData.causes}
@@ -926,6 +958,48 @@ export default function RiskRegister() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Riskin ortaya çıkma nedeni..."
                   />
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Risk Kaynağı <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="risk_source"
+                        value="INTERNAL"
+                        checked={formData.risk_source === 'INTERNAL'}
+                        onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">🏠</span>
+                        <div>
+                          <div className="font-medium">İç Risk</div>
+                          <div className="text-sm text-gray-600">Kurum içinden kaynaklanan riskler (yönetim, personel, süreçler vb.)</div>
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded border border-gray-200 hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="risk_source"
+                        value="EXTERNAL"
+                        checked={formData.risk_source === 'EXTERNAL'}
+                        onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
+                        className="mt-1"
+                      />
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">🌍</span>
+                        <div>
+                          <div className="font-medium">Dış Risk</div>
+                          <div className="text-sm text-gray-600">Kurum dışından kaynaklanan riskler (ekonomik, politik, doğal afetler vb.)</div>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-4">
