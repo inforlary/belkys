@@ -35,10 +35,15 @@ interface Risk {
   risk_response: string;
   response_rationale: string;
   status: string;
+  approval_status: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
   identified_date: string;
   identified_by_id: string;
   categories?: Array<{ category_id: string; category: { id: string; code: string; name: string; color: string } }>;
   department?: { name: string };
+  approved_by_profile?: { full_name: string };
   coordination_department?: { name: string };
   objective?: { code: string; title: string };
   goal?: { code: string; title: string };
@@ -124,6 +129,18 @@ function getStatusBadge(status: string) {
   return statusMap[status] || { color: 'bg-gray-200 text-gray-800', label: status };
 }
 
+function getApprovalStatusBadge(status: string) {
+  const statusMap: Record<string, { color: string; emoji: string; label: string }> = {
+    DRAFT: { color: 'bg-gray-200 text-gray-800', emoji: '📝', label: 'Taslak' },
+    IN_REVIEW: { color: 'bg-blue-100 text-blue-700', emoji: '👀', label: 'İncelemede' },
+    PENDING_APPROVAL: { color: 'bg-orange-100 text-orange-700', emoji: '⏳', label: 'Onay Bekliyor' },
+    APPROVED: { color: 'bg-green-100 text-green-700', emoji: '✅', label: 'Onaylandı' },
+    REJECTED: { color: 'bg-red-100 text-red-700', emoji: '❌', label: 'Reddedildi' },
+    CLOSED: { color: 'bg-gray-800 text-white', emoji: '🔒', label: 'Kapandı' }
+  };
+  return statusMap[status] || { color: 'bg-gray-200 text-gray-800', emoji: '❓', label: status };
+}
+
 function getTreatmentStatusBadge(status: string) {
   const statusMap: Record<string, { color: string; emoji: string; label: string }> = {
     PLANNED: { color: 'bg-gray-200 text-gray-800', emoji: '⚪', label: 'Başlamadı' },
@@ -170,6 +187,9 @@ export default function RiskDetail() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editFormData, setEditFormData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<string>('');
+  const [rejectionReason, setRejectionReason] = useState('');
   const [riskCategories, setRiskCategories] = useState<string[]>([]);
 
   const [showControlModal, setShowControlModal] = useState(false);
@@ -208,6 +228,7 @@ export default function RiskDetail() {
             objective:objectives(code, title),
             goal:goals(code, title),
             identified_by:profiles!identified_by_id(full_name),
+            approved_by_profile:profiles!approved_by(full_name),
             related_goal:goals!related_goal_id(code, title),
             related_activity:activities!related_activity_id(code, name),
             related_process:qm_processes!related_process_id(code, name)
@@ -372,6 +393,77 @@ export default function RiskDetail() {
     }
   }
 
+  async function handleApprovalStatusChange(newStatus: string) {
+    if (!risk) return;
+
+    if (newStatus === 'REJECTED' && !rejectionReason.trim()) {
+      alert('Red nedeni zorunludur!');
+      return;
+    }
+
+    try {
+      const updateData: any = {
+        approval_status: newStatus
+      };
+
+      if (newStatus === 'APPROVED') {
+        updateData.approved_by = profile?.id;
+        updateData.approved_at = new Date().toISOString();
+      }
+
+      if (newStatus === 'REJECTED') {
+        updateData.rejection_reason = rejectionReason;
+      }
+
+      const { error } = await supabase
+        .from('risks')
+        .update(updateData)
+        .eq('id', riskId);
+
+      if (error) throw error;
+
+      alert('Risk durumu başarıyla güncellendi!');
+      setShowApprovalModal(false);
+      setRejectionReason('');
+      setApprovalAction('');
+      loadData();
+    } catch (error: any) {
+      console.error('Durum güncellenirken hata:', error);
+      alert('Durum güncellenirken hata oluştu!');
+    }
+  }
+
+  function getAvailableActions() {
+    if (!risk) return [];
+
+    const actions = [];
+    const status = risk.approval_status;
+
+    if (status === 'DRAFT') {
+      actions.push({ action: 'IN_REVIEW', label: 'İncelemeye Gönder', color: 'bg-blue-600 hover:bg-blue-700' });
+    }
+
+    if (status === 'IN_REVIEW') {
+      actions.push({ action: 'PENDING_APPROVAL', label: 'Onaya Gönder', color: 'bg-orange-600 hover:bg-orange-700' });
+      actions.push({ action: 'DRAFT', label: 'Taslağa Döndür', color: 'bg-gray-600 hover:bg-gray-700' });
+    }
+
+    if (status === 'PENDING_APPROVAL') {
+      actions.push({ action: 'APPROVED', label: 'Onayla', color: 'bg-green-600 hover:bg-green-700' });
+      actions.push({ action: 'REJECTED', label: 'Reddet', color: 'bg-red-600 hover:bg-red-700' });
+    }
+
+    if (status === 'REJECTED') {
+      actions.push({ action: 'DRAFT', label: 'Taslağa Döndür', color: 'bg-gray-600 hover:bg-gray-700' });
+    }
+
+    if (status === 'APPROVED') {
+      actions.push({ action: 'CLOSED', label: 'Kapat', color: 'bg-gray-800 hover:bg-gray-900' });
+    }
+
+    return actions;
+  }
+
   const tabs = [
     { id: 'general', label: 'Genel Bilgiler', icon: Info },
     { id: 'assessment', label: 'Değerlendirme', icon: BarChart3 },
@@ -410,9 +502,11 @@ export default function RiskDetail() {
   const inherentBadge = getRiskScoreBadge(risk.inherent_score);
   const residualBadge = getRiskScoreBadge(risk.residual_score);
   const statusBadge = getStatusBadge(risk.status);
+  const approvalBadge = getApprovalStatusBadge(risk.approval_status);
 
   const activeControls = controls.filter(c => c.operating_effectiveness >= 3).length;
   const activeTreatments = treatments.filter(t => t.status === 'IN_PROGRESS' || t.status === 'DELAYED').length;
+  const availableActions = getAvailableActions();
 
   return (
     <div className="space-y-6">
@@ -432,8 +526,9 @@ export default function RiskDetail() {
               <h1 className="text-2xl font-bold text-gray-900">
                 {risk.code} - {risk.name}
               </h1>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
-                {statusBadge.label}
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${approvalBadge.color} flex items-center gap-1`}>
+                <span>{approvalBadge.emoji}</span>
+                <span>{approvalBadge.label}</span>
               </span>
             </div>
           </div>
@@ -478,6 +573,76 @@ export default function RiskDetail() {
           </div>
         )}
       </div>
+
+      {availableActions.length > 0 && isAdmin && (
+        <Card className="p-4 bg-blue-50 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-blue-600" />
+              <div>
+                <div className="font-semibold text-gray-900">Onay Durumu Değiştir</div>
+                <div className="text-sm text-gray-600">Risk için mevcut durum değişiklik aksiyonları</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {availableActions.map(action => (
+                <button
+                  key={action.action}
+                  onClick={() => {
+                    setApprovalAction(action.action);
+                    if (action.action === 'REJECTED') {
+                      setShowApprovalModal(true);
+                    } else {
+                      if (confirm(`Risk durumunu "${action.label}" olarak değiştirmek istediğinizden emin misiniz?`)) {
+                        handleApprovalStatusChange(action.action);
+                      }
+                    }
+                  }}
+                  className={`px-4 py-2 text-white rounded-lg transition ${action.color}`}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {risk.approval_status === 'REJECTED' && risk.rejection_reason && (
+        <Card className="p-4 bg-red-50 border-red-200">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-red-900 mb-1">Risk Reddedildi</div>
+              <div className="text-sm text-red-700 mb-2">Red Nedeni:</div>
+              <div className="text-sm text-gray-700 bg-white p-3 rounded border border-red-200 whitespace-pre-wrap">
+                {risk.rejection_reason}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {risk.approval_status === 'APPROVED' && risk.approved_by_profile && (
+        <Card className="p-4 bg-green-50 border-green-200">
+          <div className="flex items-start gap-3">
+            <div className="text-2xl">✅</div>
+            <div className="flex-1">
+              <div className="font-semibold text-green-900 mb-1">Risk Onaylandı</div>
+              <div className="text-sm text-gray-700">
+                <span className="font-medium">{risk.approved_by_profile.full_name}</span> tarafından{' '}
+                {risk.approved_at && new Date(risk.approved_at).toLocaleDateString('tr-TR', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })} tarihinde onaylandı.
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-6 text-center">
@@ -2664,6 +2829,65 @@ function IndicatorModal({ isOpen, onClose, riskId, indicator, onSuccess }: any) 
           </div>
         </form>
       </div>
+
+      {showApprovalModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+            <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-red-600">Risk Reddet</h3>
+              <button
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  setRejectionReason('');
+                  setApprovalAction('');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Red Nedeni <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Risk neden reddedildi? Detaylı açıklama giriniz..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  rows={5}
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Red nedeni risk sahibi tarafından görülecektir.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  setRejectionReason('');
+                  setApprovalAction('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => handleApprovalStatusChange(approvalAction)}
+                disabled={!rejectionReason.trim()}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reddet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

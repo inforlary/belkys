@@ -106,6 +106,16 @@ const statusOptions = [
   { value: 'CLOSED', label: 'Kapatıldı' }
 ];
 
+const approvalStatusOptions = [
+  { value: '', label: 'Tüm Durumlar' },
+  { value: 'DRAFT', label: 'Taslak' },
+  { value: 'IN_REVIEW', label: 'İncelemede' },
+  { value: 'PENDING_APPROVAL', label: 'Onay Bekliyor' },
+  { value: 'APPROVED', label: 'Onaylandı' },
+  { value: 'REJECTED', label: 'Reddedildi' },
+  { value: 'CLOSED', label: 'Kapandı' }
+];
+
 const riskLevelOptions = [
   { value: '', label: 'Tüm Seviyeler' },
   { value: '1-4', label: 'Düşük (1-4)' },
@@ -121,6 +131,18 @@ function getRiskScoreBadge(score: number) {
   if (score >= 10) return { color: 'bg-orange-500 text-white', emoji: '🟠', label: 'Yüksek' };
   if (score >= 5) return { color: 'bg-yellow-500 text-black', emoji: '🟡', label: 'Orta' };
   return { color: 'bg-green-500 text-white', emoji: '🟢', label: 'Düşük' };
+}
+
+function getApprovalStatusBadge(status: string) {
+  const statusMap: Record<string, { color: string; emoji: string; label: string }> = {
+    DRAFT: { color: 'bg-gray-200 text-gray-800', emoji: '📝', label: 'Taslak' },
+    IN_REVIEW: { color: 'bg-blue-100 text-blue-700', emoji: '👀', label: 'İncelemede' },
+    PENDING_APPROVAL: { color: 'bg-orange-100 text-orange-700', emoji: '⏳', label: 'Onay Bekliyor' },
+    APPROVED: { color: 'bg-green-100 text-green-700', emoji: '✅', label: 'Onaylandı' },
+    REJECTED: { color: 'bg-red-100 text-red-700', emoji: '❌', label: 'Reddedildi' },
+    CLOSED: { color: 'bg-gray-800 text-white', emoji: '🔒', label: 'Kapandı' }
+  };
+  return statusMap[status] || { color: 'bg-gray-200 text-gray-800', emoji: '❓', label: status };
 }
 
 function getStatusBadge(status: string) {
@@ -179,6 +201,7 @@ export default function RiskRegister() {
     goal: '',
     level: '',
     status: '',
+    approvalStatus: '',
     riskSource: '',
     riskRelation: '',
     controlLevel: '',
@@ -580,6 +603,7 @@ export default function RiskRegister() {
     if (filters.department && risk.owner_department_id !== filters.department) return false;
     if (filters.goal && risk.goal_id !== filters.goal) return false;
     if (filters.status && risk.status !== filters.status) return false;
+    if (filters.approvalStatus && risk.approval_status !== filters.approvalStatus) return false;
     if (filters.riskSource && risk.risk_source !== filters.riskSource) return false;
     if (filters.riskRelation && risk.risk_relation !== filters.riskRelation) return false;
     if (filters.controlLevel && risk.control_level !== filters.controlLevel) return false;
@@ -794,6 +818,21 @@ export default function RiskRegister() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Onay Durumu
+              </label>
+              <select
+                value={filters.approvalStatus}
+                onChange={(e) => setFilters({ ...filters, approvalStatus: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {approvalStatusOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Arama
               </label>
               <div className="relative">
@@ -818,7 +857,7 @@ export default function RiskRegister() {
           </div>
 
           <button
-            onClick={() => setFilters({ category: '', department: '', goal: '', level: '', status: '', riskSource: '', riskRelation: '', controlLevel: '', search: '' })}
+            onClick={() => setFilters({ category: '', department: '', goal: '', level: '', status: '', approvalStatus: '', riskSource: '', riskRelation: '', controlLevel: '', search: '' })}
             className="text-sm text-blue-600 hover:text-blue-700"
           >
             Filtreleri Temizle
@@ -873,6 +912,9 @@ export default function RiskRegister() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Durum
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Onay Durumu
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   İşlem
                 </th>
@@ -901,6 +943,7 @@ export default function RiskRegister() {
                   const inherentBadge = getRiskScoreBadge(risk.inherent_score);
                   const residualBadge = getRiskScoreBadge(risk.residual_score);
                   const statusBadge = getStatusBadge(risk.status);
+                  const approvalBadge = getApprovalStatusBadge(risk.approval_status || 'DRAFT');
 
                   const relatedGoal = risk.goal_id ? goals.find(g => g.id === risk.goal_id) : null;
                   const exceedsAppetite = relatedGoal?.risk_appetite_max_score && risk.residual_score > relatedGoal.risk_appetite_max_score;
@@ -1001,6 +1044,14 @@ export default function RiskRegister() {
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadge.color}`}
                         >
                           {statusBadge.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${approvalBadge.color}`}
+                        >
+                          <span>{approvalBadge.emoji}</span>
+                          <span>{approvalBadge.label}</span>
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
