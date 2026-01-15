@@ -43,7 +43,7 @@ interface DepartmentBudgetSummary {
 }
 
 export default function BudgetActivityIntegration() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [selectedProgram, setSelectedProgram] = useState<string>('all');
@@ -55,10 +55,10 @@ export default function BudgetActivityIntegration() {
 
   useEffect(() => {
     loadData();
-  }, [selectedYear, user]);
+  }, [selectedYear, profile]);
 
   const loadData = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) return;
 
     setLoading(true);
     try {
@@ -97,7 +97,7 @@ export default function BudgetActivityIntegration() {
           )
         )
       `)
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     if (!budgetPrograms) return;
 
@@ -165,7 +165,7 @@ export default function BudgetActivityIntegration() {
     const { data: departments } = await supabase
       .from('departments')
       .select('id, name')
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     if (!departments) return;
 

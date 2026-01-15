@@ -37,7 +37,7 @@ interface RiskHeatMapData {
 }
 
 export default function RiskICMap() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [riskGoalConnections, setRiskGoalConnections] = useState<RiskGoalConnection[]>([]);
@@ -50,14 +50,14 @@ export default function RiskICMap() {
 
   useEffect(() => {
     loadDepartments();
-  }, [user]);
+  }, [profile]);
 
   useEffect(() => {
     loadData();
-  }, [selectedYear, selectedDepartment, user]);
+  }, [selectedYear, selectedDepartment, profile]);
 
   const loadDepartments = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) return;
 
     const { data } = await supabase
       .from('departments')
@@ -69,7 +69,7 @@ export default function RiskICMap() {
   };
 
   const loadData = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) return;
 
     setLoading(true);
     try {
@@ -99,7 +99,7 @@ export default function RiskICMap() {
         goal:goals(id, name, department:departments(name), indicators(name)),
         risk_treatments(status)
       `)
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     if (selectedDepartment !== 'all') {
       const dept = departments.find(d => d.name === selectedDepartment);
@@ -162,7 +162,7 @@ export default function RiskICMap() {
         status,
         responsible_departments
       `)
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     if (!actions) return;
 

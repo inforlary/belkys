@@ -28,7 +28,7 @@ type SortField = 'code' | 'name' | 'department' | 'achievement' | 'deviation';
 type SortDirection = 'asc' | 'desc';
 
 export default function IndicatorPerformanceMatrix() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [filteredIndicators, setFilteredIndicators] = useState<Indicator[]>([]);
@@ -44,18 +44,18 @@ export default function IndicatorPerformanceMatrix() {
 
   useEffect(() => {
     loadDepartments();
-  }, [user]);
+  }, [profile]);
 
   useEffect(() => {
     loadIndicators();
-  }, [selectedYear, user]);
+  }, [selectedYear, profile]);
 
   useEffect(() => {
     filterAndSortIndicators();
   }, [indicators, searchTerm, selectedDepartment, selectedStatus, sortField, sortDirection]);
 
   const loadDepartments = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) return;
 
     const { data } = await supabase
       .from('departments')
@@ -67,7 +67,7 @@ export default function IndicatorPerformanceMatrix() {
   };
 
   const loadIndicators = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) return;
 
     setLoading(true);
     try {

@@ -55,7 +55,7 @@ interface BestWorstPerformer {
 }
 
 export default function ComparativeAnalysis() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [selectedMetric, setSelectedMetric] = useState<'achievement' | 'budget' | 'dataEntry'>('achievement');
@@ -69,10 +69,13 @@ export default function ComparativeAnalysis() {
 
   useEffect(() => {
     loadData();
-  }, [selectedYear, user]);
+  }, [selectedYear, profile]);
 
   const loadData = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -93,7 +96,7 @@ export default function ComparativeAnalysis() {
     const { data: departments } = await supabase
       .from('departments')
       .select('id, name')
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     if (!departments) return;
 
@@ -158,7 +161,7 @@ export default function ComparativeAnalysis() {
       const { data: goals } = await supabase
         .from('goals')
         .select('id')
-        .eq('organization_id', user?.organizationId)
+        .eq('organization_id', profile?.organization_id)
         .eq('fiscal_year', year);
 
       const goalIds = goals?.map(g => g.id) || [];
@@ -187,7 +190,7 @@ export default function ComparativeAnalysis() {
       const { data: activities } = await supabase
         .from('activities')
         .select('id')
-        .eq('organization_id', user?.organizationId)
+        .eq('organization_id', profile?.organization_id)
         .eq('status', 'completed');
 
       comparisons.push({
@@ -210,7 +213,7 @@ export default function ComparativeAnalysis() {
       const { data: goals } = await supabase
         .from('goals')
         .select('id')
-        .eq('organization_id', user?.organizationId)
+        .eq('organization_id', profile?.organization_id)
         .eq('fiscal_year', year);
 
       const goalIds = goals?.map(g => g.id) || [];

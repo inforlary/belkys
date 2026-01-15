@@ -55,11 +55,12 @@ interface ICAction {
 }
 
 export default function DepartmentAnalysis() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState(2025);
+  const [error, setError] = useState<string | null>(null);
   const [kpis, setKpis] = useState<DepartmentKPIs | null>(null);
   const [quarterlyTrend, setQuarterlyTrend] = useState<any[]>([]);
   const [indicatorPerformance, setIndicatorPerformance] = useState<IndicatorPerformance[]>([]);
@@ -69,7 +70,7 @@ export default function DepartmentAnalysis() {
 
   useEffect(() => {
     loadDepartments();
-  }, [user]);
+  }, [profile]);
 
   useEffect(() => {
     if (selectedDepartment) {
@@ -78,13 +79,23 @@ export default function DepartmentAnalysis() {
   }, [selectedDepartment, selectedYear]);
 
   const loadDepartments = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) {
+      setLoading(false);
+      return;
+    }
 
-    const { data } = await supabase
+    const { data, error: deptError } = await supabase
       .from('departments')
       .select('id, name')
-      .eq('organization_id', user.organizationId)
+      .eq('organization_id', profile.organization_id)
       .order('name');
+
+    if (deptError) {
+      console.error('Department load error:', deptError);
+      setError('Müdürlükler yüklenemedi');
+      setLoading(false);
+      return;
+    }
 
     if (data && data.length > 0) {
       setDepartments(data);

@@ -35,7 +35,7 @@ interface RiskDistribution {
 }
 
 export default function InstitutionOverview() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [selectedQuarter, setSelectedQuarter] = useState<number | null>(null);
@@ -44,15 +44,21 @@ export default function InstitutionOverview() {
   const [departmentPerformance, setDepartmentPerformance] = useState<DepartmentPerformance[]>([]);
   const [riskDistribution, setRiskDistribution] = useState<RiskDistribution[]>([]);
   const [goalProgress, setGoalProgress] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
-  }, [selectedYear, selectedQuarter, user]);
+  }, [selectedYear, selectedQuarter, profile]);
 
   const loadData = async () => {
-    if (!user?.organizationId) return;
+    if (!profile?.organization_id) {
+      setLoading(false);
+      setError('Organizasyon bilgisi bulunamadı');
+      return;
+    }
 
     setLoading(true);
+    setError(null);
     try {
       await Promise.all([
         loadKPIData(),
@@ -63,17 +69,22 @@ export default function InstitutionOverview() {
       ]);
     } catch (error) {
       console.error('Error loading data:', error);
+      setError('Veriler yüklenirken bir hata oluştu');
     } finally {
       setLoading(false);
     }
   };
 
   const loadKPIData = async () => {
-    const { data: goals } = await supabase
+    const { data: goals, error: goalsError } = await supabase
       .from('goals')
       .select('id')
-      .eq('organization_id', user?.organizationId)
+      .eq('organization_id', profile?.organization_id)
       .eq('fiscal_year', selectedYear);
+
+    if (goalsError) {
+      console.error('Goals error:', goalsError);
+    }
 
     const { data: indicators } = await supabase
       .from('indicators')
@@ -97,12 +108,12 @@ export default function InstitutionOverview() {
     const { data: risks } = await supabase
       .from('risks')
       .select('id')
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     const { data: activities } = await supabase
       .from('activities')
       .select('id, status')
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     const completedActivities = activities?.filter(a => a.status === 'completed').length || 0;
 
@@ -149,7 +160,7 @@ export default function InstitutionOverview() {
     const { data: departments } = await supabase
       .from('departments')
       .select('id, name')
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     if (!departments) return;
 
@@ -196,7 +207,7 @@ export default function InstitutionOverview() {
     const { data: risks } = await supabase
       .from('risks')
       .select('inherent_probability, inherent_impact')
-      .eq('organization_id', user?.organizationId);
+      .eq('organization_id', profile?.organization_id);
 
     const distribution = {
       low: 0,
@@ -225,7 +236,7 @@ export default function InstitutionOverview() {
     const { data: strategicPlans } = await supabase
       .from('strategic_plans')
       .select('id, objectives(id, name, goals(id, name, indicators(id, target_value)))')
-      .eq('organization_id', user?.organizationId)
+      .eq('organization_id', profile?.organization_id)
       .eq('start_year', selectedYear)
       .single();
 
@@ -252,6 +263,23 @@ export default function InstitutionOverview() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Veriler yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 font-medium">{error}</p>
+          <button
+            onClick={loadData}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Tekrar Dene
+          </button>
         </div>
       </div>
     );
