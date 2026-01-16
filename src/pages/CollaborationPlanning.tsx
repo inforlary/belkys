@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, X, Save, Trash2, Users, Banknote, FileText, Target, AlertTriangle, Search, Lightbulb, ChevronDown, ChevronRight, FileDown, Edit, Shield, TrendingDown } from 'lucide-react';
+import { Plus, X, Save, Trash2, Users, Banknote, FileText, Target, AlertTriangle, Search, Lightbulb, ChevronDown, ChevronRight, FileDown, Edit, Shield, TrendingDown, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -111,6 +111,9 @@ export default function CollaborationPlanning() {
   const [plans, setPlans] = useState<CollaborationPlan[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [processes, setProcesses] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [strategicPlan, setStrategicPlan] = useState<StrategicPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -137,12 +140,27 @@ export default function CollaborationPlanning() {
   const [transferFormData, setTransferFormData] = useState({
     category_ids: [] as string[],
     status: 'ACTIVE',
+    risk_source: '',
+    risk_relation: '',
+    control_level: '',
+    coordination_department_id: '',
+    external_organization: '',
+    external_contact: '',
+    related_goal_id: '',
+    related_activity_id: '',
+    related_process_id: '',
+    related_project_id: '',
     inherent_likelihood: 3,
     inherent_impact: 3,
     residual_likelihood: 2,
     residual_impact: 2,
+    target_probability: 1,
+    target_impact: 1,
+    target_date: '',
     risk_response: 'MITIGATE',
     response_rationale: '',
+    review_period: 'QUARTERLY',
+    last_review_date: new Date().toISOString().split('T')[0],
     additional_description: ''
   });
 
@@ -172,7 +190,7 @@ export default function CollaborationPlanning() {
     try {
       setLoading(true);
 
-      const [plansRes, goalsRes, depsRes, planRes, categoriesRes, transferredRes, criteriaRes] = await Promise.all([
+      const [plansRes, goalsRes, depsRes, planRes, categoriesRes, transferredRes, criteriaRes, activitiesRes, processesRes, projectsRes] = await Promise.all([
         supabase
           .from('collaboration_plans')
           .select(`
@@ -223,7 +241,25 @@ export default function CollaborationPlanning() {
           .select('*')
           .eq('organization_id', profile.organization_id)
           .order('criteria_type')
-          .order('level')
+          .order('level'),
+
+        supabase
+          .from('activities')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .order('name'),
+
+        supabase
+          .from('qm_processes')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .order('code'),
+
+        supabase
+          .from('projects')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .order('name')
       ]);
 
       if (plansRes.error) throw plansRes.error;
@@ -233,6 +269,9 @@ export default function CollaborationPlanning() {
       setPlans(plansRes.data || []);
       setGoals(goalsRes.data || []);
       setDepartments(depsRes.data || []);
+      setActivities(activitiesRes.data || []);
+      setProcesses(processesRes.data || []);
+      setProjects(projectsRes.data || []);
       setStrategicPlan(planRes.data);
       setRiskCategories(categoriesRes.data || []);
       setTransferredRisks(transferredRes.data || []);
@@ -564,12 +603,27 @@ export default function CollaborationPlanning() {
     setTransferFormData({
       category_ids: [],
       status: 'ACTIVE',
+      risk_source: '',
+      risk_relation: '',
+      control_level: '',
+      coordination_department_id: '',
+      external_organization: '',
+      external_contact: '',
+      related_goal_id: plan.goal_id || '',
+      related_activity_id: '',
+      related_process_id: '',
+      related_project_id: '',
       inherent_likelihood: 3,
       inherent_impact: 3,
       residual_likelihood: 2,
       residual_impact: 2,
+      target_probability: 1,
+      target_impact: 1,
+      target_date: '',
       risk_response: 'MITIGATE',
       response_rationale: '',
+      review_period: 'QUARTERLY',
+      last_review_date: new Date().toISOString().split('T')[0],
       additional_description: ''
     });
     setControls([]);
@@ -580,8 +634,14 @@ export default function CollaborationPlanning() {
 
   const handleTransferRisk = async () => {
     if (!profile?.organization_id || !transferringRisk?.plan.goal) return;
+
     if (transferFormData.category_ids.length === 0) {
       alert('En az bir risk kategorisi seçmelisiniz.');
+      return;
+    }
+
+    if (!transferFormData.risk_source || !transferFormData.risk_relation || !transferFormData.control_level) {
+      alert('Lütfen tüm zorunlu alanları doldurun (Risk Kaynağı, İlişki Türü, Kontrol Düzeyi).');
       return;
     }
 
@@ -592,26 +652,41 @@ export default function CollaborationPlanning() {
         ? `İşbirliği planından aktarılan risk: ${transferringRisk.plan.title}\n\n${transferFormData.additional_description}`
         : `İşbirliği planından aktarılan risk: ${transferringRisk.plan.title}`;
 
-      const inherentScore = transferFormData.inherent_likelihood * transferFormData.inherent_impact;
       const residualScore = transferFormData.residual_likelihood * transferFormData.residual_impact;
+      const nextReviewDate = calculateNextReview(transferFormData.last_review_date, transferFormData.review_period);
 
       const { data: riskData, error: riskError } = await supabase
         .from('risks')
         .insert({
           organization_id: profile.organization_id,
-          goal_id: transferringRisk.plan.goal_id,
+          goal_id: transferFormData.related_goal_id || null,
           collaboration_item_id: transferringRisk.item.id,
           code: nextCode,
           name: transferringRisk.item.content,
           description: description,
-          owner_department_id: transferringRisk.plan.responsible_department_id,
+          risk_source: transferFormData.risk_source,
+          risk_relation: transferFormData.risk_relation,
+          control_level: transferFormData.control_level,
+          owner_department_id: transferFormData.control_level === 'CONTROLLABLE' ? transferringRisk.plan.responsible_department_id : null,
+          coordination_department_id: transferFormData.coordination_department_id || null,
+          external_organization: transferFormData.external_organization || null,
+          external_contact: transferFormData.external_contact || null,
+          related_activity_id: transferFormData.related_activity_id || null,
+          related_process_id: transferFormData.related_process_id || null,
+          related_project_id: transferFormData.related_project_id || null,
           inherent_likelihood: transferFormData.inherent_likelihood,
           inherent_impact: transferFormData.inherent_impact,
           residual_likelihood: transferFormData.residual_likelihood,
           residual_impact: transferFormData.residual_impact,
+          target_probability: transferFormData.target_probability,
+          target_impact: transferFormData.target_impact,
+          target_date: transferFormData.target_date || null,
           risk_level: calculateRiskLevel(residualScore),
           risk_response: transferFormData.risk_response,
           response_rationale: transferFormData.response_rationale,
+          review_period: transferFormData.review_period,
+          last_review_date: transferFormData.last_review_date,
+          next_review_date: nextReviewDate,
           status: transferFormData.status,
           is_active: true,
           identified_date: new Date().toISOString().split('T')[0],
@@ -658,6 +733,25 @@ export default function CollaborationPlanning() {
       console.error('Risk aktarılırken hata:', error);
       alert('Risk aktarılırken hata oluştu: ' + (error?.message || 'Bilinmeyen hata'));
     }
+  };
+
+  const calculateNextReview = (lastReview: string, period: string) => {
+    const date = new Date(lastReview);
+    switch (period) {
+      case 'MONTHLY':
+        date.setMonth(date.getMonth() + 1);
+        break;
+      case 'QUARTERLY':
+        date.setMonth(date.getMonth() + 3);
+        break;
+      case 'SEMI_ANNUAL':
+        date.setMonth(date.getMonth() + 6);
+        break;
+      case 'ANNUAL':
+        date.setFullYear(date.getFullYear() + 1);
+        break;
+    }
+    return date.toISOString().split('T')[0];
   };
 
   const handleAddControl = () => {
@@ -1455,13 +1549,17 @@ export default function CollaborationPlanning() {
 
       {showTransferModal && transferringRisk && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg max-w-5xl w-full my-8">
+          <div className="bg-white rounded-lg max-w-6xl w-full my-8">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg z-10">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Risk Yönetimine Aktar</h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Risk: <span className="font-medium">{transferringRisk.item.content}</span>
+                    <span className="font-semibold">Risk Kodu:</span> Otomatik oluşturulacak
+                    {' | '}
+                    <span className="font-semibold">Risk Adı:</span> {transferringRisk.item.content}
+                    {' | '}
+                    <span className="font-semibold">Sorumlu Birim:</span> {transferringRisk.plan.responsible_department?.name}
                   </p>
                 </div>
                 <button
@@ -1473,9 +1571,10 @@ export default function CollaborationPlanning() {
               </div>
             </div>
 
-            <div className="px-6 py-6 space-y-8 max-h-[calc(90vh-200px)] overflow-y-auto">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Temel Bilgiler</h3>
+            <div className="px-6 py-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
+              {/* BÖLÜM 1: Risk Kategorileri */}
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">1. Risk Kategorileri</h3>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1866,6 +1965,499 @@ export default function CollaborationPlanning() {
                       </span>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* BÖLÜM 2: Risk Sınıflandırması */}
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">2. Risk Sınıflandırması</h3>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      Risk Kaynağı <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="INTERNAL"
+                          checked={transferFormData.risk_source === 'INTERNAL'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_source: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">İç Risk</div>
+                          <div className="text-xs text-slate-600">Kurum içinden kaynaklanan</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="EXTERNAL"
+                          checked={transferFormData.risk_source === 'EXTERNAL'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_source: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Dış Risk</div>
+                          <div className="text-xs text-slate-600">Kurum dışından kaynaklanan</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      İlişki Türü <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="STRATEGIC"
+                          checked={transferFormData.risk_relation === 'STRATEGIC'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_relation: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Stratejik</div>
+                          <div className="text-xs text-slate-600">Hedefe bağlı</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="OPERATIONAL"
+                          checked={transferFormData.risk_relation === 'OPERATIONAL'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_relation: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Operasyonel</div>
+                          <div className="text-xs text-slate-600">Sürece bağlı</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="PROJECT"
+                          checked={transferFormData.risk_relation === 'PROJECT'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_relation: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Proje</div>
+                          <div className="text-xs text-slate-600">Projeye bağlı</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="CORPORATE"
+                          checked={transferFormData.risk_relation === 'CORPORATE'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_relation: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Kurumsal</div>
+                          <div className="text-xs text-slate-600">Tüm kurumu etkiler</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      Kontrol Düzeyi <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="CONTROLLABLE"
+                          checked={transferFormData.control_level === 'CONTROLLABLE'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, control_level: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Kontrol Edilebilir</div>
+                          <div className="text-xs text-slate-600">Bizim kontrolümüzde</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="PARTIAL"
+                          checked={transferFormData.control_level === 'PARTIAL'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, control_level: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Kısmen Kontrol Edilebilir</div>
+                          <div className="text-xs text-slate-600">Etkiyi azaltabiliriz</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                        <input
+                          type="radio"
+                          value="UNCONTROLLABLE"
+                          checked={transferFormData.control_level === 'UNCONTROLLABLE'}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, control_level: e.target.value }))}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <div className="font-medium text-sm">Kontrol Dışı</div>
+                          <div className="text-xs text-slate-600">Sadece izleyebiliriz</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BÖLÜM 3: Sorumluluk (Dinamik) */}
+              {transferFormData.control_level && transferFormData.control_level !== 'CONTROLLABLE' && (
+                <div className="bg-white rounded-lg border border-slate-200 p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">3. Sorumluluk</h3>
+
+                  {transferFormData.control_level === 'PARTIAL' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Koordinasyon Birimi <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-slate-600 mb-2">Dış kurumla iletişimi sağlayacak birim</p>
+                        <select
+                          value={transferFormData.coordination_department_id}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, coordination_department_id: e.target.value }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          required
+                        >
+                          <option value="">Seçiniz</option>
+                          {departments.map((dept) => (
+                            <option key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Yetkili Dış Kurum <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={transferFormData.external_organization}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, external_organization: e.target.value }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Dış kurum adı..."
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          İletişim Bilgisi
+                        </label>
+                        <input
+                          type="text"
+                          value={transferFormData.external_contact}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, external_contact: e.target.value }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Telefon, e-posta vb."
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {transferFormData.control_level === 'UNCONTROLLABLE' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Koordinasyon Birimi <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-slate-600 mb-2">Riski izleyecek ve dış kurumla iletişim sağlayacak birim</p>
+                        <select
+                          value={transferFormData.coordination_department_id}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, coordination_department_id: e.target.value }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          required
+                        >
+                          <option value="">Seçiniz</option>
+                          {departments.map((dept) => (
+                            <option key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Yetkili Dış Kurum <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={transferFormData.external_organization}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, external_organization: e.target.value }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Dış kurum adı..."
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          İletişim Bilgisi
+                        </label>
+                        <input
+                          type="text"
+                          value={transferFormData.external_contact}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, external_contact: e.target.value }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Telefon, e-posta vb."
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* BÖLÜM 4: İlişki Bağlantısı (Dinamik) */}
+              {transferFormData.risk_relation && (
+                <div className="bg-white rounded-lg border border-slate-200 p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">4. İlişki Bağlantısı</h3>
+
+                  {transferFormData.risk_relation === 'STRATEGIC' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Bağlı Hedef
+                        </label>
+                        <select
+                          value={transferFormData.related_goal_id}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, related_goal_id: e.target.value, related_activity_id: '' }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Seçiniz</option>
+                          {goals.map((goal) => (
+                            <option key={goal.id} value={goal.id}>
+                              {goal.code} - {goal.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Bağlı Faaliyet
+                        </label>
+                        <select
+                          value={transferFormData.related_activity_id}
+                          onChange={(e) => setTransferFormData(prev => ({ ...prev, related_activity_id: e.target.value }))}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Seçiniz</option>
+                          {activities.map((act) => (
+                            <option key={act.id} value={act.id}>
+                              {act.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {transferFormData.risk_relation === 'OPERATIONAL' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Bağlı Süreç
+                      </label>
+                      <select
+                        value={transferFormData.related_process_id}
+                        onChange={(e) => setTransferFormData(prev => ({ ...prev, related_process_id: e.target.value }))}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Seçiniz</option>
+                        {processes.map((proc) => (
+                          <option key={proc.id} value={proc.id}>
+                            {proc.code} - {proc.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {transferFormData.risk_relation === 'PROJECT' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Bağlı Proje
+                      </label>
+                      <select
+                        value={transferFormData.related_project_id}
+                        onChange={(e) => setTransferFormData(prev => ({ ...prev, related_project_id: e.target.value }))}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Seçiniz</option>
+                        {projects.map((proj) => (
+                          <option key={proj.id} value={proj.id}>
+                            {proj.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {transferFormData.risk_relation === 'CORPORATE' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                      <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-blue-900">
+                        <p className="font-medium mb-1">Kurumsal Risk</p>
+                        <p>Bu risk tüm kurumu etkiler.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* BÖLÜM 5: Hedef Risk Değerlendirmesi */}
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">5. Hedef Risk Değerlendirmesi</h3>
+                <p className="text-sm text-slate-600 mb-4">İlave tedbirler sonrası hedeflenen risk</p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      Olasılık
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <label
+                          key={level}
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            transferFormData.target_probability === level
+                              ? 'border-purple-500 bg-purple-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="target_probability"
+                            value={level}
+                            checked={transferFormData.target_probability === level}
+                            onChange={() => setTransferFormData(prev => ({ ...prev, target_probability: level }))}
+                            className="w-4 h-4 text-purple-600"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{level} - {getLikelihoodLabel(level)}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      Etki
+                    </label>
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <label
+                          key={level}
+                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            transferFormData.target_impact === level
+                              ? 'border-purple-500 bg-purple-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="target_impact"
+                            value={level}
+                            checked={transferFormData.target_impact === level}
+                            onChange={() => setTransferFormData(prev => ({ ...prev, target_impact: level }))}
+                            className="w-4 h-4 text-purple-600"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{level} - {getImpactLabel(level)}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-2 border-purple-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700">Hedef Risk Skoru:</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl font-bold text-gray-900">
+                        {transferFormData.target_probability * transferFormData.target_impact}
+                      </span>
+                      <span className={`text-lg ${getRiskScoreColor(transferFormData.target_probability * transferFormData.target_impact)}`}>
+                        ({getRiskScoreLabel(transferFormData.target_probability * transferFormData.target_impact)})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Hedef Tarih</label>
+                  <input
+                    type="date"
+                    value={transferFormData.target_date}
+                    onChange={(e) => setTransferFormData(prev => ({ ...prev, target_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* BÖLÜM 6: Gözden Geçirme Ayarları */}
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">6. Gözden Geçirme Ayarları</h3>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Gözden Geçirme Periyodu
+                    </label>
+                    <select
+                      value={transferFormData.review_period}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, review_period: e.target.value }))}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="MONTHLY">Aylık</option>
+                      <option value="QUARTERLY">Çeyreklik</option>
+                      <option value="SEMI_ANNUAL">6 Aylık</option>
+                      <option value="ANNUAL">Yıllık</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Son Gözden Geçirme
+                    </label>
+                    <input
+                      type="date"
+                      value={transferFormData.last_review_date}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, last_review_date: e.target.value }))}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Sonraki Gözden Geçirme
+                    </label>
+                    <input
+                      type="text"
+                      value={calculateNextReview(transferFormData.last_review_date, transferFormData.review_period)}
+                      disabled
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600"
+                    />
+                  </div>
                 </div>
               </div>
 
