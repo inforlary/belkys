@@ -105,7 +105,8 @@ export default function ICActionDetail() {
   }>({});
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'details' | 'progress' | 'documents' | 'relations'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'progress' | 'documents' | 'relations' | 'risk_treatments'>('details');
+  const [linkedRiskTreatments, setLinkedRiskTreatments] = useState<any[]>([]);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -258,6 +259,18 @@ export default function ICActionDetail() {
       setAction(actionRes.data);
       setProgressHistory(progressRes.data || []);
       setDocuments(docsRes.data || []);
+
+      const { data: riskTreatments } = await supabase
+        .from('risk_treatments')
+        .select(`
+          *,
+          risk:risks(id, code, name),
+          responsible_department:departments!responsible_department_id(id, name)
+        `)
+        .eq('ic_action_id', actionId)
+        .order('created_at', { ascending: false });
+
+      setLinkedRiskTreatments(riskTreatments || []);
 
       if (actionRes.data.metadata) {
         const metadata = actionRes.data.metadata;
@@ -707,7 +720,8 @@ export default function ICActionDetail() {
               { id: 'details', label: 'Detaylar' },
               { id: 'progress', label: 'İlerleme Geçmişi' },
               { id: 'documents', label: 'Belgeler' },
-              { id: 'relations', label: 'İlişkiler' }
+              { id: 'relations', label: 'İlişkiler' },
+              { id: 'risk_treatments', label: `Risk Faaliyetleri${linkedRiskTreatments.length > 0 ? ` (${linkedRiskTreatments.length})` : ''}` }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1152,6 +1166,111 @@ export default function ICActionDetail() {
               {!linkedRisk && !linkedControl && !linkedActivity && !linkedGoal && (
                 <div className="text-center py-12 text-slate-500">
                   Bu eylem için ilişkilendirme yapılmamış
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'risk_treatments' && (
+            <div className="space-y-4">
+              {linkedRiskTreatments.length > 0 ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm text-slate-600">
+                      Bu İç Kontrol eylemine <span className="font-semibold text-green-600">{linkedRiskTreatments.length}</span> risk faaliyeti bağlanmıştır.
+                    </p>
+                    <button
+                      onClick={() => navigate.navigate('/risk-management/risk-treatments')}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Risk Faaliyetlerine Git
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {linkedRiskTreatments.map((treatment: any) => {
+                      const statusColors: Record<string, string> = {
+                        'NOT_STARTED': 'bg-gray-100 text-gray-800',
+                        'IN_PROGRESS': 'bg-blue-100 text-blue-800',
+                        'COMPLETED': 'bg-green-100 text-green-800',
+                        'DELAYED': 'bg-red-100 text-red-800',
+                        'CANCELLED': 'bg-gray-200 text-gray-700'
+                      };
+
+                      const statusLabels: Record<string, string> = {
+                        'NOT_STARTED': 'Başlamadı',
+                        'IN_PROGRESS': 'Devam Ediyor',
+                        'COMPLETED': 'Tamamlandı',
+                        'DELAYED': 'Gecikmiş',
+                        'CANCELLED': 'İptal'
+                      };
+
+                      return (
+                        <div key={treatment.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-green-300 transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm font-semibold text-slate-900">
+                                  {treatment.code} - {treatment.title}
+                                </span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColors[treatment.status] || 'bg-gray-100 text-gray-800'}`}>
+                                  {statusLabels[treatment.status] || treatment.status}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3 text-sm text-slate-600">
+                                <div>
+                                  <span className="font-medium">İlişkili Risk:</span>
+                                  <div className="text-slate-700">{treatment.risk?.code} - {treatment.risk?.name}</div>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Sorumlu Birim:</span>
+                                  <div className="text-slate-700">{treatment.responsible_department?.name || '-'}</div>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Hedef Tarih:</span>
+                                  <div className="text-slate-700">
+                                    {treatment.planned_end_date ? new Date(treatment.planned_end_date).toLocaleDateString('tr-TR') : '-'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="font-medium">İlerleme:</span>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 bg-slate-200 rounded-full h-2">
+                                      <div
+                                        className="bg-green-600 h-2 rounded-full transition-all"
+                                        style={{ width: `${treatment.progress_percent || 0}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-slate-700 font-medium">{treatment.progress_percent || 0}%</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {treatment.description && (
+                                <div className="mt-2 text-sm text-slate-600">
+                                  <span className="font-medium">Açıklama:</span> {treatment.description}
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => navigate.navigate(`/risk-management/risk-treatments`)}
+                              className="text-green-600 hover:text-green-700 flex-shrink-0"
+                              title="Risk faaliyetine git"
+                            >
+                              <ExternalLink className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-slate-500">
+                  Bu İç Kontrol eylemine henüz risk faaliyeti bağlanmamış
                 </div>
               )}
             </div>
