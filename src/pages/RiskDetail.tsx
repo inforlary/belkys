@@ -136,13 +136,16 @@ export default function RiskDetail() {
         identified_by:profiles!identified_by_id(full_name),
         approved_by_profile:profiles!approved_by(full_name),
         related_goal:goals!related_goal_id(code, title),
-        related_activity:activities!related_activity_id(code, name),
+        related_activity:activities!related_activity_id(name),
         related_process:qm_processes!related_process_id(code, name)
       `)
       .eq('id', riskId)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error loading risk:', error);
+      return;
+    }
     if (data) {
       const categoryIds = data.categories?.map((c: any) => c.category_id) || [];
       setFormData({
