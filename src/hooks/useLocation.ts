@@ -48,5 +48,13 @@ export const useLocation = () => {
     return Object.fromEntries(searchParams.entries());
   };
 
-  return { currentPath, navigate, searchParams, getParams };
+  const getPathParam = (index: number = -1) => {
+    const parts = currentPath.split('/').filter(p => p);
+    if (index === -1) {
+      return parts[parts.length - 1];
+    }
+    return parts[index];
+  };
+
+  return { currentPath, navigate, searchParams, getParams, getPathParam };
 };

@@ -25,8 +25,8 @@ interface RiskRelation {
 
 export default function RiskDetail() {
   const { profile } = useAuth();
-  const { getParams, navigate } = useLocation();
-  const riskId = getParams().id;
+  const { getPathParam, navigate } = useLocation();
+  const riskId = getPathParam();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
