@@ -829,7 +829,7 @@ export default function CollaborationPlanning() {
   };
 
   const getNextRiskCode = async (): Promise<string> => {
-    if (!profile?.organization_id) return 'R001';
+    if (!profile?.organization_id) return 'RSK-001';
 
     try {
       const { data, error } = await supabase
@@ -842,17 +842,17 @@ export default function CollaborationPlanning() {
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        return 'R001';
+        return 'RSK-001';
       }
 
       const lastCode = data[0].code;
       const numericPart = parseInt(lastCode.replace(/\D/g, ''));
       const nextNumber = numericPart + 1;
 
-      return `R${nextNumber.toString().padStart(3, '0')}`;
+      return `RSK-${nextNumber.toString().padStart(3, '0')}`;
     } catch (error) {
       console.error('Risk kodu oluşturulurken hata:', error);
-      return 'R001';
+      return 'RSK-001';
     }
   };
 
