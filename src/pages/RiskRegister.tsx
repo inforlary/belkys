@@ -199,6 +199,7 @@ export default function RiskRegister() {
   const [goals, setGoals] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [processes, setProcesses] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [criteria, setCriteria] = useState<RiskCriterion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -312,7 +313,7 @@ export default function RiskRegister() {
     try {
       setLoading(true);
 
-      const [risksRes, categoriesRes, departmentsRes, objectivesRes, goalsRes, activitiesRes, processesRes, profilesRes, criteriaRes, relationCountsRes] = await Promise.all([
+      const [risksRes, categoriesRes, departmentsRes, objectivesRes, goalsRes, activitiesRes, processesRes, projectsRes, profilesRes, criteriaRes, relationCountsRes] = await Promise.all([
         supabase
           .from('risks')
           .select(`
@@ -358,6 +359,11 @@ export default function RiskRegister() {
           .eq('organization_id', profile?.organization_id)
           .order('code', { ascending: true }),
         supabase
+          .from('projects')
+          .select('id, name, department_id')
+          .eq('organization_id', profile?.organization_id)
+          .order('name', { ascending: true }),
+        supabase
           .from('profiles')
           .select('id, full_name, department_id')
           .eq('organization_id', profile?.organization_id)
@@ -369,8 +375,8 @@ export default function RiskRegister() {
           .order('criteria_type')
           .order('level'),
         supabase
-          .from('rm_risk_relations')
-          .select('source_risk_id, target_risk_id')
+          .from('risk_relations')
+          .select('risk_id, related_risk_id')
           .eq('organization_id', profile?.organization_id)
       ]);
 
@@ -381,12 +387,13 @@ export default function RiskRegister() {
       if (goalsRes.error) throw goalsRes.error;
       if (activitiesRes.error) throw activitiesRes.error;
       if (processesRes.error) throw processesRes.error;
+      if (projectsRes.error) throw projectsRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
       const relationCounts = new Map<string, number>();
       (relationCountsRes.data || []).forEach((rel: any) => {
-        relationCounts.set(rel.source_risk_id, (relationCounts.get(rel.source_risk_id) || 0) + 1);
-        relationCounts.set(rel.target_risk_id, (relationCounts.get(rel.target_risk_id) || 0) + 1);
+        relationCounts.set(rel.risk_id, (relationCounts.get(rel.risk_id) || 0) + 1);
+        relationCounts.set(rel.related_risk_id, (relationCounts.get(rel.related_risk_id) || 0) + 1);
       });
 
       const risksWithRelations = (risksRes.data || []).map((risk: Risk) => ({
@@ -401,6 +408,7 @@ export default function RiskRegister() {
       setGoals(goalsRes.data || []);
       setActivities(activitiesRes.data || []);
       setProcesses(processesRes.data || []);
+      setProjects(projectsRes.data || []);
       setProfiles(profilesRes.data || []);
       setCriteria(criteriaRes.data || []);
 
@@ -557,7 +565,7 @@ export default function RiskRegister() {
         }));
 
         const { error: impactsError } = await supabase
-          .from('rm_risk_department_impacts')
+          .from('risk_department_impacts')
           .insert(impactsToInsert);
 
         if (impactsError) throw impactsError;
@@ -1025,14 +1033,49 @@ export default function RiskRegister() {
                           </span>
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 text-sm">
                         {(() => {
                           const relationBadge = getRiskRelationBadge(risk.risk_relation);
+                          let relationDetail = null;
+
+                          if (risk.risk_relation === 'STRATEGIC' && risk.related_goal) {
+                            relationDetail = (
+                              <div className="mt-1 text-xs text-gray-600">
+                                Hedef: {risk.related_goal.code}
+                                {risk.related_activity && ` / Faaliyet: ${risk.related_activity.name}`}
+                              </div>
+                            );
+                          } else if (risk.risk_relation === 'OPERATIONAL' && risk.related_process) {
+                            relationDetail = (
+                              <div className="mt-1 text-xs text-gray-600">
+                                Süreç: {risk.related_process.code} - {risk.related_process.name}
+                              </div>
+                            );
+                          } else if (risk.risk_relation === 'PROJECT' && risk.related_project_id) {
+                            const project = projects.find(p => p.id === risk.related_project_id);
+                            if (project) {
+                              relationDetail = (
+                                <div className="mt-1 text-xs text-gray-600">
+                                  Proje: {project.name}
+                                </div>
+                              );
+                            }
+                          } else if (risk.risk_relation === 'CORPORATE') {
+                            relationDetail = (
+                              <div className="mt-1 text-xs text-gray-600">
+                                Kurumsal risk
+                              </div>
+                            );
+                          }
+
                           return (
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${relationBadge.color}`}>
-                              <span>{relationBadge.emoji}</span>
-                              <span>{relationBadge.label}</span>
-                            </span>
+                            <div>
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${relationBadge.color}`}>
+                                <span>{relationBadge.emoji}</span>
+                                <span>{relationBadge.label}</span>
+                              </span>
+                              {relationDetail}
+                            </div>
                           );
                         })()}
                       </td>
