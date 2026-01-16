@@ -30,6 +30,9 @@ interface Risk {
   residual_likelihood: number;
   residual_impact: number;
   residual_score: number;
+  target_probability: number | null;
+  target_impact: number | null;
+  target_score: number | null;
   risk_response: string;
   response_rationale: string;
   status: string;
@@ -634,11 +637,19 @@ export default function RiskRegister() {
   const sortedRisks = [...filteredRisks].sort((a, b) => {
     if (!sortConfig) return 0;
 
-    let aValue = a[sortConfig.key as keyof Risk];
-    let bValue = b[sortConfig.key as keyof Risk];
+    let aValue: any = a[sortConfig.key as keyof Risk];
+    let bValue: any = b[sortConfig.key as keyof Risk];
 
-    if (aValue === null || aValue === undefined) return 1;
-    if (bValue === null || bValue === undefined) return -1;
+    if (sortConfig.key === 'department') {
+      aValue = a.department?.name || '';
+      bValue = b.department?.name || '';
+    } else if (sortConfig.key === 'category') {
+      aValue = a.categories?.[0]?.category?.name || '';
+      bValue = b.categories?.[0]?.category?.name || '';
+    }
+
+    if (aValue === null || aValue === undefined || aValue === '') return 1;
+    if (bValue === null || bValue === undefined || bValue === '') return -1;
 
     if (typeof aValue === 'string' && typeof bValue === 'string') {
       return sortConfig.direction === 'asc'
@@ -907,54 +918,87 @@ export default function RiskRegister() {
                 >
                   Risk Adı {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kategori
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Birim
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kaynak
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İlişki
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kontrol
+                <th
+                  onClick={() => handleSort('description')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  Açıklama {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
-                  onClick={() => handleSort('relation_count')}
-                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('category')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 >
-                  İlişkiler {sortConfig.key === 'relation_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  Kategori {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  onClick={() => handleSort('department')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  Sorumlu Birim {sortConfig.key === 'department' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  onClick={() => handleSort('risk_source')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  Kaynak {sortConfig.key === 'risk_source' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  onClick={() => handleSort('risk_relation')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  İlişki {sortConfig.key === 'risk_relation' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  onClick={() => handleSort('control_level')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  Kontrol Düzeyi {sortConfig.key === 'control_level' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   onClick={() => handleSort('inherent_score')}
                   className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 >
-                  Doğal Skor {sortConfig.key === 'inherent_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  Doğal Risk {sortConfig.key === 'inherent_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   onClick={() => handleSort('residual_score')}
                   className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 >
-                  Artık Skor {sortConfig.key === 'residual_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  Artık Risk {sortConfig.key === 'residual_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Durum
+                <th
+                  onClick={() => handleSort('target_score')}
+                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  Hedef Risk {sortConfig.key === 'target_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Onay Durumu
+                <th
+                  onClick={() => handleSort('relation_count')}
+                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  İlişkili Riskler {sortConfig.key === 'relation_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  onClick={() => handleSort('status')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  Durum {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  onClick={() => handleSort('next_review_date')}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                >
+                  Sonraki İnceleme {sortConfig.key === 'next_review_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İşlem
+                  İşlemler
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 relative">
               {sortedRisks.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={15} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <AlertTriangle className="w-12 h-12 text-gray-300" />
                       <p>Henüz risk kaydı bulunmuyor.</p>
@@ -999,6 +1043,13 @@ export default function RiskRegister() {
                               Risk iştahını aşıyor! (Limit: {relatedGoal?.risk_appetite_max_score})
                             </div>
                           )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        <div className="max-w-xs">
+                          <div className="line-clamp-2" title={risk.description}>
+                            {risk.description || '-'}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm">
@@ -1090,16 +1141,6 @@ export default function RiskRegister() {
                         })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        {risk.relation_count && risk.relation_count > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                            <span>🔗</span>
-                            <span>{risk.relation_count}</span>
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 text-xs">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span
                           className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${inherentBadge.color}`}
                         >
@@ -1115,6 +1156,28 @@ export default function RiskRegister() {
                           <span>{risk.residual_score}</span>
                         </span>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {risk.target_score ? (
+                          <span
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getRiskScoreBadge(risk.target_score).color}`}
+                          >
+                            <span>{getRiskScoreBadge(risk.target_score).emoji}</span>
+                            <span>{risk.target_score}</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {risk.relation_count && risk.relation_count > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                            <span>🔗</span>
+                            <span>{risk.relation_count}</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadge.color}`}
@@ -1123,12 +1186,32 @@ export default function RiskRegister() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${approvalBadge.color}`}
-                        >
-                          <span>{approvalBadge.emoji}</span>
-                          <span>{approvalBadge.label}</span>
-                        </span>
+                        {(() => {
+                          if (!risk.next_review_date) {
+                            return <span className="text-gray-400 text-xs">-</span>;
+                          }
+
+                          const today = new Date();
+                          const reviewDate = new Date(risk.next_review_date);
+                          const daysDiff = Math.floor((reviewDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                          let bgColor = 'bg-gray-100 text-gray-700';
+                          let textPrefix = '';
+
+                          if (daysDiff < 0) {
+                            bgColor = 'bg-red-100 text-red-700 border-red-300 border';
+                            textPrefix = '⚠️ ';
+                          } else if (daysDiff <= 7) {
+                            bgColor = 'bg-yellow-100 text-yellow-700 border-yellow-300 border';
+                            textPrefix = '⏰ ';
+                          }
+
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor}`}>
+                              {textPrefix}{new Date(risk.next_review_date).toLocaleDateString('tr-TR')}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="relative inline-block text-left dropdown-menu-container">
