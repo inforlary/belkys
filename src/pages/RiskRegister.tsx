@@ -1026,7 +1026,17 @@ export default function RiskRegister() {
                   return (
                     <tr
                       key={risk.id}
-                      onClick={() => navigate(`risk-management/risks/${risk.id}`)}
+                      onClick={(e) => {
+                        console.log('[RiskRegister] Row clicked, risk.id:', risk.id);
+                        const target = e.target as HTMLElement;
+                        console.log('[RiskRegister] Target:', target.tagName, target.className);
+                        if (!target.closest('button') && !target.closest('.dropdown-menu-container')) {
+                          console.log('[RiskRegister] Navigating to risk detail');
+                          navigate(`risk-management/risks/${risk.id}`);
+                        } else {
+                          console.log('[RiskRegister] Click ignored');
+                        }
+                      }}
                       className={`hover:bg-gray-50 cursor-pointer relative ${exceedsAppetite ? 'bg-red-50' : ''}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

@@ -251,6 +251,10 @@ export default function RiskDetail() {
   const { profile } = useAuth();
   const { navigate, currentPath } = useLocation();
   const riskId = currentPath.split('/').pop() || '';
+  console.log('[RiskDetail] Component mounted');
+  console.log('[RiskDetail] currentPath:', currentPath);
+  console.log('[RiskDetail] riskId:', riskId);
+  console.log('[RiskDetail] profile?.organization_id:', profile?.organization_id);
 
   const [activeTab, setActiveTab] = useState('general');
   const [risk, setRisk] = useState<Risk | null>(null);
