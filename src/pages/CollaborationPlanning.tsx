@@ -1572,264 +1572,41 @@ export default function CollaborationPlanning() {
             </div>
 
             <div className="px-6 py-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
-              {/* BÖLÜM 1: Risk Kategorileri */}
+              {/* BÖLÜM 1: Temel Bilgiler */}
               <div className="bg-white rounded-lg border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">1. Risk Kategorileri</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">1. Temel Bilgiler</h3>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-gray-300 rounded-lg p-4">
-                    {riskCategories.map((category) => (
-                      <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                        <input
-                          type="checkbox"
-                          checked={transferFormData.category_ids.includes(category.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setTransferFormData(prev => ({
-                                ...prev,
-                                category_ids: [...prev.category_ids, category.id]
-                              }));
-                            } else {
-                              setTransferFormData(prev => ({
-                                ...prev,
-                                category_ids: prev.category_ids.filter(id => id !== category.id)
-                              }));
-                            }
-                          }}
-                          className="w-4 h-4 text-blue-600 rounded"
-                        />
-                        <span className="text-sm text-gray-700">
-                          {category.code} - {category.name}
-                          <span className="text-xs text-gray-500 ml-1">({category.type})</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Risk Durumu <span className="text-red-500">*</span>
+                      Risk Kodu <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={transferFormData.status}
-                      onChange={(e) => setTransferFormData(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="DRAFT">Taslak</option>
-                      <option value="ACTIVE">Aktif</option>
-                      <option value="IDENTIFIED">Tespit Edildi</option>
-                      <option value="ASSESSING">Değerlendiriliyor</option>
-                      <option value="TREATING">Tedavi Ediliyor</option>
-                      <option value="MONITORING">İzlemede</option>
-                      <option value="CLOSED">Kapatıldı</option>
-                    </select>
+                    <div className="px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <span className="text-sm font-medium text-gray-700">Otomatik oluşturulacak</span>
+                    </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Risk Yanıt Stratejisi <span className="text-red-500">*</span>
+                      Risk Adı <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={transferFormData.risk_response}
-                      onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_response: e.target.value }))}
+                    <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <span className="text-sm text-gray-900">{transferringRisk.item.content}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Açıklaması
+                    </label>
+                    <textarea
+                      value={transferFormData.additional_description}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, additional_description: e.target.value }))}
+                      rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="ACCEPT">Kabul Et</option>
-                      <option value="MITIGATE">Azalt</option>
-                      <option value="TRANSFER">Transfer Et</option>
-                      <option value="AVOID">Kaçın</option>
-                    </select>
+                      placeholder="Risk hakkında detaylı açıklama..."
+                    />
                   </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Yanıt Gerekçesi
-                  </label>
-                  <textarea
-                    value={transferFormData.response_rationale}
-                    onChange={(e) => setTransferFormData(prev => ({ ...prev, response_rationale: e.target.value }))}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Risk yanıt stratejisinin gerekçesi..."
-                  />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Doğal Risk Değerlendirmesi</h3>
-                <p className="text-sm text-gray-600 mb-4">Kontrol önlemleri olmadan riskin değerlendirmesi</p>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Olasılık <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-2">
-                      {[1, 2, 3, 4, 5].map((level) => (
-                        <label
-                          key={level}
-                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                            transferFormData.inherent_likelihood === level
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="inherent_likelihood"
-                            value={level}
-                            checked={transferFormData.inherent_likelihood === level}
-                            onChange={() => setTransferFormData(prev => ({ ...prev, inherent_likelihood: level }))}
-                            className="w-4 h-4 text-blue-600"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{level} - {getLikelihoodLabel(level)}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Etki <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-2">
-                      {[1, 2, 3, 4, 5].map((level) => (
-                        <label
-                          key={level}
-                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                            transferFormData.inherent_impact === level
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="inherent_impact"
-                            value={level}
-                            checked={transferFormData.inherent_impact === level}
-                            onChange={() => setTransferFormData(prev => ({ ...prev, inherent_impact: level }))}
-                            className="w-4 h-4 text-blue-600"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{level} - {getImpactLabel(level)}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-2 border-blue-300">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700">Doğal Risk Skoru:</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl font-bold text-gray-900">
-                        {transferFormData.inherent_likelihood * transferFormData.inherent_impact}
-                      </span>
-                      <span className={`text-lg ${getRiskScoreColor(transferFormData.inherent_likelihood * transferFormData.inherent_impact)}`}>
-                        ({getRiskScoreLabel(transferFormData.inherent_likelihood * transferFormData.inherent_impact)})
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Artık Risk Değerlendirmesi</h3>
-                <p className="text-sm text-gray-600 mb-4">Kontrol önlemleri uygulandıktan sonra kalan risk</p>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Olasılık <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-2">
-                      {[1, 2, 3, 4, 5].map((level) => (
-                        <label
-                          key={level}
-                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                            transferFormData.residual_likelihood === level
-                              ? 'border-orange-500 bg-orange-50'
-                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="residual_likelihood"
-                            value={level}
-                            checked={transferFormData.residual_likelihood === level}
-                            onChange={() => setTransferFormData(prev => ({ ...prev, residual_likelihood: level }))}
-                            className="w-4 h-4 text-orange-600"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{level} - {getLikelihoodLabel(level)}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Etki <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-2">
-                      {[1, 2, 3, 4, 5].map((level) => (
-                        <label
-                          key={level}
-                          className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                            transferFormData.residual_impact === level
-                              ? 'border-orange-500 bg-orange-50'
-                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="residual_impact"
-                            value={level}
-                            checked={transferFormData.residual_impact === level}
-                            onChange={() => setTransferFormData(prev => ({ ...prev, residual_impact: level }))}
-                            className="w-4 h-4 text-orange-600"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{level} - {getImpactLabel(level)}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700">Artık Risk Skoru:</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl font-bold text-gray-900">
-                        {transferFormData.residual_likelihood * transferFormData.residual_impact}
-                      </span>
-                      <span className={`text-lg ${getRiskScoreColor(transferFormData.residual_likelihood * transferFormData.residual_impact)}`}>
-                        ({getRiskScoreLabel(transferFormData.residual_likelihood * transferFormData.residual_impact)})
-                      </span>
-                    </div>
-                  </div>
-                  {(transferFormData.inherent_likelihood * transferFormData.inherent_impact) >
-                   (transferFormData.residual_likelihood * transferFormData.residual_impact) && (
-                    <div className="mt-3 pt-3 border-t border-orange-300 flex items-center gap-2 text-sm text-green-700">
-                      <TrendingDown className="w-5 h-5" />
-                      <span className="font-medium">
-                        Risk {(transferFormData.inherent_likelihood * transferFormData.inherent_impact) -
-                        (transferFormData.residual_likelihood * transferFormData.residual_impact)} puan azaltıldı
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -1837,7 +1614,43 @@ export default function CollaborationPlanning() {
               <div className="bg-white rounded-lg border border-slate-200 p-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">2. Risk Sınıflandırması</h3>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Kategorileri <span className="text-red-500">*</span> (Birden fazla seçilebilir)
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-gray-300 rounded-lg p-4">
+                      {riskCategories.map((category) => (
+                        <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={transferFormData.category_ids.includes(category.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setTransferFormData(prev => ({
+                                  ...prev,
+                                  category_ids: [...prev.category_ids, category.id]
+                                }));
+                              } else {
+                                setTransferFormData(prev => ({
+                                  ...prev,
+                                  category_ids: prev.category_ids.filter(id => id !== category.id)
+                                }));
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 rounded"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {category.code} - {category.name}
+                            <span className="text-xs text-gray-500 ml-1">({category.type})</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-3">
                       Risk Kaynağı <span className="text-red-500">*</span>
@@ -1978,6 +1791,56 @@ export default function CollaborationPlanning() {
                       </label>
                     </div>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Durumu <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={transferFormData.status}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="DRAFT">Taslak</option>
+                      <option value="ACTIVE">Aktif</option>
+                      <option value="IDENTIFIED">Tespit Edildi</option>
+                      <option value="ASSESSING">Değerlendiriliyor</option>
+                      <option value="TREATING">Tedavi Ediliyor</option>
+                      <option value="MONITORING">İzlemede</option>
+                      <option value="CLOSED">Kapatıldı</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Yanıt Stratejisi <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={transferFormData.risk_response}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, risk_response: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="ACCEPT">Kabul Et</option>
+                      <option value="MITIGATE">Azalt</option>
+                      <option value="TRANSFER">Transfer Et</option>
+                      <option value="AVOID">Kaçın</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Yanıt Gerekçesi
+                  </label>
+                  <textarea
+                    value={transferFormData.response_rationale}
+                    onChange={(e) => setTransferFormData(prev => ({ ...prev, response_rationale: e.target.value }))}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Risk yanıt stratejisinin gerekçesi..."
+                  />
                 </div>
               </div>
 
@@ -2194,10 +2057,188 @@ export default function CollaborationPlanning() {
                 </div>
               )}
 
-              {/* BÖLÜM 5: Hedef Risk Değerlendirmesi */}
+              {/* BÖLÜM 5: Risk Değerlendirmesi */}
               <div className="bg-white rounded-lg border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">5. Hedef Risk Değerlendirmesi</h3>
-                <p className="text-sm text-slate-600 mb-4">İlave tedbirler sonrası hedeflenen risk</p>
+                <h3 className="text-lg font-semibold text-slate-900 mb-6">5. Risk Değerlendirmesi</h3>
+
+                {/* Doğal Risk */}
+                <div className="mb-8">
+                  <h4 className="text-md font-semibold text-gray-900 mb-2">Doğal Risk Değerlendirmesi</h4>
+                  <p className="text-sm text-gray-600 mb-4">Kontrol önlemleri olmadan riskin değerlendirmesi</p>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Olasılık <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <label
+                            key={level}
+                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                              transferFormData.inherent_likelihood === level
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="inherent_likelihood"
+                              value={level}
+                              checked={transferFormData.inherent_likelihood === level}
+                              onChange={() => setTransferFormData(prev => ({ ...prev, inherent_likelihood: level }))}
+                              className="w-4 h-4 text-blue-600"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{level} - {getLikelihoodLabel(level)}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Etki <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <label
+                            key={level}
+                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                              transferFormData.inherent_impact === level
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="inherent_impact"
+                              value={level}
+                              checked={transferFormData.inherent_impact === level}
+                              onChange={() => setTransferFormData(prev => ({ ...prev, inherent_impact: level }))}
+                              className="w-4 h-4 text-blue-600"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{level} - {getImpactLabel(level)}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-2 border-blue-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700">Doğal Risk Skoru:</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl font-bold text-gray-900">
+                          {transferFormData.inherent_likelihood * transferFormData.inherent_impact}
+                        </span>
+                        <span className={`text-lg ${getRiskScoreColor(transferFormData.inherent_likelihood * transferFormData.inherent_impact)}`}>
+                          ({getRiskScoreLabel(transferFormData.inherent_likelihood * transferFormData.inherent_impact)})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Artık Risk */}
+                <div className="mb-8">
+                  <h4 className="text-md font-semibold text-gray-900 mb-2">Artık Risk Değerlendirmesi</h4>
+                  <p className="text-sm text-gray-600 mb-4">Kontrol önlemleri uygulandıktan sonra kalan risk</p>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Olasılık <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <label
+                            key={level}
+                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                              transferFormData.residual_likelihood === level
+                                ? 'border-orange-500 bg-orange-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="residual_likelihood"
+                              value={level}
+                              checked={transferFormData.residual_likelihood === level}
+                              onChange={() => setTransferFormData(prev => ({ ...prev, residual_likelihood: level }))}
+                              className="w-4 h-4 text-orange-600"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{level} - {getLikelihoodLabel(level)}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Etki <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <label
+                            key={level}
+                            className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                              transferFormData.residual_impact === level
+                                ? 'border-orange-500 bg-orange-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="residual_impact"
+                              value={level}
+                              checked={transferFormData.residual_impact === level}
+                              onChange={() => setTransferFormData(prev => ({ ...prev, residual_impact: level }))}
+                              className="w-4 h-4 text-orange-600"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{level} - {getImpactLabel(level)}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700">Artık Risk Skoru:</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl font-bold text-gray-900">
+                          {transferFormData.residual_likelihood * transferFormData.residual_impact}
+                        </span>
+                        <span className={`text-lg ${getRiskScoreColor(transferFormData.residual_likelihood * transferFormData.residual_impact)}`}>
+                          ({getRiskScoreLabel(transferFormData.residual_likelihood * transferFormData.residual_impact)})
+                        </span>
+                      </div>
+                    </div>
+                    {(transferFormData.inherent_likelihood * transferFormData.inherent_impact) >
+                     (transferFormData.residual_likelihood * transferFormData.residual_impact) && (
+                      <div className="mt-3 pt-3 border-t border-orange-300 flex items-center gap-2 text-sm text-green-700">
+                        <TrendingDown className="w-5 h-5" />
+                        <span className="font-medium">
+                          Risk {(transferFormData.inherent_likelihood * transferFormData.inherent_impact) -
+                          (transferFormData.residual_likelihood * transferFormData.residual_impact)} puan azaltıldı
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hedef Risk */}
+                <div>
+                  <h4 className="text-md font-semibold text-gray-900 mb-2">Hedef Risk Değerlendirmesi</h4>
+                  <p className="text-sm text-slate-600 mb-4">İlave tedbirler sonrası hedeflenen risk</p>
 
                 <div className="grid grid-cols-2 gap-6">
                   <div>
@@ -2285,6 +2326,7 @@ export default function CollaborationPlanning() {
                   />
                 </div>
               </div>
+              </div>
 
               {/* BÖLÜM 6: Gözden Geçirme Ayarları */}
               <div className="bg-white rounded-lg border border-slate-200 p-6">
@@ -2333,14 +2375,15 @@ export default function CollaborationPlanning() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Ek Açıklama</h3>
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">8. İlişkili Riskler ve Ek Bilgiler</h3>
+                <p className="text-sm text-slate-600 mb-4">Bu risk ile ilgili ek açıklamalar ve notlar</p>
                 <textarea
                   value={transferFormData.additional_description}
                   onChange={(e) => setTransferFormData(prev => ({ ...prev, additional_description: e.target.value }))}
-                  rows={3}
+                  rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Risk hakkında ek bilgiler ve notlar..."
+                  placeholder="Risk hakkında ek bilgiler, diğer risklerle ilişkisi ve notlar..."
                 />
               </div>
             </div>
