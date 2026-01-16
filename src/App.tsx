@@ -170,6 +170,9 @@ const renderPage = () => {
     if (currentPath.startsWith('risks/treatments/') && currentPath !== 'risks/treatments') {
       return <RiskTreatmentDetail />;
     }
+    if (currentPath === 'risk-management/risks/new') {
+      return <RiskRegisterNew />;
+    }
     if (currentPath.startsWith('risk-management/risks/') && currentPath !== 'risk-management/risks') {
       return <RiskDetail />;
     }
