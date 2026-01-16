@@ -340,7 +340,8 @@ export default function RiskRegisterNew() {
         last_review_date: formData.last_review_date,
         next_review_date: nextReviewDate,
         status: submitForApproval ? 'PENDING_APPROVAL' : 'DRAFT',
-        created_by: profile?.id,
+        identified_by_id: profile?.id,
+        identified_date: new Date().toISOString().split('T')[0],
       };
 
       const { data: risk, error: riskError } = await supabase

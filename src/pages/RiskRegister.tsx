@@ -376,8 +376,7 @@ export default function RiskRegister() {
           .order('level'),
         supabase
           .from('risk_relations')
-          .select('risk_id, related_risk_id')
-          .eq('organization_id', profile?.organization_id)
+          .select('source_risk_id, related_risk_id')
       ]);
 
       if (risksRes.error) throw risksRes.error;
@@ -392,7 +391,7 @@ export default function RiskRegister() {
 
       const relationCounts = new Map<string, number>();
       (relationCountsRes.data || []).forEach((rel: any) => {
-        relationCounts.set(rel.risk_id, (relationCounts.get(rel.risk_id) || 0) + 1);
+        relationCounts.set(rel.source_risk_id, (relationCounts.get(rel.source_risk_id) || 0) + 1);
         relationCounts.set(rel.related_risk_id, (relationCounts.get(rel.related_risk_id) || 0) + 1);
       });
 
