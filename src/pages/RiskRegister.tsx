@@ -424,42 +424,7 @@ export default function RiskRegister() {
   }
 
   function openNewRiskModal() {
-    setFormData({
-      code: '',
-      name: '',
-      description: '',
-      causes: '',
-      category_ids: [] as string[],
-      owner_department_id: '',
-      owner_id: '',
-      goal_id: '',
-      risk_source: 'INTERNAL',
-      risk_relation: 'OPERATIONAL',
-      control_level: 'CONTROLLABLE',
-      related_goal_id: '',
-      related_activity_id: '',
-      related_process_id: '',
-      related_project_id: '',
-      external_organization: '',
-      external_contact: '',
-      coordination_department_id: '',
-      inherent_likelihood: 3,
-      inherent_impact: 3,
-      residual_likelihood: 2,
-      residual_impact: 2,
-      risk_response: 'MITIGATE',
-      response_rationale: '',
-      review_date: '',
-      status: 'ACTIVE'
-    });
-    setControls([]);
-    setDepartmentImpacts([]);
-    setShowControlForm(false);
-    setShowDepartmentImpactForm(false);
-    setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
-    setNewDepartmentImpact({ department_id: '', impact_level: 3, impact_description: '', affected_processes: '', specific_controls: '' });
-    setEditingDepartmentImpact(null);
-    setShowModal(true);
+    navigate('risk-management/risks/new');
   }
 
   async function handleDelete(id: string, code: string, name: string) {
