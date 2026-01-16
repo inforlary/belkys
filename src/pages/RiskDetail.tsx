@@ -278,17 +278,17 @@ export default function RiskDetail() {
 
   const loadRiskRelations = async () => {
     const { data } = await supabase
-      .from('risk_relations')
+      .from('rm_risk_relations')
       .select(`
         *,
-        related_risk:risks!related_risk_id(code, name)
+        related_risk:risks!target_risk_id(code, name)
       `)
-      .eq('risk_id', riskId);
+      .eq('source_risk_id', riskId);
 
     if (data) {
       const relations = data.map((r: any) => ({
         id: r.id,
-        related_risk_id: r.related_risk_id,
+        related_risk_id: r.target_risk_id,
         related_risk_name: r.related_risk ? `${r.related_risk.code} - ${r.related_risk.name}` : '',
         relation_type: r.relation_type,
         description: r.description || '',
@@ -517,20 +517,22 @@ export default function RiskDetail() {
       }
 
       await supabase
-        .from('risk_relations')
+        .from('rm_risk_relations')
         .delete()
-        .eq('risk_id', riskId);
+        .eq('source_risk_id', riskId);
 
       if (riskRelations.length > 0) {
         const relations = riskRelations.map(rel => ({
-          risk_id: riskId,
-          related_risk_id: rel.related_risk_id,
+          organization_id: risk?.organization_id,
+          source_risk_id: riskId,
+          target_risk_id: rel.related_risk_id,
           relation_type: rel.relation_type,
           description: rel.description,
+          created_by: risk?.identified_by_id
         }));
 
         const { error: relationsError } = await supabase
-          .from('risk_relations')
+          .from('rm_risk_relations')
           .insert(relations);
 
         if (relationsError) throw relationsError;

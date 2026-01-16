@@ -380,14 +380,16 @@ export default function RiskRegisterNew() {
 
       if (riskRelations.length > 0) {
         const relations = riskRelations.map(rel => ({
-          risk_id: risk.id,
-          related_risk_id: rel.related_risk_id,
+          organization_id: risk.organization_id,
+          source_risk_id: risk.id,
+          target_risk_id: rel.related_risk_id,
           relation_type: rel.relation_type,
           description: rel.description,
+          created_by: risk.identified_by_id
         }));
 
         const { error: relationsError } = await supabase
-          .from('risk_relations')
+          .from('rm_risk_relations')
           .insert(relations);
 
         if (relationsError) throw relationsError;
