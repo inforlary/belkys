@@ -1743,141 +1743,6 @@ export default function CollaborationPlanning() {
               </div>
 
               <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Mevcut Kontroller</h3>
-                    <p className="text-sm text-gray-600 mt-1">Riskin yönetimi için uygulanmakta olan kontrol önlemleri</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowControlForm(!showControlForm)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Kontrol Ekle
-                  </button>
-                </div>
-
-                {showControlForm && (
-                  <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Kontrol Adı <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={newControl.name}
-                          onChange={(e) => setNewControl({ ...newControl, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="Kontrol önleminin adı"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Kontrol Tipi <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={newControl.control_type}
-                          onChange={(e) => setNewControl({ ...newControl, control_type: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="PREVENTIVE">Önleyici</option>
-                          <option value="DETECTIVE">Tespit Edici</option>
-                          <option value="CORRECTIVE">Düzeltici</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Açıklama <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          value={newControl.description}
-                          onChange={(e) => setNewControl({ ...newControl, description: e.target.value })}
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="Kontrol önleminin detaylı açıklaması"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Etkinlik <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={newControl.effectiveness}
-                          onChange={(e) => setNewControl({ ...newControl, effectiveness: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="EFFECTIVE">Etkili</option>
-                          <option value="PARTIALLY_EFFECTIVE">Kısmen Etkili</option>
-                          <option value="INEFFECTIVE">Etkisiz</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowControlForm(false);
-                          setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
-                        }}
-                        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                      >
-                        İptal
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleAddControl}
-                        className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-                      >
-                        Ekle
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {controls.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                    Henüz kontrol önlemi eklenmemiş
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {controls.map((control, index) => (
-                      <div key={index} className="p-4 bg-white border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-semibold text-gray-900">{control.name}</h4>
-                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                                {control.control_type === 'PREVENTIVE' ? 'Önleyici' : control.control_type === 'DETECTIVE' ? 'Tespit Edici' : 'Düzeltici'}
-                              </span>
-                              <span className={`px-2 py-1 text-xs rounded ${
-                                control.effectiveness === 'EFFECTIVE' ? 'bg-green-100 text-green-800' :
-                                control.effectiveness === 'PARTIALLY_EFFECTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {control.effectiveness === 'EFFECTIVE' ? 'Etkili' : control.effectiveness === 'PARTIALLY_EFFECTIVE' ? 'Kısmen Etkili' : 'Etkisiz'}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600">{control.description}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveControl(index)}
-                            className="ml-3 p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Artık Risk Değerlendirmesi</h3>
                 <p className="text-sm text-gray-600 mb-4">Kontrol önlemleri uygulandıktan sonra kalan risk</p>
 
@@ -2242,12 +2107,19 @@ export default function CollaborationPlanning() {
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                           <option value="">Seçiniz</option>
-                          {goals.map((goal) => (
-                            <option key={goal.id} value={goal.id}>
-                              {goal.code} - {goal.title}
-                            </option>
-                          ))}
+                          {goals
+                            .filter(goal => goal.department_id === transferringRisk?.plan.responsible_department_id)
+                            .map((goal) => (
+                              <option key={goal.id} value={goal.id}>
+                                {goal.code} - {goal.title}
+                              </option>
+                            ))}
                         </select>
+                        {goals.filter(goal => goal.department_id === transferringRisk?.plan.responsible_department_id).length === 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Bu birime ait hedef bulunmamaktadır
+                          </p>
+                        )}
                       </div>
 
                       <div>
