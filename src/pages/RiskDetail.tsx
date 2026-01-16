@@ -325,7 +325,7 @@ export default function RiskDetail() {
             department:departments!owner_department_id(name),
             coordination_department:departments!coordination_department_id(name),
             objective:objectives(code, title),
-            goal:goals(code, title),
+            goal:goals!goal_id(code, title),
             identified_by:profiles!identified_by_id(full_name),
             approved_by_profile:profiles!approved_by(full_name),
             related_goal:goals!related_goal_id(code, title),
