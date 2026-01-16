@@ -44,5 +44,9 @@ export const useLocation = () => {
     return new URLSearchParams(queryString);
   }, [queryString]);
 
-  return { currentPath, navigate, searchParams };
+  const getParams = () => {
+    return Object.fromEntries(searchParams.entries());
+  };
+
+  return { currentPath, navigate, searchParams, getParams };
 };
