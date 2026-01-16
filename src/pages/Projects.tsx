@@ -19,12 +19,12 @@ interface Manager {
 interface Goal {
   id: string;
   code: string;
-  name: string;
+  title: string;
   objective_id: string;
   objective?: {
     id: string;
     code: string;
-    name: string;
+    title: string;
   };
 }
 
@@ -123,7 +123,7 @@ export default function Projects() {
             *,
             department:departments!department_id(id, name),
             manager:profiles!manager_id(id, full_name),
-            goal:goals!related_goal_id(id, code, name, objective_id, objective:objectives!objective_id(id, code, name)),
+            goal:goals!related_goal_id(id, code, title, objective_id, objective:objectives!objective_id(id, code, title)),
             activity:activities!related_activity_id(id, code, name, goal_id)
           `)
           .eq('organization_id', profile?.organization_id)
@@ -145,8 +145,8 @@ export default function Projects() {
         supabase
           .from('goals')
           .select(`
-            id, code, name, objective_id,
-            objective:objectives!objective_id(id, code, name)
+            id, code, title, objective_id,
+            objective:objectives!objective_id(id, code, title)
           `)
           .eq('organization_id', profile?.organization_id)
           .order('code'),
@@ -795,7 +795,7 @@ export default function Projects() {
                     <option value="">Seçiniz...</option>
                     {goals.map((goal) => (
                       <option key={goal.id} value={goal.id}>
-                        {goal.objective?.code} - {goal.objective?.name} &gt; {goal.code} - {goal.name}
+                        {goal.objective?.code} - {goal.objective?.title} &gt; {goal.code} - {goal.title}
                       </option>
                     ))}
                   </select>
