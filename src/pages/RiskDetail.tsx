@@ -31,6 +31,7 @@ export default function RiskDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -93,13 +94,19 @@ export default function RiskDetail() {
   });
 
   useEffect(() => {
-    if (profile?.organization_id && riskId) {
+    if (!riskId) {
+      setError('Risk ID bulunamadı');
+      setLoading(false);
+      return;
+    }
+    if (profile?.organization_id) {
       loadData();
     }
   }, [profile?.organization_id, riskId]);
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       await Promise.all([
         loadRisk(),
@@ -116,8 +123,9 @@ export default function RiskDetail() {
         loadTreatments(),
         loadIndicators(),
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading data:', error);
+      setError(error?.message || 'Veriler yüklenirken bir hata oluştu');
     } finally {
       setLoading(false);
     }
@@ -140,43 +148,46 @@ export default function RiskDetail() {
         related_process:qm_processes!related_process_id(code, name)
       `)
       .eq('id', riskId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error loading risk:', error);
-      return;
+      throw new Error('Risk yüklenirken hata oluştu: ' + error.message);
     }
-    if (data) {
-      const categoryIds = data.categories?.map((c: any) => c.category_id) || [];
-      setFormData({
-        code: data.code,
-        name: data.name,
-        description: data.description || '',
-        category_ids: categoryIds,
-        risk_source: data.risk_source || '',
-        risk_relation: data.risk_relation || '',
-        control_level: data.control_level || '',
-        owner_department_id: data.owner_department_id || '',
-        coordination_department_id: data.coordination_department_id || '',
-        external_organization: data.external_organization || '',
-        external_contact: data.external_contact || '',
-        related_goal_id: data.goal_id || '',
-        related_activity_id: data.related_activity_id || '',
-        related_process_id: data.related_process_id || '',
-        related_project_id: data.related_project_id || '',
-        inherent_likelihood: data.inherent_likelihood || 1,
-        inherent_impact: data.inherent_impact || 1,
-        residual_likelihood: data.residual_likelihood || 1,
-        residual_impact: data.residual_impact || 1,
-        target_probability: data.target_probability || 1,
-        target_impact: data.target_impact || 1,
-        target_date: data.target_date || '',
-        risk_response: data.risk_response || 'MITIGATE',
-        review_period: data.review_period || 'QUARTERLY',
-        last_review_date: data.last_review_date || '',
-        status: data.status || 'DRAFT',
-      });
+
+    if (!data) {
+      throw new Error('Risk bulunamadı');
     }
+
+    const categoryIds = data.categories?.map((c: any) => c.category_id) || [];
+    setFormData({
+      code: data.code,
+      name: data.name,
+      description: data.description || '',
+      category_ids: categoryIds,
+      risk_source: data.risk_source || '',
+      risk_relation: data.risk_relation || '',
+      control_level: data.control_level || '',
+      owner_department_id: data.owner_department_id || '',
+      coordination_department_id: data.coordination_department_id || '',
+      external_organization: data.external_organization || '',
+      external_contact: data.external_contact || '',
+      related_goal_id: data.goal_id || '',
+      related_activity_id: data.related_activity_id || '',
+      related_process_id: data.related_process_id || '',
+      related_project_id: data.related_project_id || '',
+      inherent_likelihood: data.inherent_likelihood || 1,
+      inherent_impact: data.inherent_impact || 1,
+      residual_likelihood: data.residual_likelihood || 1,
+      residual_impact: data.residual_impact || 1,
+      target_probability: data.target_probability || 1,
+      target_impact: data.target_impact || 1,
+      target_date: data.target_date || '',
+      risk_response: data.risk_response || 'MITIGATE',
+      review_period: data.review_period || 'QUARTERLY',
+      last_review_date: data.last_review_date || '',
+      status: data.status || 'DRAFT',
+    });
   };
 
   const loadCategories = async () => {
@@ -593,6 +604,27 @@ export default function RiskDetail() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <div className="p-4 bg-red-100 rounded-lg">
+          <AlertTriangle className="w-12 h-12 text-red-600" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Hata Oluştu</h3>
+          <p className="text-slate-600 mb-4">{error}</p>
+          <button
+            onClick={() => navigate('/risk-management')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Risk Yönetimine Dön
+          </button>
+        </div>
       </div>
     );
   }
