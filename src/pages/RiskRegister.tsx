@@ -457,7 +457,7 @@ export default function RiskRegister() {
     }
   }
 
-  async function handleSave(saveStatus: string) {
+  async function handleSave(saveStatus: string, submitForApproval: boolean = false) {
     if (!formData.name || formData.category_ids.length === 0 || !formData.owner_department_id) {
       alert('Lütfen zorunlu alanları doldurun!');
       return;
@@ -520,6 +520,9 @@ export default function RiskRegister() {
           risk_response: formData.risk_response,
           response_rationale: formData.response_rationale,
           status: saveStatus,
+          approval_status: submitForApproval ? 'IN_REVIEW' : 'DRAFT',
+          submitted_at: submitForApproval ? new Date().toISOString() : null,
+          submitted_by_id: submitForApproval ? profile?.id : null,
           identified_by_id: profile?.id,
           identified_date: new Date().toISOString().split('T')[0]
         })
@@ -573,7 +576,11 @@ export default function RiskRegister() {
         if (impactsError) throw impactsError;
       }
 
-      alert(saveStatus === 'DRAFT' ? 'Risk taslak olarak kaydedildi!' : 'Risk başarıyla kaydedildi!');
+      if (submitForApproval) {
+        alert('Risk başarıyla onaya gönderildi!');
+      } else {
+        alert(saveStatus === 'DRAFT' ? 'Risk taslak olarak kaydedildi!' : 'Risk başarıyla kaydedildi!');
+      }
       setShowModal(false);
       setShowControlForm(false);
       setShowDepartmentImpactForm(false);
@@ -2375,20 +2382,30 @@ export default function RiskRegister() {
               </button>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleSave('DRAFT')}
+                  onClick={() => handleSave('DRAFT', false)}
                   disabled={saving}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Taslak Kaydet
                 </button>
                 <button
-                  onClick={() => handleSave('ACTIVE')}
+                  onClick={() => handleSave('ACTIVE', false)}
                   disabled={saving}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
-                  {saving ? 'Kaydediliyor...' : 'Kaydet ve Kapat'}
+                  {saving ? 'Kaydediliyor...' : 'Kaydet'}
                 </button>
+                {(profile?.role === 'USER' || profile?.role === 'DIRECTOR') && (
+                  <button
+                    onClick={() => handleSave('ACTIVE', true)}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    {saving ? 'Gönderiliyor...' : 'Onaya Gönder'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

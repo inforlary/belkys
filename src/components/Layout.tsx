@@ -18,6 +18,7 @@ interface MenuItem {
   strictAdminOnly?: boolean;
   requiresDepartment?: boolean;
   allowDirector?: boolean;
+  directorOrAdmin?: boolean;
 }
 
 interface MenuSection {
@@ -281,6 +282,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: 'risk-management/dashboard' },
         { icon: FileWarning, label: 'Risk Listesi', path: 'risk-management/risks' },
+        { icon: CheckCircle, label: 'Risk Onayları', path: 'risk-management/approvals', directorOrAdmin: true },
         { icon: Grid, label: 'Risk Matrisi', path: 'risk-management/matrix' },
         { icon: Shield, label: 'Risk Kontrolleri', path: 'risk-management/controls' },
         { icon: CheckSquare, label: 'Risk Faaliyetleri', path: 'risk-management/treatments' },
@@ -378,9 +380,11 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
     const isAdminOrVP = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'vice_president';
     const isDirector = profile?.role === 'director';
+    const isDirectorOrAdmin = isDirector || isAdminOrVP;
 
     if (item.strictAdminOnly && !isAdmin) return false;
     if (item.adminOnly && !isAdminOrVP && !(item.allowDirector && isDirector)) return false;
+    if (item.directorOrAdmin && !isDirectorOrAdmin) return false;
     if (item.requiresDepartment && !profile?.department_id && !isAdminOrVP) return false;
     return true;
   };
