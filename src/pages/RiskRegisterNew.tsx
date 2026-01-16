@@ -184,11 +184,11 @@ export default function RiskRegisterNew() {
   };
 
   const getRiskScoreBadge = (score: number) => {
-    if (score >= 15) return { label: 'Kritik', color: 'text-red-700 bg-red-100', emoji: '🔴' };
-    if (score >= 10) return { label: 'Yüksek', color: 'text-orange-700 bg-orange-100', emoji: '🟠' };
-    if (score >= 6) return { label: 'Orta', color: 'text-yellow-700 bg-yellow-100', emoji: '🟡' };
-    if (score >= 3) return { label: 'Düşük', color: 'text-blue-700 bg-blue-100', emoji: '🔵' };
-    return { label: 'Çok Düşük', color: 'text-green-700 bg-green-100', emoji: '🟢' };
+    if (score >= 15) return { label: 'Kritik', color: 'text-red-700 bg-red-100' };
+    if (score >= 10) return { label: 'Yüksek', color: 'text-orange-700 bg-orange-100' };
+    if (score >= 6) return { label: 'Orta', color: 'text-yellow-700 bg-yellow-100' };
+    if (score >= 3) return { label: 'Düşük', color: 'text-blue-700 bg-blue-100' };
+    return { label: 'Çok Düşük', color: 'text-green-700 bg-green-100' };
   };
 
   const addDepartmentImpact = () => {
@@ -477,27 +477,21 @@ export default function RiskRegisterNew() {
 
               <div className="mt-4">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Kategori <span className="text-red-500">*</span> (Birden fazla seçilebilir)
+                  Kategori <span className="text-red-500">*</span>
                 </label>
-                <div className="border border-slate-300 rounded-lg p-3 max-h-48 overflow-y-auto">
-                  {categories.map(cat => (
-                    <label key={cat.id} className="flex items-center space-x-2 py-1.5 hover:bg-slate-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.category_ids.includes(cat.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({ ...formData, category_ids: [...formData.category_ids, cat.id] });
-                          } else {
-                            setFormData({ ...formData, category_ids: formData.category_ids.filter(id => id !== cat.id) });
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-slate-700">{cat.code} - {cat.name}</span>
-                    </label>
+                <select
+                  value={formData.category_ids[0] || ''}
+                  onChange={(e) => setFormData({ ...formData, category_ids: e.target.value ? [e.target.value] : [] })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Seçiniz</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.code} - {cat.name}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             </div>
 
@@ -510,36 +504,30 @@ export default function RiskRegisterNew() {
                     Risk Kaynağı <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-2">
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="INTERNAL"
                         checked={formData.risk_source === 'INTERNAL'}
                         onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">🏠</span>
-                        <div>
-                          <div className="font-medium text-sm">İç Risk</div>
-                          <div className="text-xs text-slate-600">Kurum içinden</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">İç Risk</div>
+                        <div className="text-xs text-slate-600">Kurum içinden kaynaklanan</div>
                       </div>
                     </label>
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="EXTERNAL"
                         checked={formData.risk_source === 'EXTERNAL'}
                         onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">🌍</span>
-                        <div>
-                          <div className="font-medium text-sm">Dış Risk</div>
-                          <div className="text-xs text-slate-600">Kurum dışından</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Dış Risk</div>
+                        <div className="text-xs text-slate-600">Kurum dışından kaynaklanan</div>
                       </div>
                     </label>
                   </div>
@@ -550,68 +538,56 @@ export default function RiskRegisterNew() {
                     İlişki Türü <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-2">
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="STRATEGIC"
                         checked={formData.risk_relation === 'STRATEGIC'}
                         onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">🎯</span>
-                        <div>
-                          <div className="font-medium text-sm">Stratejik</div>
-                          <div className="text-xs text-slate-600">Hedefe bağlı</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Stratejik</div>
+                        <div className="text-xs text-slate-600">Hedefe veya faaliyete bağlı</div>
                       </div>
                     </label>
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="OPERATIONAL"
                         checked={formData.risk_relation === 'OPERATIONAL'}
                         onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">⚙️</span>
-                        <div>
-                          <div className="font-medium text-sm">Operasyonel</div>
-                          <div className="text-xs text-slate-600">Sürece bağlı</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Operasyonel</div>
+                        <div className="text-xs text-slate-600">Sürece bağlı</div>
                       </div>
                     </label>
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="PROJECT"
                         checked={formData.risk_relation === 'PROJECT'}
                         onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">📋</span>
-                        <div>
-                          <div className="font-medium text-sm">Proje</div>
-                          <div className="text-xs text-slate-600">Projeye bağlı</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Proje</div>
+                        <div className="text-xs text-slate-600">Projeye bağlı</div>
                       </div>
                     </label>
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="CORPORATE"
                         checked={formData.risk_relation === 'CORPORATE'}
                         onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">🏛️</span>
-                        <div>
-                          <div className="font-medium text-sm">Kurumsal</div>
-                          <div className="text-xs text-slate-600">Bağımsız</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Kurumsal</div>
+                        <div className="text-xs text-slate-600">Tüm kurumu etkiler</div>
                       </div>
                     </label>
                   </div>
@@ -622,52 +598,43 @@ export default function RiskRegisterNew() {
                     Kontrol Düzeyi <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-2">
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="CONTROLLABLE"
                         checked={formData.control_level === 'CONTROLLABLE'}
                         onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">✅</span>
-                        <div>
-                          <div className="font-medium text-sm">Kontrol Edilebilir</div>
-                          <div className="text-xs text-slate-600">Tamamen kontrol</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Kontrol Edilebilir</div>
+                        <div className="text-xs text-slate-600">Tamamen bizim kontrolümüzde</div>
                       </div>
                     </label>
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="PARTIAL"
                         checked={formData.control_level === 'PARTIAL'}
                         onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">⚠️</span>
-                        <div>
-                          <div className="font-medium text-sm">Kısmen Kontrol</div>
-                          <div className="text-xs text-slate-600">Etki azaltılabilir</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Kısmen Kontrol Edilebilir</div>
+                        <div className="text-xs text-slate-600">Etkiyi azaltabiliriz</div>
                       </div>
                     </label>
-                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                       <input
                         type="radio"
                         value="UNCONTROLLABLE"
                         checked={formData.control_level === 'UNCONTROLLABLE'}
                         onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                        className="mt-1"
+                        className="w-4 h-4"
                       />
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">❌</span>
-                        <div>
-                          <div className="font-medium text-sm">Kontrol Dışı</div>
-                          <div className="text-xs text-slate-600">Sadece izleme</div>
-                        </div>
+                      <div>
+                        <div className="font-medium text-sm">Kontrol Dışı</div>
+                        <div className="text-xs text-slate-600">Sadece izleyebiliriz</div>
                       </div>
                     </label>
                   </div>
@@ -984,7 +951,6 @@ export default function RiskRegisterNew() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-slate-700">DOĞAL RİSK SKORU:</span>
                       <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(inherentScore).color} px-4 py-2 rounded-lg`}>
-                        <span>{getRiskScoreBadge(inherentScore).emoji}</span>
                         <span>{inherentScore}</span>
                         <span className="text-sm">({getRiskScoreBadge(inherentScore).label})</span>
                       </span>
@@ -1048,7 +1014,6 @@ export default function RiskRegisterNew() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-slate-700">ARTIK RİSK SKORU:</span>
                       <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(residualScore).color} px-4 py-2 rounded-lg`}>
-                        <span>{getRiskScoreBadge(residualScore).emoji}</span>
                         <span>{residualScore}</span>
                         <span className="text-sm">({getRiskScoreBadge(residualScore).label})</span>
                       </span>
@@ -1113,7 +1078,6 @@ export default function RiskRegisterNew() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-slate-700">HEDEF RİSK SKORU:</span>
                         <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(targetScore).color} px-4 py-2 rounded-lg`}>
-                          <span>{getRiskScoreBadge(targetScore).emoji}</span>
                           <span>{targetScore}</span>
                           <span className="text-sm">({getRiskScoreBadge(targetScore).label})</span>
                         </span>
