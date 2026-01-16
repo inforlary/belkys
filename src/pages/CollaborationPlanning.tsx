@@ -127,6 +127,7 @@ export default function CollaborationPlanning() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferringRisk, setTransferringRisk] = useState<{ item: PlanItem; plan: CollaborationPlan } | null>(null);
   const [riskCategories, setRiskCategories] = useState<RiskCategory[]>([]);
+  const [allRisks, setAllRisks] = useState<any[]>([]);
   const [transferredRisks, setTransferredRisks] = useState<TransferredRisk[]>([]);
   const [criteria, setCriteria] = useState<RiskCriterion[]>([]);
   const [controls, setControls] = useState<RiskControl[]>([]);
@@ -161,7 +162,8 @@ export default function CollaborationPlanning() {
     response_rationale: '',
     review_period: 'QUARTERLY',
     last_review_date: new Date().toISOString().split('T')[0],
-    additional_description: ''
+    additional_description: '',
+    related_risk_ids: [] as string[]
   });
 
   const [formData, setFormData] = useState({
@@ -190,7 +192,7 @@ export default function CollaborationPlanning() {
     try {
       setLoading(true);
 
-      const [plansRes, goalsRes, depsRes, planRes, categoriesRes, transferredRes, criteriaRes, activitiesRes, processesRes, projectsRes] = await Promise.all([
+      const [plansRes, goalsRes, depsRes, planRes, categoriesRes, transferredRes, criteriaRes, activitiesRes, processesRes, projectsRes, risksRes] = await Promise.all([
         supabase
           .from('collaboration_plans')
           .select(`
@@ -259,7 +261,14 @@ export default function CollaborationPlanning() {
           .from('projects')
           .select('*')
           .eq('organization_id', profile.organization_id)
-          .order('name')
+          .order('name'),
+
+        supabase
+          .from('risks')
+          .select('id, code, name, owner_department_id, department:departments!owner_department_id(name)')
+          .eq('organization_id', profile.organization_id)
+          .eq('status', 'ACTIVE')
+          .order('code')
       ]);
 
       if (plansRes.error) throw plansRes.error;
@@ -276,6 +285,7 @@ export default function CollaborationPlanning() {
       setRiskCategories(categoriesRes.data || []);
       setTransferredRisks(transferredRes.data || []);
       setCriteria(criteriaRes.data || []);
+      setAllRisks(risksRes.data || []);
 
       if (criteriaRes.data?.length === 0) {
         await supabase.rpc('initialize_default_risk_criteria', {
@@ -624,7 +634,8 @@ export default function CollaborationPlanning() {
       response_rationale: '',
       review_period: 'QUARTERLY',
       last_review_date: new Date().toISOString().split('T')[0],
-      additional_description: ''
+      additional_description: '',
+      related_risk_ids: [] as string[]
     });
     setControls([]);
     setShowControlForm(false);
@@ -667,7 +678,7 @@ export default function CollaborationPlanning() {
           risk_source: transferFormData.risk_source,
           risk_relation: transferFormData.risk_relation,
           control_level: transferFormData.control_level,
-          owner_department_id: transferFormData.control_level === 'CONTROLLABLE' ? transferringRisk.plan.responsible_department_id : null,
+          owner_department_id: transferringRisk.plan.responsible_department_id,
           coordination_department_id: transferFormData.coordination_department_id || null,
           external_organization: transferFormData.external_organization || null,
           external_contact: transferFormData.external_contact || null,
@@ -723,6 +734,22 @@ export default function CollaborationPlanning() {
           .insert(controlInserts);
 
         if (controlsError) throw controlsError;
+      }
+
+      if (transferFormData.related_risk_ids.length > 0) {
+        const relationInserts = transferFormData.related_risk_ids.map(relatedRiskId => ({
+          organization_id: profile.organization_id,
+          source_risk_id: riskData.id,
+          target_risk_id: relatedRiskId,
+          relation_type: 'RELATED',
+          description: 'İşbirliği planından aktarılırken ilişkilendirildi'
+        }));
+
+        const { error: relationsError } = await supabase
+          .from('risk_relations')
+          .insert(relationInserts);
+
+        if (relationsError) throw relationsError;
       }
 
       alert('Risk başarıyla Risk Yönetimi sistemine aktarıldı!');
@@ -2377,14 +2404,76 @@ export default function CollaborationPlanning() {
 
               <div className="bg-white rounded-lg border border-slate-200 p-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">8. İlişkili Riskler ve Ek Bilgiler</h3>
-                <p className="text-sm text-slate-600 mb-4">Bu risk ile ilgili ek açıklamalar ve notlar</p>
-                <textarea
-                  value={transferFormData.additional_description}
-                  onChange={(e) => setTransferFormData(prev => ({ ...prev, additional_description: e.target.value }))}
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Risk hakkında ek bilgiler, diğer risklerle ilişkisi ve notlar..."
-                />
+
+                <div className="space-y-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      İlişkili Riskler
+                    </label>
+                    <p className="text-xs text-slate-600 mb-2">Bu risk ile ilişkili diğer riskleri seçiniz</p>
+                    <div className="border border-slate-300 rounded-lg max-h-48 overflow-y-auto">
+                      {allRisks.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-slate-500">
+                          Henüz aktif risk bulunmuyor
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-200">
+                          {allRisks.map(risk => (
+                            <label key={risk.id} className="flex items-center p-3 hover:bg-slate-50 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={transferFormData.related_risk_ids.includes(risk.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setTransferFormData(prev => ({
+                                      ...prev,
+                                      related_risk_ids: [...prev.related_risk_ids, risk.id]
+                                    }));
+                                  } else {
+                                    setTransferFormData(prev => ({
+                                      ...prev,
+                                      related_risk_ids: prev.related_risk_ids.filter(id => id !== risk.id)
+                                    }));
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                              />
+                              <div className="ml-3 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-slate-900">{risk.code}</span>
+                                  <span className="text-sm text-slate-700">{risk.name}</span>
+                                </div>
+                                {risk.department && (
+                                  <div className="text-xs text-slate-500 mt-0.5">
+                                    {risk.department.name}
+                                  </div>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {transferFormData.related_risk_ids.length > 0 && (
+                      <div className="mt-2 text-xs text-slate-600">
+                        {transferFormData.related_risk_ids.length} risk seçildi
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Ek Bilgiler ve Notlar
+                    </label>
+                    <textarea
+                      value={transferFormData.additional_description}
+                      onChange={(e) => setTransferFormData(prev => ({ ...prev, additional_description: e.target.value }))}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Risk hakkında ek bilgiler ve notlar..."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
