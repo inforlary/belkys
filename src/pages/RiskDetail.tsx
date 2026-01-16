@@ -298,14 +298,23 @@ export default function RiskDetail() {
   const [availableRisks, setAvailableRisks] = useState<any[]>([]);
 
   useEffect(() => {
+    console.log('[RiskDetail] useEffect triggered');
+    console.log('[RiskDetail] riskId:', riskId, 'Type:', typeof riskId);
+    console.log('[RiskDetail] profile?.organization_id:', profile?.organization_id);
     if (riskId && profile?.organization_id) {
+      console.log('[RiskDetail] Calling loadData...');
       loadData();
+    } else {
+      console.log('[RiskDetail] NOT calling loadData - missing riskId or organization_id');
     }
   }, [riskId, profile?.organization_id]);
 
   async function loadData() {
     try {
       setLoading(true);
+      console.log('[RiskDetail] loadData started');
+      console.log('[RiskDetail] Loading risk with ID:', riskId);
+      console.log('[RiskDetail] Organization ID:', profile?.organization_id);
 
       const [riskRes, controlsRes, treatmentsRes, indicatorsRes, departmentImpactsRes, assessmentsRes, deptsRes, profilesRes, categoriesRes, riskCategoriesRes, goalsRes, relationsRes, availableRisksRes] = await Promise.all([
         supabase
@@ -395,7 +404,23 @@ export default function RiskDetail() {
           .order('code')
       ]);
 
-      if (riskRes.error) throw riskRes.error;
+      console.log('[RiskDetail] Risk query result:', riskRes);
+      console.log('[RiskDetail] Risk data:', riskRes.data);
+      console.log('[RiskDetail] Risk error:', riskRes.error);
+
+      if (riskRes.error) {
+        console.error('[RiskDetail] Risk query error:', riskRes.error);
+        throw riskRes.error;
+      }
+
+      if (!riskRes.data) {
+        console.error('[RiskDetail] Risk not found for ID:', riskId);
+        alert('Risk bulunamadı!');
+        navigate('risk-management/risks');
+        return;
+      }
+
+      console.log('[RiskDetail] Risk loaded successfully:', riskRes.data.name);
 
       setRisk(riskRes.data);
       setControls(controlsRes.data || []);
@@ -416,7 +441,8 @@ export default function RiskDetail() {
       setRiskRelations(relationsRes.data || []);
       setAvailableRisks(availableRisksRes.data || []);
     } catch (error) {
-      console.error('Error loading risk:', error);
+      console.error('[RiskDetail] Error loading risk:', error);
+      alert('Risk yüklenirken bir hata oluştu: ' + (error as any).message);
     } finally {
       setLoading(false);
     }
