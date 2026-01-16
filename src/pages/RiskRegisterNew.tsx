@@ -128,7 +128,7 @@ export default function RiskRegisterNew() {
 
   const loadCategories = async () => {
     const { data } = await supabase
-      .from('rm_risk_categories')
+      .from('risk_categories')
       .select('*')
       .eq('organization_id', profile?.organization_id)
       .order('code');
@@ -384,6 +384,42 @@ export default function RiskRegisterNew() {
     return labels[level] || '';
   };
 
+  const getLevelColor = (level: number, isSelected: boolean) => {
+    const colors = {
+      1: {
+        bg: isSelected ? 'bg-green-600' : 'bg-green-100',
+        text: isSelected ? 'text-white' : 'text-green-700',
+        border: 'border-green-300',
+        hover: 'hover:bg-green-200'
+      },
+      2: {
+        bg: isSelected ? 'bg-blue-600' : 'bg-blue-100',
+        text: isSelected ? 'text-white' : 'text-blue-700',
+        border: 'border-blue-300',
+        hover: 'hover:bg-blue-200'
+      },
+      3: {
+        bg: isSelected ? 'bg-yellow-600' : 'bg-yellow-100',
+        text: isSelected ? 'text-white' : 'text-yellow-700',
+        border: 'border-yellow-300',
+        hover: 'hover:bg-yellow-200'
+      },
+      4: {
+        bg: isSelected ? 'bg-orange-600' : 'bg-orange-100',
+        text: isSelected ? 'text-white' : 'text-orange-700',
+        border: 'border-orange-300',
+        hover: 'hover:bg-orange-200'
+      },
+      5: {
+        bg: isSelected ? 'bg-red-600' : 'bg-red-100',
+        text: isSelected ? 'text-white' : 'text-red-700',
+        border: 'border-red-300',
+        hover: 'hover:bg-red-200'
+      }
+    };
+    return colors[level as keyof typeof colors] || colors[3];
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -411,21 +447,20 @@ export default function RiskRegisterNew() {
               <input
                 type="text"
                 value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed"
                 placeholder="RSK-0001"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kategori <span className="text-red-500">*</span>
+                Kategori
               </label>
               <select
                 value={formData.category_id}
                 onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
               >
                 <option value="">Seçiniz</option>
                 {categories.map((cat) => (
@@ -878,40 +913,38 @@ export default function RiskRegisterNew() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
                   <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, inherent_likelihood: val })}
-                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                          formData.inherent_likelihood === val
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                    {[1, 2, 3, 4, 5].map((val) => {
+                      const colors = getLevelColor(val, formData.inherent_likelihood === val);
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, inherent_likelihood: val })}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.inherent_likelihood || formData.inherent_likelihood !== val ? colors.hover : ''}`}
+                        >
+                          {val}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Etki</label>
                   <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, inherent_impact: val })}
-                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                          formData.inherent_impact === val
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                    {[1, 2, 3, 4, 5].map((val) => {
+                      const colors = getLevelColor(val, formData.inherent_impact === val);
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, inherent_impact: val })}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.inherent_impact || formData.inherent_impact !== val ? colors.hover : ''}`}
+                        >
+                          {val}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -935,40 +968,38 @@ export default function RiskRegisterNew() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
                   <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, residual_likelihood: val })}
-                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                          formData.residual_likelihood === val
-                            ? 'bg-green-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                    {[1, 2, 3, 4, 5].map((val) => {
+                      const colors = getLevelColor(val, formData.residual_likelihood === val);
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, residual_likelihood: val })}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.residual_likelihood || formData.residual_likelihood !== val ? colors.hover : ''}`}
+                        >
+                          {val}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Etki</label>
                   <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, residual_impact: val })}
-                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                          formData.residual_impact === val
-                            ? 'bg-green-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                    {[1, 2, 3, 4, 5].map((val) => {
+                      const colors = getLevelColor(val, formData.residual_impact === val);
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, residual_impact: val })}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.residual_impact || formData.residual_impact !== val ? colors.hover : ''}`}
+                        >
+                          {val}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -992,40 +1023,38 @@ export default function RiskRegisterNew() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
                   <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, target_probability: val })}
-                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                          formData.target_probability === val
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                    {[1, 2, 3, 4, 5].map((val) => {
+                      const colors = getLevelColor(val, formData.target_probability === val);
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, target_probability: val })}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.target_probability || formData.target_probability !== val ? colors.hover : ''}`}
+                        >
+                          {val}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Etki</label>
                   <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, target_impact: val })}
-                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                          formData.target_impact === val
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                    {[1, 2, 3, 4, 5].map((val) => {
+                      const colors = getLevelColor(val, formData.target_impact === val);
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, target_impact: val })}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.target_impact || formData.target_impact !== val ? colors.hover : ''}`}
+                        >
+                          {val}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
