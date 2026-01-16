@@ -609,38 +609,16 @@ export default function CollaborationPlanning() {
       return;
     }
 
-    setTransferringRisk({ item: riskItem, plan });
-    setTransferFormData({
-      category_ids: [],
-      status: 'ACTIVE',
-      risk_source: '',
-      risk_relation: '',
-      control_level: '',
-      coordination_department_id: '',
-      external_organization: '',
-      external_contact: '',
-      related_goal_id: plan.goal_id || '',
-      related_activity_id: '',
-      related_process_id: '',
-      related_project_id: '',
-      inherent_likelihood: 3,
-      inherent_impact: 3,
-      residual_likelihood: 2,
-      residual_impact: 2,
-      target_probability: 1,
-      target_impact: 1,
-      target_date: '',
-      risk_response: 'MITIGATE',
-      response_rationale: '',
-      review_period: 'QUARTERLY',
-      last_review_date: new Date().toISOString().split('T')[0],
-      additional_description: '',
-      related_risk_ids: [] as string[]
+    const params = new URLSearchParams({
+      fromCollaboration: 'true',
+      riskName: riskItem.content,
+      ownerDepartmentId: plan.responsible_department_id,
+      collaborationItemId: riskItem.id,
+      goalId: plan.goal_id || '',
+      planTitle: plan.title
     });
-    setControls([]);
-    setShowControlForm(false);
-    setNewControl({ name: '', description: '', control_type: 'PREVENTIVE', effectiveness: 'EFFECTIVE' });
-    setShowTransferModal(true);
+
+    navigate(`risk-register-new?${params.toString()}`);
   };
 
   const handleTransferRisk = async () => {

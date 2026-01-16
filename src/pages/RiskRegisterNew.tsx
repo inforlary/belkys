@@ -35,6 +35,7 @@ export default function RiskRegisterNew() {
   const [showDepartmentImpactModal, setShowDepartmentImpactModal] = useState(false);
   const [showRiskRelationModal, setShowRiskRelationModal] = useState(false);
   const [editingImpactIndex, setEditingImpactIndex] = useState<number | null>(null);
+  const [collaborationItemId, setCollaborationItemId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -84,8 +85,31 @@ export default function RiskRegisterNew() {
     if (profile?.organization_id) {
       loadData();
       generateCode();
+      loadCollaborationParams();
     }
   }, [profile?.organization_id]);
+
+  const loadCollaborationParams = () => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const fromCollaboration = params.get('fromCollaboration');
+
+    if (fromCollaboration === 'true') {
+      const riskName = params.get('riskName') || '';
+      const ownerDepartmentId = params.get('ownerDepartmentId') || '';
+      const collabItemId = params.get('collaborationItemId') || '';
+      const goalId = params.get('goalId') || '';
+      const planTitle = params.get('planTitle') || '';
+
+      setCollaborationItemId(collabItemId);
+      setFormData(prev => ({
+        ...prev,
+        name: riskName,
+        owner_department_id: ownerDepartmentId,
+        related_goal_id: goalId,
+        description: `İşbirliği planından aktarılan risk: ${planTitle}`
+      }));
+    }
+  };
 
   const loadData = async () => {
     await Promise.all([
@@ -322,6 +346,7 @@ export default function RiskRegisterNew() {
         external_organization: formData.external_organization || null,
         external_contact: formData.external_contact || null,
         goal_id: formData.related_goal_id || null,
+        collaboration_item_id: collaborationItemId || null,
         related_activity_id: formData.related_activity_id || null,
         related_process_id: formData.related_process_id || null,
         related_project_id: formData.related_project_id || null,

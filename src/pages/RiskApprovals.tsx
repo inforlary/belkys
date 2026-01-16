@@ -109,12 +109,12 @@ export default function RiskApprovals() {
         .from('risks')
         .select(`
           *,
-          categories:risk_categories(
+          categories:risk_category_mappings(
             category_id,
-            category:risk_category_master(id, name, code, color)
+            category:risk_categories(id, name, code)
           ),
           department:departments!owner_department_id(name),
-          related_goal:goals!related_goal_id(code, title),
+          related_goal:goals!goal_id(code, title),
           submitted_by:profiles!risks_submitted_by_id_fkey(full_name),
           reviewed_by:profiles!risks_reviewed_by_id_fkey(full_name),
           approved_by:profiles!risks_approved_by_id_fkey(full_name)
