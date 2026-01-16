@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, TrendingUp, DollarSign, User, Building2, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Calendar, TrendingUp, DollarSign, User, Building2, Clock, AlertTriangle, Target, ExternalLink } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
@@ -19,6 +19,8 @@ interface Project {
   status: string;
   progress: number;
   created_at: string;
+  related_goal_id?: string;
+  related_activity_id?: string;
   department?: {
     id: string;
     name: string;
@@ -27,6 +29,22 @@ interface Project {
     id: string;
     full_name: string;
     email: string;
+  };
+  goal?: {
+    id: string;
+    code: string;
+    name: string;
+    objective_id: string;
+    objective?: {
+      id: string;
+      code: string;
+      name: string;
+    };
+  };
+  activity?: {
+    id: string;
+    code: string;
+    name: string;
   };
 }
 
@@ -60,7 +78,9 @@ export default function ProjectDetail() {
         .select(`
           *,
           department:departments!department_id(id, name),
-          manager:profiles!manager_id(id, full_name, email)
+          manager:profiles!manager_id(id, full_name, email),
+          goal:goals!related_goal_id(id, code, name, objective_id, objective:objectives!objective_id(id, code, name)),
+          activity:activities!related_activity_id(id, code, name)
         `)
         .eq('id', projectId)
         .single();
@@ -220,6 +240,58 @@ export default function ProjectDetail() {
                 Planlanan bitiş tarihinden {Math.abs(remainingDays)} gün geçmiştir
               </div>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {(project.related_goal_id || project.related_activity_id) && (
+        <Card className="border-l-4 border-green-500 bg-gradient-to-r from-green-50 to-blue-50">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Target className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  Stratejik Plan Bağlantısı
+                </h3>
+                <div className="space-y-2">
+                  {project.goal?.objective && (
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700">Amaç:</span>
+                      <span className="ml-2 text-gray-900">
+                        {project.goal.objective.code} - {project.goal.objective.name}
+                      </span>
+                    </div>
+                  )}
+                  {project.goal && (
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700">Hedef:</span>
+                      <span className="ml-2 text-gray-900">
+                        {project.goal.code} - {project.goal.name}
+                      </span>
+                    </div>
+                  )}
+                  {project.activity && (
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700">Faaliyet:</span>
+                      <span className="ml-2 text-gray-900">
+                        {project.activity.code} - {project.activity.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {project.goal && (
+              <button
+                onClick={() => navigate(`/goals`)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+              >
+                Stratejik Plana Git
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </Card>
       )}

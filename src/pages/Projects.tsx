@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Trash2, Eye, Filter, X, FolderOpen } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Filter, FolderOpen, Target, Link as LinkIcon } from 'lucide-react';
 
 interface Department {
   id: string;
@@ -14,6 +14,25 @@ interface Department {
 interface Manager {
   id: string;
   full_name: string;
+}
+
+interface Goal {
+  id: string;
+  code: string;
+  name: string;
+  objective_id: string;
+  objective?: {
+    id: string;
+    code: string;
+    name: string;
+  };
+}
+
+interface Activity {
+  id: string;
+  code: string;
+  name: string;
+  goal_id: string;
 }
 
 interface Project {
@@ -29,8 +48,12 @@ interface Project {
   end_date: string;
   status: string;
   progress: number;
+  related_goal_id?: string;
+  related_activity_id?: string;
   department?: Department;
   manager?: Manager;
+  goal?: Goal;
+  activity?: Activity;
 }
 
 const statusLabels: Record<string, { label: string; color: string }> = {
@@ -48,6 +71,8 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -58,7 +83,8 @@ export default function Projects() {
     department_id: '',
     date_from: '',
     date_to: '',
-    search: ''
+    search: '',
+    sp_connection: ''
   });
 
   const [formData, setFormData] = useState({
@@ -71,7 +97,10 @@ export default function Projects() {
     start_date: '',
     end_date: '',
     status: 'PLANNED',
-    progress: 0
+    progress: 0,
+    has_sp_connection: false,
+    related_goal_id: '',
+    related_activity_id: ''
   });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -87,13 +116,15 @@ export default function Projects() {
     try {
       setLoading(true);
 
-      const [projectsRes, departmentsRes, managersRes] = await Promise.all([
+      const [projectsRes, departmentsRes, managersRes, goalsRes, activitiesRes] = await Promise.all([
         supabase
           .from('projects')
           .select(`
             *,
             department:departments!department_id(id, name),
-            manager:profiles!manager_id(id, full_name)
+            manager:profiles!manager_id(id, full_name),
+            goal:goals!related_goal_id(id, code, name, objective_id, objective:objectives!objective_id(id, code, name)),
+            activity:activities!related_activity_id(id, code, name, goal_id)
           `)
           .eq('organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
@@ -109,16 +140,35 @@ export default function Projects() {
           .select('id, full_name')
           .eq('organization_id', profile?.organization_id)
           .in('role', ['admin', 'director', 'user'])
-          .order('full_name')
+          .order('full_name'),
+
+        supabase
+          .from('goals')
+          .select(`
+            id, code, name, objective_id,
+            objective:objectives!objective_id(id, code, name)
+          `)
+          .eq('organization_id', profile?.organization_id)
+          .order('code'),
+
+        supabase
+          .from('activities')
+          .select('id, code, name, goal_id')
+          .eq('organization_id', profile?.organization_id)
+          .order('code')
       ]);
 
       if (projectsRes.error) throw projectsRes.error;
       if (departmentsRes.error) throw departmentsRes.error;
       if (managersRes.error) throw managersRes.error;
+      if (goalsRes.error) throw goalsRes.error;
+      if (activitiesRes.error) throw activitiesRes.error;
 
       setProjects(projectsRes.data || []);
       setDepartments(departmentsRes.data || []);
       setManagers(managersRes.data || []);
+      setGoals(goalsRes.data || []);
+      setActivities(activitiesRes.data || []);
     } catch (error) {
       console.error('Veriler yüklenirken hata:', error);
     } finally {
@@ -139,7 +189,10 @@ export default function Projects() {
         start_date: project.start_date,
         end_date: project.end_date,
         status: project.status,
-        progress: project.progress
+        progress: project.progress,
+        has_sp_connection: !!(project.related_goal_id || project.related_activity_id),
+        related_goal_id: project.related_goal_id || '',
+        related_activity_id: project.related_activity_id || ''
       });
     } else {
       setEditingProject(null);
@@ -153,7 +206,10 @@ export default function Projects() {
         start_date: '',
         end_date: '',
         status: 'PLANNED',
-        progress: 0
+        progress: 0,
+        has_sp_connection: false,
+        related_goal_id: '',
+        related_activity_id: ''
       });
     }
     setShowModal(true);
@@ -169,6 +225,11 @@ export default function Projects() {
 
     if (!formData.name || !formData.department_id || !formData.start_date || !formData.end_date) {
       alert('Lütfen zorunlu alanları doldurun');
+      return;
+    }
+
+    if (formData.has_sp_connection && !formData.related_goal_id && !formData.related_activity_id) {
+      alert('Stratejik Plan bağlantısı için en az bir hedef veya faaliyet seçmelisiniz');
       return;
     }
 
@@ -207,7 +268,9 @@ export default function Projects() {
         start_date: formData.start_date,
         end_date: formData.end_date,
         status: formData.status,
-        progress: formData.progress
+        progress: formData.progress,
+        related_goal_id: formData.has_sp_connection && formData.related_goal_id ? formData.related_goal_id : null,
+        related_activity_id: formData.has_sp_connection && formData.related_activity_id ? formData.related_activity_id : null
       };
 
       if (editingProject) {
@@ -258,12 +321,18 @@ export default function Projects() {
     return diffDays;
   }
 
+  const filteredActivities = formData.related_goal_id
+    ? activities.filter(a => a.goal_id === formData.related_goal_id)
+    : activities;
+
   const filteredProjects = projects.filter(p => {
     if (!p) return false;
     if (filters.status && p.status !== filters.status) return false;
     if (filters.department_id && p.department_id !== filters.department_id) return false;
     if (filters.date_from && p.start_date < filters.date_from) return false;
     if (filters.date_to && p.end_date > filters.date_to) return false;
+    if (filters.sp_connection === 'connected' && !p.related_goal_id && !p.related_activity_id) return false;
+    if (filters.sp_connection === 'not_connected' && (p.related_goal_id || p.related_activity_id)) return false;
     if (filters.search) {
       const search = filters.search.toLowerCase();
       return p.code?.toLowerCase().includes(search) || p.name?.toLowerCase().includes(search);
@@ -277,7 +346,8 @@ export default function Projects() {
       department_id: '',
       date_from: '',
       date_to: '',
-      search: ''
+      search: '',
+      sp_connection: ''
     });
   }
 
@@ -285,7 +355,7 @@ export default function Projects() {
     return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
   }
 
-  const hasActiveFilters = filters.status || filters.department_id || filters.date_from || filters.date_to || filters.search;
+  const hasActiveFilters = filters.status || filters.department_id || filters.date_from || filters.date_to || filters.search || filters.sp_connection;
 
   return (
     <div className="space-y-6">
@@ -333,10 +403,10 @@ export default function Projects() {
         </Card>
         <Card>
           <div className="text-center">
-            <div className="text-3xl font-bold text-gray-600">
-              {filteredProjects.filter(p => p.status === 'PLANNED').length}
+            <div className="text-3xl font-bold text-purple-600">
+              {filteredProjects.filter(p => p.related_goal_id || p.related_activity_id).length}
             </div>
-            <div className="text-sm text-gray-600">Planlanan</div>
+            <div className="text-sm text-gray-600">SP Bağlantılı</div>
           </div>
         </Card>
       </div>
@@ -357,14 +427,14 @@ export default function Projects() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div>
             <select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Durum ▼</option>
+              <option value="">Durum</option>
               {Object.entries(statusLabels).map(([key, { label }]) => (
                 <option key={key} value={key}>{label}</option>
               ))}
@@ -377,10 +447,22 @@ export default function Projects() {
               onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Birim ▼</option>
+              <option value="">Birim</option>
               {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>{dept.name}</option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={filters.sp_connection}
+              onChange={(e) => setFilters({ ...filters, sp_connection: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">SP Bağlantısı</option>
+              <option value="connected">Bağlantılı</option>
+              <option value="not_connected">Bağlantısız</option>
             </select>
           </div>
 
@@ -424,6 +506,7 @@ export default function Projects() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proje Kodu</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proje Adı</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu Birim</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SP Bağlantısı</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlerleme</th>
@@ -433,7 +516,7 @@ export default function Projects() {
             <tbody className="divide-y divide-gray-200">
               {filteredProjects.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     Proje bulunamadı
                   </td>
                 </tr>
@@ -442,6 +525,7 @@ export default function Projects() {
                   const statusInfo = statusLabels[project.status] || statusLabels['PLANNED'];
                   const remainingDays = getRemainingDays(project.end_date);
                   const isOverdue = remainingDays < 0 && project.status !== 'COMPLETED' && project.status !== 'CANCELLED';
+                  const hasSpConnection = !!(project.related_goal_id || project.related_activity_id);
 
                   return (
                     <tr
@@ -453,6 +537,18 @@ export default function Projects() {
                       <td className="px-4 py-3 text-sm text-gray-900">{project.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {project.department?.name || '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {hasSpConnection ? (
+                          <div className="flex items-center gap-1 text-sm">
+                            <Target className="w-4 h-4 text-green-600" />
+                            <span className="text-green-700 font-medium">
+                              {project.goal?.code || project.activity?.code || '-'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm text-gray-700">
@@ -659,6 +755,79 @@ export default function Projects() {
               <span>50%</span>
               <span>100%</span>
             </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <input
+                type="checkbox"
+                id="has_sp_connection"
+                checked={formData.has_sp_connection}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  has_sp_connection: e.target.checked,
+                  related_goal_id: e.target.checked ? formData.related_goal_id : '',
+                  related_activity_id: e.target.checked ? formData.related_activity_id : ''
+                })}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <label htmlFor="has_sp_connection" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-600" />
+                Bu proje Stratejik Plana bağlı mı?
+              </label>
+            </div>
+
+            {formData.has_sp_connection && (
+              <div className="ml-6 space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Bağlı Hedef
+                  </label>
+                  <select
+                    value={formData.related_goal_id}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      related_goal_id: e.target.value,
+                      related_activity_id: ''
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">Seçiniz...</option>
+                    {goals.map((goal) => (
+                      <option key={goal.id} value={goal.id}>
+                        {goal.objective?.code} - {goal.objective?.name} &gt; {goal.code} - {goal.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Bağlı Faaliyet
+                  </label>
+                  <select
+                    value={formData.related_activity_id}
+                    onChange={(e) => setFormData({ ...formData, related_activity_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                    disabled={!formData.related_goal_id}
+                  >
+                    <option value="">Seçiniz...</option>
+                    {filteredActivities.map((activity) => (
+                      <option key={activity.id} value={activity.id}>
+                        {activity.code} - {activity.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!formData.related_goal_id && (
+                    <p className="text-xs text-gray-500 mt-1">Önce bir hedef seçmelisiniz</p>
+                  )}
+                </div>
+
+                <div className="text-xs text-blue-700 bg-blue-100 p-2 rounded">
+                  En az bir hedef veya faaliyet seçmelisiniz
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
