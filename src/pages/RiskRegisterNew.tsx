@@ -517,6 +517,16 @@ export default function RiskRegisterNew() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
+                Risk Kodu
+              </label>
+              <div className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500">
+                Otomatik oluşturulacak
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Risk kodu kayıt sırasında otomatik olarak atanacaktır</p>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Risk Adı <span className="text-red-500">*</span>
               </label>
               <input
