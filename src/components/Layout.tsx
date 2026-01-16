@@ -290,6 +290,13 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       ],
     },
     {
+      label: 'Proje Yönetimi',
+      icon: FolderOpen,
+      items: [
+        { icon: FolderOpen, label: 'Projeler', path: 'projects' },
+      ],
+    },
+    {
       label: 'İç Kontrol',
       icon: ShieldCheck,
       items: [

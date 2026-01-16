@@ -87,6 +87,8 @@ import RiskTreatments from './pages/RiskTreatments';
 import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
 import RiskCategories from './pages/RiskCategories';
 import RiskReports from './pages/RiskReports';
+import Projects from './pages/Projects';
+import ProjectDetail from './pages/ProjectDetail';
 import QualityDashboard from './pages/QualityDashboard';
 import QualityProcesses from './pages/QualityProcesses';
 import QualityProcessDetail from './pages/QualityProcessDetail';
@@ -170,6 +172,9 @@ const renderPage = () => {
     }
     if (currentPath.startsWith('risk-management/risks/') && currentPath !== 'risk-management/risks') {
       return <RiskDetail />;
+    }
+    if (currentPath.startsWith('projects/') && currentPath !== 'projects') {
+      return <ProjectDetail />;
     }
     if (currentPath.startsWith('quality-management/processes/') && currentPath !== 'quality-management/processes') {
       return <QualityProcessDetail />;
@@ -370,6 +375,8 @@ const renderPage = () => {
         return <RiskIndicatorEntry />;
       case 'risk-management/reports':
         return <RiskReports />;
+      case 'projects':
+        return <Projects />;
       case 'quality-management':
         return <QualityDashboard />;
       case 'quality-management/dashboard':
