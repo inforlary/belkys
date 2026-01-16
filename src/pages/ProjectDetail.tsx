@@ -64,10 +64,12 @@ export default function ProjectDetail() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [risks, setRisks] = useState<any[]>([]);
 
   useEffect(() => {
     if (profile?.organization_id && projectId) {
       loadProject();
+      loadRisks();
     }
   }, [profile?.organization_id, projectId]);
 
@@ -91,6 +93,22 @@ export default function ProjectDetail() {
       console.error('Proje yüklenirken hata:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadRisks() {
+    try {
+      const { data, error } = await supabase
+        .from('risks')
+        .select('id, code, name, risk_level, status, residual_likelihood, residual_impact')
+        .eq('related_project_id', projectId)
+        .eq('is_active', true)
+        .order('residual_likelihood', { ascending: false });
+
+      if (error) throw error;
+      setRisks(data || []);
+    } catch (error) {
+      console.error('Riskler yüklenirken hata:', error);
     }
   }
 
@@ -484,6 +502,65 @@ export default function ProjectDetail() {
           </div>
         </div>
       </Card>
+
+      {risks.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Proje Riskleri</h2>
+            <div className="flex items-center gap-4">
+              <div className="text-sm">
+                <span className="text-gray-600">Toplam: </span>
+                <span className="font-semibold text-gray-900">{risks.length}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-gray-600">Yüksek Risk: </span>
+                <span className="font-semibold text-red-600">
+                  {risks.filter(r => (r.residual_likelihood * r.residual_impact) >= 15).length}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk Kodu</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk Adı</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk Skoru</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Seviye</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {risks.map((risk) => {
+                  const score = risk.residual_likelihood * risk.residual_impact;
+                  const levelColor = score >= 20 ? 'bg-red-100 text-red-800' :
+                                   score >= 15 ? 'bg-orange-100 text-orange-800' :
+                                   score >= 9 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800';
+                  const levelLabel = score >= 20 ? 'Kritik' : score >= 15 ? 'Yüksek' : score >= 9 ? 'Orta' : 'Düşük';
+
+                  return (
+                    <tr key={risk.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/risks/${risk.id}`)}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{risk.code}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{risk.name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${levelColor}`}>
+                          {score}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{levelLabel}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {risk.status === 'ACTIVE' ? 'Aktif' : risk.status === 'CLOSED' ? 'Kapalı' : 'Diğer'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

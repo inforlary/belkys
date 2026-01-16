@@ -13,6 +13,7 @@ export default function RiskRegisterNew() {
   const [objectives, setObjectives] = useState<any[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
   const [filteredGoals, setFilteredGoals] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -22,6 +23,8 @@ export default function RiskRegisterNew() {
     owner_department_id: '',
     objective_id: '',
     goal_id: '',
+    risk_relation: 'OPERATIONAL',
+    related_project_id: '',
     causes: '',
     consequences: '',
     inherent_likelihood: 3,
@@ -40,6 +43,7 @@ export default function RiskRegisterNew() {
       loadCategories();
       loadDepartments();
       loadGoals();
+      loadProjects();
     }
   }, [profile?.organization_id]);
 
@@ -137,6 +141,22 @@ export default function RiskRegisterNew() {
     }
   };
 
+  const loadProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, code, name, status')
+        .eq('organization_id', profile?.organization_id)
+        .in('status', ['PLANNED', 'IN_PROGRESS', 'ON_HOLD'])
+        .order('code');
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Projeler yüklenirken hata:', error);
+    }
+  };
+
   const inherentScore = formData.inherent_likelihood * formData.inherent_impact;
   const residualScore = formData.residual_likelihood * formData.residual_impact;
 
@@ -167,6 +187,8 @@ export default function RiskRegisterNew() {
           objective_id: formData.objective_id || null,
           goal_id: formData.goal_id || null,
           owner_department_id: formData.owner_department_id || null,
+          risk_relation: formData.risk_relation,
+          related_project_id: formData.risk_relation === 'PROJECT' ? formData.related_project_id || null : null,
           name: formData.name,
           description: formData.description,
           causes: formData.causes,
@@ -342,36 +364,74 @@ export default function RiskRegisterNew() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  İlişkili Hedef (Opsiyonel)
-                  {formData.owner_department_id && (
-                    <span className="text-xs text-slate-500 ml-2">
-                      (Seçilen birime ait hedefler gösteriliyor)
-                    </span>
-                  )}
+                  İlişki Türü
                 </label>
                 <select
-                  value={formData.goal_id}
-                  onChange={(e) => {
-                    const selectedGoal = goals.find(g => g.id === e.target.value);
-                    setFormData({
-                      ...formData,
-                      goal_id: e.target.value,
-                      objective_id: selectedGoal?.objective_id || ''
-                    });
-                  }}
+                  value={formData.risk_relation}
+                  onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value, related_project_id: '' })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={!formData.owner_department_id}
                 >
-                  <option value="">
-                    {formData.owner_department_id ? 'Seçiniz' : 'Önce sorumlu birim seçiniz'}
-                  </option>
-                  {filteredGoals.map((goal) => (
-                    <option key={goal.id} value={goal.id}>
-                      {goal.code} - {goal.title}
+                  <option value="STRATEGIC">Stratejik</option>
+                  <option value="OPERATIONAL">Operasyonel</option>
+                  <option value="PROJECT">Proje</option>
+                  <option value="CORPORATE">Kurumsal</option>
+                </select>
+              </div>
+            </div>
+
+            {formData.risk_relation === 'PROJECT' && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Bağlı Proje <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.related_project_id}
+                  onChange={(e) => setFormData({ ...formData, related_project_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required={formData.risk_relation === 'PROJECT'}
+                >
+                  <option value="">Proje Seçiniz...</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.code} - {project.name}
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-slate-500 mt-1">Sadece aktif projeler gösterilmektedir</p>
               </div>
+            )}
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                İlişkili Hedef (Opsiyonel)
+                {formData.owner_department_id && (
+                  <span className="text-xs text-slate-500 ml-2">
+                    (Seçilen birime ait hedefler gösteriliyor)
+                  </span>
+                )}
+              </label>
+              <select
+                value={formData.goal_id}
+                onChange={(e) => {
+                  const selectedGoal = goals.find(g => g.id === e.target.value);
+                  setFormData({
+                    ...formData,
+                    goal_id: e.target.value,
+                    objective_id: selectedGoal?.objective_id || ''
+                  });
+                }}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!formData.owner_department_id}
+              >
+                <option value="">
+                  {formData.owner_department_id ? 'Seçiniz' : 'Önce sorumlu birim seçiniz'}
+                </option>
+                {filteredGoals.map((goal) => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.code} - {goal.title}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
