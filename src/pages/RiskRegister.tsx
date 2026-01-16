@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
-import { Plus, Search, X, Save, AlertTriangle, Trash2, Edit2, Eye, MoreVertical } from 'lucide-react';
+import { Plus, Search, X, Save, AlertTriangle, Trash2, CreditCard as Edit2, Eye, MoreVertical } from 'lucide-react';
 
 interface Risk {
   id: string;
