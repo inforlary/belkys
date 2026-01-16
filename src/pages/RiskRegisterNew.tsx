@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
-import { AlertTriangle, Save, X, Plus, Trash2, Info } from 'lucide-react';
+import { AlertTriangle, Save, X, Plus, Trash2, Info, Edit2 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 
 interface DepartmentImpact {
@@ -40,9 +40,7 @@ export default function RiskRegisterNew() {
     code: '',
     name: '',
     description: '',
-    causes: '',
-    consequences: '',
-    category_ids: [] as string[],
+    category_id: '',
     risk_source: '',
     risk_relation: '',
     control_level: '',
@@ -85,6 +83,7 @@ export default function RiskRegisterNew() {
   useEffect(() => {
     if (profile?.organization_id) {
       loadData();
+      generateCode();
     }
   }, [profile?.organization_id]);
 
@@ -100,12 +99,39 @@ export default function RiskRegisterNew() {
     ]);
   };
 
+  const generateCode = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rm_risks')
+        .select('code')
+        .eq('organization_id', profile?.organization_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const lastCode = data[0].code;
+        const match = lastCode.match(/RSK-(\d+)/);
+        if (match) {
+          const nextNumber = parseInt(match[1]) + 1;
+          setFormData(prev => ({ ...prev, code: `RSK-${String(nextNumber).padStart(4, '0')}` }));
+        }
+      } else {
+        setFormData(prev => ({ ...prev, code: 'RSK-0001' }));
+      }
+    } catch (error) {
+      console.error('Error generating code:', error);
+      setFormData(prev => ({ ...prev, code: 'RSK-0001' }));
+    }
+  };
+
   const loadCategories = async () => {
     const { data } = await supabase
-      .from('risk_categories')
+      .from('rm_risk_categories')
       .select('*')
       .eq('organization_id', profile?.organization_id)
-      .order('name');
+      .order('code');
     if (data) setCategories(data);
   };
 
@@ -120,7 +146,7 @@ export default function RiskRegisterNew() {
 
   const loadGoals = async () => {
     const { data } = await supabase
-      .from('goals')
+      .from('sp_goals')
       .select('*')
       .eq('organization_id', profile?.organization_id)
       .order('code');
@@ -141,7 +167,7 @@ export default function RiskRegisterNew() {
       .from('qm_processes')
       .select('*')
       .eq('organization_id', profile?.organization_id)
-      .order('name');
+      .order('code');
     if (data) setProcesses(data);
   };
 
@@ -150,22 +176,21 @@ export default function RiskRegisterNew() {
       .from('projects')
       .select('*')
       .eq('organization_id', profile?.organization_id)
-      .eq('status', 'active')
       .order('name');
     if (data) setProjects(data);
   };
 
   const loadAllRisks = async () => {
     const { data } = await supabase
-      .from('risks')
+      .from('rm_risks')
       .select('id, code, name')
       .eq('organization_id', profile?.organization_id)
       .order('code');
     if (data) setAllRisks(data);
   };
 
-  const calculateNextReviewDate = (lastDate: string, period: string): string => {
-    const date = new Date(lastDate);
+  const calculateNextReview = (lastReview: string, period: string) => {
+    const date = new Date(lastReview);
     switch (period) {
       case 'MONTHLY':
         date.setMonth(date.getMonth() + 1);
@@ -183,14 +208,6 @@ export default function RiskRegisterNew() {
     return date.toISOString().split('T')[0];
   };
 
-  const getRiskScoreBadge = (score: number) => {
-    if (score >= 15) return { label: 'Kritik', color: 'text-red-700 bg-red-100' };
-    if (score >= 10) return { label: 'Yüksek', color: 'text-orange-700 bg-orange-100' };
-    if (score >= 6) return { label: 'Orta', color: 'text-yellow-700 bg-yellow-100' };
-    if (score >= 3) return { label: 'Düşük', color: 'text-blue-700 bg-blue-100' };
-    return { label: 'Çok Düşük', color: 'text-green-700 bg-green-100' };
-  };
-
   const addDepartmentImpact = () => {
     if (!tempImpact.department_id) {
       alert('Lütfen bir birim seçin');
@@ -200,7 +217,7 @@ export default function RiskRegisterNew() {
     const dept = departments.find(d => d.id === tempImpact.department_id);
     const newImpact: DepartmentImpact = {
       ...tempImpact,
-      department_name: dept?.name || '',
+      department_name: dept?.name,
     };
 
     if (editingImpactIndex !== null) {
@@ -227,7 +244,7 @@ export default function RiskRegisterNew() {
     setShowDepartmentImpactModal(true);
   };
 
-  const deleteDepartmentImpact = (index: number) => {
+  const removeDepartmentImpact = (index: number) => {
     setDepartmentImpacts(departmentImpacts.filter((_, i) => i !== index));
   };
 
@@ -252,81 +269,26 @@ export default function RiskRegisterNew() {
     setShowRiskRelationModal(false);
   };
 
-  const deleteRiskRelation = (index: number) => {
+  const removeRiskRelation = (index: number) => {
     setRiskRelations(riskRelations.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (sendForApproval: boolean = false) => {
-    if (!formData.name) {
-      alert('Risk adı zorunludur');
-      return;
-    }
-
-    if (!formData.risk_source) {
-      alert('Risk kaynağı seçiniz');
-      return;
-    }
-
-    if (!formData.risk_relation) {
-      alert('İlişki türü seçiniz');
-      return;
-    }
-
-    if (!formData.control_level) {
-      alert('Kontrol düzeyi seçiniz');
-      return;
-    }
-
-    if (formData.control_level === 'CONTROLLABLE' && !formData.owner_department_id) {
-      alert('Risk sahibi birim zorunludur');
-      return;
-    }
-
-    if (formData.control_level === 'PARTIAL') {
-      if (!formData.owner_department_id || !formData.coordination_department_id || !formData.external_organization) {
-        alert('Kısmen kontrol edilebilir riskler için tüm alanlar zorunludur');
-        return;
-      }
-    }
-
-    if (formData.control_level === 'UNCONTROLLABLE') {
-      if (!formData.coordination_department_id || !formData.external_organization) {
-        alert('Kontrol dışı riskler için koordinasyon birimi ve dış kurum zorunludur');
-        return;
-      }
-    }
-
-    if (formData.risk_relation === 'STRATEGIC' && !formData.related_goal_id) {
-      alert('Stratejik riskler için hedef seçimi zorunludur');
-      return;
-    }
-
-    if (formData.risk_relation === 'OPERATIONAL' && !formData.related_process_id) {
-      alert('Operasyonel riskler için süreç seçimi zorunludur');
-      return;
-    }
-
-    if (formData.risk_relation === 'PROJECT' && !formData.related_project_id) {
-      alert('Proje riskleri için proje seçimi zorunludur');
-      return;
-    }
-
-    if (formData.category_ids.length === 0) {
-      alert('En az bir kategori seçiniz');
+  const handleSubmit = async (submitForApproval: boolean = false) => {
+    if (!formData.name || !formData.risk_source || !formData.risk_relation || !formData.control_level) {
+      alert('Lütfen tüm zorunlu alanları doldurun');
       return;
     }
 
     setLoading(true);
-
     try {
-      const nextReviewDate = calculateNextReviewDate(formData.last_review_date, formData.review_period);
+      const nextReviewDate = calculateNextReview(formData.last_review_date, formData.review_period);
 
-      const riskData: any = {
+      const riskData = {
         organization_id: profile?.organization_id,
+        code: formData.code,
         name: formData.name,
-        description: formData.description || null,
-        causes: formData.causes || null,
-        consequences: formData.consequences || null,
+        description: formData.description,
+        category_id: formData.category_id || null,
         risk_source: formData.risk_source,
         risk_relation: formData.risk_relation,
         control_level: formData.control_level,
@@ -334,72 +296,72 @@ export default function RiskRegisterNew() {
         coordination_department_id: formData.coordination_department_id || null,
         external_organization: formData.external_organization || null,
         external_contact: formData.external_contact || null,
-        related_goal_id: formData.related_goal_id || null,
+        goal_id: formData.related_goal_id || null,
         related_activity_id: formData.related_activity_id || null,
         related_process_id: formData.related_process_id || null,
         related_project_id: formData.related_project_id || null,
         inherent_likelihood: formData.inherent_likelihood,
         inherent_impact: formData.inherent_impact,
+        inherent_score: formData.inherent_likelihood * formData.inherent_impact,
         residual_likelihood: formData.residual_likelihood,
         residual_impact: formData.residual_impact,
+        residual_score: formData.residual_likelihood * formData.residual_impact,
         target_probability: formData.target_probability,
         target_impact: formData.target_impact,
+        target_score: formData.target_probability * formData.target_impact,
         target_date: formData.target_date || null,
         risk_response: formData.risk_response,
         review_period: formData.review_period,
         last_review_date: formData.last_review_date,
         next_review_date: nextReviewDate,
-        approval_status: sendForApproval ? 'PENDING_APPROVAL' : 'DRAFT',
-        identified_by_id: profile?.id,
-        identified_date: new Date().toISOString().split('T')[0],
+        status: submitForApproval ? 'PENDING_APPROVAL' : 'DRAFT',
+        created_by: profile?.id,
       };
 
-      const { data: newRisk, error: riskError } = await supabase
-        .from('risks')
-        .insert([riskData])
+      const { data: risk, error: riskError } = await supabase
+        .from('rm_risks')
+        .insert(riskData)
         .select()
         .single();
 
       if (riskError) throw riskError;
 
-      if (formData.category_ids.length > 0) {
-        const categoryMappings = formData.category_ids.map(catId => ({
-          risk_id: newRisk.id,
-          category_id: catId,
-        }));
-        await supabase.from('risk_category_mappings').insert(categoryMappings);
-      }
-
-      if (departmentImpacts.length > 0 && formData.risk_relation === 'CORPORATE') {
-        const impactData = departmentImpacts.map(impact => ({
-          organization_id: profile?.organization_id,
-          risk_id: newRisk.id,
+      if (departmentImpacts.length > 0) {
+        const impacts = departmentImpacts.map(impact => ({
+          risk_id: risk.id,
           department_id: impact.department_id,
           impact_level: impact.impact_level,
           impact_description: impact.impact_description,
-          affected_processes: null,
-          specific_controls: impact.specific_measures,
+          specific_measures: impact.specific_measures,
         }));
-        await supabase.from('rm_risk_department_impacts').insert(impactData);
+
+        const { error: impactsError } = await supabase
+          .from('rm_risk_department_impacts')
+          .insert(impacts);
+
+        if (impactsError) throw impactsError;
       }
 
       if (riskRelations.length > 0) {
-        const relationData = riskRelations.map(rel => ({
-          organization_id: profile?.organization_id,
-          source_risk_id: newRisk.id,
-          target_risk_id: rel.related_risk_id,
+        const relations = riskRelations.map(rel => ({
+          risk_id: risk.id,
+          related_risk_id: rel.related_risk_id,
           relation_type: rel.relation_type,
-          description: rel.description || null,
-          created_by: profile?.id,
+          description: rel.description,
         }));
-        await supabase.from('rm_risk_relations').insert(relationData);
+
+        const { error: relationsError } = await supabase
+          .from('rm_risk_relations')
+          .insert(relations);
+
+        if (relationsError) throw relationsError;
       }
 
-      alert(sendForApproval ? 'Risk başarıyla kaydedildi ve onaya gönderildi!' : 'Risk taslak olarak kaydedildi!');
+      alert(submitForApproval ? 'Risk onaya gönderildi' : 'Risk taslak olarak kaydedildi');
       navigate('/risk-management');
     } catch (error: any) {
-      console.error('Error creating risk:', error);
-      alert('Hata: ' + error.message);
+      console.error('Error saving risk:', error);
+      alert('Risk kaydedilirken bir hata oluştu: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -409,923 +371,928 @@ export default function RiskRegisterNew() {
   const residualScore = formData.residual_likelihood * formData.residual_impact;
   const targetScore = formData.target_probability * formData.target_impact;
 
+  const getRiskLevel = (score: number) => {
+    if (score >= 15) return { label: 'Kritik', color: 'text-red-700 bg-red-100' };
+    if (score >= 10) return { label: 'Yüksek', color: 'text-orange-700 bg-orange-100' };
+    if (score >= 6) return { label: 'Orta', color: 'text-yellow-700 bg-yellow-100' };
+    if (score >= 3) return { label: 'Düşük', color: 'text-blue-700 bg-blue-100' };
+    return { label: 'Çok Düşük', color: 'text-green-700 bg-green-100' };
+  };
+
+  const getImpactLevelLabel = (level: number) => {
+    const labels = ['Etkilenmez', 'Minimal', 'Düşük', 'Orta', 'Yüksek', 'Kritik'];
+    return labels[level] || '';
+  };
+
   return (
-    <div className="p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 mb-6">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                <AlertTriangle className="w-6 h-6 text-orange-600" />
-                Yeni Risk Ekle
-              </h1>
-              <p className="text-sm text-slate-600 mt-1">Tüm alanları dikkatlice doldurun</p>
-            </div>
-            <button
-              onClick={() => navigate('/risk-management')}
-              className="text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-6 h-6" />
-            </button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-red-100 rounded-lg">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
-
-          <div className="p-6 space-y-6">
-            <div className="bg-slate-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">1. Temel Bilgiler</h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Risk Kodu
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Otomatik oluşturulacak veya manuel girebilirsiniz"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Risk Adı <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Risk adını giriniz"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Risk Açıklaması
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Riskin detaylı açıklaması..."
-                />
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Kategori <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.category_ids[0] || ''}
-                  onChange={(e) => setFormData({ ...formData, category_ids: e.target.value ? [e.target.value] : [] })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Seçiniz</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.code} - {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">2. Risk Sınıflandırması</h3>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    Risk Kaynağı <span className="text-red-500">*</span>
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="INTERNAL"
-                        checked={formData.risk_source === 'INTERNAL'}
-                        onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">İç Risk</div>
-                        <div className="text-xs text-slate-600">Kurum içinden kaynaklanan</div>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="EXTERNAL"
-                        checked={formData.risk_source === 'EXTERNAL'}
-                        onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Dış Risk</div>
-                        <div className="text-xs text-slate-600">Kurum dışından kaynaklanan</div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    İlişki Türü <span className="text-red-500">*</span>
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="STRATEGIC"
-                        checked={formData.risk_relation === 'STRATEGIC'}
-                        onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Stratejik</div>
-                        <div className="text-xs text-slate-600">Hedefe veya faaliyete bağlı</div>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="OPERATIONAL"
-                        checked={formData.risk_relation === 'OPERATIONAL'}
-                        onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Operasyonel</div>
-                        <div className="text-xs text-slate-600">Sürece bağlı</div>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="PROJECT"
-                        checked={formData.risk_relation === 'PROJECT'}
-                        onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Proje</div>
-                        <div className="text-xs text-slate-600">Projeye bağlı</div>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="CORPORATE"
-                        checked={formData.risk_relation === 'CORPORATE'}
-                        onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Kurumsal</div>
-                        <div className="text-xs text-slate-600">Tüm kurumu etkiler</div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    Kontrol Düzeyi <span className="text-red-500">*</span>
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="CONTROLLABLE"
-                        checked={formData.control_level === 'CONTROLLABLE'}
-                        onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Kontrol Edilebilir</div>
-                        <div className="text-xs text-slate-600">Tamamen bizim kontrolümüzde</div>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="PARTIAL"
-                        checked={formData.control_level === 'PARTIAL'}
-                        onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Kısmen Kontrol Edilebilir</div>
-                        <div className="text-xs text-slate-600">Etkiyi azaltabiliriz</div>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        value="UNCONTROLLABLE"
-                        checked={formData.control_level === 'UNCONTROLLABLE'}
-                        onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">Kontrol Dışı</div>
-                        <div className="text-xs text-slate-600">Sadece izleyebiliriz</div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {formData.control_level && (
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">3. Sorumluluk</h3>
-
-                {formData.control_level === 'CONTROLLABLE' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Risk Sahibi Birim <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.owner_department_id}
-                      onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Seçiniz</option>
-                      {departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-slate-500 mt-1">Riski yönetmekten sorumlu birim</p>
-                  </div>
-                )}
-
-                {formData.control_level === 'PARTIAL' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Risk Sahibi Birim <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.owner_department_id}
-                        onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {departments.map((dept) => (
-                          <option key={dept.id} value={dept.id}>
-                            {dept.name}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-slate-500 mt-1">Etkiyi azaltmaktan sorumlu birim</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Koordinasyon Birimi <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.coordination_department_id}
-                        onChange={(e) => setFormData({ ...formData, coordination_department_id: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {departments.map((dept) => (
-                          <option key={dept.id} value={dept.id}>
-                            {dept.name}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-slate-500 mt-1">Dış kurumla iletişimi sağlayacak birim</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Yetkili Dış Kurum <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.external_organization}
-                        onChange={(e) => setFormData({ ...formData, external_organization: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        İletişim Bilgisi
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.external_contact}
-                        onChange={(e) => setFormData({ ...formData, external_contact: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Telefon, email vb."
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {formData.control_level === 'UNCONTROLLABLE' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Koordinasyon Birimi <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.coordination_department_id}
-                        onChange={(e) => setFormData({ ...formData, coordination_department_id: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {departments.map((dept) => (
-                          <option key={dept.id} value={dept.id}>
-                            {dept.name}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-slate-500 mt-1">Riski izleyecek ve dış kurumla iletişim sağlayacak birim</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Yetkili Dış Kurum <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.external_organization}
-                        onChange={(e) => setFormData({ ...formData, external_organization: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        İletişim Bilgisi
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.external_contact}
-                        onChange={(e) => setFormData({ ...formData, external_contact: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Telefon, email vb."
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {formData.risk_relation && (
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">4. İlişki Bağlantısı</h3>
-
-                {formData.risk_relation === 'STRATEGIC' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Bağlı Hedef <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.related_goal_id}
-                        onChange={(e) => setFormData({ ...formData, related_goal_id: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {goals.map((goal) => (
-                          <option key={goal.id} value={goal.id}>
-                            {goal.code} - {goal.title}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Bağlı Faaliyet (Opsiyonel)
-                      </label>
-                      <select
-                        value={formData.related_activity_id}
-                        onChange={(e) => setFormData({ ...formData, related_activity_id: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Seçiniz (Opsiyonel)</option>
-                        {activities
-                          .filter(act => !formData.related_goal_id || act.goal_id === formData.related_goal_id)
-                          .map((act) => (
-                            <option key={act.id} value={act.id}>
-                              {act.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {formData.risk_relation === 'OPERATIONAL' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Bağlı Süreç <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.related_process_id}
-                      onChange={(e) => setFormData({ ...formData, related_process_id: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Seçiniz</option>
-                      {processes.map((proc) => (
-                        <option key={proc.id} value={proc.id}>
-                          {proc.code} - {proc.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {formData.risk_relation === 'PROJECT' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Bağlı Proje <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.related_project_id}
-                      onChange={(e) => setFormData({ ...formData, related_project_id: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Seçiniz</option>
-                      {projects.map((proj) => (
-                        <option key={proj.id} value={proj.id}>
-                          {proj.code} - {proj.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {formData.risk_relation === 'CORPORATE' && (
-                  <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-blue-900">
-                      <p className="font-medium mb-1">Kurumsal Risk</p>
-                      <p>Bu risk tüm kurumu etkiler. Birim etki analizi bölümünden etkilenen birimleri belirleyebilirsiniz.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">5. Risk Değerlendirmesi</h3>
-
-              <div className="space-y-6">
-                <div className="bg-blue-50 rounded-lg p-6">
-                  <h4 className="text-md font-semibold text-slate-900 mb-2">Doğal Risk (Inherent Risk)</h4>
-                  <p className="text-sm text-slate-600 mb-4">Herhangi bir kontrol olmadan riskin değerlendirilmesi</p>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-3">
-                        Olasılık <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(level => (
-                          <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-blue-100">
-                            <input
-                              type="radio"
-                              name="inherent_likelihood"
-                              value={level}
-                              checked={formData.inherent_likelihood === level}
-                              onChange={(e) => setFormData({ ...formData, inherent_likelihood: parseInt(e.target.value) })}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-3">
-                        Etki <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(level => (
-                          <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-blue-100">
-                            <input
-                              type="radio"
-                              name="inherent_impact"
-                              value={level}
-                              checked={formData.inherent_impact === level}
-                              onChange={(e) => setFormData({ ...formData, inherent_impact: parseInt(e.target.value) })}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 p-4 bg-white rounded-lg border-2 border-blue-300">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700">DOĞAL RİSK SKORU:</span>
-                      <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(inherentScore).color} px-4 py-2 rounded-lg`}>
-                        <span>{inherentScore}</span>
-                        <span className="text-sm">({getRiskScoreBadge(inherentScore).label})</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-green-50 rounded-lg p-6">
-                  <h4 className="text-md font-semibold text-slate-900 mb-2">Artık Risk (Residual Risk)</h4>
-                  <p className="text-sm text-slate-600 mb-4">Mevcut kontroller uygulandıktan sonra kalan risk</p>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-3">
-                        Olasılık <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(level => (
-                          <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-green-100">
-                            <input
-                              type="radio"
-                              name="residual_likelihood"
-                              value={level}
-                              checked={formData.residual_likelihood === level}
-                              onChange={(e) => setFormData({ ...formData, residual_likelihood: parseInt(e.target.value) })}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-3">
-                        Etki <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(level => (
-                          <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-green-100">
-                            <input
-                              type="radio"
-                              name="residual_impact"
-                              value={level}
-                              checked={formData.residual_impact === level}
-                              onChange={(e) => setFormData({ ...formData, residual_impact: parseInt(e.target.value) })}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 p-4 bg-white rounded-lg border-2 border-green-300">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700">ARTIK RİSK SKORU:</span>
-                      <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(residualScore).color} px-4 py-2 rounded-lg`}>
-                        <span>{residualScore}</span>
-                        <span className="text-sm">({getRiskScoreBadge(residualScore).label})</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-purple-50 rounded-lg p-6">
-                  <h4 className="text-md font-semibold text-slate-900 mb-2">Hedef Risk (Target Risk)</h4>
-                  <p className="text-sm text-slate-600 mb-4">Ulaşmak istediğimiz risk seviyesi</p>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-3">
-                        Olasılık <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(level => (
-                          <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-purple-100">
-                            <input
-                              type="radio"
-                              name="target_probability"
-                              value={level}
-                              checked={formData.target_probability === level}
-                              onChange={(e) => setFormData({ ...formData, target_probability: parseInt(e.target.value) })}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-3">
-                        Etki <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(level => (
-                          <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-purple-100">
-                            <input
-                              type="radio"
-                              name="target_impact"
-                              value={level}
-                              checked={formData.target_impact === level}
-                              onChange={(e) => setFormData({ ...formData, target_impact: parseInt(e.target.value) })}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{level} - {['', 'Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'][level]}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-white rounded-lg border-2 border-purple-300">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700">HEDEF RİSK SKORU:</span>
-                        <span className={`text-2xl font-bold flex items-center gap-2 ${getRiskScoreBadge(targetScore).color} px-4 py-2 rounded-lg`}>
-                          <span>{targetScore}</span>
-                          <span className="text-sm">({getRiskScoreBadge(targetScore).label})</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Hedef Tarih
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.target_date}
-                        onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Risk Yanıt Stratejisi <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.risk_response}
-                    onChange={(e) => setFormData({ ...formData, risk_response: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="ACCEPT">Kabul Et - Riski olduğu gibi kabul et</option>
-                    <option value="MITIGATE">Azalt - Risk etkisini veya olasılığını azalt</option>
-                    <option value="TRANSFER">Devret - Riski üçüncü tarafa aktar (sigorta vb.)</option>
-                    <option value="AVOID">Kaçın - Riske neden olan faaliyetten kaçın</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">6. Gözden Geçirme Ayarları</h3>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Gözden Geçirme Periyodu <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.review_period}
-                    onChange={(e) => setFormData({ ...formData, review_period: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="MONTHLY">Aylık</option>
-                    <option value="QUARTERLY">Çeyreklik (3 Ay)</option>
-                    <option value="SEMI_ANNUAL">6 Aylık</option>
-                    <option value="ANNUAL">Yıllık</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Son Gözden Geçirme
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.last_review_date}
-                    onChange={(e) => setFormData({ ...formData, last_review_date: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Sonraki Gözden Geçirme
-                  </label>
-                  <input
-                    type="text"
-                    value={calculateNextReviewDate(formData.last_review_date, formData.review_period)}
-                    readOnly
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {formData.risk_relation === 'CORPORATE' && (
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-900">7. Birim Etki Analizi</h3>
-                  <button
-                    onClick={() => {
-                      setTempImpact({ department_id: '', impact_level: 3, impact_description: '', specific_measures: '' });
-                      setEditingImpactIndex(null);
-                      setShowDepartmentImpactModal(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Birim Ekle
-                  </button>
-                </div>
-
-                {departmentImpacts.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Birim</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Etki</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Açıklama</th>
-                          <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">İşlemler</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {departmentImpacts.map((impact, index) => (
-                          <tr key={index} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 text-sm text-slate-900">{impact.department_name}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
-                                impact.impact_level === 0 ? 'bg-gray-100 text-gray-800' :
-                                impact.impact_level === 1 ? 'bg-blue-100 text-blue-800' :
-                                impact.impact_level === 2 ? 'bg-green-100 text-green-800' :
-                                impact.impact_level === 3 ? 'bg-yellow-100 text-yellow-800' :
-                                impact.impact_level === 4 ? 'bg-orange-100 text-orange-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {impact.impact_level} - {['Etkilenmez', 'Minimal', 'Düşük', 'Orta', 'Yüksek', 'Kritik'][impact.impact_level]}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{impact.impact_description}</td>
-                            <td className="px-4 py-3 text-right space-x-2">
-                              <button
-                                onClick={() => editDepartmentImpact(index)}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                              >
-                                Düzenle
-                              </button>
-                              <button
-                                onClick={() => deleteDepartmentImpact(index)}
-                                className="text-red-600 hover:text-red-800 text-sm font-medium"
-                              >
-                                Sil
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-slate-500">
-                    Henüz birim etkisi eklenmemiş. "Birim Ekle" butonuna tıklayarak başlayın.
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900">8. İlişkili Riskler (Opsiyonel)</h3>
-                <button
-                  onClick={() => {
-                    setTempRelation({ related_risk_id: '', relation_type: 'RELATED', description: '' });
-                    setShowRiskRelationModal(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4" />
-                  İlişki Ekle
-                </button>
-              </div>
-
-              {riskRelations.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Risk</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">İlişki Türü</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">İşlemler</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {riskRelations.map((rel, index) => (
-                        <tr key={index} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-sm text-slate-900">{rel.related_risk_name}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600">
-                            {rel.relation_type === 'TRIGGERS' && '→ Bu risk şunu tetikler'}
-                            {rel.relation_type === 'TRIGGERED_BY' && '← Bu risk şundan tetiklenir'}
-                            {rel.relation_type === 'INCREASES' && '↑ Bu risk şunu artırır'}
-                            {rel.relation_type === 'DECREASES' && '↓ Bu risk şunu azaltır'}
-                            {rel.relation_type === 'RELATED' && '↔ İlişkili'}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={() => deleteRiskRelation(index)}
-                              className="text-red-600 hover:text-red-800 text-sm font-medium"
-                            >
-                              Sil
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-slate-500">
-                  Henüz ilişkili risk eklenmemiş.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-            <button
-              onClick={() => navigate('/risk-management')}
-              className="px-6 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
-              disabled={loading}
-            >
-              İptal
-            </button>
-            <button
-              onClick={() => handleSubmit(false)}
-              disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              Taslak Olarak Kaydet
-            </button>
-            <button
-              onClick={() => handleSubmit(true)}
-              disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              Kaydet ve Onaya Gönder
-            </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Yeni Risk Kaydı</h1>
+            <p className="text-sm text-slate-600">Risk bilgilerini eksiksiz doldurun</p>
           </div>
         </div>
       </div>
 
+      <form className="space-y-6">
+        {/* BÖLÜM 1: TEMEL BİLGİLER */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">1. Temel Bilgiler</h3>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Risk Kodu <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="RSK-0001"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Kategori <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.category_id}
+                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Seçiniz</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.code} - {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Risk Adı <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Risk adını girin..."
+              required
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Risk Açıklaması
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={4}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Riskin detaylı açıklaması..."
+            />
+          </div>
+        </div>
+
+        {/* BÖLÜM 2: RİSK SINIFLANDIRMASI */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">2. Risk Sınıflandırması</h3>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">
+                Risk Kaynağı <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="INTERNAL"
+                    checked={formData.risk_source === 'INTERNAL'}
+                    onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">İç Risk</div>
+                    <div className="text-xs text-slate-600">Kurum içinden kaynaklanan</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="EXTERNAL"
+                    checked={formData.risk_source === 'EXTERNAL'}
+                    onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Dış Risk</div>
+                    <div className="text-xs text-slate-600">Kurum dışından kaynaklanan</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">
+                İlişki Türü <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="STRATEGIC"
+                    checked={formData.risk_relation === 'STRATEGIC'}
+                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Stratejik</div>
+                    <div className="text-xs text-slate-600">Hedefe veya faaliyete bağlı</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="OPERATIONAL"
+                    checked={formData.risk_relation === 'OPERATIONAL'}
+                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Operasyonel</div>
+                    <div className="text-xs text-slate-600">Sürece bağlı</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="PROJECT"
+                    checked={formData.risk_relation === 'PROJECT'}
+                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Proje</div>
+                    <div className="text-xs text-slate-600">Projeye bağlı</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="CORPORATE"
+                    checked={formData.risk_relation === 'CORPORATE'}
+                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Kurumsal</div>
+                    <div className="text-xs text-slate-600">Tüm kurumu etkiler</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">
+                Kontrol Düzeyi <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="CONTROLLABLE"
+                    checked={formData.control_level === 'CONTROLLABLE'}
+                    onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Kontrol Edilebilir</div>
+                    <div className="text-xs text-slate-600">Tamamen bizim kontrolümüzde</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="PARTIAL"
+                    checked={formData.control_level === 'PARTIAL'}
+                    onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Kısmen Kontrol Edilebilir</div>
+                    <div className="text-xs text-slate-600">Etkiyi azaltabiliriz</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    value="UNCONTROLLABLE"
+                    checked={formData.control_level === 'UNCONTROLLABLE'}
+                    onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Kontrol Dışı</div>
+                    <div className="text-xs text-slate-600">Sadece izleyebiliriz</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* BÖLÜM 3: SORUMLULUK (Dinamik) */}
+        {formData.control_level && (
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">3. Sorumluluk</h3>
+
+            {formData.control_level === 'CONTROLLABLE' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Risk Sahibi Birim <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-slate-600 mb-2">Riski yönetmekten sorumlu birim</p>
+                <select
+                  value={formData.owner_department_id}
+                  onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Seçiniz</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {formData.control_level === 'PARTIAL' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Risk Sahibi Birim <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-slate-600 mb-2">Etkiyi azaltmaktan sorumlu birim</p>
+                  <select
+                    value={formData.owner_department_id}
+                    onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Seçiniz</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Koordinasyon Birimi <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-slate-600 mb-2">Dış kurumla iletişimi sağlayacak birim</p>
+                  <select
+                    value={formData.coordination_department_id}
+                    onChange={(e) => setFormData({ ...formData, coordination_department_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Seçiniz</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Yetkili Dış Kurum <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.external_organization}
+                    onChange={(e) => setFormData({ ...formData, external_organization: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Dış kurum adı..."
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    İletişim Bilgisi
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.external_contact}
+                    onChange={(e) => setFormData({ ...formData, external_contact: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Telefon, e-posta vb."
+                  />
+                </div>
+              </div>
+            )}
+
+            {formData.control_level === 'UNCONTROLLABLE' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Koordinasyon Birimi <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-slate-600 mb-2">Riski izleyecek ve dış kurumla iletişim sağlayacak birim</p>
+                  <select
+                    value={formData.coordination_department_id}
+                    onChange={(e) => setFormData({ ...formData, coordination_department_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Seçiniz</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Yetkili Dış Kurum <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.external_organization}
+                    onChange={(e) => setFormData({ ...formData, external_organization: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Dış kurum adı..."
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    İletişim Bilgisi
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.external_contact}
+                    onChange={(e) => setFormData({ ...formData, external_contact: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Telefon, e-posta vb."
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BÖLÜM 4: İLİŞKİ BAĞLANTISI (Dinamik) */}
+        {formData.risk_relation && (
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">4. İlişki Bağlantısı</h3>
+
+            {formData.risk_relation === 'STRATEGIC' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Bağlı Hedef <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.related_goal_id}
+                    onChange={(e) => setFormData({ ...formData, related_goal_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Seçiniz</option>
+                    {goals.map((goal) => (
+                      <option key={goal.id} value={goal.id}>
+                        {goal.code} - {goal.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Bağlı Faaliyet
+                  </label>
+                  <select
+                    value={formData.related_activity_id}
+                    onChange={(e) => setFormData({ ...formData, related_activity_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Seçiniz</option>
+                    {activities.map((act) => (
+                      <option key={act.id} value={act.id}>
+                        {act.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {formData.risk_relation === 'OPERATIONAL' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Bağlı Süreç <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.related_process_id}
+                  onChange={(e) => setFormData({ ...formData, related_process_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Seçiniz</option>
+                  {processes.map((proc) => (
+                    <option key={proc.id} value={proc.id}>
+                      {proc.code} - {proc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {formData.risk_relation === 'PROJECT' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Bağlı Proje <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.related_project_id}
+                  onChange={(e) => setFormData({ ...formData, related_project_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Seçiniz</option>
+                  {projects.map((proj) => (
+                    <option key={proj.id} value={proj.id}>
+                      {proj.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {formData.risk_relation === 'CORPORATE' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-900">
+                  <p className="font-medium mb-1">Kurumsal Risk</p>
+                  <p>Bu risk tüm kurumu etkiler. Birim etki analizi bölümünden etkilenen birimleri belirleyebilirsiniz.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BÖLÜM 5: RİSK DEĞERLENDİRMESİ */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">5. Risk Değerlendirmesi</h3>
+
+          <div className="grid grid-cols-3 gap-6">
+            {/* Doğal Risk */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h4 className="text-md font-semibold text-slate-900 mb-3">Doğal Risk</h4>
+              <p className="text-xs text-slate-600 mb-4">Kontrol önlemleri olmadan riskin durumu</p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, inherent_likelihood: val })}
+                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                          formData.inherent_likelihood === val
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Etki</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, inherent_impact: val })}
+                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                          formData.inherent_impact === val
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-white rounded-lg border-2 border-blue-300">
+                <div className="text-center">
+                  <div className="text-xs text-slate-600 mb-1">SKOR</div>
+                  <div className={`text-2xl font-bold ${getRiskLevel(inherentScore).color} px-3 py-1 rounded inline-block`}>
+                    {inherentScore} - {getRiskLevel(inherentScore).label}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Artık Risk */}
+            <div className="bg-green-50 rounded-lg p-4">
+              <h4 className="text-md font-semibold text-slate-900 mb-3">Artık Risk</h4>
+              <p className="text-xs text-slate-600 mb-4">Mevcut kontroller sonrası riskin durumu</p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, residual_likelihood: val })}
+                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                          formData.residual_likelihood === val
+                            ? 'bg-green-600 text-white'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Etki</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, residual_impact: val })}
+                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                          formData.residual_impact === val
+                            ? 'bg-green-600 text-white'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-white rounded-lg border-2 border-green-300">
+                <div className="text-center">
+                  <div className="text-xs text-slate-600 mb-1">SKOR</div>
+                  <div className={`text-2xl font-bold ${getRiskLevel(residualScore).color} px-3 py-1 rounded inline-block`}>
+                    {residualScore} - {getRiskLevel(residualScore).label}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Hedef Risk */}
+            <div className="bg-purple-50 rounded-lg p-4">
+              <h4 className="text-md font-semibold text-slate-900 mb-3">Hedef Risk</h4>
+              <p className="text-xs text-slate-600 mb-4">İlave tedbirler sonrası hedeflenen risk</p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, target_probability: val })}
+                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                          formData.target_probability === val
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Etki</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, target_impact: val })}
+                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                          formData.target_impact === val
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-white rounded-lg border-2 border-purple-300">
+                <div className="text-center">
+                  <div className="text-xs text-slate-600 mb-1">SKOR</div>
+                  <div className={`text-2xl font-bold ${getRiskLevel(targetScore).color} px-3 py-1 rounded inline-block`}>
+                    {targetScore} - {getRiskLevel(targetScore).label}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Hedef Tarih</label>
+                <input
+                  type="date"
+                  value={formData.target_date}
+                  onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Risk Yanıt Stratejisi
+            </label>
+            <select
+              value={formData.risk_response}
+              onChange={(e) => setFormData({ ...formData, risk_response: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="ACCEPT">Kabul Et</option>
+              <option value="MITIGATE">Azalt</option>
+              <option value="TRANSFER">Devret</option>
+              <option value="AVOID">Kaçın</option>
+            </select>
+          </div>
+        </div>
+
+        {/* BÖLÜM 6: GÖZDEN GEÇİRME AYARLARI */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">6. Gözden Geçirme Ayarları</h3>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Gözden Geçirme Periyodu
+              </label>
+              <select
+                value={formData.review_period}
+                onChange={(e) => setFormData({ ...formData, review_period: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="MONTHLY">Aylık</option>
+                <option value="QUARTERLY">Çeyreklik</option>
+                <option value="SEMI_ANNUAL">6 Aylık</option>
+                <option value="ANNUAL">Yıllık</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Son Gözden Geçirme
+              </label>
+              <input
+                type="date"
+                value={formData.last_review_date}
+                onChange={(e) => setFormData({ ...formData, last_review_date: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Sonraki Gözden Geçirme
+              </label>
+              <input
+                type="text"
+                value={calculateNextReview(formData.last_review_date, formData.review_period)}
+                disabled
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* BÖLÜM 7: BİRİM ETKİ ANALİZİ */}
+        {formData.risk_relation === 'CORPORATE' && (
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">7. Birim Etki Analizi</h3>
+              <button
+                type="button"
+                onClick={() => setShowDepartmentImpactModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Birim Ekle
+              </button>
+            </div>
+
+            {departmentImpacts.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Birim</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Etki Seviyesi</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Açıklama</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {departmentImpacts.map((impact, index) => (
+                      <tr key={index} className="border-b border-slate-200 hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm text-slate-900">{impact.department_name}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-3 py-1 text-xs font-medium rounded ${
+                            impact.impact_level === 0 ? 'bg-gray-100 text-gray-700' :
+                            impact.impact_level === 1 ? 'bg-blue-100 text-blue-700' :
+                            impact.impact_level === 2 ? 'bg-green-100 text-green-700' :
+                            impact.impact_level === 3 ? 'bg-yellow-100 text-yellow-700' :
+                            impact.impact_level === 4 ? 'bg-orange-100 text-orange-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {impact.impact_level} - {getImpactLevelLabel(impact.impact_level)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{impact.impact_description}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editDepartmentImpact(index)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeDepartmentImpact(index)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-500">
+                <Info className="w-12 h-12 mx-auto mb-2 text-slate-400" />
+                <p>Henüz birim eklenmemiş</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BÖLÜM 8: İLİŞKİLİ RİSKLER */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">8. İlişkili Riskler</h3>
+            <button
+              type="button"
+              onClick={() => setShowRiskRelationModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              İlişki Ekle
+            </button>
+          </div>
+
+          {riskRelations.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Risk</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">İlişki Türü</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {riskRelations.map((rel, index) => (
+                    <tr key={index} className="border-b border-slate-200 hover:bg-slate-50">
+                      <td className="px-4 py-3 text-sm text-slate-900">{rel.related_risk_name}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        {rel.relation_type === 'TRIGGERS' && 'Bu risk şunu tetikler'}
+                        {rel.relation_type === 'TRIGGERED_BY' && 'Bu risk şundan tetiklenir'}
+                        {rel.relation_type === 'INCREASES' && 'Bu risk şunu artırır'}
+                        {rel.relation_type === 'DECREASES' && 'Bu risk şunu azaltır'}
+                        {rel.relation_type === 'RELATED' && 'İlişkili'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeRiskRelation(index)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <Info className="w-12 h-12 mx-auto mb-2 text-slate-400" />
+              <p>Henüz ilişkili risk eklenmemiş</p>
+            </div>
+          )}
+        </div>
+
+        {/* FORM ALTINDA BUTONLAR */}
+        <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={() => navigate('/risk-management')}
+            disabled={loading}
+            className="flex items-center gap-2 px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <X className="w-4 h-4" />
+            İptal
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSubmit(false)}
+            disabled={loading}
+            className="flex items-center gap-2 px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {loading ? 'Kaydediliyor...' : 'Kaydet'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSubmit(true)}
+            disabled={loading}
+            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {loading ? 'Kaydediliyor...' : 'Kaydet ve Onaya Gönder'}
+          </button>
+        </div>
+      </form>
+
+      {/* BİRİM ETKİ MODAL */}
       <Modal
         isOpen={showDepartmentImpactModal}
         onClose={() => {
           setShowDepartmentImpactModal(false);
           setEditingImpactIndex(null);
+          setTempImpact({
+            department_id: '',
+            impact_level: 3,
+            impact_description: '',
+            specific_measures: '',
+          });
         }}
         title={editingImpactIndex !== null ? 'Birim Etkisini Düzenle' : 'Birim Etkisi Ekle'}
       >
@@ -1337,8 +1304,7 @@ export default function RiskRegisterNew() {
             <select
               value={tempImpact.department_id}
               onChange={(e) => setTempImpact({ ...tempImpact, department_id: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Seçiniz</option>
               {departments.map((dept) => (
@@ -1354,18 +1320,17 @@ export default function RiskRegisterNew() {
               Etki Seviyesi (0-5) <span className="text-red-500">*</span>
             </label>
             <div className="space-y-2">
-              {[0, 1, 2, 3, 4, 5].map(level => (
-                <label key={level} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-slate-50 border border-slate-200">
+              {[0, 1, 2, 3, 4, 5].map((level) => (
+                <label key={level} className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                   <input
                     type="radio"
-                    name="impact_level"
                     value={level}
                     checked={tempImpact.impact_level === level}
                     onChange={(e) => setTempImpact({ ...tempImpact, impact_level: parseInt(e.target.value) })}
-                    className="mt-1"
+                    className="w-4 h-4"
                   />
                   <div>
-                    <div className="font-medium text-sm">{level} - {['Etkilenmez', 'Minimal', 'Düşük', 'Orta', 'Yüksek', 'Kritik'][level]}</div>
+                    <div className="font-medium text-sm">{level} - {getImpactLevelLabel(level)}</div>
                   </div>
                 </label>
               ))}
@@ -1380,9 +1345,8 @@ export default function RiskRegisterNew() {
               value={tempImpact.impact_description}
               onChange={(e) => setTempImpact({ ...tempImpact, impact_description: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Bu riskin birime olan etkisini açıklayın..."
-              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Riskin birime etkisini açıklayın..."
             />
           </div>
 
@@ -1394,24 +1358,32 @@ export default function RiskRegisterNew() {
               value={tempImpact.specific_measures}
               onChange={(e) => setTempImpact({ ...tempImpact, specific_measures: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Bu birim için alınacak özel önlemleri belirtin (opsiyonel)"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Bu birim için alınacak özel önlemler..."
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <button
+              type="button"
               onClick={() => {
                 setShowDepartmentImpactModal(false);
                 setEditingImpactIndex(null);
+                setTempImpact({
+                  department_id: '',
+                  impact_level: 3,
+                  impact_description: '',
+                  specific_measures: '',
+                });
               }}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
             >
               İptal
             </button>
             <button
+              type="button"
               onClick={addDepartmentImpact}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               {editingImpactIndex !== null ? 'Güncelle' : 'Ekle'}
             </button>
@@ -1419,10 +1391,18 @@ export default function RiskRegisterNew() {
         </div>
       </Modal>
 
+      {/* RİSK İLİŞKİSİ MODAL */}
       <Modal
         isOpen={showRiskRelationModal}
-        onClose={() => setShowRiskRelationModal(false)}
-        title="İlişkili Risk Ekle"
+        onClose={() => {
+          setShowRiskRelationModal(false);
+          setTempRelation({
+            related_risk_id: '',
+            relation_type: 'RELATED',
+            description: '',
+          });
+        }}
+        title="Risk İlişkisi Ekle"
       >
         <div className="space-y-4">
           <div>
@@ -1432,8 +1412,7 @@ export default function RiskRegisterNew() {
             <select
               value={tempRelation.related_risk_id}
               onChange={(e) => setTempRelation({ ...tempRelation, related_risk_id: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Seçiniz</option>
               {allRisks.map((risk) => (
@@ -1451,8 +1430,7 @@ export default function RiskRegisterNew() {
             <select
               value={tempRelation.relation_type}
               onChange={(e) => setTempRelation({ ...tempRelation, relation_type: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="TRIGGERS">Bu risk şunu tetikler</option>
               <option value="TRIGGERED_BY">Bu risk şundan tetiklenir</option>
@@ -1470,21 +1448,30 @@ export default function RiskRegisterNew() {
               value={tempRelation.description}
               onChange={(e) => setTempRelation({ ...tempRelation, description: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="İlişkinin açıklaması (opsiyonel)"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="İlişkinin detaylarını açıklayın..."
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <button
-              onClick={() => setShowRiskRelationModal(false)}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              type="button"
+              onClick={() => {
+                setShowRiskRelationModal(false);
+                setTempRelation({
+                  related_risk_id: '',
+                  relation_type: 'RELATED',
+                  description: '',
+                });
+              }}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
             >
               İptal
             </button>
             <button
+              type="button"
               onClick={addRiskRelation}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Ekle
             </button>
