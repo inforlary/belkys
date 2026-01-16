@@ -40,7 +40,7 @@ export default function RiskRegisterNew() {
     code: '',
     name: '',
     description: '',
-    category_id: '',
+    category_ids: [] as string[],
     risk_source: '',
     risk_relation: '',
     control_level: '',
@@ -99,33 +99,6 @@ export default function RiskRegisterNew() {
     ]);
   };
 
-  const generateCode = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('rm_risks')
-        .select('code')
-        .eq('organization_id', profile?.organization_id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const lastCode = data[0].code;
-        const match = lastCode.match(/RSK-(\d+)/);
-        if (match) {
-          const nextNumber = parseInt(match[1]) + 1;
-          setFormData(prev => ({ ...prev, code: `RSK-${String(nextNumber).padStart(4, '0')}` }));
-        }
-      } else {
-        setFormData(prev => ({ ...prev, code: 'RSK-0001' }));
-      }
-    } catch (error) {
-      console.error('Error generating code:', error);
-      setFormData(prev => ({ ...prev, code: 'RSK-0001' }));
-    }
-  };
-
   const loadCategories = async () => {
     const { data } = await supabase
       .from('risk_categories')
@@ -146,7 +119,7 @@ export default function RiskRegisterNew() {
 
   const loadGoals = async () => {
     const { data } = await supabase
-      .from('sp_goals')
+      .from('goals')
       .select('*')
       .eq('organization_id', profile?.organization_id)
       .order('code');
@@ -180,13 +153,66 @@ export default function RiskRegisterNew() {
     if (data) setProjects(data);
   };
 
+  const filteredGoals = formData.owner_department_id
+    ? goals.filter(g => g.department_id === formData.owner_department_id)
+    : goals;
+
+  const filteredActivities = formData.owner_department_id && formData.related_goal_id
+    ? activities.filter(a =>
+        a.department_id === formData.owner_department_id &&
+        a.goal_id === formData.related_goal_id
+      )
+    : formData.owner_department_id
+    ? activities.filter(a => a.department_id === formData.owner_department_id)
+    : activities;
+
+  const filteredProjects = formData.owner_department_id
+    ? projects.filter(p => p.department_id === formData.owner_department_id)
+    : projects;
+
   const loadAllRisks = async () => {
     const { data } = await supabase
-      .from('rm_risks')
+      .from('risks')
       .select('id, code, name')
       .eq('organization_id', profile?.organization_id)
       .order('code');
     if (data) setAllRisks(data);
+  };
+
+  const generateCode = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('risks')
+        .select('code')
+        .eq('organization_id', profile?.organization_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const lastCode = data[0].code;
+        const match = lastCode.match(/RSK-(\d+)/);
+        if (match) {
+          const nextNumber = parseInt(match[1]) + 1;
+          setFormData(prev => ({ ...prev, code: `RSK-${String(nextNumber).padStart(4, '0')}` }));
+        }
+      } else {
+        setFormData(prev => ({ ...prev, code: 'RSK-0001' }));
+      }
+    } catch (error) {
+      console.error('Error generating code:', error);
+      setFormData(prev => ({ ...prev, code: 'RSK-0001' }));
+    }
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      category_ids: prev.category_ids.includes(categoryId)
+        ? prev.category_ids.filter(id => id !== categoryId)
+        : [...prev.category_ids, categoryId]
+    }));
   };
 
   const calculateNextReview = (lastReview: string, period: string) => {
@@ -288,7 +314,6 @@ export default function RiskRegisterNew() {
         code: formData.code,
         name: formData.name,
         description: formData.description,
-        category_id: formData.category_id || null,
         risk_source: formData.risk_source,
         risk_relation: formData.risk_relation,
         control_level: formData.control_level,
@@ -319,12 +344,25 @@ export default function RiskRegisterNew() {
       };
 
       const { data: risk, error: riskError } = await supabase
-        .from('rm_risks')
+        .from('risks')
         .insert(riskData)
         .select()
         .single();
 
       if (riskError) throw riskError;
+
+      if (formData.category_ids.length > 0) {
+        const categoryMappings = formData.category_ids.map(catId => ({
+          risk_id: risk.id,
+          category_id: catId,
+        }));
+
+        const { error: categoryError } = await supabase
+          .from('risk_category_mappings')
+          .insert(categoryMappings);
+
+        if (categoryError) throw categoryError;
+      }
 
       if (departmentImpacts.length > 0) {
         const impacts = departmentImpacts.map(impact => ({
@@ -336,7 +374,7 @@ export default function RiskRegisterNew() {
         }));
 
         const { error: impactsError } = await supabase
-          .from('rm_risk_department_impacts')
+          .from('risk_department_impacts')
           .insert(impacts);
 
         if (impactsError) throw impactsError;
@@ -351,7 +389,7 @@ export default function RiskRegisterNew() {
         }));
 
         const { error: relationsError } = await supabase
-          .from('rm_risk_relations')
+          .from('risk_relations')
           .insert(relations);
 
         if (relationsError) throw relationsError;
@@ -439,7 +477,7 @@ export default function RiskRegisterNew() {
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">1. Temel Bilgiler</h3>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Risk Kodu <span className="text-red-500">*</span>
@@ -455,48 +493,83 @@ export default function RiskRegisterNew() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kategori
+                Kategoriler (Birden fazla seçilebilir)
               </label>
-              <select
-                value={formData.category_id}
-                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Seçiniz</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.code} - {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="border border-slate-300 rounded-lg p-4 max-h-48 overflow-y-auto">
+                {categories.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-2">Kategori bulunamadı</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {categories.map((cat) => (
+                      <label
+                        key={cat.id}
+                        className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-slate-50 border border-slate-200"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.category_ids.includes(cat.id)}
+                          onChange={() => toggleCategory(cat.id)}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-slate-900">{cat.code}</div>
+                          <div className="text-xs text-slate-600">{cat.name}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {formData.category_ids.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {formData.category_ids.map(catId => {
+                    const cat = categories.find(c => c.id === catId);
+                    return cat ? (
+                      <span
+                        key={catId}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                      >
+                        {cat.code}
+                        <button
+                          type="button"
+                          onClick={() => toggleCategory(catId)}
+                          className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Risk Adı <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Risk adını girin..."
-              required
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Risk Adı <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Risk adını girin..."
+                required
+              />
+            </div>
 
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Risk Açıklaması
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={4}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Riskin detaylı açıklaması..."
-            />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Risk Açıklaması
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={4}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Riskin detaylı açıklaması..."
+              />
+            </div>
           </div>
         </div>
 
@@ -810,37 +883,57 @@ export default function RiskRegisterNew() {
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Bağlı Hedef <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={formData.related_goal_id}
-                    onChange={(e) => setFormData({ ...formData, related_goal_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Seçiniz</option>
-                    {goals.map((goal) => (
-                      <option key={goal.id} value={goal.id}>
-                        {goal.code} - {goal.name}
-                      </option>
-                    ))}
-                  </select>
+                  {!formData.owner_department_id ? (
+                    <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      Önce Risk Sahibi Birim seçiniz
+                    </p>
+                  ) : filteredGoals.length === 0 ? (
+                    <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      Seçili birime ait hedef bulunamadı
+                    </p>
+                  ) : (
+                    <select
+                      value={formData.related_goal_id}
+                      onChange={(e) => setFormData({ ...formData, related_goal_id: e.target.value, related_activity_id: '' })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="">Seçiniz</option>
+                      {filteredGoals.map((goal) => (
+                        <option key={goal.id} value={goal.id}>
+                          {goal.code} - {goal.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Bağlı Faaliyet
                   </label>
-                  <select
-                    value={formData.related_activity_id}
-                    onChange={(e) => setFormData({ ...formData, related_activity_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Seçiniz</option>
-                    {activities.map((act) => (
-                      <option key={act.id} value={act.id}>
-                        {act.name}
-                      </option>
-                    ))}
-                  </select>
+                  {!formData.related_goal_id ? (
+                    <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      Önce Bağlı Hedef seçiniz
+                    </p>
+                  ) : filteredActivities.length === 0 ? (
+                    <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      Seçili hedefe ait faaliyet bulunamadı
+                    </p>
+                  ) : (
+                    <select
+                      value={formData.related_activity_id}
+                      onChange={(e) => setFormData({ ...formData, related_activity_id: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Seçiniz</option>
+                      {filteredActivities.map((act) => (
+                        <option key={act.id} value={act.id}>
+                          {act.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
             )}
@@ -871,19 +964,29 @@ export default function RiskRegisterNew() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Bağlı Proje <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={formData.related_project_id}
-                  onChange={(e) => setFormData({ ...formData, related_project_id: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Seçiniz</option>
-                  {projects.map((proj) => (
-                    <option key={proj.id} value={proj.id}>
-                      {proj.name}
-                    </option>
-                  ))}
-                </select>
+                {!formData.owner_department_id ? (
+                  <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    Önce Risk Sahibi Birim seçiniz
+                  </p>
+                ) : filteredProjects.length === 0 ? (
+                  <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    Seçili birime ait proje bulunamadı
+                  </p>
+                ) : (
+                  <select
+                    value={formData.related_project_id}
+                    onChange={(e) => setFormData({ ...formData, related_project_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Seçiniz</option>
+                    {filteredProjects.map((proj) => (
+                      <option key={proj.id} value={proj.id}>
+                        {proj.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
 
