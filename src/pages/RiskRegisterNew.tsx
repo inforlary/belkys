@@ -587,117 +587,173 @@ export default function RiskRegisterNew() {
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">2. Risk Sınıflandırması</h3>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-3">
-                Risk Kaynağı <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="INTERNAL"
-                    checked={formData.risk_source === 'INTERNAL'}
-                    onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">İç Risk - Kurum içinden kaynaklanan</span>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Risk Kaynağı <span className="text-red-500">*</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="EXTERNAL"
-                    checked={formData.risk_source === 'EXTERNAL'}
-                    onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Dış Risk - Kurum dışından kaynaklanan</span>
-                </label>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="INTERNAL"
+                      checked={formData.risk_source === 'INTERNAL'}
+                      onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">🏠</span>
+                      <div>
+                        <div className="font-medium text-sm">İç Risk</div>
+                        <div className="text-xs text-slate-600">Kurum içinden</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="EXTERNAL"
+                      checked={formData.risk_source === 'EXTERNAL'}
+                      onChange={(e) => setFormData({ ...formData, risk_source: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">🌍</span>
+                      <div>
+                        <div className="font-medium text-sm">Dış Risk</div>
+                        <div className="text-xs text-slate-600">Kurum dışından</div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-slate-700 mb-3">
-                İlişki Türü <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="STRATEGIC"
-                    checked={formData.risk_relation === 'STRATEGIC'}
-                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Stratejik - Hedefe veya faaliyete bağlı</span>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  İlişki Türü <span className="text-red-500">*</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="OPERATIONAL"
-                    checked={formData.risk_relation === 'OPERATIONAL'}
-                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Operasyonel - Sürece bağlı</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="PROJECT"
-                    checked={formData.risk_relation === 'PROJECT'}
-                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Proje - Projeye bağlı</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="CORPORATE"
-                    checked={formData.risk_relation === 'CORPORATE'}
-                    onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Kurumsal - Tüm kurumu etkiler</span>
-                </label>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="STRATEGIC"
+                      checked={formData.risk_relation === 'STRATEGIC'}
+                      onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">🎯</span>
+                      <div>
+                        <div className="font-medium text-sm">Stratejik</div>
+                        <div className="text-xs text-slate-600">Hedefe bağlı</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="OPERATIONAL"
+                      checked={formData.risk_relation === 'OPERATIONAL'}
+                      onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">⚙️</span>
+                      <div>
+                        <div className="font-medium text-sm">Operasyonel</div>
+                        <div className="text-xs text-slate-600">Sürece bağlı</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="PROJECT"
+                      checked={formData.risk_relation === 'PROJECT'}
+                      onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">📋</span>
+                      <div>
+                        <div className="font-medium text-sm">Proje</div>
+                        <div className="text-xs text-slate-600">Projeye bağlı</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="CORPORATE"
+                      checked={formData.risk_relation === 'CORPORATE'}
+                      onChange={(e) => setFormData({ ...formData, risk_relation: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">🏛️</span>
+                      <div>
+                        <div className="font-medium text-sm">Kurumsal</div>
+                        <div className="text-xs text-slate-600">Bağımsız</div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-slate-700 mb-3">
-                Kontrol Düzeyi <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="CONTROLLABLE"
-                    checked={formData.control_level === 'CONTROLLABLE'}
-                    onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Kontrol Edilebilir - Tamamen bizim kontrolümüzde</span>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Kontrol Düzeyi <span className="text-red-500">*</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="PARTIALLY_CONTROLLABLE"
-                    checked={formData.control_level === 'PARTIALLY_CONTROLLABLE'}
-                    onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Kısmen Kontrol Edilebilir - Etkiyi azaltabiliriz</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="UNCONTROLLABLE"
-                    checked={formData.control_level === 'UNCONTROLLABLE'}
-                    onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm text-slate-700">Kontrol Dışı - Sadece izleyebiliriz</span>
-                </label>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="CONTROLLABLE"
+                      checked={formData.control_level === 'CONTROLLABLE'}
+                      onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">✅</span>
+                      <div>
+                        <div className="font-medium text-sm">Kontrol Edilebilir</div>
+                        <div className="text-xs text-slate-600">Tamamen kontrol</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="PARTIAL"
+                      checked={formData.control_level === 'PARTIAL'}
+                      onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">⚠️</span>
+                      <div>
+                        <div className="font-medium text-sm">Kısmen Kontrol</div>
+                        <div className="text-xs text-slate-600">Etki azaltılabilir</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      value="UNCONTROLLABLE"
+                      checked={formData.control_level === 'UNCONTROLLABLE'}
+                      onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">❌</span>
+                      <div>
+                        <div className="font-medium text-sm">Kontrol Dışı</div>
+                        <div className="text-xs text-slate-600">Sadece izleme</div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -727,7 +783,7 @@ export default function RiskRegisterNew() {
               </div>
             )}
 
-            {formData.control_level === 'PARTIALLY_CONTROLLABLE' && (
+            {formData.control_level === 'PARTIAL' && (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
