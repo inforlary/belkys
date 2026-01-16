@@ -115,6 +115,7 @@ Deno.serve(async (req: Request) => {
         email: adminEmail,
         full_name: adminFullName,
         role: "admin",
+        initial_password: adminPassword,
       })
       .select()
       .single();

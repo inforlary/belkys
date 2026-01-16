@@ -10,6 +10,7 @@ interface User {
   full_name: string;
   role: string;
   created_at: string;
+  initial_password?: string;
   department?: {
     id: string;
     name: string;
@@ -48,6 +49,7 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
           full_name,
           role,
           created_at,
+          initial_password,
           department:departments!department_id(id, name)
         `)
         .eq('organization_id', organizationId)
@@ -120,6 +122,11 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
 
       if (error) throw error;
 
+      await supabase
+        .from('profiles')
+        .update({ initial_password: newPassword })
+        .eq('id', userId);
+
       await supabase.from('super_admin_activity_logs').insert({
         action: 'reset_password',
         entity_type: 'user',
@@ -131,7 +138,7 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
         },
       });
 
-      setUsers(users.map(u => u.id === userId ? { ...u, tempPassword: newPassword } : u));
+      setUsers(users.map(u => u.id === userId ? { ...u, initial_password: newPassword, tempPassword: newPassword } : u));
       setEditingUserId(null);
       setNewPassword('');
       alert('Şifre başarıyla güncellendi');
@@ -272,13 +279,13 @@ export default function OrganizationUsersModal({ organizationId, organizationNam
                             </Button>
                           </div>
                         </div>
-                      ) : user.tempPassword ? (
+                      ) : (user.tempPassword || user.initial_password) ? (
                         <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
                           <div className="flex items-center gap-2 text-sm">
                             <Key className="w-4 h-4 text-green-600" />
                             <span className="text-green-700 font-medium">Giriş Şifresi:</span>
                             <code className="px-2 py-1 bg-white rounded border border-green-300 text-green-900 font-mono">
-                              {user.tempPassword}
+                              {user.tempPassword || user.initial_password}
                             </code>
                           </div>
                         </div>
