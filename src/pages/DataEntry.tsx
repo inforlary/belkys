@@ -146,15 +146,18 @@ export default function DataEntry() {
         const yearTarget = ind.indicator_targets?.find((t: any) => t.year === selectedYear);
         const previousYearTarget = ind.indicator_targets?.find((t: any) => t.year === selectedYear - 1);
 
-        const baselineValue = previousYearTarget?.target_value
-          ? parseFloat(previousYearTarget.target_value)
-          : yearTarget?.baseline_value
-          ? parseFloat(yearTarget.baseline_value)
-          : ind.baseline_value;
+        let baselineValue;
+        if (previousYearTarget?.target_value !== null && previousYearTarget?.target_value !== undefined) {
+          baselineValue = parseFloat(previousYearTarget.target_value);
+        } else if (ind.baseline_value !== null && ind.baseline_value !== undefined) {
+          baselineValue = ind.baseline_value;
+        } else {
+          baselineValue = 0;
+        }
 
         return {
           ...ind,
-          yearly_target: yearTarget?.target_value ? parseFloat(yearTarget.target_value) : ind.target_value,
+          yearly_target: yearTarget?.target_value !== null && yearTarget?.target_value !== undefined ? parseFloat(yearTarget.target_value) : (ind.target_value !== null && ind.target_value !== undefined ? ind.target_value : null),
           yearly_baseline: baselineValue,
           goal: ind.goals ? {
             title: ind.goals.title,

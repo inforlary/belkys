@@ -33,6 +33,7 @@ interface Indicator {
   unit: string;
   target_value: number | null;
   yearly_target?: number | null;
+  yearly_baseline?: number | null;
   calculation_method: string;
   baseline_value?: number | null;
   measurement_frequency?: string;
@@ -184,7 +185,7 @@ export default function DataArchive() {
             target_value,
             indicators!inner(organization_id)
           `)
-          .eq('year', selectedYear)
+          .in('year', [selectedYear, selectedYear - 1])
           .eq('indicators.organization_id', profile.organization_id)
       ]);
 
@@ -192,8 +193,14 @@ export default function DataArchive() {
       if (entriesRes.error) throw entriesRes.error;
 
       const targetsByIndicator: Record<string, number> = {};
+      const baselineByIndicator: Record<string, number> = {};
+
       targetsRes.data?.forEach(target => {
-        targetsByIndicator[target.indicator_id] = target.target_value;
+        if (target.year === selectedYear) {
+          targetsByIndicator[target.indicator_id] = target.target_value;
+        } else if (target.year === selectedYear - 1) {
+          baselineByIndicator[target.indicator_id] = target.target_value;
+        }
       });
 
       let filteredObjectives = objectivesRes.data || [];
@@ -202,10 +209,22 @@ export default function DataArchive() {
         ...obj,
         goals: obj.goals.map(goal => ({
           ...goal,
-          indicators: goal.indicators.map(ind => ({
-            ...ind,
-            yearly_target: targetsByIndicator[ind.id] !== undefined ? targetsByIndicator[ind.id] : null
-          }))
+          indicators: goal.indicators.map(ind => {
+            let baselineValue;
+            if (baselineByIndicator[ind.id] !== undefined && baselineByIndicator[ind.id] !== null) {
+              baselineValue = baselineByIndicator[ind.id];
+            } else if (ind.baseline_value !== undefined && ind.baseline_value !== null) {
+              baselineValue = ind.baseline_value;
+            } else {
+              baselineValue = 0;
+            }
+
+            return {
+              ...ind,
+              yearly_target: targetsByIndicator[ind.id] !== undefined ? targetsByIndicator[ind.id] : null,
+              yearly_baseline: baselineValue
+            };
+          })
         }))
       }));
 
@@ -240,15 +259,15 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
       e => e.indicator_id === indicator.id && e.status === 'approved'
     );
     if (indicatorEntries.length === 0) return null;
-    
+
     const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
     const periodCount = indicatorEntries.length;
     const average = sumOfEntries / periodCount;
-    const baselineValue = indicator.baseline_value || 0;
+    const baselineValue = indicator.yearly_baseline !== undefined && indicator.yearly_baseline !== null ? indicator.yearly_baseline : (indicator.baseline_value !== undefined && indicator.baseline_value !== null ? indicator.baseline_value : 0);
     const calculationMethod = indicator.calculation_method || 'cumulative';
 
     let currentValue = 0;
-    
+
     switch (calculationMethod) {
       case 'cumulative':
       case 'cumulative_increasing':
