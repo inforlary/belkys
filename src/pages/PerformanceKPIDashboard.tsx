@@ -164,7 +164,7 @@ export default function PerformanceKPIDashboard() {
             id: indicator.id,
             code: indicator.code,
             name: indicator.name,
-            measurement_unit: indicator.unit,
+            measurement_unit: (indicator as any).unit || '',
             target_value: yearlyTarget,
             baseline_value: indicator.baseline_value,
             calculation_method: indicator.calculation_method || 'cumulative',
@@ -268,6 +268,8 @@ export default function PerformanceKPIDashboard() {
       avgProgress: number;
     }> = {};
 
+    console.log('🔍 Filtered Indicators:', filteredIndicators.length, filteredIndicators);
+
     filteredIndicators.forEach(indicator => {
       const goalId = indicator.goal_id;
       if (!grouped[goalId]) {
@@ -285,22 +287,31 @@ export default function PerformanceKPIDashboard() {
       grouped[goalId].indicators.push(indicator);
 
       const achievementRate = indicator.achievement_rate || 0;
+      console.log(`📊 Indicator: ${indicator.code} - Rate: ${achievementRate}`);
+
       if (achievementRate >= 85) {
         grouped[goalId].onTarget.push(indicator);
+        console.log(`✅ Added to onTarget`);
       } else if (achievementRate >= 50) {
         grouped[goalId].atRisk.push(indicator);
+        console.log(`⚠️ Added to atRisk`);
       } else {
         grouped[goalId].behind.push(indicator);
+        console.log(`❌ Added to behind`);
       }
     });
 
-    Object.values(grouped).forEach(group => {
+    const result = Object.values(grouped);
+    console.log('📦 Grouped by Goal:', result);
+
+    result.forEach(group => {
       const total = group.indicators.length;
       const sum = group.indicators.reduce((acc, i) => acc + (i.achievement_rate || 0), 0);
       group.avgProgress = total > 0 ? sum / total : 0;
+      console.log(`🎯 Goal ${group.goal.code}: ${group.onTarget.length} onTarget, ${group.atRisk.length} atRisk, ${group.behind.length} behind`);
     });
 
-    return Object.values(grouped).sort((a, b) => b.avgProgress - a.avgProgress);
+    return result.sort((a, b) => b.avgProgress - a.avgProgress);
   };
 
   const stats = getSummaryStats();
@@ -433,7 +444,13 @@ export default function PerformanceKPIDashboard() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {groupedByGoal.map((group, index) => (
+          {groupedByGoal.map((group, index) => {
+            console.log(`🎨 Rendering goal ${group.goal.code}:`, {
+              onTarget: group.onTarget?.length || 0,
+              atRisk: group.atRisk?.length || 0,
+              behind: group.behind?.length || 0
+            });
+            return (
             <Card key={group.goal.id} className="overflow-hidden">
               <CardBody className="p-0">
                 <div className="bg-gradient-to-r from-amber-50 to-amber-100 border-b border-amber-200 p-4">
@@ -606,7 +623,8 @@ export default function PerformanceKPIDashboard() {
                 </div>
               </CardBody>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
