@@ -52,9 +52,10 @@ export default function RiskMatrixReport({ onClose }: { onClose: () => void }) {
 
   const getLevelStats = (useInherent: boolean) => {
     const getRiskLevel = (score: number) => {
-      if (score >= 15) return 'Çok Yüksek';
-      if (score >= 10) return 'Yüksek';
-      if (score >= 5) return 'Orta';
+      if (score >= 16) return 'Çok Yüksek';
+      if (score >= 12) return 'Yüksek';
+      if (score >= 8) return 'Orta';
+      if (score >= 4) return 'Düşük-Orta';
       return 'Düşük';
     };
 
@@ -62,6 +63,7 @@ export default function RiskMatrixReport({ onClose }: { onClose: () => void }) {
       'Çok Yüksek': 0,
       'Yüksek': 0,
       'Orta': 0,
+      'Düşük-Orta': 0,
       'Düşük': 0
     };
 

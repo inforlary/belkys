@@ -786,23 +786,26 @@ export default function CollaborationPlanning() {
   };
 
   const getRiskScoreColor = (score: number) => {
-    if (score >= 15) return 'text-red-700 font-bold';
-    if (score >= 10) return 'text-orange-600 font-bold';
-    if (score >= 5) return 'text-yellow-600 font-bold';
-    return 'text-green-600 font-bold';
+    if (score >= 16) return 'text-red-700 font-bold';
+    if (score >= 12) return 'text-orange-600 font-bold';
+    if (score >= 8) return 'text-yellow-600 font-bold';
+    if (score >= 4) return 'text-lime-600 font-bold';
+    return 'text-green-700 font-bold';
   };
 
   const getRiskScoreLabel = (score: number) => {
-    if (score >= 15) return 'Çok Yüksek';
-    if (score >= 10) return 'Yüksek';
-    if (score >= 5) return 'Orta';
+    if (score >= 16) return 'Çok Yüksek';
+    if (score >= 12) return 'Yüksek';
+    if (score >= 8) return 'Orta';
+    if (score >= 4) return 'Düşük-Orta';
     return 'Düşük';
   };
 
   const calculateRiskLevel = (score: number): string => {
-    if (score <= 4) return 'LOW';
-    if (score <= 9) return 'MEDIUM';
-    if (score <= 14) return 'HIGH';
+    if (score <= 3) return 'LOW';
+    if (score <= 7) return 'LOW_MEDIUM';
+    if (score <= 11) return 'MEDIUM';
+    if (score <= 15) return 'HIGH';
     return 'VERY_HIGH';
   };
 

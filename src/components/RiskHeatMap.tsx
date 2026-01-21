@@ -31,17 +31,19 @@ export function RiskHeatMap({ risks, type }: RiskHeatMapProps) {
 
   const getRiskColor = (likelihood: number, impact: number) => {
     const score = likelihood * impact;
-    if (score >= 15) return 'bg-red-600';
-    if (score >= 10) return 'bg-orange-500';
-    if (score >= 5) return 'bg-yellow-400';
-    return 'bg-green-500';
+    if (score >= 16) return 'bg-red-600';
+    if (score >= 12) return 'bg-orange-500';
+    if (score >= 8) return 'bg-yellow-400';
+    if (score >= 4) return 'bg-lime-400';
+    return 'bg-green-600';
   };
 
   const getRiskLevel = (likelihood: number, impact: number) => {
     const score = likelihood * impact;
-    if (score >= 15) return 'Çok Yüksek';
-    if (score >= 10) return 'Yüksek';
-    if (score >= 5) return 'Orta';
+    if (score >= 16) return 'Çok Yüksek';
+    if (score >= 12) return 'Yüksek';
+    if (score >= 8) return 'Orta';
+    if (score >= 4) return 'Düşük-Orta';
     return 'Düşük';
   };
 
@@ -139,19 +141,23 @@ export function RiskHeatMap({ risks, type }: RiskHeatMapProps) {
       <div className="mt-4 flex gap-4 justify-center flex-wrap">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-600 rounded"></div>
-          <span className="text-xs text-gray-600">Çok Yüksek (15-25)</span>
+          <span className="text-xs text-gray-600">Çok Yüksek (16-25)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-orange-500 rounded"></div>
-          <span className="text-xs text-gray-600">Yüksek (10-14)</span>
+          <span className="text-xs text-gray-600">Yüksek (12-15)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-yellow-400 rounded"></div>
-          <span className="text-xs text-gray-600">Orta (5-9)</span>
+          <span className="text-xs text-gray-600">Orta (8-11)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-green-500 rounded"></div>
-          <span className="text-xs text-gray-600">Düşük (1-4)</span>
+          <div className="w-4 h-4 bg-lime-400 rounded"></div>
+          <span className="text-xs text-gray-600">Düşük-Orta (4-7)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-green-600 rounded"></div>
+          <span className="text-xs text-gray-600">Düşük (1-3)</span>
         </div>
       </div>
     </div>

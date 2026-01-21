@@ -79,13 +79,14 @@ export default function DepartmentRiskReport({ onClose }: { onClose: () => void 
   };
 
   const getRiskLevel = (score: number) => {
-    if (score >= 15) return 'Çok Yüksek';
-    if (score >= 10) return 'Yüksek';
-    if (score >= 5) return 'Orta';
+    if (score >= 16) return 'Çok Yüksek';
+    if (score >= 12) return 'Yüksek';
+    if (score >= 8) return 'Orta';
+    if (score >= 4) return 'Düşük-Orta';
     return 'Düşük';
   };
 
-  const criticalRisks = risks.filter(r => r.residual_score >= 15).length;
+  const criticalRisks = risks.filter(r => r.residual_score >= 16).length;
   const avgScore = risks.length > 0 ? (risks.reduce((sum, r) => sum + r.residual_score, 0) / risks.length).toFixed(1) : 0;
   const openTreatments = treatments.filter(t => t.status !== 'completed').length;
   const overdueTreatments = treatments.filter(t =>

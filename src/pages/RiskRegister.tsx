@@ -132,17 +132,19 @@ const reviewStatusOptions = [
 
 const riskLevelOptions = [
   { value: '', label: 'Tüm Seviyeler' },
-  { value: '1-4', label: 'Düşük (1-4)' },
-  { value: '5-9', label: 'Orta (5-9)' },
-  { value: '10-14', label: 'Yüksek (10-14)' },
-  { value: '15-25', label: 'Çok Yüksek (15-25)' }
+  { value: '1-3', label: 'Düşük (1-3)' },
+  { value: '4-7', label: 'Düşük-Orta (4-7)' },
+  { value: '8-11', label: 'Orta (8-11)' },
+  { value: '12-15', label: 'Yüksek (12-15)' },
+  { value: '16-25', label: 'Çok Yüksek (16-25)' }
 ];
 
 function getRiskScoreBadge(score: number) {
-  if (score >= 15) return { color: 'bg-red-600 text-white', emoji: '🔴', label: 'Çok Yüksek' };
-  if (score >= 10) return { color: 'bg-orange-500 text-white', emoji: '🟠', label: 'Yüksek' };
-  if (score >= 5) return { color: 'bg-yellow-400 text-gray-900', emoji: '🟡', label: 'Orta' };
-  return { color: 'bg-green-500 text-white', emoji: '🟢', label: 'Düşük' };
+  if (score >= 16) return { color: 'bg-red-600 text-white', emoji: '🔴', label: 'Çok Yüksek' };
+  if (score >= 12) return { color: 'bg-orange-500 text-white', emoji: '🟠', label: 'Yüksek' };
+  if (score >= 8) return { color: 'bg-yellow-400 text-gray-900', emoji: '🟡', label: 'Orta' };
+  if (score >= 4) return { color: 'bg-lime-400 text-gray-900', emoji: '🟢', label: 'Düşük-Orta' };
+  return { color: 'bg-green-600 text-white', emoji: '🟢', label: 'Düşük' };
 }
 
 function getApprovalStatusBadge(status: string) {

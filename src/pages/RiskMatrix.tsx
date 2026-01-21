@@ -39,23 +39,26 @@ const LIKELIHOOD_LABELS = ['Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok
 const IMPACT_LABELS = ['Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'];
 
 function getCellColor(score: number): string {
-  if (score >= 15) return 'bg-red-600 text-white';
-  if (score >= 10) return 'bg-orange-500 text-white';
-  if (score >= 5) return 'bg-yellow-400 text-gray-900';
-  return 'bg-green-500 text-white';
+  if (score >= 16) return 'bg-red-600 text-white';
+  if (score >= 12) return 'bg-orange-500 text-white';
+  if (score >= 8) return 'bg-yellow-400 text-gray-900';
+  if (score >= 4) return 'bg-lime-400 text-gray-900';
+  return 'bg-green-600 text-white';
 }
 
 function getRiskLevelLabel(score: number): string {
-  if (score >= 15) return 'Çok Yüksek';
-  if (score >= 10) return 'Yüksek';
-  if (score >= 5) return 'Orta';
+  if (score >= 16) return 'Çok Yüksek';
+  if (score >= 12) return 'Yüksek';
+  if (score >= 8) return 'Orta';
+  if (score >= 4) return 'Düşük-Orta';
   return 'Düşük';
 }
 
 function getRiskLevelEmoji(score: number): string {
-  if (score >= 15) return '🔴';
-  if (score >= 10) return '🟠';
-  if (score >= 5) return '🟡';
+  if (score >= 16) return '🔴';
+  if (score >= 12) return '🟠';
+  if (score >= 8) return '🟡';
+  if (score >= 4) return '🟢';
   return '🟢';
 }
 
@@ -154,19 +157,23 @@ export default function RiskMatrix() {
     total: filteredRisks.length,
     veryHigh: filteredRisks.filter(r => {
       const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
-      return score >= 15;
+      return score >= 16;
     }).length,
     high: filteredRisks.filter(r => {
       const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
-      return score >= 10 && score <= 14;
+      return score >= 12 && score <= 15;
     }).length,
     medium: filteredRisks.filter(r => {
       const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
-      return score >= 5 && score <= 9;
+      return score >= 8 && score <= 11;
+    }).length,
+    lowMedium: filteredRisks.filter(r => {
+      const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
+      return score >= 4 && score <= 7;
     }).length,
     low: filteredRisks.filter(r => {
       const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
-      return score >= 1 && score <= 4;
+      return score >= 1 && score <= 3;
     }).length
   };
 
@@ -434,7 +441,7 @@ export default function RiskMatrix() {
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">🔴 Çok Yüksek (15-25)</span>
+                    <span className="font-medium">🔴 Çok Yüksek (16-25)</span>
                     <span className="text-gray-600">{statistics.veryHigh} ({statistics.total > 0 ? Math.round((statistics.veryHigh / statistics.total) * 100) : 0}%)</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -447,7 +454,7 @@ export default function RiskMatrix() {
 
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">🟠 Yüksek (10-14)</span>
+                    <span className="font-medium">🟠 Yüksek (12-15)</span>
                     <span className="text-gray-600">{statistics.high} ({statistics.total > 0 ? Math.round((statistics.high / statistics.total) * 100) : 0}%)</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -460,7 +467,7 @@ export default function RiskMatrix() {
 
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">🟡 Orta (5-9)</span>
+                    <span className="font-medium">🟡 Orta (8-11)</span>
                     <span className="text-gray-600">{statistics.medium} ({statistics.total > 0 ? Math.round((statistics.medium / statistics.total) * 100) : 0}%)</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -473,12 +480,25 @@ export default function RiskMatrix() {
 
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">🟢 Düşük (1-4)</span>
+                    <span className="font-medium">🟢 Düşük-Orta (4-7)</span>
+                    <span className="text-gray-600">{statistics.lowMedium} ({statistics.total > 0 ? Math.round((statistics.lowMedium / statistics.total) * 100) : 0}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-lime-400 h-2 rounded-full transition-all"
+                      style={{ width: `${statistics.total > 0 ? (statistics.lowMedium / statistics.total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium">🟢 Düşük (1-3)</span>
                     <span className="text-gray-600">{statistics.low} ({statistics.total > 0 ? Math.round((statistics.low / statistics.total) * 100) : 0}%)</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-green-500 h-2 rounded-full transition-all"
+                      className="bg-green-600 h-2 rounded-full transition-all"
                       style={{ width: `${statistics.total > 0 ? (statistics.low / statistics.total) * 100 : 0}%` }}
                     />
                   </div>

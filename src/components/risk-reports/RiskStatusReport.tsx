@@ -98,9 +98,10 @@ export default function RiskStatusReport({ onClose }: { onClose: () => void }) {
   };
 
   const getRiskLevel = (score: number) => {
-    if (score >= 15) return 'Çok Yüksek';
-    if (score >= 10) return 'Yüksek';
-    if (score >= 5) return 'Orta';
+    if (score >= 16) return 'Çok Yüksek';
+    if (score >= 12) return 'Yüksek';
+    if (score >= 8) return 'Orta';
+    if (score >= 4) return 'Düşük-Orta';
     return 'Düşük';
   };
 
@@ -109,7 +110,8 @@ export default function RiskStatusReport({ onClose }: { onClose: () => void }) {
       case 'Çok Yüksek': return '#dc2626';
       case 'Yüksek': return '#f59e0b';
       case 'Orta': return '#facc15';
-      case 'Düşük': return '#22c55e';
+      case 'Düşük-Orta': return '#a3e635';
+      case 'Düşük': return '#16a34a';
       default: return '#64748b';
     }
   };

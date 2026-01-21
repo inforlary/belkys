@@ -35,16 +35,17 @@ export default function PeriodComparisonReport({ onClose }: { onClose: () => voi
   };
 
   const getRiskLevel = (score: number) => {
-    if (score >= 15) return 'Çok Yüksek';
-    if (score >= 10) return 'Yüksek';
-    if (score >= 5) return 'Orta';
+    if (score >= 16) return 'Çok Yüksek';
+    if (score >= 12) return 'Yüksek';
+    if (score >= 8) return 'Orta';
+    if (score >= 4) return 'Düşük-Orta';
     return 'Düşük';
   };
 
   const p1Stats = {
     total: Math.floor(risks.length * 0.88),
     avgScore: 13.5,
-    critical: 3,
+    critical: 2,
     completedActivities: 8,
     overdueActivities: 5,
     alarmIndicators: 4
@@ -53,7 +54,7 @@ export default function PeriodComparisonReport({ onClose }: { onClose: () => voi
   const p2Stats = {
     total: risks.length,
     avgScore: risks.length > 0 ? (risks.reduce((sum, r) => sum + r.residual_score, 0) / risks.length) : 0,
-    critical: risks.filter(r => r.residual_score >= 15).length,
+    critical: risks.filter(r => r.residual_score >= 16).length,
     completedActivities: 12,
     overdueActivities: 3,
     alarmIndicators: 2
@@ -63,22 +64,27 @@ export default function PeriodComparisonReport({ onClose }: { onClose: () => voi
     {
       name: 'Çok Yüksek',
       [period1]: p1Stats.critical,
-      [period2]: risks.filter(r => r.residual_score >= 15).length
+      [period2]: risks.filter(r => r.residual_score >= 16).length
     },
     {
       name: 'Yüksek',
-      [period1]: Math.floor(p1Stats.total * 0.32),
-      [period2]: risks.filter(r => r.residual_score >= 10 && r.residual_score < 15).length
+      [period1]: Math.floor(p1Stats.total * 0.22),
+      [period2]: risks.filter(r => r.residual_score >= 12 && r.residual_score < 16).length
     },
     {
       name: 'Orta',
-      [period1]: Math.floor(p1Stats.total * 0.23),
-      [period2]: risks.filter(r => r.residual_score >= 5 && r.residual_score < 10).length
+      [period1]: Math.floor(p1Stats.total * 0.28),
+      [period2]: risks.filter(r => r.residual_score >= 8 && r.residual_score < 12).length
+    },
+    {
+      name: 'Düşük-Orta',
+      [period1]: Math.floor(p1Stats.total * 0.24),
+      [period2]: risks.filter(r => r.residual_score >= 4 && r.residual_score < 8).length
     },
     {
       name: 'Düşük',
       [period1]: Math.floor(p1Stats.total * 0.09),
-      [period2]: risks.filter(r => r.residual_score < 5).length
+      [period2]: risks.filter(r => r.residual_score < 4).length
     }
   ];
 
