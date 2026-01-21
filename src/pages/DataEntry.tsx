@@ -16,6 +16,7 @@ interface Indicator {
   calculation_method?: string;
   calculation_notes?: string;
   yearly_target?: number | null;
+  yearly_baseline?: number | null;
   goal?: {
     title: string;
     code: string;
@@ -107,6 +108,7 @@ export default function DataEntry() {
           ),
           indicator_targets!left(
             target_value,
+            baseline_value,
             year
           )
         `)
@@ -145,6 +147,7 @@ export default function DataEntry() {
         return {
           ...ind,
           yearly_target: yearTarget?.target_value || ind.target_value,
+          yearly_baseline: yearTarget?.baseline_value ?? ind.baseline_value,
           goal: ind.goals ? {
             title: ind.goals.title,
             code: ind.goals.code,
@@ -500,70 +503,70 @@ export default function DataEntry() {
 
   const calculateCurrentValue = (indicator: Indicator) => {
     const indicatorEntries = entries.filter(
-      e => e.indicator_id === indicator.id && e.status === 'approved'
+      e => e.indicator_id === indicator.id && e.period_year === selectedYear && e.status === 'approved'
     );
     if (indicatorEntries.length === 0) return null;
-    
+
     const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
     const periodCount = indicatorEntries.length;
     const average = sumOfEntries / periodCount;
-    const baselineValue = indicator.baseline_value || 0;
+    const baselineValue = getIndicatorBaseline(indicator);
     const calculationMethod = indicator.calculation_method || 'cumulative';
 
     let currentValue = 0;
-    
+
     switch (calculationMethod) {
       case 'cumulative':
       case 'cumulative_increasing':
       case 'increasing':
         currentValue = baselineValue + sumOfEntries;
         break;
-        
+
       case 'cumulative_decreasing':
       case 'decreasing':
         currentValue = baselineValue - sumOfEntries;
         break;
-        
+
       case 'percentage':
       case 'percentage_increasing':
       case 'percentage_decreasing':
         currentValue = average;
         break;
-        
+
       case 'maintenance':
       case 'maintenance_increasing':
       case 'maintenance_decreasing':
         currentValue = average;
         break;
-        
+
       default:
         currentValue = baselineValue + sumOfEntries;
         break;
     }
-    
+
     return currentValue;
   };
 
 const getCurrentValueLabel = (indicator: Indicator) => {
     const indicatorEntries = entries.filter(
-      e => e.indicator_id === indicator.id && e.status === 'approved'
+      e => e.indicator_id === indicator.id && e.period_year === selectedYear && e.status === 'approved'
     );
-    
+
     if (indicatorEntries.length === 0) return '';
-    
+
     const calculationMethod = indicator.calculation_method || 'cumulative';
     const periodLabels = indicatorEntries.map((_, index) => `Ç${index + 1}`).join('+');
-    
+
     switch (calculationMethod) {
       case 'cumulative':
       case 'cumulative_increasing':
       case 'increasing':
         return `Başlangıç + ${periodLabels}`;
-        
+
       case 'cumulative_decreasing':
       case 'decreasing':
         return `Başlangıç - ${periodLabels}`;
-        
+
       case 'percentage':
       case 'percentage_increasing':
       case 'percentage_decreasing':
@@ -571,7 +574,7 @@ const getCurrentValueLabel = (indicator: Indicator) => {
       case 'maintenance_increasing':
       case 'maintenance_decreasing':
         return `Ort: ${periodLabels}`;
-        
+
       default:
         return periodLabels;
     }
@@ -580,6 +583,10 @@ const getCurrentValueLabel = (indicator: Indicator) => {
 
 const getIndicatorTarget = (indicator: Indicator) => {
     return indicator.yearly_target || indicator.target_value || 0;
+  };
+
+  const getIndicatorBaseline = (indicator: Indicator) => {
+    return indicator.yearly_baseline ?? indicator.baseline_value ?? 0;
   };
   
   const calculateProgress = (indicator: Indicator) => {
@@ -691,7 +698,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
                       <span className="font-medium">Hedef ({selectedYear}):</span> {getIndicatorTarget(indicator)?.toLocaleString('tr-TR') || '-'} {indicator.unit}
                     </div>
                     <div className="text-sm text-slate-600">
-                      <span className="font-medium">Başlangıç:</span> {indicator.baseline_value?.toLocaleString('tr-TR') || '-'} {indicator.unit}
+                      <span className="font-medium">Başlangıç ({selectedYear}):</span> {getIndicatorBaseline(indicator)?.toLocaleString('tr-TR') || '-'} {indicator.unit}
                     </div>
                    <div className="text-sm text-slate-700">
   <span className="font-medium">Güncel:</span> {currentValue.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {indicator.unit} {getCurrentValueLabel(indicator) && `(${getCurrentValueLabel(indicator)})`}
