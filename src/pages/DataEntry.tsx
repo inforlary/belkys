@@ -144,10 +144,18 @@ export default function DataEntry() {
 
       const mappedIndicators = indicatorsRes.data?.map(ind => {
         const yearTarget = ind.indicator_targets?.find((t: any) => t.year === selectedYear);
+        const previousYearTarget = ind.indicator_targets?.find((t: any) => t.year === selectedYear - 1);
+
+        const baselineValue = previousYearTarget?.target_value
+          ? parseFloat(previousYearTarget.target_value)
+          : yearTarget?.baseline_value
+          ? parseFloat(yearTarget.baseline_value)
+          : ind.baseline_value;
+
         return {
           ...ind,
           yearly_target: yearTarget?.target_value ? parseFloat(yearTarget.target_value) : ind.target_value,
-          yearly_baseline: yearTarget?.baseline_value ? parseFloat(yearTarget.baseline_value) : ind.baseline_value,
+          yearly_baseline: baselineValue,
           goal: ind.goals ? {
             title: ind.goals.title,
             code: ind.goals.code,

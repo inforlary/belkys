@@ -529,13 +529,17 @@ export default function Indicators() {
                                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                                     <div className="text-xs text-gray-500 mb-1">Hedef Değer</div>
                                     <div className="text-sm font-medium text-gray-900">
-                                      {indicator.yearly_target || indicator.target_value || '-'}
+                                      {indicator.yearly_target !== null && indicator.yearly_target !== undefined
+                                        ? indicator.yearly_target
+                                        : indicator.target_value !== null && indicator.target_value !== undefined
+                                        ? indicator.target_value
+                                        : '-'}
                                     </div>
                                   </div>
 
                                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                                     <div className="text-xs text-gray-500 mb-2">İlerleme</div>
-                                    {progress === 0 && !indicator.yearly_target && !indicator.target_value ? (
+                                    {progress === 0 && indicator.yearly_target === null && indicator.yearly_target === undefined && indicator.target_value === null && indicator.target_value === undefined ? (
                                       <span className="text-xs text-gray-400">Hedef yok</span>
                                     ) : (
                                       <div className="flex items-center gap-2">
