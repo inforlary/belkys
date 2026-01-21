@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Download, AlertCircle, CheckCircle, Clock, XCircle, FileText } from 'lucide-react';
 import { exportToExcel } from '../../utils/exportHelpers';
 import { generateDataEntryStatusPDF } from '../../utils/reportPDFGenerators';
+import { getProgressColor } from '../../utils/progressCalculations';
 
 interface IndicatorEntryStatus {
   id: string;
@@ -306,13 +307,7 @@ export default function DataEntryStatus({ selectedYear }: DataEntryStatusProps) 
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-20 bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full ${
-                              ind.completion_rate === 100
-                                ? 'bg-green-500'
-                                : ind.completion_rate >= 50
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
-                            }`}
+                            className={`h-2 rounded-full ${getProgressColor(ind.completion_rate)}`}
                             style={{ width: `${ind.completion_rate}%` }}
                           />
                         </div>

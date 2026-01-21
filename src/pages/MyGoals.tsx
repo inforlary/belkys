@@ -167,15 +167,6 @@ export default function MyGoals() {
     }, allDataEntries);
   };
 
-  const getProgressColor = (progress: number) => {
-    if (progress >= 115) return 'bg-purple-500';
-    if (progress >= 85) return 'bg-green-500';
-    if (progress >= 70) return 'bg-green-400';
-    if (progress >= 55) return 'bg-yellow-500';
-    if (progress >= 45) return 'bg-red-500';
-    return 'bg-amber-700';
-  };
-
   const getExpectedEntries = (frequency: string) => {
     if (frequency === 'quarterly' || frequency === '3-month') return 4;
     if (frequency === 'semi-annual' || frequency === 'semi_annual' || frequency === '6-month') return 2;

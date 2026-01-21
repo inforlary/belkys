@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Download, Award, AlertTriangle, FileText } from 'lucide-react';
 import { exportToExcel } from '../../utils/exportHelpers';
 import { generateDepartmentPerformancePDF } from '../../utils/reportPDFGenerators';
-import { calculateIndicatorProgress } from '../../utils/progressCalculations';
+import { calculateIndicatorProgress, getProgressColor, getProgressTextColor } from '../../utils/progressCalculations';
 
 interface DepartmentData {
   id: string;
@@ -258,13 +258,7 @@ export default function DepartmentPerformance({ selectedYear }: DepartmentPerfor
                 </div>
                 <div className="text-right">
                   <div
-                    className={`text-3xl font-bold ${
-                      dept.avg_progress >= 70
-                        ? 'text-green-600'
-                        : dept.avg_progress >= 50
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
-                    }`}
+                    className={`text-3xl font-bold ${getProgressTextColor(dept.avg_progress)}`}
                   >
                     {Math.round(dept.avg_progress)}%
                   </div>
@@ -275,13 +269,7 @@ export default function DepartmentPerformance({ selectedYear }: DepartmentPerfor
               <div className="mb-4">
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
-                    className={`h-3 rounded-full transition-all ${
-                      dept.avg_progress >= 70
-                        ? 'bg-green-500'
-                        : dept.avg_progress >= 50
-                        ? 'bg-yellow-500'
-                        : 'bg-red-500'
-                    }`}
+                    className={`h-3 rounded-full transition-all ${getProgressColor(dept.avg_progress)}`}
                     style={{ width: `${Math.min(dept.avg_progress, 100)}%` }}
                   />
                 </div>

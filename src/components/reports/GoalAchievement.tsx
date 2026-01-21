@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Download, Target, AlertTriangle, FileText } from 'lucide-react';
 import { exportToExcel } from '../../utils/exportHelpers';
 import { generateGoalAchievementPDF } from '../../utils/reportPDFGenerators';
-import { calculateIndicatorProgress } from '../../utils/progressCalculations';
+import { calculateIndicatorProgress, getProgressColor, getProgressTextColor } from '../../utils/progressCalculations';
 import {
   IndicatorStatus,
   getIndicatorStatus,
@@ -272,13 +272,7 @@ export default function GoalAchievement({ selectedYear }: GoalAchievementProps) 
                 </div>
                 <div className="text-right">
                   <div
-                    className={`text-3xl font-bold ${
-                      goal.avg_progress >= 70
-                        ? 'text-green-600'
-                        : goal.avg_progress >= 50
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
-                    }`}
+                    className={`text-3xl font-bold ${getProgressTextColor(goal.avg_progress)}`}
                   >
                     {Math.round(goal.avg_progress)}%
                   </div>
@@ -289,13 +283,7 @@ export default function GoalAchievement({ selectedYear }: GoalAchievementProps) 
               <div className="mb-4">
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
-                    className={`h-3 rounded-full transition-all ${
-                      goal.avg_progress >= 70
-                        ? 'bg-green-500'
-                        : goal.avg_progress >= 50
-                        ? 'bg-yellow-500'
-                        : 'bg-red-500'
-                    }`}
+                    className={`h-3 rounded-full transition-all ${getProgressColor(goal.avg_progress)}`}
                     style={{ width: `${Math.min(goal.avg_progress, 100)}%` }}
                   />
                 </div>

@@ -585,11 +585,17 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
                     className={`h-3 rounded-full transition-all ${
-                      dept.avg_progress >= 70
+                      dept.avg_progress >= 115
+                        ? 'bg-purple-500'
+                        : dept.avg_progress >= 85
                         ? 'bg-green-500'
-                        : dept.avg_progress >= 50
+                        : dept.avg_progress >= 70
+                        ? 'bg-green-400'
+                        : dept.avg_progress >= 55
                         ? 'bg-yellow-500'
-                        : 'bg-red-500'
+                        : dept.avg_progress >= 45
+                        ? 'bg-red-500'
+                        : 'bg-amber-700'
                     }`}
                     style={{ width: `${Math.min(dept.avg_progress, 100)}%` }}
                   />
