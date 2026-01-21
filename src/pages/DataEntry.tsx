@@ -539,10 +539,7 @@ const getCurrentValueLabel = (indicator: Indicator) => {
     const indicatorEntries = entries.filter(
       e => e.indicator_id === indicator.id && e.status === 'approved'
     );
-const getIndicatorTarget = (indicator: Indicator) => {
-    return indicator.yearly_target || indicator.target_value || 0;
-  };
-  
+    
     if (indicatorEntries.length === 0) return '';
     
     const calculationMethod = indicator.calculation_method || 'cumulative';
@@ -572,7 +569,9 @@ const getIndicatorTarget = (indicator: Indicator) => {
   };
 
 
-
+const getIndicatorTarget = (indicator: Indicator) => {
+    return indicator.yearly_target || indicator.target_value || 0;
+  };
   
   const calculateProgress = (indicator: Indicator) => {
     const dataEntriesForIndicator = entries
