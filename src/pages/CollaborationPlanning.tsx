@@ -1125,12 +1125,32 @@ export default function CollaborationPlanning() {
                                     </div>
                                   </div>
                                   <ul className="space-y-3">
-                                    {plan.items.filter(i => i.category === 'risk').map((item, idx) => (
-                                      <li key={idx} className="flex items-start gap-2 bg-white bg-opacity-60 rounded-md p-2.5 border border-red-200">
-                                        <span className="text-red-500 mt-0.5 font-bold">•</span>
-                                        <span className="font-medium text-sm text-red-900 flex-1">{item.content}</span>
-                                      </li>
-                                    ))}
+                                    {plan.items.filter(i => i.category === 'risk').map((item, idx) => {
+                                      const isTransferred = transferredRisks.some(tr => tr.collaboration_item_id === item.id);
+                                      return (
+                                        <li key={idx} className="flex items-start justify-between gap-2 bg-white bg-opacity-60 rounded-md p-2.5 border border-red-200">
+                                          <div className="flex items-start gap-2 flex-1">
+                                            <span className="text-red-500 mt-0.5 font-bold">•</span>
+                                            <span className="font-medium text-sm text-red-900 flex-1">{item.content}</span>
+                                          </div>
+                                          {isTransferred ? (
+                                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-800 text-xs font-bold rounded border border-green-300 whitespace-nowrap flex-shrink-0">
+                                              <Shield className="w-3.5 h-3.5" />
+                                              Aktarıldı
+                                            </span>
+                                          ) : (
+                                            <button
+                                              onClick={() => openTransferModal(item, plan)}
+                                              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors whitespace-nowrap flex-shrink-0"
+                                              title="Risk Yönetimine Aktar"
+                                            >
+                                              <Shield className="w-3.5 h-3.5" />
+                                              Aktar
+                                            </button>
+                                          )}
+                                        </li>
+                                      );
+                                    })}
                                   </ul>
                                 </div>
                               )}
