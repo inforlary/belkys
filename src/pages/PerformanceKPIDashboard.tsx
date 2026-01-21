@@ -493,32 +493,32 @@ export default function PerformanceKPIDashboard() {
                     </div>
                   </div>
 
-                  {group.onTarget && group.onTarget.length > 0 && (
+                  {group.onTarget.length > 0 ? (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
                         Hedefte Olan Göstergeler ({group.onTarget.length})
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {group.onTarget.map((indicator) => (
-                          <div key={indicator.id} className="bg-white border-l-4 border-green-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                        {group.onTarget.map((indicator, idx) => (
+                          <div key={`${indicator.id}-${idx}`} className="bg-white border border-gray-200 border-l-4 border-l-green-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
-                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name}</h4>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code || 'N/A'}</div>
+                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name || 'İsimsiz Gösterge'}</h4>
                               </div>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
-                                %{indicator.achievement_rate?.toFixed(1)}
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2 flex-shrink-0">
+                                %{(indicator.achievement_rate || 0).toFixed(1)}
                               </span>
                             </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-xs">
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between">
                                 <span className="text-gray-600">Hedef:</span>
-                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR') || '0'} {indicator.measurement_unit || ''}</span>
                               </div>
-                              <div className="flex justify-between text-xs">
+                              <div className="flex justify-between">
                                 <span className="text-gray-600">Gerçekleşen:</span>
-                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR') || '0'} {indicator.measurement_unit || ''}</span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
                                 <div className="h-1.5 rounded-full bg-green-500" style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }} />
@@ -528,34 +528,34 @@ export default function PerformanceKPIDashboard() {
                         ))}
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
-                  {group.atRisk && group.atRisk.length > 0 && (
+                  {group.atRisk.length > 0 ? (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4" />
                         Risk Altında Olan Göstergeler ({group.atRisk.length})
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {group.atRisk.map((indicator) => (
-                          <div key={indicator.id} className="bg-white border-l-4 border-yellow-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                        {group.atRisk.map((indicator, idx) => (
+                          <div key={`${indicator.id}-${idx}`} className="bg-white border border-gray-200 border-l-4 border-l-yellow-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
-                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name}</h4>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code || 'N/A'}</div>
+                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name || 'İsimsiz Gösterge'}</h4>
                               </div>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">
-                                %{indicator.achievement_rate?.toFixed(1)}
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2 flex-shrink-0">
+                                %{(indicator.achievement_rate || 0).toFixed(1)}
                               </span>
                             </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-xs">
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between">
                                 <span className="text-gray-600">Hedef:</span>
-                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR') || '0'} {indicator.measurement_unit || ''}</span>
                               </div>
-                              <div className="flex justify-between text-xs">
+                              <div className="flex justify-between">
                                 <span className="text-gray-600">Gerçekleşen:</span>
-                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR') || '0'} {indicator.measurement_unit || ''}</span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
                                 <div className="h-1.5 rounded-full bg-yellow-500" style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }} />
@@ -565,34 +565,34 @@ export default function PerformanceKPIDashboard() {
                         ))}
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
-                  {group.behind && group.behind.length > 0 && (
+                  {group.behind.length > 0 ? (
                     <div>
                       <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
                         <XCircle className="w-4 h-4" />
                         Geride Olan Göstergeler ({group.behind.length})
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {group.behind.map((indicator) => (
-                          <div key={indicator.id} className="bg-white border-l-4 border-red-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                        {group.behind.map((indicator, idx) => (
+                          <div key={`${indicator.id}-${idx}`} className="bg-white border border-gray-200 border-l-4 border-l-red-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
-                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name}</h4>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code || 'N/A'}</div>
+                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name || 'İsimsiz Gösterge'}</h4>
                               </div>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 ml-2">
-                                %{indicator.achievement_rate?.toFixed(1)}
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 ml-2 flex-shrink-0">
+                                %{(indicator.achievement_rate || 0).toFixed(1)}
                               </span>
                             </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-xs">
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between">
                                 <span className="text-gray-600">Hedef:</span>
-                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR') || '0'} {indicator.measurement_unit || ''}</span>
                               </div>
-                              <div className="flex justify-between text-xs">
+                              <div className="flex justify-between">
                                 <span className="text-gray-600">Gerçekleşen:</span>
-                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR') || '0'} {indicator.measurement_unit || ''}</span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
                                 <div className="h-1.5 rounded-full bg-red-500" style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }} />
@@ -602,7 +602,7 @@ export default function PerformanceKPIDashboard() {
                         ))}
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </CardBody>
             </Card>
