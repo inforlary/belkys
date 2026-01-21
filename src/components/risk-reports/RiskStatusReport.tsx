@@ -98,7 +98,6 @@ export default function RiskStatusReport({ onClose }: { onClose: () => void }) {
   };
 
   const getRiskLevel = (score: number) => {
-    if (score >= 20) return 'Kritik';
     if (score >= 15) return 'Çok Yüksek';
     if (score >= 10) return 'Yüksek';
     if (score >= 5) return 'Orta';
@@ -107,10 +106,9 @@ export default function RiskStatusReport({ onClose }: { onClose: () => void }) {
 
   const getLevelColor = (level: string) => {
     switch (level) {
-      case 'Kritik': return '#dc2626';
-      case 'Çok Yüksek': return '#ea580c';
+      case 'Çok Yüksek': return '#dc2626';
       case 'Yüksek': return '#f59e0b';
-      case 'Orta': return '#eab308';
+      case 'Orta': return '#facc15';
       case 'Düşük': return '#22c55e';
       default: return '#64748b';
     }

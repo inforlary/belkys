@@ -79,7 +79,6 @@ export default function DepartmentRiskReport({ onClose }: { onClose: () => void 
   };
 
   const getRiskLevel = (score: number) => {
-    if (score >= 20) return 'Kritik';
     if (score >= 15) return 'Çok Yüksek';
     if (score >= 10) return 'Yüksek';
     if (score >= 5) return 'Orta';

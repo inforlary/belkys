@@ -135,15 +135,13 @@ const riskLevelOptions = [
   { value: '1-4', label: 'Düşük (1-4)' },
   { value: '5-9', label: 'Orta (5-9)' },
   { value: '10-14', label: 'Yüksek (10-14)' },
-  { value: '15-19', label: 'Çok Yüksek (15-19)' },
-  { value: '20-25', label: 'Kritik (20-25)' }
+  { value: '15-25', label: 'Çok Yüksek (15-25)' }
 ];
 
 function getRiskScoreBadge(score: number) {
-  if (score >= 20) return { color: 'bg-gray-800 text-white', emoji: '⬛', label: 'Kritik' };
-  if (score >= 15) return { color: 'bg-red-500 text-white', emoji: '🔴', label: 'Çok Yüksek' };
+  if (score >= 15) return { color: 'bg-red-600 text-white', emoji: '🔴', label: 'Çok Yüksek' };
   if (score >= 10) return { color: 'bg-orange-500 text-white', emoji: '🟠', label: 'Yüksek' };
-  if (score >= 5) return { color: 'bg-yellow-500 text-black', emoji: '🟡', label: 'Orta' };
+  if (score >= 5) return { color: 'bg-yellow-400 text-gray-900', emoji: '🟡', label: 'Orta' };
   return { color: 'bg-green-500 text-white', emoji: '🟢', label: 'Düşük' };
 }
 

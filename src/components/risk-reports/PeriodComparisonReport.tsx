@@ -35,7 +35,6 @@ export default function PeriodComparisonReport({ onClose }: { onClose: () => voi
   };
 
   const getRiskLevel = (score: number) => {
-    if (score >= 20) return 'Kritik';
     if (score >= 15) return 'Çok Yüksek';
     if (score >= 10) return 'Yüksek';
     if (score >= 5) return 'Orta';
@@ -54,7 +53,7 @@ export default function PeriodComparisonReport({ onClose }: { onClose: () => voi
   const p2Stats = {
     total: risks.length,
     avgScore: risks.length > 0 ? (risks.reduce((sum, r) => sum + r.residual_score, 0) / risks.length) : 0,
-    critical: risks.filter(r => r.residual_score >= 20).length,
+    critical: risks.filter(r => r.residual_score >= 15).length,
     completedActivities: 12,
     overdueActivities: 3,
     alarmIndicators: 2
@@ -62,14 +61,9 @@ export default function PeriodComparisonReport({ onClose }: { onClose: () => voi
 
   const levelComparison = [
     {
-      name: 'Kritik',
+      name: 'Çok Yüksek',
       [period1]: p1Stats.critical,
-      [period2]: p2Stats.critical
-    },
-    {
-      name: 'Ç.Yüksek',
-      [period1]: Math.floor(p1Stats.total * 0.14),
-      [period2]: risks.filter(r => r.residual_score >= 15 && r.residual_score < 20).length
+      [period2]: risks.filter(r => r.residual_score >= 15).length
     },
     {
       name: 'Yüksek',

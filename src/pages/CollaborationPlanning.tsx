@@ -786,15 +786,13 @@ export default function CollaborationPlanning() {
   };
 
   const getRiskScoreColor = (score: number) => {
-    if (score >= 20) return 'text-red-700 font-bold';
-    if (score >= 15) return 'text-orange-600 font-bold';
-    if (score >= 10) return 'text-yellow-600 font-bold';
-    if (score >= 5) return 'text-blue-600 font-bold';
+    if (score >= 15) return 'text-red-700 font-bold';
+    if (score >= 10) return 'text-orange-600 font-bold';
+    if (score >= 5) return 'text-yellow-600 font-bold';
     return 'text-green-600 font-bold';
   };
 
   const getRiskScoreLabel = (score: number) => {
-    if (score >= 20) return 'Kritik';
     if (score >= 15) return 'Çok Yüksek';
     if (score >= 10) return 'Yüksek';
     if (score >= 5) return 'Orta';
@@ -804,8 +802,8 @@ export default function CollaborationPlanning() {
   const calculateRiskLevel = (score: number): string => {
     if (score <= 4) return 'LOW';
     if (score <= 9) return 'MEDIUM';
-    if (score <= 15) return 'HIGH';
-    return 'CRITICAL';
+    if (score <= 14) return 'HIGH';
+    return 'VERY_HIGH';
   };
 
   const getNextRiskCode = async (): Promise<string> => {

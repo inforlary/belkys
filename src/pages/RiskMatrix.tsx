@@ -39,15 +39,13 @@ const LIKELIHOOD_LABELS = ['Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok
 const IMPACT_LABELS = ['Çok Düşük', 'Düşük', 'Orta', 'Yüksek', 'Çok Yüksek'];
 
 function getCellColor(score: number): string {
-  if (score >= 20) return 'bg-gray-800 text-white';
-  if (score >= 15) return 'bg-red-500 text-white';
+  if (score >= 15) return 'bg-red-600 text-white';
   if (score >= 10) return 'bg-orange-500 text-white';
-  if (score >= 5) return 'bg-yellow-500 text-black';
+  if (score >= 5) return 'bg-yellow-400 text-gray-900';
   return 'bg-green-500 text-white';
 }
 
 function getRiskLevelLabel(score: number): string {
-  if (score >= 20) return 'Kritik';
   if (score >= 15) return 'Çok Yüksek';
   if (score >= 10) return 'Yüksek';
   if (score >= 5) return 'Orta';
@@ -55,7 +53,6 @@ function getRiskLevelLabel(score: number): string {
 }
 
 function getRiskLevelEmoji(score: number): string {
-  if (score >= 20) return '⬛';
   if (score >= 15) return '🔴';
   if (score >= 10) return '🟠';
   if (score >= 5) return '🟡';
@@ -155,13 +152,9 @@ export default function RiskMatrix() {
 
   const statistics = {
     total: filteredRisks.length,
-    critical: filteredRisks.filter(r => {
-      const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
-      return score >= 20;
-    }).length,
     veryHigh: filteredRisks.filter(r => {
       const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
-      return score >= 15 && score <= 19;
+      return score >= 15;
     }).length,
     high: filteredRisks.filter(r => {
       const score = viewMode === 'inherent' ? r.inherent_score : r.residual_score;
@@ -441,25 +434,12 @@ export default function RiskMatrix() {
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">⬛ Kritik (20-25)</span>
-                    <span className="text-gray-600">{statistics.critical} ({statistics.total > 0 ? Math.round((statistics.critical / statistics.total) * 100) : 0}%)</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-gray-800 h-2 rounded-full transition-all"
-                      style={{ width: `${statistics.total > 0 ? (statistics.critical / statistics.total) * 100 : 0}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">🔴 Çok Yüksek (15-19)</span>
+                    <span className="font-medium">🔴 Çok Yüksek (15-25)</span>
                     <span className="text-gray-600">{statistics.veryHigh} ({statistics.total > 0 ? Math.round((statistics.veryHigh / statistics.total) * 100) : 0}%)</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-red-500 h-2 rounded-full transition-all"
+                      className="bg-red-600 h-2 rounded-full transition-all"
                       style={{ width: `${statistics.total > 0 ? (statistics.veryHigh / statistics.total) * 100 : 0}%` }}
                     />
                   </div>
@@ -485,7 +465,7 @@ export default function RiskMatrix() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-yellow-500 h-2 rounded-full transition-all"
+                      className="bg-yellow-400 h-2 rounded-full transition-all"
                       style={{ width: `${statistics.total > 0 ? (statistics.medium / statistics.total) * 100 : 0}%` }}
                     />
                   </div>

@@ -31,20 +31,18 @@ export function RiskHeatMap({ risks, type }: RiskHeatMapProps) {
 
   const getRiskColor = (likelihood: number, impact: number) => {
     const score = likelihood * impact;
-    if (score >= 20) return 'bg-red-600';
-    if (score >= 15) return 'bg-red-500';
+    if (score >= 15) return 'bg-red-600';
     if (score >= 10) return 'bg-orange-500';
-    if (score >= 5) return 'bg-yellow-500';
+    if (score >= 5) return 'bg-yellow-400';
     return 'bg-green-500';
   };
 
   const getRiskLevel = (likelihood: number, impact: number) => {
     const score = likelihood * impact;
-    if (score >= 20) return 'Kritik';
-    if (score >= 15) return 'Yüksek';
-    if (score >= 10) return 'Orta';
-    if (score >= 5) return 'Düşük';
-    return 'Çok Düşük';
+    if (score >= 15) return 'Çok Yüksek';
+    if (score >= 10) return 'Yüksek';
+    if (score >= 5) return 'Orta';
+    return 'Düşük';
   };
 
   return (
@@ -141,23 +139,19 @@ export function RiskHeatMap({ risks, type }: RiskHeatMapProps) {
       <div className="mt-4 flex gap-4 justify-center flex-wrap">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-600 rounded"></div>
-          <span className="text-xs text-gray-600">Kritik (20-25)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-red-500 rounded"></div>
-          <span className="text-xs text-gray-600">Yüksek (15-19)</span>
+          <span className="text-xs text-gray-600">Çok Yüksek (15-25)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-orange-500 rounded"></div>
-          <span className="text-xs text-gray-600">Orta (10-14)</span>
+          <span className="text-xs text-gray-600">Yüksek (10-14)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-          <span className="text-xs text-gray-600">Düşük (5-9)</span>
+          <div className="w-4 h-4 bg-yellow-400 rounded"></div>
+          <span className="text-xs text-gray-600">Orta (5-9)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-green-500 rounded"></div>
-          <span className="text-xs text-gray-600">Çok Düşük (1-4)</span>
+          <span className="text-xs text-gray-600">Düşük (1-4)</span>
         </div>
       </div>
     </div>
