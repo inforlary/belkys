@@ -662,6 +662,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
           const currentValue = calculateCurrentValue(indicator);
           const progress = calculateProgress(indicator);
           const latestLabel = getLatestEntryLabel(indicator);
+      console.log('indicator:', indicator);
 
           return (
             <div key={indicator.id} className="bg-white rounded-lg border border-gray-200 p-4">
