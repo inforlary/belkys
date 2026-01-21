@@ -150,27 +150,56 @@ export default function RiskTreatments() {
         supabase
           .from('ic_standards')
           .select('id, code, name')
-          .is('organization_id', null)
+          .or(`organization_id.is.null,organization_id.eq.${profile?.organization_id}`)
           .order('code'),
 
         supabase
           .from('ic_actions')
           .select('id, code, title, standard_id')
-          .eq('organization_id', profile?.organization_id)
+          .or(`organization_id.is.null,organization_id.eq.${profile?.organization_id}`)
           .order('code')
       ]);
 
-      if (treatmentsRes.error) throw treatmentsRes.error;
-      if (risksRes.error) throw risksRes.error;
-      if (departmentsRes.error) throw departmentsRes.error;
-      if (icStandardsRes.error) throw icStandardsRes.error;
-      if (icActionsRes.error) throw icActionsRes.error;
+      if (treatmentsRes.error) {
+        console.error('Faaliyetler yüklenirken hata:', treatmentsRes.error);
+        throw treatmentsRes.error;
+      }
+      if (risksRes.error) {
+        console.error('Riskler yüklenirken hata:', risksRes.error);
+        throw risksRes.error;
+      }
+      if (departmentsRes.error) {
+        console.error('Birimler yüklenirken hata:', departmentsRes.error);
+        throw departmentsRes.error;
+      }
+      if (icStandardsRes.error) {
+        console.error('İç Kontrol Standartları yüklenirken hata:', icStandardsRes.error);
+        throw icStandardsRes.error;
+      }
+      if (icActionsRes.error) {
+        console.error('İç Kontrol Eylemleri yüklenirken hata:', icActionsRes.error);
+        throw icActionsRes.error;
+      }
 
-      setTreatments(treatmentsRes.data || []);
-      setRisks(risksRes.data || []);
-      setDepartments(departmentsRes.data || []);
-      setIcStandards(icStandardsRes.data || []);
-      setIcActions(icActionsRes.data || []);
+      const treatments = treatmentsRes.data || [];
+      const risks = risksRes.data || [];
+      const departments = departmentsRes.data || [];
+      const icStandards = icStandardsRes.data || [];
+      const icActions = icActionsRes.data || [];
+
+      console.log('Yüklenen veriler:', {
+        treatments: treatments.length,
+        risks: risks.length,
+        departments: departments.length,
+        icStandards: icStandards.length,
+        icActions: icActions.length
+      });
+
+      setTreatments(treatments);
+      setRisks(risks);
+      setDepartments(departments);
+      setIcStandards(icStandards);
+      setIcActions(icActions);
     } catch (error) {
       console.error('Veriler yüklenirken hata:', error);
     } finally {
@@ -839,6 +868,11 @@ export default function RiskTreatments() {
                 <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
               ))}
             </select>
+            {risks.length === 0 && (
+              <p className="text-xs text-yellow-600 mt-1">
+                ⚠ Henüz risk tanımlanmamış. Lütfen önce Risk Kaydı sayfasından risk ekleyin.
+              </p>
+            )}
             {formData.risk_id && formData.responsible_department_id && !editingTreatment && (
               <p className="text-xs text-green-600 mt-1">
                 ✓ Sorumlu birim otomatik olarak yüklendi
@@ -896,6 +930,11 @@ export default function RiskTreatments() {
                 <option key={dept.id} value={dept.id}>{dept.name}</option>
               ))}
             </select>
+            {departments.length === 0 && (
+              <p className="text-xs text-yellow-600 mt-1">
+                ⚠ Birim bulunamadı. Lütfen sistem yöneticisi ile iletişime geçin.
+              </p>
+            )}
           </div>
 
           <div>
@@ -970,6 +1009,11 @@ export default function RiskTreatments() {
                         </option>
                       ))}
                     </select>
+                    {icStandards.length === 0 && (
+                      <p className="text-xs text-yellow-600 mt-1">
+                        ⚠ İç kontrol standartları yüklenemedi. Lütfen sayfayı yenileyin.
+                      </p>
+                    )}
                   </div>
 
                   {formData.ic_standard_id && (
