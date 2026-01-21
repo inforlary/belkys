@@ -15,6 +15,7 @@ interface Indicator {
   baseline_value: number | null;
   calculation_method?: string;
   calculation_notes?: string;
+  yearly_target?: number | null;
   goal?: {
     title: string;
     code: string;
@@ -69,7 +70,7 @@ export default function DataEntry() {
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) {
@@ -103,6 +104,10 @@ export default function DataEntry() {
             title,
             code,
             department_id
+          ),
+          indicator_targets!left(
+            target_value,
+            year
           )
         `)
         .eq('organization_id', profile.organization_id)
@@ -135,14 +140,18 @@ export default function DataEntry() {
       if (entriesRes.error) throw entriesRes.error;
       if (activationsRes.error) throw activationsRes.error;
 
-      const mappedIndicators = indicatorsRes.data?.map(ind => ({
-        ...ind,
-        goal: ind.goals ? {
-          title: ind.goals.title,
-          code: ind.goals.code,
-          department_id: ind.goals.department_id
-        } : undefined
-      })) || [];
+      const mappedIndicators = indicatorsRes.data?.map(ind => {
+        const yearTarget = ind.indicator_targets?.find((t: any) => t.year === selectedYear);
+        return {
+          ...ind,
+          yearly_target: yearTarget?.target_value || ind.target_value,
+          goal: ind.goals ? {
+            title: ind.goals.title,
+            code: ind.goals.code,
+            department_id: ind.goals.department_id
+          } : undefined
+        };
+      }) || [];
 
       console.log('Loaded indicators:', mappedIndicators.map(i => ({
         code: i.code,
@@ -585,7 +594,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
     return calculateIndicatorProgress(
       {
         ...indicator,
-        yearly_target: indicator.target_value,
+        yearly_target: getIndicatorTarget(indicator),
         current_value: calculateCurrentValue(indicator)
       },
       dataEntriesForIndicator
@@ -679,7 +688,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
                   </div>
                   <div className="text-right space-y-1">
                     <div className="text-sm text-slate-700">
-                      <span className="font-medium">Hedef ({indicator.target_year || selectedYear}):</span> {indicator.target_value?.toLocaleString('tr-TR') || '-'} {indicator.unit}
+                      <span className="font-medium">Hedef ({selectedYear}):</span> {getIndicatorTarget(indicator)?.toLocaleString('tr-TR') || '-'} {indicator.unit}
                     </div>
                     <div className="text-sm text-slate-600">
                       <span className="font-medium">Başlangıç:</span> {indicator.baseline_value?.toLocaleString('tr-TR') || '-'} {indicator.unit}
