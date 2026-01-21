@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from '../hooks/useLocation';
 import { Plus, X, Save, Trash2, Users, Banknote, FileText, Target, AlertTriangle, Search, Lightbulb, ChevronDown, ChevronRight, FileDown, Edit, Shield, TrendingDown, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -108,6 +109,7 @@ interface RiskControl {
 
 export default function CollaborationPlanning() {
   const { user, profile } = useAuth();
+  const { navigate } = useLocation();
   const [plans, setPlans] = useState<CollaborationPlan[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -618,7 +620,7 @@ export default function CollaborationPlanning() {
       planTitle: plan.title
     });
 
-    navigate(`risk-register-new?${params.toString()}`);
+    navigate(`/risk-management/risks/new?${params.toString()}`);
   };
 
   const handleTransferRisk = async () => {
