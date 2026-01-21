@@ -5,6 +5,7 @@ import { Download, TrendingUp, TrendingDown, Minus, FileText, ArrowUpDown, X } f
 import { exportToExcel } from '../../utils/exportHelpers';
 import { generatePerformanceDashboardPDF } from '../../utils/reportPDFGenerators';
 import Modal from '../ui/Modal';
+import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 
 interface DepartmentPerformance {
   department_id: string;
@@ -118,7 +119,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
             const { data: indicators } = await supabase
               .from('indicators')
-              .select('id')
+              .select('id, calculation_method')
               .eq('organization_id', profile.organization_id)
               .in('goal_id', goalIds);
 
@@ -139,29 +140,38 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             const [entriesResult, targetsResult] = await Promise.all([
               supabase
                 .from('indicator_data_entries')
-                .select('indicator_id, value')
+                .select('indicator_id, value, period_quarter')
                 .eq('organization_id', profile.organization_id)
                 .eq('period_year', currentYear)
                 .in('status', ['approved', 'submitted'])
-                .in('indicator_id', indicatorIds),
+                .in('indicator_id', indicatorIds)
+                .order('period_quarter', { ascending: true }),
               supabase
                 .from('indicator_targets')
-                .select('indicator_id, target_value')
+                .select('indicator_id, target_value, baseline_value')
                 .eq('year', currentYear)
                 .in('indicator_id', indicatorIds),
             ]);
 
-            const entriesByIndicator: Record<string, number> = {};
+            const entriesByIndicator: Record<string, number[]> = {};
             entriesResult.data?.forEach(entry => {
               if (!entriesByIndicator[entry.indicator_id]) {
-                entriesByIndicator[entry.indicator_id] = 0;
+                entriesByIndicator[entry.indicator_id] = [];
               }
-              entriesByIndicator[entry.indicator_id] += entry.value;
+              entriesByIndicator[entry.indicator_id].push(entry.value || 0);
             });
 
-            const targetsByIndicator: Record<string, number> = {};
+            const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
             targetsResult.data?.forEach(target => {
-              targetsByIndicator[target.indicator_id] = target.target_value;
+              targetsByIndicator[target.indicator_id] = {
+                target: target.target_value,
+                baseline: target.baseline_value || 0,
+              };
+            });
+
+            const indicatorMethodMap: Record<string, CalculationMethod> = {};
+            indicators.forEach(ind => {
+              indicatorMethodMap[ind.id] = (ind.calculation_method || 'standard') as CalculationMethod;
             });
 
             let totalProgress = 0;
@@ -171,10 +181,19 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             let validCount = 0;
 
             indicatorIds.forEach(id => {
-              const target = targetsByIndicator[id];
-              if (target && target > 0) {
-                const current = entriesByIndicator[id] || 0;
-                const progress = (current / target) * 100;
+              const targetData = targetsByIndicator[id];
+              if (targetData && targetData.target > 0) {
+                const periodValues = entriesByIndicator[id] || [];
+                const calculationMethod = indicatorMethodMap[id];
+
+                const progress = calculatePerformancePercentage({
+                  method: calculationMethod,
+                  baselineValue: targetData.baseline,
+                  targetValue: targetData.target,
+                  periodValues: periodValues,
+                  currentValue: 0,
+                });
+
                 totalProgress += progress;
                 validCount++;
 
@@ -254,7 +273,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
       const { data: indicators } = await supabase
         .from('indicators')
-        .select('id, name, code')
+        .select('id, name, code, calculation_method')
         .eq('organization_id', profile.organization_id)
         .in('goal_id', goalIds);
 
@@ -268,38 +287,59 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
       const [entriesResult, targetsResult] = await Promise.all([
         supabase
           .from('indicator_data_entries')
-          .select('indicator_id, value')
+          .select('indicator_id, value, period_quarter')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
           .in('status', ['approved', 'submitted'])
-          .in('indicator_id', indicatorIds),
+          .in('indicator_id', indicatorIds)
+          .order('period_quarter', { ascending: true }),
         supabase
           .from('indicator_targets')
-          .select('indicator_id, target_value')
+          .select('indicator_id, target_value, baseline_value')
           .eq('year', currentYear)
           .in('indicator_id', indicatorIds),
       ]);
 
-      const entriesByIndicator: Record<string, number> = {};
+      const entriesByIndicator: Record<string, number[]> = {};
       entriesResult.data?.forEach(entry => {
         if (!entriesByIndicator[entry.indicator_id]) {
-          entriesByIndicator[entry.indicator_id] = 0;
+          entriesByIndicator[entry.indicator_id] = [];
         }
-        entriesByIndicator[entry.indicator_id] += entry.value;
+        entriesByIndicator[entry.indicator_id].push(entry.value || 0);
       });
 
-      const targetsByIndicator: Record<string, number> = {};
+      const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
       targetsResult.data?.forEach(target => {
-        targetsByIndicator[target.indicator_id] = target.target_value;
+        targetsByIndicator[target.indicator_id] = {
+          target: target.target_value,
+          baseline: target.baseline_value || 0,
+        };
       });
 
       const details: IndicatorDetail[] = [];
 
       indicators.forEach(indicator => {
-        const target = targetsByIndicator[indicator.id];
-        if (target && target > 0) {
-          const current = entriesByIndicator[indicator.id] || 0;
-          const progress = (current / target) * 100;
+        const targetData = targetsByIndicator[indicator.id];
+        if (targetData && targetData.target > 0) {
+          const periodValues = entriesByIndicator[indicator.id] || [];
+          const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
+
+          const sum = periodValues.reduce((acc, val) => acc + val, 0);
+          let currentValue = sum;
+
+          if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+            currentValue = targetData.baseline + sum;
+          } else if (calculationMethod === 'decreasing') {
+            currentValue = targetData.baseline - sum;
+          }
+
+          const progress = calculatePerformancePercentage({
+            method: calculationMethod,
+            baselineValue: targetData.baseline,
+            targetValue: targetData.target,
+            periodValues: periodValues,
+            currentValue: currentValue,
+          });
 
           let indicatorStatus: 'on_track' | 'at_risk' | 'behind';
           if (progress >= 70) indicatorStatus = 'on_track';
@@ -311,8 +351,8 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
               id: indicator.id,
               name: indicator.name,
               code: indicator.code || '',
-              current_value: current,
-              target_value: target,
+              current_value: currentValue,
+              target_value: targetData.target,
               progress: progress,
               status: indicatorStatus,
             });
