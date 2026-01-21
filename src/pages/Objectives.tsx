@@ -110,7 +110,7 @@ export default function Objectives() {
           .select('indicator_id, value, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', selectedYear)
-          .in('status', ['approved', 'submitted'])
+          .eq('status', 'approved')
       ]);
 
       if (objectivesRes.error) throw objectivesRes.error;

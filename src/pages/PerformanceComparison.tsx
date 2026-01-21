@@ -122,7 +122,7 @@ export default function PerformanceComparison() {
           .select('indicator_id, period_year, period_quarter, value, status')
           .eq('organization_id', profile.organization_id)
           .in('period_year', activeYears)
-          .in('status', ['approved', 'submitted'])
+          .eq('status', 'approved')
       ]);
 
       if (goalsRes.error) throw goalsRes.error;

@@ -93,7 +93,7 @@ export default function MyGoals() {
           .select('indicator_id, period_quarter, value, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', selectedYear)
-          .in('status', ['approved', 'submitted']),
+          .eq('status', 'approved'),
         supabase
           .from('indicator_targets')
           .select('indicator_id, year, target_value')

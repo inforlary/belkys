@@ -138,7 +138,7 @@ export async function getIndicatorPeriodValues(
     .eq('indicator_id', indicatorId)
     .eq('period_year', year)
     .eq('organization_id', organizationId)
-    .in('status', ['approved', 'submitted'])
+    .eq('status', 'approved')
     .order('period_quarter', { ascending: true });
 
   if (error) {

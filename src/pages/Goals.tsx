@@ -181,7 +181,7 @@ export default function Goals() {
           .select('indicator_id, value, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', selectedYear)
-          .in('status', ['approved', 'submitted']),
+          .eq('status', 'approved'),
         supabase
           .from('risks')
           .select('id, goal_id, residual_score, status')

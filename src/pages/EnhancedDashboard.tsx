@@ -146,7 +146,7 @@ export default function EnhancedDashboard() {
       supabase.from('activities').select('id', { count: 'exact', head: true }).eq('organization_id', profile.organization_id).lt('end_date', new Date().toISOString()).neq('status', 'completed'),
       supabase.from('indicators').select('id, baseline_value, target_value, calculation_method').eq('organization_id', profile.organization_id),
       supabase.from('indicator_targets').select('indicator_id, target_value').eq('year', currentYear),
-      supabase.from('indicator_data_entries').select('indicator_id, value, status').eq('organization_id', profile.organization_id).eq('period_year', currentYear).in('status', ['approved', 'submitted'])
+      supabase.from('indicator_data_entries').select('indicator_id, value, status').eq('organization_id', profile.organization_id).eq('period_year', currentYear).eq('status', 'approved')
     ]);
 
     let avgAchievement = 0;
@@ -266,7 +266,7 @@ export default function EnhancedDashboard() {
           .eq('organization_id', profile.organization_id)
           .eq('goals.department_id', dept.id),
         supabase.from('indicator_targets').select('indicator_id, target_value').eq('year', new Date().getFullYear()),
-        supabase.from('indicator_data_entries').select('indicator_id, value, status').eq('organization_id', profile.organization_id).eq('period_year', new Date().getFullYear()).in('status', ['approved', 'submitted'])
+        supabase.from('indicator_data_entries').select('indicator_id, value, status').eq('organization_id', profile.organization_id).eq('period_year', new Date().getFullYear()).eq('status', 'approved')
       ]);
 
       const deptIndicators = indicatorsDataRes.data || [];

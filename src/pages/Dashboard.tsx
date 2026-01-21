@@ -93,7 +93,7 @@ export default function Dashboard() {
           .select('indicator_id, value, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
-          .in('status', ['approved', 'submitted'])
+          .eq('status', 'approved')
       ]);
 
       let avgAchievement = 0;

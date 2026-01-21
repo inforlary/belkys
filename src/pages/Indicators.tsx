@@ -190,7 +190,7 @@ export default function Indicators() {
           .select('indicator_id, value, status, period_year')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', selectedYear)
-          .in('status', ['approved', 'submitted']),
+          .eq('status', 'approved'),
         supabase
           .from('indicator_targets')
           .select(`

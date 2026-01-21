@@ -32,7 +32,7 @@ export function calculateIndicatorProgress(
 
   const indicatorEntries = dataEntries.filter(
     e => e.indicator_id === indicator.id &&
-    (e.status === 'approved' || e.status === 'submitted')
+    e.status === 'approved'
   );
 
   if (indicatorEntries.length === 0) return 0;

@@ -101,7 +101,7 @@ export default function DepartmentPerformance({ selectedYear }: DepartmentPerfor
                 .select('indicator_id, value, status')
                 .eq('organization_id', profile.organization_id)
                 .eq('period_year', currentYear)
-                .in('status', ['approved', 'submitted'])
+                .eq('status', 'approved')
                 .in('indicator_id', indicatorIds),
               supabase
                 .from('indicator_targets')
