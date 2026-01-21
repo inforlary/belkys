@@ -257,8 +257,53 @@ export default function PerformanceKPIDashboard() {
     return { onTarget, atRisk, behind };
   };
 
+  const getGroupedByGoal = () => {
+    const grouped: Record<string, {
+      goal: Goal;
+      department?: Department;
+      indicators: IndicatorData[];
+      onTarget: IndicatorData[];
+      atRisk: IndicatorData[];
+      behind: IndicatorData[];
+      avgProgress: number;
+    }> = {};
+
+    filteredIndicators.forEach(indicator => {
+      const goalId = indicator.goal_id;
+      if (!grouped[goalId]) {
+        grouped[goalId] = {
+          goal: indicator.goal!,
+          department: indicator.department,
+          indicators: [],
+          onTarget: [],
+          atRisk: [],
+          behind: []
+        } as any;
+      }
+
+      grouped[goalId].indicators.push(indicator);
+
+      if ((indicator.achievement_rate || 0) >= 85) {
+        grouped[goalId].onTarget.push(indicator);
+      } else if ((indicator.achievement_rate || 0) >= 50) {
+        grouped[goalId].atRisk.push(indicator);
+      } else {
+        grouped[goalId].behind.push(indicator);
+      }
+    });
+
+    Object.values(grouped).forEach(group => {
+      const total = group.indicators.length;
+      const sum = group.indicators.reduce((acc, i) => acc + (i.achievement_rate || 0), 0);
+      group.avgProgress = total > 0 ? sum / total : 0;
+    });
+
+    return Object.values(grouped).sort((a, b) => b.avgProgress - a.avgProgress);
+  };
+
   const stats = getSummaryStats();
   const categorizedIndicators = getCategorizedIndicators();
+  const groupedByGoal = getGroupedByGoal();
 
   if (loading) {
     return (
@@ -386,200 +431,180 @@ export default function PerformanceKPIDashboard() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {categorizedIndicators.onTarget.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Hedefte Olan Göstergeler
-                </h2>
-                <span className="text-sm text-gray-500">({categorizedIndicators.onTarget.length})</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {categorizedIndicators.onTarget.map((indicator) => (
-                  <Card key={indicator.id} className="hover:shadow-lg transition-shadow border-l-4 border-green-500">
-                    <CardBody>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
-                          <h3 className="font-semibold text-gray-900 text-sm line-clamp-2">{indicator.name}</h3>
-                        </div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          %{indicator.achievement_rate?.toFixed(1)}
-                        </span>
+          {groupedByGoal.map((group, index) => (
+            <Card key={group.goal.id} className="overflow-hidden">
+              <CardBody className="p-0">
+                <div className="bg-gradient-to-r from-amber-50 to-amber-100 border-b border-amber-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-gray-900">{index + 1}</span>
+                        <h2 className="text-lg font-bold text-gray-900">
+                          {group.goal.code} - {group.goal.title}
+                        </h2>
                       </div>
+                      <div className="text-sm text-gray-600">
+                        {group.indicators.length} gösterge
+                        {group.department && ` • ${group.department.name}`}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-amber-700">
+                        {Math.round(group.avgProgress)}%
+                      </div>
+                      <div className="text-xs text-gray-600">Ortalama İlerleme</div>
+                    </div>
+                  </div>
 
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Hedef</span>
-                          <span className="font-semibold text-gray-900">
-                            {indicator.target_value?.toLocaleString('tr-TR') || '-'} {indicator.measurement_unit}
-                          </span>
-                        </div>
+                  <div className="mt-4 w-full bg-gray-300 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all"
+                      style={{ width: `${Math.min(group.avgProgress, 100)}%` }}
+                    />
+                  </div>
+                </div>
 
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Gerçekleşen</span>
-                          <span className="font-semibold text-gray-900">
-                            {indicator.latest_value?.toLocaleString('tr-TR') || '-'} {indicator.measurement_unit}
-                          </span>
-                        </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-gray-700">Hedefte</span>
+                      </div>
+                      <div className="text-2xl font-bold text-green-700">{group.onTarget.length}</div>
+                    </div>
 
-                        <div className="space-y-1">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="h-2 rounded-full transition-all bg-green-500"
-                              style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }}
-                            />
-                          </div>
-                        </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                        <span className="text-sm font-medium text-gray-700">Risk Altında</span>
+                      </div>
+                      <div className="text-2xl font-bold text-yellow-700">{group.atRisk.length}</div>
+                    </div>
 
-                        <div className="pt-2 border-t border-gray-100">
-                          <div className="text-xs text-gray-500">
-                            {indicator.goal?.code} - {indicator.goal?.title}
-                          </div>
-                          {indicator.department && (
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {indicator.department.name}
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <XCircle className="w-4 h-4 text-red-600" />
+                        <span className="text-sm font-medium text-gray-700">Geride</span>
+                      </div>
+                      <div className="text-2xl font-bold text-red-700">{group.behind.length}</div>
+                    </div>
+                  </div>
+
+                  {group.onTarget.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Hedefte Olan Göstergeler ({group.onTarget.length})
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {group.onTarget.map((indicator) => (
+                          <div key={indicator.id} className="bg-white border-l-4 border-green-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
+                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name}</h4>
+                              </div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
+                                %{indicator.achievement_rate?.toFixed(1)}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {categorizedIndicators.atRisk.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Risk Altında Olan Göstergeler
-                </h2>
-                <span className="text-sm text-gray-500">({categorizedIndicators.atRisk.length})</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {categorizedIndicators.atRisk.map((indicator) => (
-                  <Card key={indicator.id} className="hover:shadow-lg transition-shadow border-l-4 border-yellow-500">
-                    <CardBody>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
-                          <h3 className="font-semibold text-gray-900 text-sm line-clamp-2">{indicator.name}</h3>
-                        </div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          %{indicator.achievement_rate?.toFixed(1)}
-                        </span>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Hedef</span>
-                          <span className="font-semibold text-gray-900">
-                            {indicator.target_value?.toLocaleString('tr-TR') || '-'} {indicator.measurement_unit}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Gerçekleşen</span>
-                          <span className="font-semibold text-gray-900">
-                            {indicator.latest_value?.toLocaleString('tr-TR') || '-'} {indicator.measurement_unit}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="h-2 rounded-full transition-all bg-yellow-500"
-                              style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-gray-100">
-                          <div className="text-xs text-gray-500">
-                            {indicator.goal?.code} - {indicator.goal?.title}
-                          </div>
-                          {indicator.department && (
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {indicator.department.name}
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Hedef:</span>
+                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Gerçekleşen:</span>
+                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                <div className="h-1.5 rounded-full bg-green-500" style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }} />
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {categorizedIndicators.behind.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <XCircle className="w-5 h-5 text-red-600" />
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Geride Olan Göstergeler
-                </h2>
-                <span className="text-sm text-gray-500">({categorizedIndicators.behind.length})</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {categorizedIndicators.behind.map((indicator) => (
-                  <Card key={indicator.id} className="hover:shadow-lg transition-shadow border-l-4 border-red-500">
-                    <CardBody>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
-                          <h3 className="font-semibold text-gray-900 text-sm line-clamp-2">{indicator.name}</h3>
-                        </div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          %{indicator.achievement_rate?.toFixed(1)}
-                        </span>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Hedef</span>
-                          <span className="font-semibold text-gray-900">
-                            {indicator.target_value?.toLocaleString('tr-TR') || '-'} {indicator.measurement_unit}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Gerçekleşen</span>
-                          <span className="font-semibold text-gray-900">
-                            {indicator.latest_value?.toLocaleString('tr-TR') || '-'} {indicator.measurement_unit}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="h-2 rounded-full transition-all bg-red-500"
-                              style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }}
-                            />
                           </div>
-                        </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                        <div className="pt-2 border-t border-gray-100">
-                          <div className="text-xs text-gray-500">
-                            {indicator.goal?.code} - {indicator.goal?.title}
-                          </div>
-                          {indicator.department && (
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {indicator.department.name}
+                  {group.atRisk.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Risk Altında Olan Göstergeler ({group.atRisk.length})
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {group.atRisk.map((indicator) => (
+                          <div key={indicator.id} className="bg-white border-l-4 border-yellow-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
+                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name}</h4>
+                              </div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">
+                                %{indicator.achievement_rate?.toFixed(1)}
+                              </span>
                             </div>
-                          )}
-                        </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Hedef:</span>
+                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Gerçekleşen:</span>
+                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                <div className="h-1.5 rounded-full bg-yellow-500" style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
+                    </div>
+                  )}
+
+                  {group.behind.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
+                        <XCircle className="w-4 h-4" />
+                        Geride Olan Göstergeler ({group.behind.length})
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {group.behind.map((indicator) => (
+                          <div key={indicator.id} className="bg-white border-l-4 border-red-500 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code}</div>
+                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{indicator.name}</h4>
+                              </div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 ml-2">
+                                %{indicator.achievement_rate?.toFixed(1)}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Hedef:</span>
+                                <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Gerçekleşen:</span>
+                                <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR')} {indicator.measurement_unit}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                <div className="h-1.5 rounded-full bg-red-500" style={{ width: `${Math.min(indicator.achievement_rate || 0, 100)}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardBody>
+            </Card>
+          ))}
         </div>
       )}
 
