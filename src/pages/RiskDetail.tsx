@@ -939,8 +939,8 @@ export default function RiskDetail() {
                   <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                     <input
                       type="radio"
-                      value="PARTIAL"
-                      checked={formData.control_level === 'PARTIAL'}
+                      value="PARTIALLY_CONTROLLABLE"
+                      checked={formData.control_level === 'PARTIALLY_CONTROLLABLE'}
                       onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
                       className="w-4 h-4"
                     />
@@ -994,7 +994,7 @@ export default function RiskDetail() {
                 </div>
               )}
 
-              {formData.control_level === 'PARTIAL' && (
+              {formData.control_level === 'PARTIALLY_CONTROLLABLE' && (
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">

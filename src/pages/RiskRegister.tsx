@@ -186,7 +186,7 @@ function getRiskRelationBadge(relation: string) {
 function getControlLevelBadge(level: string) {
   const levelMap: Record<string, { color: string; emoji: string; label: string }> = {
     CONTROLLABLE: { color: 'bg-green-100 text-green-700', emoji: '✅', label: 'Kontrol Edilebilir' },
-    PARTIAL: { color: 'bg-yellow-100 text-yellow-700', emoji: '⚠️', label: 'Kısmen Kontrol' },
+    PARTIALLY_CONTROLLABLE: { color: 'bg-yellow-100 text-yellow-700', emoji: '⚠️', label: 'Kısmen Kontrol' },
     UNCONTROLLABLE: { color: 'bg-red-100 text-red-700', emoji: '❌', label: 'Kontrol Dışı' }
   };
   return levelMap[level] || levelMap['CONTROLLABLE'];
@@ -832,7 +832,7 @@ export default function RiskRegister() {
               >
                 <option value="">Tümü</option>
                 <option value="CONTROLLABLE">Kontrol Edilebilir</option>
-                <option value="PARTIAL">Kısmen Kontrol</option>
+                <option value="PARTIALLY_CONTROLLABLE">Kısmen Kontrol</option>
                 <option value="UNCONTROLLABLE">Kontrol Dışı</option>
               </select>
             </div>
@@ -1545,8 +1545,8 @@ export default function RiskRegister() {
                         <input
                           type="radio"
                           name="control_level"
-                          value="PARTIAL"
-                          checked={formData.control_level === 'PARTIAL'}
+                          value="PARTIALLY_CONTROLLABLE"
+                          checked={formData.control_level === 'PARTIALLY_CONTROLLABLE'}
                           onChange={(e) => setFormData({ ...formData, control_level: e.target.value })}
                           className="mt-1"
                         />

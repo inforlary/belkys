@@ -1773,8 +1773,8 @@ export default function CollaborationPlanning() {
                       <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-slate-200 hover:bg-slate-50">
                         <input
                           type="radio"
-                          value="PARTIAL"
-                          checked={transferFormData.control_level === 'PARTIAL'}
+                          value="PARTIALLY_CONTROLLABLE"
+                          checked={transferFormData.control_level === 'PARTIALLY_CONTROLLABLE'}
                           onChange={(e) => setTransferFormData(prev => ({ ...prev, control_level: e.target.value }))}
                           className="w-4 h-4"
                         />
@@ -1856,7 +1856,7 @@ export default function CollaborationPlanning() {
                 <div className="bg-white rounded-lg border border-slate-200 p-6">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">3. Sorumluluk</h3>
 
-                  {transferFormData.control_level === 'PARTIAL' && (
+                  {transferFormData.control_level === 'PARTIALLY_CONTROLLABLE' && (
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
