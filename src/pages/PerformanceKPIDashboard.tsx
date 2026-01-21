@@ -277,15 +277,17 @@ export default function PerformanceKPIDashboard() {
           indicators: [],
           onTarget: [],
           atRisk: [],
-          behind: []
-        } as any;
+          behind: [],
+          avgProgress: 0
+        };
       }
 
       grouped[goalId].indicators.push(indicator);
 
-      if ((indicator.achievement_rate || 0) >= 85) {
+      const achievementRate = indicator.achievement_rate || 0;
+      if (achievementRate >= 85) {
         grouped[goalId].onTarget.push(indicator);
-      } else if ((indicator.achievement_rate || 0) >= 50) {
+      } else if (achievementRate >= 50) {
         grouped[goalId].atRisk.push(indicator);
       } else {
         grouped[goalId].behind.push(indicator);
@@ -471,7 +473,7 @@ export default function PerformanceKPIDashboard() {
                         <CheckCircle className="w-4 h-4 text-green-600" />
                         <span className="text-sm font-medium text-gray-700">Hedefte</span>
                       </div>
-                      <div className="text-2xl font-bold text-green-700">{group.onTarget.length}</div>
+                      <div className="text-2xl font-bold text-green-700">{group.onTarget?.length || 0}</div>
                     </div>
 
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
@@ -479,7 +481,7 @@ export default function PerformanceKPIDashboard() {
                         <AlertTriangle className="w-4 h-4 text-yellow-600" />
                         <span className="text-sm font-medium text-gray-700">Risk Altında</span>
                       </div>
-                      <div className="text-2xl font-bold text-yellow-700">{group.atRisk.length}</div>
+                      <div className="text-2xl font-bold text-yellow-700">{group.atRisk?.length || 0}</div>
                     </div>
 
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -487,11 +489,11 @@ export default function PerformanceKPIDashboard() {
                         <XCircle className="w-4 h-4 text-red-600" />
                         <span className="text-sm font-medium text-gray-700">Geride</span>
                       </div>
-                      <div className="text-2xl font-bold text-red-700">{group.behind.length}</div>
+                      <div className="text-2xl font-bold text-red-700">{group.behind?.length || 0}</div>
                     </div>
                   </div>
 
-                  {group.onTarget.length > 0 && (
+                  {group.onTarget && group.onTarget.length > 0 && (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
@@ -528,7 +530,7 @@ export default function PerformanceKPIDashboard() {
                     </div>
                   )}
 
-                  {group.atRisk.length > 0 && (
+                  {group.atRisk && group.atRisk.length > 0 && (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4" />
@@ -565,7 +567,7 @@ export default function PerformanceKPIDashboard() {
                     </div>
                   )}
 
-                  {group.behind.length > 0 && (
+                  {group.behind && group.behind.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
                         <XCircle className="w-4 h-4" />
