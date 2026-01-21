@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Download, TrendingUp, TrendingDown, Minus, FileText } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, Minus, FileText, ArrowUpDown } from 'lucide-react';
 import { exportToExcel } from '../../utils/exportHelpers';
 import { generatePerformanceDashboardPDF } from '../../utils/reportPDFGenerators';
 
@@ -19,16 +19,46 @@ interface PerformanceDashboardProps {
   selectedYear?: number;
 }
 
+type SortOption = 'name-asc' | 'name-desc' | 'progress-desc' | 'progress-asc' | 'count-desc' | 'count-asc';
+
 export default function PerformanceDashboard({ selectedYear }: PerformanceDashboardProps) {
   const { profile } = useAuth();
   const [departments, setDepartments] = useState<DepartmentPerformance[]>([]);
+  const [sortedDepartments, setSortedDepartments] = useState<DepartmentPerformance[]>([]);
   const [overallProgress, setOverallProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<SortOption>('progress-desc');
   const currentYear = selectedYear || new Date().getFullYear();
 
   useEffect(() => {
     loadData();
   }, [profile, selectedYear]);
+
+  useEffect(() => {
+    sortDepartments();
+  }, [departments, sortBy]);
+
+  const sortDepartments = () => {
+    const sorted = [...departments].sort((a, b) => {
+      switch (sortBy) {
+        case 'name-asc':
+          return a.department_name.localeCompare(b.department_name, 'tr');
+        case 'name-desc':
+          return b.department_name.localeCompare(a.department_name, 'tr');
+        case 'progress-desc':
+          return b.avg_progress - a.avg_progress;
+        case 'progress-asc':
+          return a.avg_progress - b.avg_progress;
+        case 'count-desc':
+          return b.total_indicators - a.total_indicators;
+        case 'count-asc':
+          return a.total_indicators - b.total_indicators;
+        default:
+          return 0;
+      }
+    });
+    setSortedDepartments(sorted);
+  };
 
   const loadData = async () => {
     if (!profile?.organization_id) return;
@@ -167,7 +197,8 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
   };
 
   const handleExport = () => {
-    const exportData = departments.map(dept => ({
+    const exportData = sortedDepartments.map((dept, index) => ({
+      'Sıra': index + 1,
       'Birim': dept.department_name,
       'Gösterge Sayısı': dept.total_indicators,
       'Ortalama İlerleme (%)': Math.round(dept.avg_progress),
@@ -180,7 +211,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
   };
 
   const handlePDFExport = () => {
-    generatePerformanceDashboardPDF(departments, overallProgress);
+    generatePerformanceDashboardPDF(sortedDepartments, overallProgress);
   };
 
   if (loading) {
@@ -214,6 +245,23 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         </div>
       </div>
 
+      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-4">
+        <ArrowUpDown className="w-5 h-5 text-slate-500" />
+        <label className="text-sm font-medium text-slate-700">Sıralama:</label>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="progress-desc">İlerleme (Yüksekten Düşüğe)</option>
+          <option value="progress-asc">İlerleme (Düşükten Yükseğe)</option>
+          <option value="count-desc">Gösterge Sayısı (Yüksekten Düşüğe)</option>
+          <option value="count-asc">Gösterge Sayısı (Düşükten Yükseğe)</option>
+          <option value="name-asc">Birim Adı (A-Z)</option>
+          <option value="name-desc">Birim Adı (Z-A)</option>
+        </select>
+      </div>
+
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -230,22 +278,40 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         </div>
       </div>
 
-      {departments.length === 0 ? (
+      {sortedDepartments.length === 0 ? (
         <div className="text-center py-12 bg-slate-50 rounded-lg">
           <p className="text-slate-500">Henüz veri bulunmuyor</p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {departments.map((dept) => (
-            <div
-              key={dept.department_id}
-              className="bg-white border border-slate-200 rounded-lg p-6"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">{dept.department_name}</h3>
-                  <p className="text-sm text-slate-600">{dept.total_indicators} gösterge</p>
-                </div>
+          {sortedDepartments.map((dept, index) => {
+            const rank = index + 1;
+            const isTopThree = sortBy === 'progress-desc' && rank <= 3;
+            const rankColors = {
+              1: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+              2: 'bg-gray-100 text-gray-800 border-gray-300',
+              3: 'bg-orange-100 text-orange-800 border-orange-300'
+            };
+
+            return (
+              <div
+                key={dept.department_id}
+                className={`bg-white border rounded-lg p-6 ${
+                  isTopThree ? 'border-2 ' + (rankColors[rank as 1 | 2 | 3] || '') : 'border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                      isTopThree ? rankColors[rank as 1 | 2 | 3] : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {rank}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">{dept.department_name}</h3>
+                      <p className="text-sm text-slate-600">{dept.total_indicators} gösterge</p>
+                    </div>
+                  </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-blue-600">
                     {Math.round(dept.avg_progress)}%
@@ -283,8 +349,9 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                   <div className="text-xs text-slate-600">Geride</div>
                 </div>
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
