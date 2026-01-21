@@ -442,7 +442,7 @@ export default function RiskDetail() {
     try {
       const nextReviewDate = calculateNextReview(formData.last_review_date, formData.review_period);
 
-      const riskData = {
+      const riskData: any = {
         name: formData.name,
         description: formData.description,
         risk_source: formData.risk_source,
@@ -469,6 +469,12 @@ export default function RiskDetail() {
         next_review_date: nextReviewDate,
         status: submitForApproval ? 'PENDING_APPROVAL' : formData.status,
       };
+
+      if (submitForApproval) {
+        riskData.approval_status = 'IN_REVIEW';
+        riskData.submitted_at = new Date().toISOString();
+        riskData.submitted_by_id = profile?.id;
+      }
 
       const { error: riskError } = await supabase
         .from('risks')
