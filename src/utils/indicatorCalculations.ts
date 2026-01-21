@@ -84,19 +84,19 @@ export function calculatePerformancePercentage(params: CalculationParams): numbe
     }
 
     case 'percentage_decreasing': {
-      const average = sum / measurementFrequencyCount;
+      const average = sum / periodValues.length;
       const denominator = targetValue - baselineValue;
       if (denominator === 0) return 0;
       return ((average - baselineValue) / denominator) * 100;
     }
 
     case 'maintenance_increasing': {
-      return (sum / targetValue) * 100;
+      return (average / targetValue) * 100;
     }
 
     case 'maintenance_decreasing': {
       if (sum === 0) return 0;
-      return (targetValue / sum) * 100;
+      return (targetValue / average) * 100;
     }
 
     case 'percentage':
