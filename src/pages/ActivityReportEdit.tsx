@@ -388,7 +388,7 @@ export default function ActivityReportEdit() {
         .limit(1);
 
       const actualValue = entries && entries.length > 0 ? entries[0].actual_value : 0;
-      const targetValue = indicator.target_value || 0;
+      const targetValue = indicator.target_value !== null && indicator.target_value !== undefined ? indicator.target_value : 0;
       const rate = targetValue > 0 ? ((actualValue / targetValue) * 100).toFixed(2) : '0';
       const deviation = actualValue - targetValue;
       const deviationPercent = targetValue > 0 ? (((actualValue - targetValue) / targetValue) * 100).toFixed(2) : '0';

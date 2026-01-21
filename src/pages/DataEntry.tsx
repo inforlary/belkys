@@ -590,7 +590,13 @@ const getCurrentValueLabel = (indicator: Indicator) => {
 
 
 const getIndicatorTarget = (indicator: Indicator) => {
-    return indicator.yearly_target || indicator.target_value || 0;
+    if (indicator.yearly_target !== null && indicator.yearly_target !== undefined) {
+      return indicator.yearly_target;
+    }
+    if (indicator.target_value !== null && indicator.target_value !== undefined) {
+      return indicator.target_value;
+    }
+    return 0;
   };
 
   const getIndicatorBaseline = (indicator: Indicator) => {

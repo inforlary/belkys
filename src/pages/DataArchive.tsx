@@ -32,6 +32,7 @@ interface Indicator {
   name: string;
   unit: string;
   target_value: number | null;
+  yearly_target?: number | null;
   calculation_method: string;
   baseline_value?: number | null;
   measurement_frequency?: string;
@@ -190,7 +191,23 @@ export default function DataArchive() {
       if (objectivesRes.error) throw objectivesRes.error;
       if (entriesRes.error) throw entriesRes.error;
 
+      const targetsByIndicator: Record<string, number> = {};
+      targetsRes.data?.forEach(target => {
+        targetsByIndicator[target.indicator_id] = target.target_value;
+      });
+
       let filteredObjectives = objectivesRes.data || [];
+
+      filteredObjectives = filteredObjectives.map(obj => ({
+        ...obj,
+        goals: obj.goals.map(goal => ({
+          ...goal,
+          indicators: goal.indicators.map(ind => ({
+            ...ind,
+            yearly_target: targetsByIndicator[ind.id] !== undefined ? targetsByIndicator[ind.id] : null
+          }))
+        }))
+      }));
 
       if (profile.role !== 'admin' && goalIdsForUser.length > 0) {
         filteredObjectives = filteredObjectives.map(obj => ({
@@ -210,7 +227,13 @@ export default function DataArchive() {
     }
   };
 const getIndicatorTarget = (indicatorId: string, indicator: any) => {
-    return indicator.yearly_target || indicator.target_value || 0;
+    if (indicator.yearly_target !== null && indicator.yearly_target !== undefined) {
+      return indicator.yearly_target;
+    }
+    if (indicator.target_value !== null && indicator.target_value !== undefined) {
+      return indicator.target_value;
+    }
+    return 0;
   };
  const calculateCurrentValue = (indicator: Indicator) => {
     const indicatorEntries = entries.filter(

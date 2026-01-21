@@ -228,11 +228,11 @@ export default function MyGoals() {
         'Gösterge Adı': indicator.name,
         'Ölçüm Sıklığı': getFrequencyLabel(indicator.measurement_frequency),
         'Başlangıç Değeri': indicator.baseline_value || 0,
-        'Hedef Değer': indicator.yearly_target || 'Belirtilmemiş',
+        'Hedef Değer': indicator.yearly_target !== null && indicator.yearly_target !== undefined ? indicator.yearly_target : 'Belirtilmemiş',
         'Güncel Değer': getCurrentValue(indicator),
         'Birim': indicator.unit,
         'Veri Girişi': `${completedEntries}/${expectedEntries}`,
-        'Gerçekleşme (%)': indicator.yearly_target ? progress : 'Hedef Yok'
+        'Gerçekleşme (%)': indicator.yearly_target !== null && indicator.yearly_target !== undefined ? progress : 'Hedef Yok'
       };
     });
 
@@ -273,11 +273,11 @@ export default function MyGoals() {
         indicator.name,
         getFrequencyLabel(indicator.measurement_frequency),
         indicator.baseline_value || 0,
-        indicator.yearly_target || '-',
+        indicator.yearly_target !== null && indicator.yearly_target !== undefined ? indicator.yearly_target : '-',
         getCurrentValue(indicator),
         indicator.unit,
         `${completedEntries}/${expectedEntries}`,
-        indicator.yearly_target ? `${progress}%` : '-'
+        indicator.yearly_target !== null && indicator.yearly_target !== undefined ? `${progress}%` : '-'
       ];
     });
 

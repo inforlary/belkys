@@ -96,8 +96,8 @@ export default function PerformanceKPIDashboard() {
               .maybeSingle();
 
             const latestValue = entries?.actual_value || null;
-            const targetValue = indicator.target_value || 0;
-            const baselineValue = indicator.baseline_value || 0;
+            const targetValue = indicator.target_value !== null && indicator.target_value !== undefined ? indicator.target_value : 0;
+            const baselineValue = indicator.baseline_value !== null && indicator.baseline_value !== undefined ? indicator.baseline_value : 0;
 
             let achievementRate = 0;
             let status: 'excellent' | 'good' | 'warning' | 'critical' = 'critical';

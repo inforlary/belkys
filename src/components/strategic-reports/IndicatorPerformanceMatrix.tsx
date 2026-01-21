@@ -136,8 +136,8 @@ export default function IndicatorPerformanceMatrix() {
           }
 
           const latestValue = entries.year || entries.q4 || entries.q3 || entries.q2 || entries.q1;
-          const targetValue = indicator.target_value || 1;
-          const achievement = latestValue !== null ? (latestValue / targetValue) * 100 : 0;
+          const targetValue = (indicator.target_value !== null && indicator.target_value !== undefined) ? indicator.target_value : 1;
+          const achievement = latestValue !== null && targetValue !== 0 ? (latestValue / targetValue) * 100 : 0;
           const deviation = latestValue !== null ? latestValue - targetValue : 0;
 
           let trend: 'up' | 'down' | 'stable' = 'stable';

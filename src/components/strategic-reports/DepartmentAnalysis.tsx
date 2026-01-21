@@ -145,8 +145,8 @@ export default function DepartmentAnalysis() {
       .eq('status', 'approved');
 
     const totalAchievement = dataEntries?.reduce((sum, entry) => {
-      const target = entry.indicator?.target_value || 1;
-      return sum + ((entry.value / target) * 100);
+      const target = (entry.indicator?.target_value !== null && entry.indicator?.target_value !== undefined) ? entry.indicator.target_value : 1;
+      return sum + (target !== 0 ? (entry.value / target) * 100 : 0);
     }, 0) || 0;
 
     const avgAchievement = dataEntries?.length ? totalAchievement / dataEntries.length : 0;
@@ -201,8 +201,8 @@ export default function DepartmentAnalysis() {
         .eq('status', 'approved');
 
       const totalAchievement = data?.reduce((sum, entry) => {
-        const target = entry.indicator?.target_value || 1;
-        return sum + ((entry.value / target) * 100);
+        const target = (entry.indicator?.target_value !== null && entry.indicator?.target_value !== undefined) ? entry.indicator.target_value : 1;
+        return sum + (target !== 0 ? (entry.value / target) * 100 : 0);
       }, 0) || 0;
 
       const avgAchievement = data?.length ? totalAchievement / data.length : 0;
@@ -269,12 +269,13 @@ export default function DepartmentAnalysis() {
       }
 
       const latestValue = entries.year || entries.q4 || entries.q3 || entries.q2 || entries.q1 || 0;
-      const achievement = indicator.target_value ? (latestValue / indicator.target_value) * 100 : 0;
+      const targetValue = (indicator.target_value !== null && indicator.target_value !== undefined) ? indicator.target_value : 0;
+      const achievement = targetValue && targetValue !== 0 ? (latestValue / targetValue) * 100 : 0;
 
       performance.push({
         indicator: indicator.name,
         code: indicator.code || '-',
-        target: indicator.target_value || 0,
+        target: targetValue,
         ...entries,
         achievement: Math.round(achievement),
         status: achievement >= 80 ? 'good' : achievement >= 60 ? 'warning' : 'danger'
