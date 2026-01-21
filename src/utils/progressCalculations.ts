@@ -42,6 +42,7 @@ export function calculateIndicatorProgress(
   const average = sumOfEntries / periodCount;
   const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
 
+  const isMaintenanceMode = baselineValue === targetValue;
   let progress = 0;
 
   switch (calculationMethod) {
@@ -81,29 +82,34 @@ export function calculateIndicatorProgress(
     }
 
     case 'percentage_increasing': {
+      if (isMaintenanceMode && targetValue === 0) return 0;
       progress = (average / targetValue) * 100;
       break;
     }
 
     case 'percentage_decreasing': {
       if (average === 0) return 0;
+      if (isMaintenanceMode && targetValue === 0) return 0;
       progress = (targetValue / average) * 100;
       break;
     }
 
     case 'maintenance_increasing': {
+      if (isMaintenanceMode && targetValue === 0) return 0;
       progress = (average / targetValue) * 100;
       break;
     }
 
     case 'maintenance_decreasing': {
       if (average === 0) return 0;
+      if (isMaintenanceMode && targetValue === 0) return 0;
       progress = (targetValue / average) * 100;
       break;
     }
 
     case 'percentage':
     case 'maintenance': {
+      if (isMaintenanceMode && targetValue === 0) return 0;
       progress = (average / targetValue) * 100;
       break;
     }
