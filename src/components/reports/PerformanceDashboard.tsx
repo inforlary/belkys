@@ -94,41 +94,6 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     if (!profile?.organization_id) return;
 
     try {
-      // First get relevant strategic plans for the current year
-      const { data: relevantPlans } = await supabase
-        .from('strategic_plans')
-        .select('id')
-        .eq('organization_id', profile.organization_id)
-        .lte('start_year', currentYear)
-        .gte('end_year', currentYear);
-
-      if (!relevantPlans || relevantPlans.length === 0) {
-        setDepartments([]);
-        setOverallProgress(0);
-        setOverallStats(createEmptyStats());
-        setLoading(false);
-        return;
-      }
-
-      const planIds = relevantPlans.map(p => p.id);
-
-      // Get objectives for these plans
-      const { data: relevantObjectives } = await supabase
-        .from('objectives')
-        .select('id')
-        .eq('organization_id', profile.organization_id)
-        .in('strategic_plan_id', planIds);
-
-      if (!relevantObjectives || relevantObjectives.length === 0) {
-        setDepartments([]);
-        setOverallProgress(0);
-        setOverallStats(createEmptyStats());
-        setLoading(false);
-        return;
-      }
-
-      const objectiveIds = relevantObjectives.map(o => o.id);
-
       let deptsQuery = supabase
         .from('departments')
         .select('id, name')
@@ -148,8 +113,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
               .from('goals')
               .select('id')
               .eq('organization_id', profile.organization_id)
-              .eq('department_id', dept.id)
-              .in('objective_id', objectiveIds);
+              .eq('department_id', dept.id);
 
             if (!goals || goals.length === 0) {
               return {
@@ -197,7 +161,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 .select('indicator_id, value, period_quarter')
                 .eq('organization_id', profile.organization_id)
                 .eq('period_year', currentYear)
-                .in('status', ['approved', 'submitted'])
+                .eq('status', 'approved')
                 .in('indicator_id', indicatorIds)
                 .order('period_quarter', { ascending: true }),
               supabase
@@ -328,42 +292,10 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     setLoadingIndicators(true);
 
     try {
-      // First get relevant strategic plans for the current year
-      const { data: relevantPlans } = await supabase
-        .from('strategic_plans')
-        .select('id')
-        .eq('organization_id', profile.organization_id)
-        .lte('start_year', currentYear)
-        .gte('end_year', currentYear);
-
-      if (!relevantPlans || relevantPlans.length === 0) {
-        setIndicatorDetails([]);
-        setLoadingIndicators(false);
-        return;
-      }
-
-      const planIds = relevantPlans.map(p => p.id);
-
-      // Get objectives for these plans
-      const { data: relevantObjectives } = await supabase
-        .from('objectives')
-        .select('id')
-        .eq('organization_id', profile.organization_id)
-        .in('strategic_plan_id', planIds);
-
-      if (!relevantObjectives || relevantObjectives.length === 0) {
-        setIndicatorDetails([]);
-        setLoadingIndicators(false);
-        return;
-      }
-
-      const objectiveIds = relevantObjectives.map(o => o.id);
-
       let goalsQuery = supabase
         .from('goals')
         .select('id')
-        .eq('organization_id', profile.organization_id)
-        .in('objective_id', objectiveIds);
+        .eq('organization_id', profile.organization_id);
 
       if (dept) {
         goalsQuery = goalsQuery.eq('department_id', dept.department_id);
@@ -399,7 +331,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
           .select('indicator_id, value, period_quarter')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
-          .in('status', ['approved', 'submitted'])
+          .eq('status', 'approved')
           .in('indicator_id', indicatorIds)
           .order('period_quarter', { ascending: true }),
         supabase

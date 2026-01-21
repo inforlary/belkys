@@ -165,7 +165,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             .from('indicator_data_entries')
             .select('indicator_id, period_quarter, value, status, notes')
             .eq('period_year', currentYear)
-            .in('status', ['approved', 'submitted'])
+            .eq('status', 'approved')
             .in('indicator_id', indicatorIds),
           supabase
             .from('indicator_targets')

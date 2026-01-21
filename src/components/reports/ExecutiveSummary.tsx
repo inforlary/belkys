@@ -197,7 +197,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           .select('indicator_id, value, period_quarter')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
-          .in('status', ['approved', 'submitted'])
+          .eq('status', 'approved')
           .in('indicator_id', indicatorIds)
           .order('period_quarter', { ascending: true }),
         supabase
@@ -431,7 +431,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           .select('indicator_id, value, period_quarter')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
-          .in('status', ['approved', 'submitted'])
+          .eq('status', 'approved')
           .in('indicator_id', indicatorIds)
           .order('period_quarter', { ascending: true }),
         supabase
