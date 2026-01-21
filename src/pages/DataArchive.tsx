@@ -1000,7 +1000,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                           const currentValue = calculateCurrentValue(indicator);
                           const enteredPeriods = getEnteredPeriods(indicator.id, indicator);
                           const progress = calculateProgress(indicator, currentValue, targetValue);
-                          const baselineValue = indicator.baseline_value || 0;
+                          const baselineValue = indicator.yearly_baseline !== undefined && indicator.yearly_baseline !== null ? indicator.yearly_baseline : 0;
 
                           return (
                             <div key={indicator.id} className="border border-gray-200 rounded-lg p-3">
