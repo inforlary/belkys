@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, TrendingUp, BarChart3, Users, Briefcase, ClipboardCheck, Target, Award, Calendar } from 'lucide-react';
 import StrategicPlanSummary from '../components/reports/StrategicPlanSummary';
 import PerformanceDashboard from '../components/reports/PerformanceDashboard';
@@ -22,7 +22,17 @@ type ReportTab =
   | 'periodic-comparison';
 
 export default function Reports() {
-  const [activeTab, setActiveTab] = useState<ReportTab>('executive-summary');
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabParam = urlParams.get('tab') as ReportTab | null;
+  const [activeTab, setActiveTab] = useState<ReportTab>(tabParam || 'executive-summary');
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab') as ReportTab | null;
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [window.location.search]);
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
