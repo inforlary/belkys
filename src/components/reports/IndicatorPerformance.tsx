@@ -297,64 +297,116 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   };
 
   const calculateSelectedTotal = (ind: IndicatorData) => {
-    let total = 0;
-    if (selectedQuarters.includes(1)) total += ind.q1_value;
-    if (selectedQuarters.includes(2)) total += ind.q2_value;
-    if (selectedQuarters.includes(3)) total += ind.q3_value;
-    if (selectedQuarters.includes(4)) total += ind.q4_value;
-    return total;
+    let sum = 0;
+    let count = 0;
+
+    if (selectedQuarters.includes(1)) { sum += ind.q1_value; count++; }
+    if (selectedQuarters.includes(2)) { sum += ind.q2_value; count++; }
+    if (selectedQuarters.includes(3)) { sum += ind.q3_value; count++; }
+    if (selectedQuarters.includes(4)) { sum += ind.q4_value; count++; }
+
+    if (count === 0) return 0;
+
+    const calculationMethod = ind.calculation_method || 'cumulative';
+
+    if (calculationMethod === 'maintenance' ||
+        calculationMethod === 'maintenance_increasing' ||
+        calculationMethod === 'maintenance_decreasing' ||
+        calculationMethod === 'percentage' ||
+        calculationMethod === 'percentage_increasing' ||
+        calculationMethod === 'percentage_decreasing') {
+      return Number((sum / count).toFixed(2));
+    }
+
+    return sum;
   };
 
   const calculateSelectedProgress = (ind: IndicatorData) => {
-    const selectedTotal = calculateSelectedTotal(ind);
-
     if (selectedQuarters.length === 0) return 0;
+
+    let sum = 0;
+    let count = 0;
+    if (selectedQuarters.includes(1)) { sum += ind.q1_value; count++; }
+    if (selectedQuarters.includes(2)) { sum += ind.q2_value; count++; }
+    if (selectedQuarters.includes(3)) { sum += ind.q3_value; count++; }
+    if (selectedQuarters.includes(4)) { sum += ind.q4_value; count++; }
+
+    if (count === 0) return 0;
 
     const baselineValue = ind.baseline_value || 0;
     const targetValue = ind.target_value;
     const calculationMethod = ind.calculation_method || 'cumulative';
 
-    let A = baselineValue;
-    let B = targetValue;
-    let C = 0;
+    if (targetValue === 0 || targetValue === null) return 0;
+
+    let currentValue = 0;
+    let progress = 0;
 
     switch (calculationMethod) {
       case 'cumulative':
-      case 'increasing':
-        C = baselineValue + selectedTotal;
+      case 'cumulative_increasing':
+      case 'increasing': {
+        currentValue = baselineValue + sum;
+        const denominator = targetValue - baselineValue;
+        if (denominator === 0) {
+          progress = targetValue === 0 ? 0 : (currentValue / targetValue) * 100;
+        } else {
+          progress = ((currentValue - baselineValue) / denominator) * 100;
+        }
         break;
+      }
 
       case 'cumulative_decreasing':
-      case 'decreasing':
-        C = baselineValue - selectedTotal;
+      case 'decreasing': {
+        currentValue = baselineValue - sum;
+        const denominator = targetValue - baselineValue;
+        if (denominator === 0) {
+          progress = targetValue === 0 ? 0 : (currentValue / targetValue) * 100;
+        } else {
+          progress = ((currentValue - baselineValue) / denominator) * 100;
+        }
         break;
-
-      case 'maintenance':
-        C = selectedTotal;
-        break;
+      }
 
       case 'percentage':
-        A = 0;
-        B = targetValue;
-        C = selectedTotal;
+      case 'percentage_increasing': {
+        const average = sum / count;
+        progress = (average / targetValue) * 100;
         break;
-
-      default:
-        C = baselineValue + selectedTotal;
-        break;
-    }
-
-    const denominator = B - A;
-
-    if (denominator === 0) {
-      if (calculationMethod === 'maintenance') {
-        if (C === A) return 100;
-        return Math.round((C / B) * 100);
       }
-      return 0;
-    }
 
-    const progress = ((C - A) / denominator) * 100;
+      case 'percentage_decreasing': {
+        const average = sum / count;
+        if (average === 0) return 0;
+        progress = (targetValue / average) * 100;
+        break;
+      }
+
+      case 'maintenance':
+      case 'maintenance_increasing': {
+        const average = sum / count;
+        progress = (average / targetValue) * 100;
+        break;
+      }
+
+      case 'maintenance_decreasing': {
+        const average = sum / count;
+        if (average === 0) return 0;
+        progress = (targetValue / average) * 100;
+        break;
+      }
+
+      default: {
+        currentValue = baselineValue + sum;
+        const denominator = targetValue - baselineValue;
+        if (denominator === 0) {
+          progress = targetValue === 0 ? 0 : (currentValue / targetValue) * 100;
+        } else {
+          progress = ((currentValue - baselineValue) / denominator) * 100;
+        }
+        break;
+      }
+    }
 
     return Math.max(0, Math.round(progress));
   };
@@ -400,10 +452,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         'Ç2': '',
         'Ç3': '',
         'Ç4': '',
-        'Toplam': '',
+        'Toplam Veri': '',
         'Başlangıç': '',
         'Hedef': '',
-        'İlerleme': ''
+        'İlerleme Durumu': ''
       });
 
       Object.entries(planData.objectives).forEach(([objId, objData]) => {
@@ -414,10 +466,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           'Ç2': '',
           'Ç3': '',
           'Ç4': '',
-          'Toplam': '',
+          'Toplam Veri': '',
           'Başlangıç': '',
           'Hedef': '',
-          'İlerleme': ''
+          'İlerleme Durumu': ''
         });
 
         Object.entries(objData.goals).forEach(([goalId, goalData]: [string, any]) => {
@@ -428,13 +480,16 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             'Ç2': '',
             'Ç3': '',
             'Ç4': '',
-            'Toplam': '',
+            'Toplam Veri': '',
             'Başlangıç': '',
             'Hedef': '',
-            'İlerleme': ''
+            'İlerleme Durumu': ''
           });
 
           goalData.indicators.forEach((ind: IndicatorData) => {
+            const selectedTotal = calculateSelectedTotal(ind);
+            const isAverage = ['maintenance', 'maintenance_increasing', 'maintenance_decreasing', 'percentage', 'percentage_increasing', 'percentage_decreasing'].includes(ind.calculation_method || 'cumulative');
+
             const data: any = {
               'Kod': ind.code,
               'Gösterge': ind.name,
@@ -464,10 +519,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
               data['Ç4'] = '';
             }
 
-            data['Toplam'] = calculateSelectedTotal(ind);
+            data['Toplam Veri'] = selectedTotal + (isAverage ? ' (Ortalama)' : ' (Toplam)');
             data['Başlangıç'] = ind.baseline_value;
             data['Hedef'] = ind.target_value;
-            data['İlerleme'] = `${Math.round(calculateSelectedProgress(ind))}%`;
+            data['İlerleme Durumu'] = `${Math.round(calculateSelectedProgress(ind))}%`;
 
             exportData.push(data);
 
@@ -501,10 +556,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                 notesData['Ç4'] = '';
               }
 
-              notesData['Toplam'] = '';
+              notesData['Toplam Veri'] = '';
               notesData['Başlangıç'] = '';
               notesData['Hedef'] = '';
-              notesData['İlerleme'] = '';
+              notesData['İlerleme Durumu'] = '';
 
               exportData.push(notesData);
             }
@@ -590,14 +645,17 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           if (selectedQuarters.includes(2)) headers.push('Ç2');
           if (selectedQuarters.includes(3)) headers.push('Ç3');
           if (selectedQuarters.includes(4)) headers.push('Ç4');
-          headers.push('Toplam', 'Başlangıç', 'Hedef', 'İlerleme');
+          headers.push('Toplam Veri', 'Başlangıç', 'Hedef', 'İlerleme Durumu');
 
           const rows: any[] = [];
 
           goalData.indicators.forEach((ind: IndicatorData) => {
+            const selectedTotal = calculateSelectedTotal(ind);
+            const isAverage = ['maintenance', 'maintenance_increasing', 'maintenance_decreasing', 'percentage', 'percentage_increasing', 'percentage_decreasing'].includes(ind.calculation_method || 'cumulative');
+
             const row: any[] = [
               ind.code,
-              ind.name,
+              ind.name + (isAverage ? ' (Ortalama)' : ' (Toplam)'),
             ];
 
             if (selectedQuarters.includes(1)) row.push(ind.q1_value);
@@ -606,7 +664,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             if (selectedQuarters.includes(4)) row.push(ind.q4_value);
 
             row.push(
-              calculateSelectedTotal(ind),
+              selectedTotal,
               ind.baseline_value,
               ind.target_value,
               `${Math.round(calculateSelectedProgress(ind))}%`
@@ -819,19 +877,21 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                 {selectedQuarters.includes(4) && (
                                   <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">Ç4</th>
                                 )}
-                                <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase bg-blue-50">Toplam</th>
+                                <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase bg-blue-50">Toplam Veri</th>
                                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">Başlangıç</th>
                                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">Hedef</th>
-                                <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">İlerleme</th>
+                                <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">İlerleme Durumu</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
                               {goalData.indicators.map((ind: IndicatorData) => {
                                 const selectedProgress = calculateSelectedProgress(ind);
+                                const selectedTotal = calculateSelectedTotal(ind);
                                 const hasNotes = selectedQuarters.some(q => {
                                   const noteKey = `q${q}_notes` as keyof typeof ind;
                                   return ind[noteKey];
                                 });
+                                const isAverage = ['maintenance', 'maintenance_increasing', 'maintenance_decreasing', 'percentage', 'percentage_increasing', 'percentage_decreasing'].includes(ind.calculation_method || 'cumulative');
 
                                 return (
                                   <React.Fragment key={ind.id}>
@@ -839,6 +899,9 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                       <td className="px-4 py-3 text-sm text-slate-900">{ind.code}</td>
                                       <td className="px-4 py-3">
                                         <div className="text-sm font-medium text-slate-900">{ind.name}</div>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                          {isAverage ? '(Ortalama)' : '(Toplam)'}
+                                        </div>
                                       </td>
                                       {selectedQuarters.includes(1) && (
                                         <td className="px-4 py-3 text-center text-sm text-slate-700">{ind.q1_value}</td>
@@ -853,7 +916,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                         <td className="px-4 py-3 text-center text-sm text-slate-700">{ind.q4_value}</td>
                                       )}
                                       <td className="px-4 py-3 text-center text-sm font-medium text-slate-900 bg-blue-50">
-                                        {calculateSelectedTotal(ind)} {ind.unit}
+                                        {selectedTotal} {ind.unit}
                                       </td>
                                       <td className="px-4 py-3 text-center text-sm text-slate-700">
                                         {ind.baseline_value} {ind.unit}
