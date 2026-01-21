@@ -510,27 +510,38 @@ export default function PerformanceKPIDashboard() {
                     </div>
                   </div>
 
-                  {/* DEBUG: Tüm göstergeler */}
-                  <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                      DEBUG: Tüm Göstergeler ({group.indicators.length})
+                  {/* TÜM GÖSTERGELER - KATEGORİSİZ */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Tüm Göstergeler ({group.indicators.length})
                     </h3>
-                    <div className="space-y-2">
-                      {group.indicators.map((ind, i) => (
-                        <div key={i} className="bg-white p-2 rounded text-xs border">
-                          <div><strong>Kod:</strong> {ind.code}</div>
-                          <div><strong>İsim:</strong> {ind.name}</div>
-                          <div><strong>Başarı:</strong> {ind.achievement_rate}%</div>
-                          <div><strong>Kategori:</strong> {
-                            ind.achievement_rate >= 85 ? 'Hedefte' :
-                            ind.achievement_rate >= 50 ? 'Risk' : 'Geride'
-                          }</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {group.indicators.map((indicator, idx) => (
+                        <div key={`${indicator.id}-${idx}`} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                          <div className="mb-2">
+                            <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code || 'N/A'}</div>
+                            <h4 className="text-sm font-medium text-gray-900">{indicator.name || 'İsimsiz Gösterge'}</h4>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Başarı:</span>
+                              <span className="font-bold text-green-600">%{(indicator.achievement_rate || 0).toFixed(1)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Hedef:</span>
+                              <span className="font-medium">{indicator.target_value?.toLocaleString('tr-TR') || '0'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Gerçekleşen:</span>
+                              <span className="font-medium">{indicator.latest_value?.toLocaleString('tr-TR') || '0'}</span>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {(group.onTarget && group.onTarget.length > 0) && (
+                  {false && (group.onTarget && group.onTarget.length > 0) && (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
