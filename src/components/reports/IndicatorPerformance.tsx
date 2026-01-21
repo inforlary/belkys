@@ -46,6 +46,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('');
   const [selectedQuarters, setSelectedQuarters] = useState<number[]>([1, 2, 3, 4]);
+  const [hideNotes, setHideNotes] = useState(false);
   const [loading, setLoading] = useState(true);
   const currentYear = selectedYear || new Date().getFullYear();
 
@@ -296,6 +297,23 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     }
   };
 
+  const getIndicatorStats = () => {
+    let exceedingTarget = 0;
+    let onTrack = 0;
+    let atRisk = 0;
+    let behind = 0;
+
+    filteredIndicators.forEach(ind => {
+      const progress = calculateSelectedProgress(ind);
+      if (progress >= 200) exceedingTarget++;
+      else if (progress >= 70) onTrack++;
+      else if (progress >= 50) atRisk++;
+      else behind++;
+    });
+
+    return { exceedingTarget, onTrack, atRisk, behind, total: filteredIndicators.length };
+  };
+
   const calculateSelectedTotal = (ind: IndicatorData) => {
     let sum = 0;
     let count = 0;
@@ -475,7 +493,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         Object.entries(objData.goals).forEach(([goalId, goalData]: [string, any]) => {
           exportData.push({
             'Kod': '',
-            'Gösterge': `  HEDEF: ${goalData.title}`,
+            'Gösterge': `  HEDEF: ${goalData.title} [${goalData.department}]`,
             'Ç1': '',
             'Ç2': '',
             'Ç3': '',
@@ -526,7 +544,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
 
             exportData.push(data);
 
-            if (ind.q1_notes || ind.q2_notes || ind.q3_notes || ind.q4_notes) {
+            if (!hideNotes && (ind.q1_notes || ind.q2_notes || ind.q3_notes || ind.q4_notes)) {
               const notesData: any = {
                 'Kod': '',
                 'Gösterge': 'Açıklamalar:',
@@ -634,8 +652,9 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         Object.entries(objData.goals).forEach(([goalId, goalData]: [string, any]) => {
           contentHTML += `
             <div style="margin-top: 12px; margin-left: 20px; page-break-inside: avoid;">
-              <h4 style="color: #059669; font-size: 14px; font-weight: 600; margin: 0 0 8px 0; padding: 6px; background-color: #f0fdf4; border-left: 3px solid #059669;">
-                HEDEF: ${goalData.title}
+              <h4 style="color: #059669; font-size: 14px; font-weight: 600; margin: 0 0 8px 0; padding: 6px; background-color: #f0fdf4; border-left: 3px solid #059669; display: flex; justify-content: space-between; align-items: center;">
+                <span>HEDEF: ${goalData.title}</span>
+                <span style="font-size: 11px; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px;">[${goalData.department}]</span>
               </h4>
             </div>
           `;
@@ -672,7 +691,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
 
             rows.push(row);
 
-            if (ind.q1_notes || ind.q2_notes || ind.q3_notes || ind.q4_notes) {
+            if (!hideNotes && (ind.q1_notes || ind.q2_notes || ind.q3_notes || ind.q4_notes)) {
               const notesRow: any[] = ['', '<i>Açıklamalar:</i>'];
 
               if (selectedQuarters.includes(1)) notesRow.push(`<i>${ind.q1_notes || '-'}</i>`);
@@ -696,6 +715,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   if (loading) {
     return <div className="text-center py-8 text-slate-500">Yükleniyor...</div>;
   }
+
+  const stats = getIndicatorStats();
 
   return (
     <div className="space-y-6">
@@ -721,6 +742,29 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             <Download className="w-4 h-4" />
             Excel'e Aktar
           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-5 gap-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-3xl font-bold text-slate-900">{stats.total}</div>
+          <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+          <div className="text-3xl font-bold text-purple-600">{stats.exceedingTarget}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+          <div className="text-3xl font-bold text-green-600">{stats.onTrack}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedefte</div>
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+          <div className="text-3xl font-bold text-yellow-600">{stats.atRisk}</div>
+          <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+          <div className="text-3xl font-bold text-red-600">{stats.behind}</div>
+          <div className="text-sm text-slate-600 mt-1">Geride</div>
         </div>
       </div>
 
@@ -763,9 +807,21 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         </div>
 
         <div className="border-t border-slate-200 pt-4">
-          <label className="block text-sm font-medium text-slate-700 mb-3">
-            Rapor Dönemi Seçimi
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-slate-700">
+              Rapor Dönemi Seçimi
+            </label>
+            <button
+              onClick={() => setHideNotes(!hideNotes)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                hideNotes
+                  ? 'bg-slate-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {hideNotes ? 'Açıklamaları Göster' : 'Açıklamaları Kaldır'}
+            </button>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={toggleAllQuarters}
@@ -856,7 +912,12 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                     {Object.entries(objData.goals).map(([goalId, goalData]: [string, any]) => (
                       <div key={goalId} className="border-b border-slate-100 last:border-b-0">
                         <div className="bg-green-50 px-4 py-2">
-                          <h5 className="text-sm font-medium text-green-900">HEDEF: {goalData.title}</h5>
+                          <div className="flex items-center justify-between">
+                            <h5 className="text-sm font-medium text-green-900">HEDEF: {goalData.title}</h5>
+                            <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded">
+                              {goalData.department}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="overflow-x-auto">
@@ -937,7 +998,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                         </div>
                                       </td>
                                     </tr>
-                                    {hasNotes && (
+                                    {!hideNotes && hasNotes && (
                                       <tr className="bg-slate-50">
                                         <td className="px-4 py-2"></td>
                                         <td className="px-4 py-2 text-xs font-medium text-slate-500">Açıklamalar:</td>
