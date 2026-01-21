@@ -42,6 +42,10 @@ interface IndicatorData {
   target_value: number;
   progress: number;
   calculation_method: string;
+  hasQ1Entry?: boolean;
+  hasQ2Entry?: boolean;
+  hasQ3Entry?: boolean;
+  hasQ4Entry?: boolean;
 }
 
 interface IndicatorPerformanceProps {
@@ -207,6 +211,11 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           const q2 = q2Data.value;
           const q3 = q3Data.value;
           const q4 = q4Data.value;
+
+          const hasQ1Entry = entriesByIndicator[ind.id]?.[1] !== undefined;
+          const hasQ2Entry = entriesByIndicator[ind.id]?.[2] !== undefined;
+          const hasQ3Entry = entriesByIndicator[ind.id]?.[3] !== undefined;
+          const hasQ4Entry = entriesByIndicator[ind.id]?.[4] !== undefined;
           const total = q1 + q2 + q3 + q4;
           const target = targetsByIndicator[ind.id] || ind.target_value || 0;
 
@@ -245,6 +254,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             target_value: target,
             progress: progress,
             calculation_method: ind.calculation_method || 'cumulative',
+            hasQ1Entry: hasQ1Entry,
+            hasQ2Entry: hasQ2Entry,
+            hasQ3Entry: hasQ3Entry,
+            hasQ4Entry: hasQ4Entry,
           };
         });
 
@@ -299,7 +312,18 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         return;
       }
 
-      const periodValues = [ind.q1_value, ind.q2_value, ind.q3_value, ind.q4_value];
+      const periodValues: number[] = [];
+      if (ind.hasQ1Entry) periodValues.push(ind.q1_value);
+      if (ind.hasQ2Entry) periodValues.push(ind.q2_value);
+      if (ind.hasQ3Entry) periodValues.push(ind.q3_value);
+      if (ind.hasQ4Entry) periodValues.push(ind.q4_value);
+
+      if (periodValues.length === 0) {
+        const status = getIndicatorStatus(0);
+        incrementStatusInStats(stats, status);
+        return;
+      }
+
       const calculationMethod = (ind.calculation_method || 'standard') as CalculationMethod;
 
       const progress = calculatePerformancePercentage({
@@ -328,7 +352,14 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
       indicators.forEach(indicator => {
         if (indicator.target_value === 0) return;
 
-        const periodValues = [indicator.q1_value, indicator.q2_value, indicator.q3_value, indicator.q4_value];
+        const periodValues: number[] = [];
+        if (indicator.hasQ1Entry) periodValues.push(indicator.q1_value);
+        if (indicator.hasQ2Entry) periodValues.push(indicator.q2_value);
+        if (indicator.hasQ3Entry) periodValues.push(indicator.q3_value);
+        if (indicator.hasQ4Entry) periodValues.push(indicator.q4_value);
+
+        if (periodValues.length === 0) return;
+
         const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
 
         const sum = periodValues.reduce((acc, val) => acc + val, 0);
