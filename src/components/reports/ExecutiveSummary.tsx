@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Calendar, FileText } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../../utils/exportHelpers';
-import { calculateIndicatorProgress } from '../../utils/progressCalculations';
+import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 
 interface ExecutiveData {
   overall_progress: number;
@@ -54,7 +54,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
 
       let indicatorsQuery = supabase
         .from('indicators')
-        .select('id, name, goal_id, baseline_value, target_value, calculation_method')
+        .select('id, name, goal_id, calculation_method')
         .eq('organization_id', profile.organization_id);
 
       if (allowedGoalIds.length > 0) {
@@ -92,16 +92,17 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
           .in('status', ['approved', 'submitted'])
-          .in('indicator_id', indicatorIds),
+          .in('indicator_id', indicatorIds)
+          .order('period_quarter', { ascending: true }),
         supabase
           .from('indicator_targets')
-          .select('indicator_id, target_value')
+          .select('indicator_id, target_value, baseline_value')
           .eq('year', currentYear)
           .in('indicator_id', indicatorIds),
         (async () => {
           let activitiesQuery = supabase
             .from('activities')
-            .select('id, end_date, status')
+            .select('id, end_date, status, start_date')
             .eq('organization_id', profile.organization_id)
             .eq('status', 'ongoing');
 
@@ -109,7 +110,15 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
             activitiesQuery = activitiesQuery.eq('department_id', profile.department_id);
           }
 
-          return await activitiesQuery;
+          const { data } = await activitiesQuery;
+
+          const filteredActivities = data?.filter(activity => {
+            const startYear = new Date(activity.start_date).getFullYear();
+            const endYear = new Date(activity.end_date).getFullYear();
+            return startYear <= currentYear && endYear >= currentYear;
+          }) || [];
+
+          return { data: filteredActivities };
         })(),
         supabase
           .from('indicator_data_entries')
@@ -119,17 +128,26 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           .in('status', ['submitted', 'pending']),
       ]);
 
+      const entriesByIndicator: Record<string, number[]> = {};
       const quartersByIndicator: Record<string, number> = {};
       entriesData.data?.forEach(entry => {
+        if (!entriesByIndicator[entry.indicator_id]) {
+          entriesByIndicator[entry.indicator_id] = [];
+        }
+        entriesByIndicator[entry.indicator_id].push(entry.value || 0);
+
         if (!quartersByIndicator[entry.indicator_id]) {
           quartersByIndicator[entry.indicator_id] = 0;
         }
         quartersByIndicator[entry.indicator_id]++;
       });
 
-      const targetsByIndicator: Record<string, number> = {};
+      const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
       targetsData.data?.forEach(target => {
-        targetsByIndicator[target.indicator_id] = target.target_value;
+        targetsByIndicator[target.indicator_id] = {
+          target: target.target_value,
+          baseline: target.baseline_value || 0,
+        };
       });
 
       const indicatorProgress: Array<{ id: string; name: string; progress: number }> = [];
@@ -139,16 +157,23 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       let behind = 0;
 
       indicators.forEach(ind => {
-        const target = targetsByIndicator[ind.id] || ind.target_value;
+        const targetData = targetsByIndicator[ind.id];
+        if (!targetData || targetData.target === 0) {
+          indicatorProgress.push({ id: ind.id, name: ind.name, progress: 0 });
+          behind++;
+          return;
+        }
 
-        const progress = calculateIndicatorProgress({
-          id: ind.id,
-          goal_id: ind.goal_id,
-          baseline_value: ind.baseline_value,
-          target_value: ind.target_value,
-          yearly_target: target,
-          calculation_method: ind.calculation_method
-        }, entriesData.data || []);
+        const periodValues = entriesByIndicator[ind.id] || [];
+        const calculationMethod = (ind.calculation_method || 'standard') as CalculationMethod;
+
+        const progress = calculatePerformancePercentage({
+          method: calculationMethod,
+          baselineValue: targetData.baseline,
+          targetValue: targetData.target,
+          periodValues: periodValues,
+          currentValue: 0,
+        });
 
         indicatorProgress.push({ id: ind.id, name: ind.name, progress });
         totalProgress += progress;
@@ -250,7 +275,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     if (!data) return;
 
     const content = `
-      <h2>Kurum Genel Durumu - ${new Date().getFullYear()}</h2>
+      <h2>Kurum Genel Durumu - ${currentYear}</h2>
       <div class="stats-grid">
         <div class="stat-box">
           <div class="stat-value">${Math.round(data.overall_progress)}%</div>
@@ -338,7 +363,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           <div>
             <p className="text-blue-100 text-sm mb-2 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              Kurum Genel Durumu - {new Date().getFullYear()}
+              Kurum Genel Durumu - {currentYear}
             </p>
             <p className="text-5xl font-bold">{Math.round(data.overall_progress)}%</p>
             <p className="text-blue-100 mt-2">Genel İlerleme Oranı</p>
