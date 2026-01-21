@@ -146,8 +146,8 @@ export default function DataEntry() {
         const yearTarget = ind.indicator_targets?.find((t: any) => t.year === selectedYear);
         return {
           ...ind,
-          yearly_target: yearTarget?.target_value || ind.target_value,
-          yearly_baseline: yearTarget?.baseline_value ?? ind.baseline_value,
+          yearly_target: yearTarget?.target_value ? parseFloat(yearTarget.target_value) : ind.target_value,
+          yearly_baseline: yearTarget?.baseline_value ? parseFloat(yearTarget.baseline_value) : ind.baseline_value,
           goal: ind.goals ? {
             title: ind.goals.title,
             code: ind.goals.code,
