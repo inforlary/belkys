@@ -23,43 +23,14 @@ interface CalculationParams {
   measurementFrequencyCount?: number;
 }
 
-export function calculateIndicatorValue(params: CalculationParams): number {
-  const { method, baselineValue, periodValues } = params;
-  const sum = periodValues.reduce((acc, val) => acc + val, 0);
-
-  switch (method) {
-    case 'cumulative':
-    case 'cumulative_increasing':
-    case 'increasing':
-      return baselineValue + sum;
-
-    case 'cumulative_decreasing':
-    case 'decreasing':
-      return baselineValue - sum;
-
-    case 'percentage':
-    case 'percentage_increasing':
-    case 'percentage_decreasing':
-      return sum;
-
-    case 'maintenance':
-    case 'maintenance_increasing':
-    case 'maintenance_decreasing':
-      return sum;
-
-    case 'standard':
-    default:
-      return baselineValue + sum;
-  }
-}
-
 export function calculatePerformancePercentage(params: CalculationParams): number {
-  const { method, baselineValue, targetValue, periodValues, measurementFrequencyCount = 1 } = params;
-
+  const { method, baselineValue, targetValue, periodValues } = params;
   if (targetValue === 0) return 0;
-
+  
   const sum = periodValues.reduce((acc, val) => acc + val, 0);
-
+  const periodCount = periodValues.length;
+  const average = periodCount > 0 ? sum / periodCount : 0;
+  
   switch (method) {
     case 'cumulative':
     case 'cumulative_increasing':
@@ -69,7 +40,7 @@ export function calculatePerformancePercentage(params: CalculationParams): numbe
       if (denominator === 0) return 0;
       return ((currentValue - baselineValue) / denominator) * 100;
     }
-
+    
     case 'cumulative_decreasing':
     case 'decreasing': {
       const currentValue = baselineValue - sum;
@@ -77,33 +48,34 @@ export function calculatePerformancePercentage(params: CalculationParams): numbe
       if (denominator === 0) return 0;
       return ((currentValue - baselineValue) / denominator) * 100;
     }
-
+    
     case 'percentage_increasing': {
-      const average = sum / measurementFrequencyCount;
+      // Ortalama / Hedef × 100
       return (average / targetValue) * 100;
     }
-
+    
     case 'percentage_decreasing': {
-      const average = sum / periodValues.length;
-      const denominator = targetValue - baselineValue;
-      if (denominator === 0) return 0;
-      return ((average - baselineValue) / denominator) * 100;
-    }
-
-    case 'maintenance_increasing': {
-      return (average / targetValue) * 100;
-    }
-
-    case 'maintenance_decreasing': {
-      if (sum === 0) return 0;
+      // Hedef / Ortalama × 100 (düşük ortalama = yüksek performans)
+      if (average === 0) return 0;
       return (targetValue / average) * 100;
     }
-
+    
+    case 'maintenance_increasing': {
+      // Ortalama / Hedef × 100
+      return (average / targetValue) * 100;
+    }
+    
+    case 'maintenance_decreasing': {
+      // Hedef / Ortalama × 100
+      if (average === 0) return 0;
+      return (targetValue / average) * 100;
+    }
+    
     case 'percentage':
     case 'maintenance':
     case 'standard':
     default: {
-      return (sum / targetValue) * 100;
+      return (average / targetValue) * 100;
     }
   }
 }
