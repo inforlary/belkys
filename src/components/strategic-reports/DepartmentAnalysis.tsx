@@ -142,7 +142,7 @@ export default function DepartmentAnalysis() {
       .select('value, indicator:indicators!inner(target_value)')
       .in('indicator_id', indicatorIds)
       .eq('year', selectedYear)
-      .eq('status', 'approved');
+      .eq('status', 'admin_approved');
 
     const totalAchievement = dataEntries?.reduce((sum, entry) => {
       const target = (entry.indicator?.target_value !== null && entry.indicator?.target_value !== undefined) ? entry.indicator.target_value : 1;
@@ -197,8 +197,8 @@ export default function DepartmentAnalysis() {
         .in('indicator_id', indicatorIds)
         .eq('year', selectedYear)
         .eq('period_type', 'quarterly')
-        .eq('quarter', q)
-        .eq('status', 'approved');
+        .eq('period_quarter', q)
+        .eq('status', 'admin_approved');
 
       const totalAchievement = data?.reduce((sum, entry) => {
         const target = (entry.indicator?.target_value !== null && entry.indicator?.target_value !== undefined) ? entry.indicator.target_value : 1;
@@ -246,8 +246,8 @@ export default function DepartmentAnalysis() {
           .eq('indicator_id', indicator.id)
           .eq('year', selectedYear)
           .eq('period_type', 'quarterly')
-          .eq('quarter', q)
-          .eq('status', 'approved')
+          .eq('period_quarter', q)
+          .eq('status', 'admin_approved')
           .maybeSingle();
 
         if (data) {
@@ -261,7 +261,7 @@ export default function DepartmentAnalysis() {
         .eq('indicator_id', indicator.id)
         .eq('year', selectedYear)
         .eq('period_type', 'yearly')
-        .eq('status', 'approved')
+        .eq('status', 'admin_approved')
         .maybeSingle();
 
       if (yearData) {

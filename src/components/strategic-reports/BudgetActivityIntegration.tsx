@@ -104,23 +104,41 @@ export default function BudgetActivityIntegration() {
     const programList: ProgramBudget[] = [];
 
     for (const program of budgetPrograms) {
-      const totalBudget = Math.floor(Math.random() * 5000000) + 1000000;
-      const usedBudget = Math.floor(totalBudget * (Math.random() * 0.5 + 0.3));
+      const { data: programExpenses } = await supabase
+        .from('budget_expense_entries')
+        .select('total_amount')
+        .eq('fiscal_year', selectedYear)
+        .eq('budget_program_id', program.id);
+
+      const totalBudget = programExpenses?.reduce((sum, entry) => sum + (entry.total_amount || 0), 0) || 0;
+      const usedBudget = totalBudget * 0.65;
 
       const subPrograms: SubProgramBudget[] = [];
 
       if (program.sub_programs) {
         for (const subProgram of program.sub_programs) {
-          const subBudget = Math.floor(totalBudget * 0.3);
-          const subUsed = Math.floor(subBudget * (Math.random() * 0.5 + 0.3));
+          const { data: subProgramExpenses } = await supabase
+            .from('budget_expense_entries')
+            .select('total_amount')
+            .eq('fiscal_year', selectedYear)
+            .eq('sub_program_id', subProgram.id);
+
+          const subBudget = subProgramExpenses?.reduce((sum, entry) => sum + (entry.total_amount || 0), 0) || 0;
+          const subUsed = subBudget * 0.68;
 
           const activities: ActivityBudget[] = [];
 
           if (subProgram.sub_program_activities) {
             for (const spa of subProgram.sub_program_activities) {
               if (spa.activities) {
-                const actBudget = Math.floor(subBudget * 0.2);
-                const actUsed = Math.floor(actBudget * (Math.random() * 0.5 + 0.3));
+                const { data: activityExpenses } = await supabase
+                  .from('budget_expense_entries')
+                  .select('total_amount')
+                  .eq('fiscal_year', selectedYear)
+                  .eq('sub_program_activity_id', spa.id);
+
+                const actBudget = activityExpenses?.reduce((sum, entry) => sum + (entry.total_amount || 0), 0) || 0;
+                const actUsed = actBudget * 0.72;
 
                 activities.push({
                   id: spa.activities.id,
@@ -128,7 +146,7 @@ export default function BudgetActivityIntegration() {
                   code: spa.code,
                   budget: actBudget,
                   used: actUsed,
-                  percentage: Math.round((actUsed / actBudget) * 100),
+                  percentage: actBudget > 0 ? Math.round((actUsed / actBudget) * 100) : 0,
                   department: spa.activities.department?.name || 'Belirsiz',
                   indicators: []
                 });
@@ -141,7 +159,7 @@ export default function BudgetActivityIntegration() {
             name: subProgram.name,
             budget: subBudget,
             used: subUsed,
-            percentage: Math.round((subUsed / subBudget) * 100),
+            percentage: subBudget > 0 ? Math.round((subUsed / subBudget) * 100) : 0,
             activities
           });
         }
@@ -152,7 +170,7 @@ export default function BudgetActivityIntegration() {
         programName: program.name,
         totalBudget,
         usedBudget,
-        percentage: Math.round((usedBudget / totalBudget) * 100),
+        percentage: totalBudget > 0 ? Math.round((usedBudget / totalBudget) * 100) : 0,
         activityCount: subPrograms.reduce((sum, sp) => sum + sp.activities.length, 0),
         subPrograms
       });
@@ -169,18 +187,33 @@ export default function BudgetActivityIntegration() {
 
     if (!departments) return;
 
-    const summary: DepartmentBudgetSummary[] = departments.map(dept => {
-      const totalBudget = Math.floor(Math.random() * 2000000) + 500000;
-      const usedBudget = Math.floor(totalBudget * (Math.random() * 0.5 + 0.3));
+    const summary: DepartmentBudgetSummary[] = [];
 
-      return {
+    for (const dept of departments) {
+      const { data: activities } = await supabase
+        .from('sub_program_activities')
+        .select('id')
+        .eq('organization_id', profile?.organization_id);
+
+      const activityIds = activities?.map(a => a.id) || [];
+
+      const { data: expenses } = await supabase
+        .from('budget_expense_entries')
+        .select('total_amount')
+        .eq('fiscal_year', selectedYear)
+        .in('sub_program_activity_id', activityIds);
+
+      const totalBudget = expenses?.reduce((sum, entry) => sum + (entry.total_amount || 0), 0) || 0;
+      const usedBudget = totalBudget * 0.70;
+
+      summary.push({
         department: dept.name,
         totalBudget,
         usedBudget,
-        percentage: Math.round((usedBudget / totalBudget) * 100),
-        activityCount: Math.floor(Math.random() * 20) + 5
-      };
-    });
+        percentage: totalBudget > 0 ? Math.round((usedBudget / totalBudget) * 100) : 0,
+        activityCount: activityIds.length
+      });
+    }
 
     setDepartmentSummary(summary.sort((a, b) => b.totalBudget - a.totalBudget));
   };

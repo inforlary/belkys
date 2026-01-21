@@ -204,7 +204,7 @@ export default function ComparativeAnalysis() {
         .select('value, indicator:indicators!inner(target_value)')
         .in('indicator_id', indicatorIds)
         .eq('year', year)
-        .eq('status', 'approved');
+        .eq('status', 'admin_approved');
 
       const totalAchievement = dataEntries?.reduce((sum, entry) => {
         const target = entry.indicator?.target_value || 1;
@@ -214,17 +214,18 @@ export default function ComparativeAnalysis() {
       const avgAchievement = dataEntries?.length ? totalAchievement / dataEntries.length : 0;
 
       const { data: activities } = await supabase
-        .from('activities')
-        .select('id')
-        .eq('organization_id', profile?.organization_id)
-        .eq('status', 'completed');
+        .from('sub_program_activities')
+        .select('id, status')
+        .eq('organization_id', profile?.organization_id);
+
+      const completedActivities = activities?.filter(a => a.status === 'admin_approved').length || 0;
 
       comparisons.push({
         year,
         achievement: Math.round(avgAchievement),
         goalCount: goals?.length || 0,
         indicatorCount: indicators?.length || 0,
-        completedActivities: activities?.length || 0
+        completedActivities
       });
     }
 
@@ -258,8 +259,8 @@ export default function ComparativeAnalysis() {
           .in('indicator_id', indicatorIds)
           .eq('year', year)
           .eq('period_type', 'quarterly')
-          .eq('quarter', q)
-          .eq('status', 'approved');
+          .eq('period_quarter', q)
+          .eq('status', 'admin_approved');
 
         const totalAchievement = data?.reduce((sum, entry) => {
           const target = entry.indicator?.target_value || 1;

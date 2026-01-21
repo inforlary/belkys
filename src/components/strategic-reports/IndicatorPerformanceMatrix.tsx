@@ -60,7 +60,7 @@ export default function IndicatorPerformanceMatrix() {
     const { data } = await supabase
       .from('departments')
       .select('id, name')
-      .eq('organization_id', user.organizationId)
+      .eq('organization_id', profile.organization_id)
       .order('name');
 
     setDepartments(data || []);
@@ -86,7 +86,7 @@ export default function IndicatorPerformanceMatrix() {
             unit
           )
         `)
-        .eq('organization_id', user.organizationId)
+        .eq('organization_id', profile.organization_id)
         .eq('fiscal_year', selectedYear);
 
       if (!goals) return;
@@ -97,6 +97,17 @@ export default function IndicatorPerformanceMatrix() {
         if (!goal.indicators) continue;
 
         for (const indicator of goal.indicators) {
+          const { data: targetData } = await supabase
+            .from('indicator_targets')
+            .select('target_value')
+            .eq('indicator_id', indicator.id)
+            .eq('year', selectedYear)
+            .maybeSingle();
+
+          const targetValue = targetData?.target_value !== null && targetData?.target_value !== undefined
+            ? targetData.target_value
+            : (indicator.target_value !== null && indicator.target_value !== undefined ? indicator.target_value : 1);
+
           const entries: any = { q1: null, q2: null, q3: null, q4: null, year: null };
           let lastUpdated: string | null = null;
 
@@ -107,8 +118,8 @@ export default function IndicatorPerformanceMatrix() {
               .eq('indicator_id', indicator.id)
               .eq('year', selectedYear)
               .eq('period_type', 'quarterly')
-              .eq('quarter', q)
-              .eq('status', 'approved')
+              .eq('period_quarter', q)
+              .eq('status', 'admin_approved')
               .maybeSingle();
 
             if (data) {
@@ -125,7 +136,7 @@ export default function IndicatorPerformanceMatrix() {
             .eq('indicator_id', indicator.id)
             .eq('year', selectedYear)
             .eq('period_type', 'yearly')
-            .eq('status', 'approved')
+            .eq('status', 'admin_approved')
             .maybeSingle();
 
           if (yearData) {
@@ -136,7 +147,6 @@ export default function IndicatorPerformanceMatrix() {
           }
 
           const latestValue = entries.year || entries.q4 || entries.q3 || entries.q2 || entries.q1;
-          const targetValue = (indicator.target_value !== null && indicator.target_value !== undefined) ? indicator.target_value : 1;
           const achievement = latestValue !== null && targetValue !== 0 ? (latestValue / targetValue) * 100 : 0;
           const deviation = latestValue !== null ? latestValue - targetValue : 0;
 
