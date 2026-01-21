@@ -1,23 +1,13 @@
 import { useState } from 'react';
-import { TrendingUp, BarChart3, Users, Briefcase, ClipboardCheck, Target, Award, Calendar } from 'lucide-react';
+import { TrendingUp, BarChart3, Award } from 'lucide-react';
 import PerformanceDashboard from '../components/reports/PerformanceDashboard';
 import IndicatorPerformance from '../components/reports/IndicatorPerformance';
-import DepartmentPerformance from '../components/reports/DepartmentPerformance';
-import ActivityStatus from '../components/reports/ActivityStatus';
-import DataEntryStatus from '../components/reports/DataEntryStatus';
-import GoalAchievement from '../components/reports/GoalAchievement';
 import ExecutiveSummary from '../components/reports/ExecutiveSummary';
-import { PeriodicDataComparison } from '../components/reports/PeriodicDataComparison';
 
 type ReportTab =
   | 'performance-dashboard'
   | 'indicator-performance'
-  | 'department-performance'
-  | 'activity-status'
-  | 'data-entry-status'
-  | 'goal-achievement'
-  | 'executive-summary'
-  | 'periodic-comparison';
+  | 'executive-summary';
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState<ReportTab>('executive-summary');
@@ -46,41 +36,6 @@ export default function Reports() {
       icon: BarChart3,
       description: 'Çeyrek dönem bazında detaylı gösterge analizi',
       component: IndicatorPerformance,
-    },
-    {
-      id: 'department-performance' as ReportTab,
-      name: 'Birim Performansı',
-      icon: Users,
-      description: 'Birimler arası karşılaştırmalı performans analizi',
-      component: DepartmentPerformance,
-    },
-    {
-      id: 'goal-achievement' as ReportTab,
-      name: 'Hedef Başarısı',
-      icon: Target,
-      description: 'Hedeflere ulaşma durumu ve başarı tahminleri',
-      component: GoalAchievement,
-    },
-    {
-      id: 'activity-status' as ReportTab,
-      name: 'Faaliyet Durumu',
-      icon: Briefcase,
-      description: 'Faaliyet izleme ve durum raporları',
-      component: ActivityStatus,
-    },
-    {
-      id: 'data-entry-status' as ReportTab,
-      name: 'Veri Giriş Durumu',
-      icon: ClipboardCheck,
-      description: 'Veri girişi tamamlanma durumu',
-      component: DataEntryStatus,
-    },
-    {
-      id: 'periodic-comparison' as ReportTab,
-      name: 'Dönemsel Karşılaştırma',
-      icon: Calendar,
-      description: 'Dönemler arası karşılaştırmalı analiz',
-      component: PeriodicDataComparison,
     },
   ];
 
