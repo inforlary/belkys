@@ -52,13 +52,10 @@ export function calculateIndicatorProgress(
       const denominator = targetValue - baselineValue;
 
       if (denominator === 0) {
-        if (sumOfEntries > 0) {
-          progress = 100;
-        } else if (sumOfEntries < 0) {
-          progress = 0;
-        } else {
-          progress = 100;
+        if (targetValue === 0) {
+          return 0;
         }
+        progress = (currentValue / targetValue) * 100;
         break;
       }
 
@@ -72,13 +69,10 @@ export function calculateIndicatorProgress(
       const denominator = targetValue - baselineValue;
 
       if (denominator === 0) {
-        if (sumOfEntries < 0) {
-          progress = 100;
-        } else if (sumOfEntries > 0) {
-          progress = 0;
-        } else {
-          progress = 100;
+        if (targetValue === 0) {
+          return 0;
         }
+        progress = (currentValue / targetValue) * 100;
         break;
       }
 
@@ -119,13 +113,10 @@ export function calculateIndicatorProgress(
       const denominator = targetValue - baselineValue;
 
       if (denominator === 0) {
-        if (sumOfEntries > 0) {
-          progress = 100;
-        } else if (sumOfEntries < 0) {
-          progress = 0;
-        } else {
-          progress = 100;
+        if (targetValue === 0) {
+          return 0;
         }
+        progress = (currentValue / targetValue) * 100;
         break;
       }
 
