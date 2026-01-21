@@ -364,6 +364,9 @@ export default function RiskRegisterNew() {
         last_review_date: formData.last_review_date,
         next_review_date: nextReviewDate,
         status: submitForApproval ? 'PENDING_APPROVAL' : 'DRAFT',
+        approval_status: submitForApproval ? 'IN_REVIEW' : 'DRAFT',
+        submitted_at: submitForApproval ? new Date().toISOString() : null,
+        submitted_by_id: submitForApproval ? profile?.id : null,
         identified_by_id: profile?.id,
         identified_date: new Date().toISOString().split('T')[0],
       };
