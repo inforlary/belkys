@@ -33,7 +33,11 @@ interface IndicatorData {
   calculation_method: string;
 }
 
-export default function IndicatorPerformance() {
+interface IndicatorPerformanceProps {
+  selectedYear?: number;
+}
+
+export default function IndicatorPerformance({ selectedYear }: IndicatorPerformanceProps) {
   const { profile } = useAuth();
   const [indicators, setIndicators] = useState<IndicatorData[]>([]);
   const [filteredIndicators, setFilteredIndicators] = useState<IndicatorData[]>([]);
@@ -43,10 +47,11 @@ export default function IndicatorPerformance() {
   const [selectedPlan, setSelectedPlan] = useState('');
   const [selectedQuarters, setSelectedQuarters] = useState<number[]>([1, 2, 3, 4]);
   const [loading, setLoading] = useState(true);
+  const currentYear = selectedYear || new Date().getFullYear();
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   useEffect(() => {
     applyFilters();
@@ -59,7 +64,6 @@ export default function IndicatorPerformance() {
     }
 
     try {
-      const currentYear = new Date().getFullYear();
       console.log('Loading indicators for organization:', profile.organization_id, 'year:', currentYear);
 
       // First get goals to filter indicators by department
@@ -549,7 +553,7 @@ export default function IndicatorPerformance() {
     }, {} as Record<string, any>);
 
     let contentHTML = `
-      <h2>Gösterge Performans Raporu - ${new Date().getFullYear()}</h2>
+      <h2>Gösterge Performans Raporu - ${currentYear}</h2>
       <p><strong>Seçili Çeyrekler:</strong> ${selectedQuarters.map(q => `Ç${q}`).join(', ')}</p>
       <p><strong>Toplam Gösterge:</strong> ${filteredIndicators.length}</p>
     `;

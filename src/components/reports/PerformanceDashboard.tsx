@@ -15,21 +15,25 @@ interface DepartmentPerformance {
   behind: number;
 }
 
-export default function PerformanceDashboard() {
+interface PerformanceDashboardProps {
+  selectedYear?: number;
+}
+
+export default function PerformanceDashboard({ selectedYear }: PerformanceDashboardProps) {
   const { profile } = useAuth();
   const [departments, setDepartments] = useState<DepartmentPerformance[]>([]);
   const [overallProgress, setOverallProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const currentYear = selectedYear || new Date().getFullYear();
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) return;
 
     try {
-      const currentYear = new Date().getFullYear();
 
       let deptsQuery = supabase
         .from('departments')

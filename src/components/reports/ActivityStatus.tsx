@@ -17,7 +17,11 @@ interface ActivityData {
   is_overdue: boolean;
 }
 
-export default function ActivityStatus() {
+interface ActivityStatusProps {
+  selectedYear?: number;
+}
+
+export default function ActivityStatus({ selectedYear }: ActivityStatusProps) {
   const { profile } = useAuth();
   const [activities, setActivities] = useState<ActivityData[]>([]);
   const [stats, setStats] = useState({
@@ -31,7 +35,7 @@ export default function ActivityStatus() {
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) {

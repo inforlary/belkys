@@ -19,20 +19,24 @@ interface ExecutiveData {
   recommendations: string[];
 }
 
-export default function ExecutiveSummary() {
+interface ExecutiveSummaryProps {
+  selectedYear?: number;
+}
+
+export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps) {
   const { profile } = useAuth();
   const [data, setData] = useState<ExecutiveData | null>(null);
   const [loading, setLoading] = useState(true);
+  const currentYear = selectedYear || new Date().getFullYear();
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) return;
 
     try {
-      const currentYear = new Date().getFullYear();
 
       // Get allowed goals first (department filtering)
       let goalsQuery = supabase

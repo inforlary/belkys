@@ -17,20 +17,24 @@ interface DepartmentData {
   rank: number;
 }
 
-export default function DepartmentPerformance() {
+interface DepartmentPerformanceProps {
+  selectedYear?: number;
+}
+
+export default function DepartmentPerformance({ selectedYear }: DepartmentPerformanceProps) {
   const { profile } = useAuth();
   const [departments, setDepartments] = useState<DepartmentData[]>([]);
   const [loading, setLoading] = useState(true);
+  const currentYear = selectedYear || new Date().getFullYear();
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) return;
 
     try {
-      const currentYear = new Date().getFullYear();
 
       let deptsQuery = supabase
         .from('departments')

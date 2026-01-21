@@ -18,7 +18,11 @@ interface IndicatorEntryStatus {
   completion_rate: number;
 }
 
-export default function DataEntryStatus() {
+interface DataEntryStatusProps {
+  selectedYear?: number;
+}
+
+export default function DataEntryStatus({ selectedYear }: DataEntryStatusProps) {
   const { profile } = useAuth();
   const [indicators, setIndicators] = useState<IndicatorEntryStatus[]>([]);
   const [stats, setStats] = useState({
@@ -30,16 +34,16 @@ export default function DataEntryStatus() {
     missing: 0,
   });
   const [loading, setLoading] = useState(true);
+  const currentYear = selectedYear || new Date().getFullYear();
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) return;
 
     try {
-      const currentYear = new Date().getFullYear();
 
       // Get allowed goals first
       let goalsQuery = supabase

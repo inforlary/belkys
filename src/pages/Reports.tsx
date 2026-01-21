@@ -23,6 +23,9 @@ type ReportTab =
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState<ReportTab>('executive-summary');
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   const tabs = [
     {
@@ -127,11 +130,23 @@ export default function Reports() {
 
         <div className="p-6">
           {activeTabData && (
-            <div className="mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <p className="text-slate-600">{activeTabData.description}</p>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Yıl:</label>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {years.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
-          {ActiveComponent && <ActiveComponent />}
+          {ActiveComponent && <ActiveComponent selectedYear={selectedYear} />}
         </div>
       </div>
     </div>

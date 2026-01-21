@@ -20,20 +20,24 @@ interface GoalData {
   forecast: string;
 }
 
-export default function GoalAchievement() {
+interface GoalAchievementProps {
+  selectedYear?: number;
+}
+
+export default function GoalAchievement({ selectedYear }: GoalAchievementProps) {
   const { profile } = useAuth();
   const [goals, setGoals] = useState<GoalData[]>([]);
   const [loading, setLoading] = useState(true);
+  const currentYear = selectedYear || new Date().getFullYear();
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) return;
 
     try {
-      const currentYear = new Date().getFullYear();
 
       let goalsQuery = supabase
         .from('goals')

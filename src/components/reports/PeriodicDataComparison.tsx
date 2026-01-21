@@ -39,12 +39,17 @@ interface ComparisonData {
   targetAchievement: number;
 }
 
-export function PeriodicDataComparison() {
+interface PeriodicDataComparisonProps {
+  selectedYear?: number;
+}
+
+export function PeriodicDataComparison({ selectedYear }: PeriodicDataComparisonProps) {
   const { profile } = useAuth();
   const [data, setData] = useState<ComparisonData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [year1, setYear1] = useState(2024);
-  const [year2, setYear2] = useState(2025);
+  const currentYear = selectedYear || new Date().getFullYear();
+  const [year1, setYear1] = useState(currentYear - 1);
+  const [year2, setYear2] = useState(currentYear);
   const [selectedDept, setSelectedDept] = useState('all');
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
@@ -52,6 +57,11 @@ export function PeriodicDataComparison() {
   useEffect(() => {
     loadDepartments();
   }, []);
+
+  useEffect(() => {
+    setYear1(currentYear - 1);
+    setYear2(currentYear);
+  }, [selectedYear]);
 
   useEffect(() => {
     if (profile?.organization_id) {

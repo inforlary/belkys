@@ -15,14 +15,18 @@ interface PlanSummary {
   indicators_count: number;
 }
 
-export default function StrategicPlanSummary() {
+interface StrategicPlanSummaryProps {
+  selectedYear?: number;
+}
+
+export default function StrategicPlanSummary({ selectedYear }: StrategicPlanSummaryProps) {
   const { profile } = useAuth();
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+  }, [profile, selectedYear]);
 
   const loadData = async () => {
     if (!profile?.organization_id) {
