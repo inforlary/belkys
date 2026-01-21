@@ -282,7 +282,6 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: 'risk-management/dashboard' },
         { icon: FileWarning, label: 'Risk Listesi', path: 'risk-management/risks' },
-        { icon: CheckCircle, label: 'Risk Onayları', path: 'risk-management/approvals', directorOrAdmin: true },
         { icon: Grid, label: 'Risk Matrisi', path: 'risk-management/matrix' },
         { icon: Shield, label: 'Risk Kontrolleri', path: 'risk-management/controls' },
         { icon: CheckSquare, label: 'Risk Faaliyetleri', path: 'risk-management/treatments' },

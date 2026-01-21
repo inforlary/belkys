@@ -78,7 +78,6 @@ import RiskSettingsStrategy from './pages/RiskSettingsStrategy';
 import RiskSettingsCriteria from './pages/RiskSettingsCriteria';
 import RiskRegister from './pages/RiskRegister';
 import RiskRegisterNew from './pages/RiskRegisterNew';
-import RiskApprovals from './pages/RiskApprovals';
 import RiskDetail from './pages/RiskDetail';
 import RiskMatrix from './pages/RiskMatrix';
 import RiskIndicators from './pages/RiskIndicators';
@@ -347,8 +346,6 @@ const renderPage = () => {
         return <RiskRegister />;
       case 'risks/register/new':
         return <RiskRegisterNew />;
-      case 'risks/approvals':
-        return <RiskApprovals />;
       case 'risks/matrix':
         return <RiskMatrix />;
       case 'risks/indicators':
@@ -371,8 +368,6 @@ const renderPage = () => {
         return <RiskSettingsCriteria />;
       case 'risk-management/risks':
         return <RiskRegister />;
-      case 'risk-management/approvals':
-        return <RiskApprovals />;
       case 'risk-management/matrix':
         return <RiskMatrix />;
       case 'risk-management/controls':
