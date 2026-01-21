@@ -510,7 +510,27 @@ export default function PerformanceKPIDashboard() {
                     </div>
                   </div>
 
-                  {group.onTarget.length > 0 ? (
+                  {/* DEBUG: Tüm göstergeler */}
+                  <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                      DEBUG: Tüm Göstergeler ({group.indicators.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {group.indicators.map((ind, i) => (
+                        <div key={i} className="bg-white p-2 rounded text-xs border">
+                          <div><strong>Kod:</strong> {ind.code}</div>
+                          <div><strong>İsim:</strong> {ind.name}</div>
+                          <div><strong>Başarı:</strong> {ind.achievement_rate}%</div>
+                          <div><strong>Kategori:</strong> {
+                            ind.achievement_rate >= 85 ? 'Hedefte' :
+                            ind.achievement_rate >= 50 ? 'Risk' : 'Geride'
+                          }</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(group.onTarget && group.onTarget.length > 0) && (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
