@@ -325,7 +325,7 @@ export default function RiskRegisterNew() {
     setRiskRelations(riskRelations.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (submitForApproval: boolean = false) => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.risk_source || !formData.risk_relation || !formData.control_level) {
       alert('Lütfen tüm zorunlu alanları doldurun');
       return;
@@ -363,10 +363,7 @@ export default function RiskRegisterNew() {
         review_period: formData.review_period,
         last_review_date: formData.last_review_date,
         next_review_date: nextReviewDate,
-        status: submitForApproval ? 'PENDING_APPROVAL' : 'DRAFT',
-        approval_status: submitForApproval ? 'IN_REVIEW' : 'DRAFT',
-        submitted_at: submitForApproval ? new Date().toISOString() : null,
-        submitted_by_id: submitForApproval ? profile?.id : null,
+        status: 'ACTIVE',
         identified_by_id: profile?.id,
         identified_date: new Date().toISOString().split('T')[0],
       };
@@ -425,7 +422,7 @@ export default function RiskRegisterNew() {
         if (relationsError) throw relationsError;
       }
 
-      alert(submitForApproval ? 'Risk onaya gönderildi' : 'Risk taslak olarak kaydedildi');
+      alert('Risk başarıyla kaydedildi');
       navigate('/risk-management');
     } catch (error: any) {
       console.error('Error saving risk:', error);
@@ -1438,22 +1435,12 @@ export default function RiskRegisterNew() {
 
           <button
             type="button"
-            onClick={() => handleSubmit(false)}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {loading ? 'Kaydediliyor...' : 'Kaydet'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSubmit(true)}
+            onClick={handleSubmit}
             disabled={loading}
             className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            {loading ? 'Kaydediliyor...' : 'Kaydet ve Onaya Gönder'}
+            {loading ? 'Kaydediliyor...' : 'Kaydet'}
           </button>
         </div>
       </form>

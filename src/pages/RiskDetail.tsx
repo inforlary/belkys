@@ -432,7 +432,7 @@ export default function RiskDetail() {
     setRiskRelations(riskRelations.filter((_, i) => i !== index));
   };
 
-  const handleUpdate = async (submitForApproval: boolean = false) => {
+  const handleUpdate = async () => {
     if (!formData.name || !formData.risk_source || !formData.risk_relation || !formData.control_level) {
       alert('Lütfen tüm zorunlu alanları doldurun');
       return;
@@ -467,14 +467,8 @@ export default function RiskDetail() {
         review_period: formData.review_period,
         last_review_date: formData.last_review_date,
         next_review_date: nextReviewDate,
-        status: submitForApproval ? 'PENDING_APPROVAL' : formData.status,
+        status: 'ACTIVE',
       };
-
-      if (submitForApproval) {
-        riskData.approval_status = 'IN_REVIEW';
-        riskData.submitted_at = new Date().toISOString();
-        riskData.submitted_by_id = profile?.id;
-      }
 
       const { error: riskError } = await supabase
         .from('risks')
@@ -544,7 +538,7 @@ export default function RiskDetail() {
         if (relationsError) throw relationsError;
       }
 
-      alert(submitForApproval ? 'Risk onaya gönderildi' : 'Risk güncellendi');
+      alert('Risk güncellendi');
       setIsEditing(false);
       await loadData();
     } catch (error: any) {
@@ -1648,25 +1642,13 @@ export default function RiskDetail() {
 
             <button
               type="button"
-              onClick={() => handleUpdate(false)}
+              onClick={handleUpdate}
               disabled={saving}
-              className="flex items-center gap-2 px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Kaydediliyor...' : 'Kaydet'}
             </button>
-
-            {formData.status === 'DRAFT' && (
-              <button
-                type="button"
-                onClick={() => handleUpdate(true)}
-                disabled={saving}
-                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? 'Kaydediliyor...' : 'Kaydet ve Onaya Gönder'}
-              </button>
-            )}
           </div>
         </form>
       ) : (
