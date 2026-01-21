@@ -535,6 +535,42 @@ export default function DataEntry() {
     return currentValue;
   };
 
+const getCurrentValueLabel = (indicator: Indicator) => {
+    const indicatorEntries = entries.filter(
+      e => e.indicator_id === indicator.id && e.status === 'approved'
+    );
+    
+    if (indicatorEntries.length === 0) return '';
+    
+    const calculationMethod = indicator.calculation_method || 'cumulative';
+    const periodLabels = indicatorEntries.map((_, index) => `Ç${index + 1}`).join('+');
+    
+    switch (calculationMethod) {
+      case 'cumulative':
+      case 'cumulative_increasing':
+      case 'increasing':
+        return `Başlangıç + ${periodLabels}`;
+        
+      case 'cumulative_decreasing':
+      case 'decreasing':
+        return `Başlangıç - ${periodLabels}`;
+        
+      case 'percentage':
+      case 'percentage_increasing':
+      case 'percentage_decreasing':
+      case 'maintenance':
+      case 'maintenance_increasing':
+      case 'maintenance_decreasing':
+        return `Ort: ${periodLabels}`;
+        
+      default:
+        return periodLabels;
+    }
+  };
+
+
+
+  
   const calculateProgress = (indicator: Indicator) => {
     const dataEntriesForIndicator = entries
       .filter(e => e.indicator_id === indicator.id && e.period_year === selectedYear)
