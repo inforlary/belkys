@@ -39,7 +39,7 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 const [expandedSections, setExpandedSections] = useState<string[]>([]);
   const { profile, signOut } = useAuth();
-  const { currentPath, navigate, searchParams } = useLocation();
+  const { currentPath, navigate } = useLocation();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [latestNotification, setLatestNotification] = useState<string | null>(null);
   const [icPlans, setIcPlans] = useState<ICPlan[]>([]);
@@ -108,14 +108,8 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         currentPath.startsWith('department-program-mapping') ||
         currentPath.startsWith('budget-performance') ||
         currentPath === 'program-mapping') {
-      if (!expandedSections.includes('bütçe-pp')) {
-        setExpandedSections(prev => [...prev, 'bütçe-pp']);
-      }
-    }
-
-    if (currentPath === 'reports') {
-      if (!expandedSections.includes('stratejik-plan')) {
-        setExpandedSections(prev => [...prev, 'stratejik-plan']);
+      if (!expandedSections.includes('Bütçe PP')) {
+        setExpandedSections(prev => [...prev, 'Bütçe PP']);
       }
     }
   }, [currentPath]);
@@ -239,15 +233,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       icon: Target,
       items: [
         { icon: Target, label: 'Hedeflerim', path: 'my-goals', requiresDepartment: true },
-        { icon: Award, label: 'Yönetici Özeti', path: 'reports?tab=executive-summary' },
-        { icon: FileText, label: 'Stratejik Plan Özeti', path: 'reports?tab=strategic-plan' },
-        { icon: TrendingUp, label: 'Performans Gösterge Paneli', path: 'reports?tab=performance-dashboard' },
-        { icon: BarChart3, label: 'Gösterge Performansı', path: 'reports?tab=indicator-performance' },
-        { icon: Users, label: 'Birim Performansı', path: 'reports?tab=department-performance' },
-        { icon: Target, label: 'Hedef Başarısı', path: 'reports?tab=goal-achievement' },
-        { icon: Briefcase, label: 'Faaliyet Durumu', path: 'reports?tab=activity-status' },
-        { icon: ClipboardCheck, label: 'Veri Giriş Durumu', path: 'reports?tab=data-entry-status' },
-        { icon: Calendar, label: 'Dönemsel Karşılaştırma', path: 'reports?tab=periodic-comparison' },
+        { icon: FileText, label: 'Raporlar', path: 'reports' },
         { icon: FileBarChart, label: 'Stratejik Plan Raporları', path: 'strategic-plan-reports' },
         { icon: Target, label: 'Stratejik Planlar', path: 'plans', adminOnly: true },
         { icon: Flag, label: 'Amaçlar', path: 'objectives', adminOnly: true },
@@ -443,10 +429,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
           {!profile?.is_super_admin && topMenuItems.map((item) => {
             if (!shouldShowMenuItem(item)) return null;
             const Icon = item.icon;
-            const itemPath = item.path.split('?')[0];
-            const itemQuery = item.path.includes('?') ? item.path.split('?')[1] : '';
-            const currentQuery = searchParams.toString();
-            const isActive = currentPath === itemPath && (!itemQuery || currentQuery === itemQuery);
+            const isActive = currentPath === item.path;
             return (
               <button
                 key={item.path}
@@ -471,12 +454,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
                 const sectionKey = section.label.toLowerCase().replace(/\s+/g, '-');
                 const isExpanded = expandedSections.includes(sectionKey);
                 const SectionIcon = section.icon;
-                const hasActiveItem = section.items.some(item => {
-                  const itemPath = item.path.split('?')[0];
-                  const itemQuery = item.path.includes('?') ? item.path.split('?')[1] : '';
-                  const currentQuery = searchParams.toString();
-                  return currentPath === itemPath && (!itemQuery || currentQuery === itemQuery);
-                });
+                const hasActiveItem = section.items.some(item => item.path === currentPath);
 
                 const mainModules = ['Stratejik Plan', 'Faaliyet Raporu', 'Bütçe PP', 'Risk Yönetimi', 'İç Kontrol'];
                 const isMainModule = mainModules.includes(section.label);
@@ -553,10 +531,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
                         {section.items.map((item) => {
                           if (!shouldShowMenuItem(item)) return null;
                           const Icon = item.icon;
-                          const itemPath = item.path.split('?')[0];
-                          const itemQuery = item.path.includes('?') ? item.path.split('?')[1] : '';
-                          const currentQuery = searchParams.toString();
-                          const isActive = currentPath === itemPath && (!itemQuery || currentQuery === itemQuery);
+                          const isActive = currentPath === item.path;
                           const showBadge = item.path === 'data-approvals' && pendingApprovals > 0;
                           return (
                             <button
@@ -604,10 +579,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
               if (!shouldShowMenuItem(item)) return null;
               if (profile?.is_super_admin && item.path !== 'user-profile' && item.path !== 'notification-center') return null;
               const Icon = item.icon;
-              const itemPath = item.path.split('?')[0];
-              const itemQuery = item.path.includes('?') ? item.path.split('?')[1] : '';
-              const currentQuery = searchParams.toString();
-              const isActive = currentPath === itemPath && (!itemQuery || currentQuery === itemQuery);
+              const isActive = currentPath === item.path;
               return (
                 <button
                   key={item.path}
