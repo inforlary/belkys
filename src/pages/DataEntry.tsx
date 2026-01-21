@@ -536,6 +536,9 @@ export default function DataEntry() {
   };
 
 const getCurrentValueLabel = (indicator: Indicator) => {
+  const getIndicatorTarget = (indicator: Indicator) => {
+    return indicator.yearly_target || indicator.target_value || 0;
+  };
     const indicatorEntries = entries.filter(
       e => e.indicator_id === indicator.id && e.status === 'approved'
     );
