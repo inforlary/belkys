@@ -85,12 +85,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
 
   const loadData = async () => {
     if (!profile?.organization_id) {
-      console.log('No organization_id found in profile');
       return;
     }
 
     try {
-      console.log('Loading indicators for organization:', profile.organization_id, 'year:', currentYear);
 
       // First get goals to filter indicators by department
       let goalsQuery = supabase
@@ -105,8 +103,6 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
 
       const { data: allowedGoals } = await goalsQuery;
       const allowedGoalIds = allowedGoals?.map(g => g.id) || [];
-
-      console.log('Allowed goals for user:', allowedGoalIds.length);
 
       let indicatorsQuery = supabase
         .from('indicators')
@@ -158,23 +154,11 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         indicatorsQuery,
       ]);
 
-      console.log('Departments loaded:', depsData.data?.length || 0);
-      console.log('Plans loaded:', plansData.data?.length || 0);
-      console.log('Indicators loaded:', indicatorsData.data?.length || 0);
-
-      if (depsData.error) console.error('Department error:', JSON.stringify(depsData.error, null, 2));
-      if (plansData.error) console.error('Plans error:', JSON.stringify(plansData.error, null, 2));
-      if (indicatorsData.error) {
-        console.error('Indicators error:', JSON.stringify(indicatorsData.error, null, 2));
-        console.error('Full indicators response:', indicatorsData);
-      }
-
       setDepartments(depsData.data || []);
       setPlans(plansData.data || []);
 
       if (indicatorsData.data && indicatorsData.data.length > 0) {
         const indicatorIds = indicatorsData.data.map(i => i.id);
-        console.log('Processing', indicatorIds.length, 'indicators');
 
         const [entriesData, targetsData] = await Promise.all([
           supabase
@@ -189,9 +173,6 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             .eq('year', currentYear)
             .in('indicator_id', indicatorIds),
         ]);
-
-        console.log('Entries loaded:', entriesData.data?.length || 0);
-        console.log('Targets loaded:', targetsData.data?.length || 0);
 
         const entriesByIndicator: Record<string, { [key: number]: { value: number, notes: string } }> = {};
         entriesData.data?.forEach(entry => {
@@ -267,14 +248,9 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           };
         });
 
-        console.log('Sample indicator data:', processedIndicators[0]);
-        console.log('First 3 indicators dept IDs:', processedIndicators.slice(0, 3).map(i => ({ name: i.name, dept_id: i.department_id, plan_id: i.strategic_plan_id })));
-
         setIndicators(processedIndicators);
-        console.log('Final processed indicators:', processedIndicators.length);
       } else {
         setIndicators([]);
-        console.log('No indicators data to process');
       }
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
@@ -286,23 +262,14 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const applyFilters = () => {
     let filtered = [...indicators];
 
-    console.log('Applying filters. Total indicators:', indicators.length);
-    console.log('Selected department:', selectedDepartment);
-    console.log('Selected plan:', selectedPlan);
-
     if (selectedDepartment) {
-      const beforeFilter = filtered.length;
       filtered = filtered.filter(i => i.department_id === selectedDepartment);
-      console.log('After department filter:', filtered.length, 'from', beforeFilter);
     }
 
     if (selectedPlan) {
-      const beforeFilter = filtered.length;
       filtered = filtered.filter(i => i.strategic_plan_id === selectedPlan);
-      console.log('After plan filter:', filtered.length, 'from', beforeFilter);
     }
 
-    console.log('Final filtered indicators:', filtered.length);
     setFilteredIndicators(filtered);
   };
 
