@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, CheckCircle, XCircle, Clock, Plus, CreditCard as Edit2, Trash2, Send } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, Plus, CreditCard as Edit2, Trash2, Send, X } from 'lucide-react';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
+import { calculatePerformancePercentage, CalculationMethod } from '../utils/indicatorCalculations';
+import Modal from '../components/ui/Modal';
 
 interface Indicator {
   id: string;
@@ -50,6 +52,16 @@ interface DataEntry {
   };
 }
 
+interface IndicatorDetail {
+  id: string;
+  name: string;
+  code: string;
+  current_value: number;
+  target_value: number;
+  progress: number;
+  status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+}
+
 export default function DataEntry() {
   const { profile } = useAuth();
   const [indicators, setIndicators] = useState<Indicator[]>([]);
@@ -65,6 +77,10 @@ export default function DataEntry() {
     periodQuarter: number | null;
     value: string;
   } | null>(null);
+  const [showIndicatorModal, setShowIndicatorModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<'exceeding_target' | 'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
+  const [loadingIndicators, setLoadingIndicators] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -173,7 +189,11 @@ export default function DataEntry() {
         measurement_frequency: i.measurement_frequency
       })));
 
-      setIndicators(mappedIndicators);
+      const sortedIndicators = mappedIndicators.sort((a, b) => {
+        return a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' });
+      });
+
+      setIndicators(sortedIndicators);
 
       console.log('Loaded entries from database:', entriesRes.data);
       if (entriesRes.data && entriesRes.data.length > 0) {
@@ -646,6 +666,127 @@ const getIndicatorTarget = (indicator: Indicator) => {
     return '';
   };
 
+  const getIndicatorStats = () => {
+    let exceedingTarget = 0;
+    let onTrack = 0;
+    let atRisk = 0;
+    let behind = 0;
+
+    indicators.forEach(ind => {
+      const target = getIndicatorTarget(ind);
+      if (target === 0) {
+        behind++;
+        return;
+      }
+
+      const indicatorEntries = entries.filter(
+        e => e.indicator_id === ind.id && e.period_year === selectedYear && e.status === 'approved'
+      );
+
+      const periodValues = indicatorEntries.map(e => e.value || 0);
+      const calculationMethod = (ind.calculation_method || 'standard') as CalculationMethod;
+      const baselineValue = getIndicatorBaseline(ind);
+
+      const progress = calculatePerformancePercentage({
+        method: calculationMethod,
+        baselineValue: baselineValue,
+        targetValue: target,
+        periodValues: periodValues,
+        currentValue: 0,
+      });
+
+      if (progress >= 200) exceedingTarget++;
+      else if (progress >= 70) onTrack++;
+      else if (progress >= 50) atRisk++;
+      else behind++;
+    });
+
+    return { exceedingTarget, onTrack, atRisk, behind, total: indicators.length };
+  };
+
+  const loadIndicatorDetails = async (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
+    setSelectedStatus(status);
+    setShowIndicatorModal(true);
+    setLoadingIndicators(true);
+
+    try {
+      const details: IndicatorDetail[] = [];
+
+      indicators.forEach(indicator => {
+        const target = getIndicatorTarget(indicator);
+        if (target === 0) return;
+
+        const indicatorEntries = entries.filter(
+          e => e.indicator_id === indicator.id && e.period_year === selectedYear && e.status === 'approved'
+        );
+
+        const periodValues = indicatorEntries.map(e => e.value || 0);
+        const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
+        const baselineValue = getIndicatorBaseline(indicator);
+
+        const sum = periodValues.reduce((acc, val) => acc + val, 0);
+        let currentValue = sum;
+
+        if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+          currentValue = baselineValue + sum;
+        } else if (calculationMethod === 'decreasing') {
+          currentValue = baselineValue - sum;
+        }
+
+        const progress = calculatePerformancePercentage({
+          method: calculationMethod,
+          baselineValue: baselineValue,
+          targetValue: target,
+          periodValues: periodValues,
+          currentValue: currentValue,
+        });
+
+        let indicatorStatus: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+        if (progress >= 200) indicatorStatus = 'exceeding_target';
+        else if (progress >= 70) indicatorStatus = 'on_track';
+        else if (progress >= 50) indicatorStatus = 'at_risk';
+        else indicatorStatus = 'behind';
+
+        if (indicatorStatus === status) {
+          details.push({
+            id: indicator.id,
+            name: indicator.name,
+            code: indicator.code || '',
+            current_value: currentValue,
+            target_value: target,
+            progress: progress,
+            status: indicatorStatus,
+          });
+        }
+      });
+
+      details.sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }));
+      setIndicatorDetails(details);
+    } catch (error) {
+      console.error('Gösterge detayları yükleme hatası:', error);
+    } finally {
+      setLoadingIndicators(false);
+    }
+  };
+
+  const getStatusLabel = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
+    switch (status) {
+      case 'exceeding_target': return 'Hedef Sapması';
+      case 'on_track': return 'Hedefte';
+      case 'at_risk': return 'Risk Altında';
+      case 'behind': return 'Geride';
+    }
+  };
+
+  const getStatusColor = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
+    switch (status) {
+      case 'exceeding_target': return 'text-purple-600 bg-purple-50';
+      case 'on_track': return 'text-green-600 bg-green-50';
+      case 'at_risk': return 'text-yellow-600 bg-yellow-50';
+      case 'behind': return 'text-red-600 bg-red-50';
+    }
+  };
+
   const filteredIndicators = indicators.filter(indicator =>
     indicator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     indicator.code.toLowerCase().includes(searchTerm.toLowerCase())
@@ -659,6 +800,8 @@ const getIndicatorTarget = (indicator: Indicator) => {
     );
   }
 
+  const stats = getIndicatorStats();
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -666,6 +809,53 @@ const getIndicatorTarget = (indicator: Indicator) => {
         <p className="text-gray-600 mt-1">
           Performans göstergelerinize dönemsel veri girin (ölçüm sıklığına göre aylık, çeyreklik, 6 aylık veya yıllık)
         </p>
+      </div>
+
+      <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-3xl font-bold text-slate-900">{stats.total}</div>
+          <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
+        </div>
+        <button
+          onClick={() => stats.exceedingTarget > 0 && loadIndicatorDetails('exceeding_target')}
+          disabled={stats.exceedingTarget === 0}
+          className={`bg-purple-50 border border-purple-200 rounded-lg p-4 text-center transition-all ${
+            stats.exceedingTarget > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-purple-600">{stats.exceedingTarget}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+        </button>
+        <button
+          onClick={() => stats.onTrack > 0 && loadIndicatorDetails('on_track')}
+          disabled={stats.onTrack === 0}
+          className={`bg-green-50 border border-green-200 rounded-lg p-4 text-center transition-all ${
+            stats.onTrack > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-green-600">{stats.onTrack}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedefte</div>
+        </button>
+        <button
+          onClick={() => stats.atRisk > 0 && loadIndicatorDetails('at_risk')}
+          disabled={stats.atRisk === 0}
+          className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center transition-all ${
+            stats.atRisk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-yellow-600">{stats.atRisk}</div>
+          <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
+        </button>
+        <button
+          onClick={() => stats.behind > 0 && loadIndicatorDetails('behind')}
+          disabled={stats.behind === 0}
+          className={`bg-red-50 border border-red-200 rounded-lg p-4 text-center transition-all ${
+            stats.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-red-600">{stats.behind}</div>
+          <div className="text-sm text-slate-600 mt-1">Geride</div>
+        </button>
       </div>
 
       <div className="flex gap-4 mb-6">
@@ -870,6 +1060,106 @@ const getIndicatorTarget = (indicator: Indicator) => {
           <p className="text-gray-600">Gösterge bulunamadı</p>
         </div>
       )}
+
+      <Modal
+        isOpen={showIndicatorModal}
+        onClose={() => setShowIndicatorModal(false)}
+        title={`${selectedStatus ? getStatusLabel(selectedStatus) : ''} Göstergeler`}
+        size="large"
+      >
+        <div className="space-y-4">
+          {loadingIndicators ? (
+            <div className="text-center py-8 text-slate-500">Göstergeler yükleniyor...</div>
+          ) : indicatorDetails.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">Bu kategoride gösterge bulunmuyor</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="mb-4 p-4 bg-slate-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-slate-600">
+                    Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
+                  </div>
+                  {selectedStatus && (
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedStatus)}`}>
+                      {getStatusLabel(selectedStatus)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {indicatorDetails.map((indicator) => (
+                <div
+                  key={indicator.id}
+                  className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                          {indicator.code}
+                        </span>
+                        {selectedStatus && (
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(selectedStatus)}`}>
+                            {getStatusLabel(selectedStatus)}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-medium text-slate-900 mb-3">{indicator.name}</h4>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Gerçekleşen</div>
+                          <div className="text-lg font-semibold text-blue-600">
+                            {indicator.current_value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Hedef</div>
+                          <div className="text-lg font-semibold text-slate-700">
+                            {indicator.target_value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">İlerleme</div>
+                          <div className="text-lg font-semibold text-slate-900">
+                            {Math.round(indicator.progress)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              indicator.status === 'exceeding_target'
+                                ? 'bg-purple-500'
+                                : indicator.status === 'on_track'
+                                ? 'bg-green-500'
+                                : indicator.status === 'at_risk'
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(indicator.progress, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t">
+            <button
+              onClick={() => setShowIndicatorModal(false)}
+              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
