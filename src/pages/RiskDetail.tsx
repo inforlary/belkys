@@ -523,12 +523,12 @@ export default function RiskDetail() {
 
       if (riskRelations.length > 0) {
         const relations = riskRelations.map(rel => ({
-          organization_id: risk?.organization_id,
+          organization_id: profile?.organization_id,
           source_risk_id: riskId,
           target_risk_id: rel.related_risk_id,
           relation_type: rel.relation_type,
           description: rel.description,
-          created_by: risk?.identified_by_id
+          created_by: profile?.id
         }));
 
         const { error: relationsError } = await supabase
