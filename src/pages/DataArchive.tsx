@@ -209,7 +209,9 @@ export default function DataArchive() {
       setLoading(false);
     }
   };
-
+const getIndicatorTarget = (indicatorId: string, indicator: any) => {
+    return indicator.yearly_target || indicator.target_value || 0;
+  };
  const calculateCurrentValue = (indicator: Indicator) => {
     const indicatorEntries = entries.filter(
       e => e.indicator_id === indicator.id && e.status === 'approved'
