@@ -198,22 +198,27 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
             indicatorIds.forEach(id => {
               const targetData = targetsByIndicator[id];
-              if (targetData && targetData.target > 0) {
-                const periodValues = entriesByIndicator[id] || [];
-                const calculationMethod = indicatorMethodMap[id];
 
-                const progress = calculatePerformancePercentage({
-                  method: calculationMethod,
-                  baselineValue: targetData.baseline,
-                  targetValue: targetData.target,
-                  periodValues: periodValues,
-                  currentValue: 0,
-                });
-
-                totalProgress += progress;
-                const status = getIndicatorStatus(progress);
+              if (!targetData || targetData.target === 0) {
+                const status = getIndicatorStatus(0);
                 incrementStatusInStats(stats, status);
+                return;
               }
+
+              const periodValues = entriesByIndicator[id] || [];
+              const calculationMethod = indicatorMethodMap[id];
+
+              const progress = calculatePerformancePercentage({
+                method: calculationMethod,
+                baselineValue: targetData.baseline,
+                targetValue: targetData.target,
+                periodValues: periodValues,
+                currentValue: 0,
+              });
+
+              totalProgress += progress;
+              const status = getIndicatorStatus(progress);
+              incrementStatusInStats(stats, status);
             });
 
             return {

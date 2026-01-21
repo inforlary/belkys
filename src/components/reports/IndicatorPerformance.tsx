@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Download, Filter, TrendingUp, FileText, X } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
-import { calculateIndicatorProgress } from '../../utils/progressCalculations';
+import { calculateIndicatorProgress, getProgressColor, getProgressTextColor } from '../../utils/progressCalculations';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 import {
   IndicatorStatus,
@@ -1126,15 +1126,18 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                         {ind.target_value} {ind.unit}
                                       </td>
                                       <td className="px-4 py-3 text-center">
-                                        <div className="flex items-center justify-center gap-2">
+                                        <div className="flex flex-col items-center gap-2">
                                           <div
-                                            className={`text-sm font-medium ${
-                                              selectedProgress >= 70 ? 'text-green-600' : selectedProgress >= 50 ? 'text-yellow-600' : 'text-red-600'
-                                            }`}
+                                            className={`text-sm font-medium ${getProgressTextColor(selectedProgress)}`}
                                           >
                                             {Math.round(selectedProgress)}%
                                           </div>
-                                          {selectedProgress >= 70 && <TrendingUp className="w-4 h-4 text-green-600" />}
+                                          <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div
+                                              className={`h-2 rounded-full ${getProgressColor(selectedProgress)}`}
+                                              style={{ width: `${Math.min(100, selectedProgress)}%` }}
+                                            />
+                                          </div>
                                         </div>
                                       </td>
                                     </tr>
