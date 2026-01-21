@@ -47,6 +47,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentPerformance | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
+  const [overallStats, setOverallStats] = useState({ exceedingTarget: 0, onTrack: 0, atRisk: 0, behind: 0, total: 0 });
 
   useEffect(() => {
     loadData();
@@ -229,6 +230,19 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
           0
         );
         setOverallProgress(totalValidIndicators > 0 ? weightedProgress / totalValidIndicators : 0);
+
+        const totalExceedingTarget = performanceData.reduce((sum, d) => sum + d.exceeding_target, 0);
+        const totalOnTrack = performanceData.reduce((sum, d) => sum + d.on_track, 0);
+        const totalAtRisk = performanceData.reduce((sum, d) => sum + d.at_risk, 0);
+        const totalBehind = performanceData.reduce((sum, d) => sum + d.behind, 0);
+
+        setOverallStats({
+          exceedingTarget: totalExceedingTarget,
+          onTrack: totalOnTrack,
+          atRisk: totalAtRisk,
+          behind: totalBehind,
+          total: totalValidIndicators,
+        });
       }
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
@@ -256,20 +270,27 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     generatePerformanceDashboardPDF(sortedDepartments, overallProgress);
   };
 
-  const loadIndicatorDetails = async (dept: DepartmentPerformance, status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
+  const loadIndicatorDetails = async (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind', dept?: DepartmentPerformance) => {
     if (!profile?.organization_id) return;
 
-    setSelectedDepartment(dept);
+    setSelectedDepartment(dept || null);
     setSelectedStatus(status);
     setShowIndicatorModal(true);
     setLoadingIndicators(true);
 
     try {
-      const { data: goals } = await supabase
+      let goalsQuery = supabase
         .from('goals')
         .select('id')
-        .eq('organization_id', profile.organization_id)
-        .eq('department_id', dept.department_id);
+        .eq('organization_id', profile.organization_id);
+
+      if (dept) {
+        goalsQuery = goalsQuery.eq('department_id', dept.department_id);
+      } else if (profile.role !== 'admin' && profile.role !== 'manager' && profile.department_id) {
+        goalsQuery = goalsQuery.eq('department_id', profile.department_id);
+      }
+
+      const { data: goals } = await goalsQuery;
 
       if (!goals || goals.length === 0) {
         setIndicatorDetails([]);
@@ -459,6 +480,53 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         </div>
       </div>
 
+      <div className="grid grid-cols-5 gap-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-3xl font-bold text-slate-900">{overallStats.total}</div>
+          <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
+        </div>
+        <button
+          onClick={() => overallStats.exceedingTarget > 0 && loadIndicatorDetails('exceeding_target')}
+          disabled={overallStats.exceedingTarget === 0}
+          className={`bg-purple-50 border border-purple-200 rounded-lg p-4 text-center transition-all ${
+            overallStats.exceedingTarget > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-purple-600">{overallStats.exceedingTarget}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+        </button>
+        <button
+          onClick={() => overallStats.onTrack > 0 && loadIndicatorDetails('on_track')}
+          disabled={overallStats.onTrack === 0}
+          className={`bg-green-50 border border-green-200 rounded-lg p-4 text-center transition-all ${
+            overallStats.onTrack > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-green-600">{overallStats.onTrack}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedefte</div>
+        </button>
+        <button
+          onClick={() => overallStats.atRisk > 0 && loadIndicatorDetails('at_risk')}
+          disabled={overallStats.atRisk === 0}
+          className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center transition-all ${
+            overallStats.atRisk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-yellow-600">{overallStats.atRisk}</div>
+          <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
+        </button>
+        <button
+          onClick={() => overallStats.behind > 0 && loadIndicatorDetails('behind')}
+          disabled={overallStats.behind === 0}
+          className={`bg-red-50 border border-red-200 rounded-lg p-4 text-center transition-all ${
+            overallStats.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-red-600">{overallStats.behind}</div>
+          <div className="text-sm text-slate-600 mt-1">Geride</div>
+        </button>
+      </div>
+
       {sortedDepartments.length === 0 ? (
         <div className="text-center py-12 bg-slate-50 rounded-lg">
           <p className="text-slate-500">Henüz veri bulunmuyor</p>
@@ -518,7 +586,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
               <div className="grid grid-cols-4 gap-3">
                 <button
-                  onClick={() => dept.exceeding_target > 0 && loadIndicatorDetails(dept, 'exceeding_target')}
+                  onClick={() => dept.exceeding_target > 0 && loadIndicatorDetails('exceeding_target', dept)}
                   disabled={dept.exceeding_target === 0}
                   className={`bg-purple-50 rounded-lg p-3 text-center transition-all ${
                     dept.exceeding_target > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
@@ -528,7 +596,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                   <div className="text-xs text-slate-600">Hedef Sapması</div>
                 </button>
                 <button
-                  onClick={() => dept.on_track > 0 && loadIndicatorDetails(dept, 'on_track')}
+                  onClick={() => dept.on_track > 0 && loadIndicatorDetails('on_track', dept)}
                   disabled={dept.on_track === 0}
                   className={`bg-green-50 rounded-lg p-3 text-center transition-all ${
                     dept.on_track > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
@@ -538,7 +606,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                   <div className="text-xs text-slate-600">Hedefte</div>
                 </button>
                 <button
-                  onClick={() => dept.at_risk > 0 && loadIndicatorDetails(dept, 'at_risk')}
+                  onClick={() => dept.at_risk > 0 && loadIndicatorDetails('at_risk', dept)}
                   disabled={dept.at_risk === 0}
                   className={`bg-yellow-50 rounded-lg p-3 text-center transition-all ${
                     dept.at_risk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
@@ -548,7 +616,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                   <div className="text-xs text-slate-600">Risk Altında</div>
                 </button>
                 <button
-                  onClick={() => dept.behind > 0 && loadIndicatorDetails(dept, 'behind')}
+                  onClick={() => dept.behind > 0 && loadIndicatorDetails('behind', dept)}
                   disabled={dept.behind === 0}
                   className={`bg-red-50 rounded-lg p-3 text-center transition-all ${
                     dept.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
@@ -567,7 +635,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
       <Modal
         isOpen={showIndicatorModal}
         onClose={() => setShowIndicatorModal(false)}
-        title={`${selectedDepartment?.department_name} - ${selectedStatus ? getStatusLabel(selectedStatus) : ''} Göstergeler`}
+        title={`${selectedDepartment?.department_name || 'Kurum Geneli'} - ${selectedStatus ? getStatusLabel(selectedStatus) : ''} Göstergeler`}
         size="large"
       >
         <div className="space-y-4">
