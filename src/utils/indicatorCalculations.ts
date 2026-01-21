@@ -69,7 +69,16 @@ export function calculatePerformancePercentage(params: CalculationParams): numbe
     case 'increasing': {
       const currentValue = baselineValue + sum;
       const denominator = targetValue - baselineValue;
-      if (denominator === 0) return 0;
+
+      if (denominator === 0) {
+        if (sum > 0) {
+          return 100;
+        } else if (sum < 0) {
+          return 0;
+        }
+        return 100;
+      }
+
       return ((currentValue - baselineValue) / denominator) * 100;
     }
 
@@ -77,7 +86,16 @@ export function calculatePerformancePercentage(params: CalculationParams): numbe
     case 'decreasing': {
       const currentValue = baselineValue - sum;
       const denominator = targetValue - baselineValue;
-      if (denominator === 0) return 0;
+
+      if (denominator === 0) {
+        if (sum < 0) {
+          return 100;
+        } else if (sum > 0) {
+          return 0;
+        }
+        return 100;
+      }
+
       return ((currentValue - baselineValue) / denominator) * 100;
     }
 
