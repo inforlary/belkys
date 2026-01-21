@@ -37,6 +37,8 @@ export default function RiskRegisterNew() {
   const [editingImpactIndex, setEditingImpactIndex] = useState<number | null>(null);
   const [collaborationItemId, setCollaborationItemId] = useState<string | null>(null);
 
+  const [enableTargetRisk, setEnableTargetRisk] = useState(false);
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -354,9 +356,9 @@ export default function RiskRegisterNew() {
         inherent_impact: formData.inherent_impact,
         residual_likelihood: formData.residual_likelihood,
         residual_impact: formData.residual_impact,
-        target_probability: formData.target_probability,
-        target_impact: formData.target_impact,
-        target_date: formData.target_date || null,
+        target_probability: enableTargetRisk ? formData.target_probability : null,
+        target_impact: enableTargetRisk ? formData.target_impact : null,
+        target_date: enableTargetRisk ? (formData.target_date || null) : null,
         risk_response: formData.risk_response,
         review_period: formData.review_period,
         last_review_date: formData.last_review_date,
@@ -1144,10 +1146,21 @@ export default function RiskRegisterNew() {
 
             {/* Hedef Risk */}
             <div className="bg-purple-50 rounded-lg p-4">
-              <h4 className="text-md font-semibold text-slate-900 mb-3">Hedef Risk</h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-md font-semibold text-slate-900">Hedef Risk</h4>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enableTargetRisk}
+                    onChange={(e) => setEnableTargetRisk(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Hedef Belirle</span>
+                </label>
+              </div>
               <p className="text-xs text-slate-600 mb-4">İlave tedbirler sonrası hedeflenen risk</p>
 
-              <div className="space-y-3">
+              <div className={`space-y-3 ${!enableTargetRisk ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
                   <div className="flex gap-2">
@@ -1157,7 +1170,8 @@ export default function RiskRegisterNew() {
                         <button
                           key={val}
                           type="button"
-                          onClick={() => setFormData({ ...formData, target_probability: val })}
+                          onClick={() => enableTargetRisk && setFormData({ ...formData, target_probability: val })}
+                          disabled={!enableTargetRisk}
                           className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.target_probability || formData.target_probability !== val ? colors.hover : ''}`}
                         >
                           {val}
@@ -1176,7 +1190,8 @@ export default function RiskRegisterNew() {
                         <button
                           key={val}
                           type="button"
-                          onClick={() => setFormData({ ...formData, target_impact: val })}
+                          onClick={() => enableTargetRisk && setFormData({ ...formData, target_impact: val })}
+                          disabled={!enableTargetRisk}
                           className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.target_impact || formData.target_impact !== val ? colors.hover : ''}`}
                         >
                           {val}
@@ -1187,22 +1202,24 @@ export default function RiskRegisterNew() {
                 </div>
               </div>
 
-              <div className="mt-4 p-3 bg-white rounded-lg border-2 border-purple-300">
+              <div className={`mt-4 p-3 bg-white rounded-lg border-2 border-purple-300 ${!enableTargetRisk ? 'opacity-50' : ''}`}>
                 <div className="text-center">
                   <div className="text-xs text-slate-600 mb-1">SKOR</div>
                   <div className={`text-2xl font-bold ${getRiskLevel(targetScore).color} px-3 py-1 rounded inline-block`}>
-                    {targetScore} - {getRiskLevel(targetScore).label}
+                    {enableTargetRisk ? `${targetScore} - ${getRiskLevel(targetScore).label}` : '-'}
                   </div>
                 </div>
               </div>
 
-              <div className="mt-3">
+              <div className={`mt-3 ${!enableTargetRisk ? 'opacity-50 pointer-events-none' : ''}`}>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Hedef Tarih</label>
                 <input
                   type="date"
                   value={formData.target_date}
                   onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                  disabled={!enableTargetRisk}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  placeholder="gg.aa.yyyy"
                 />
               </div>
             </div>
