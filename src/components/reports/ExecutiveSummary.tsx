@@ -19,6 +19,7 @@ interface PlanSummary {
 interface ExecutiveData {
   overall_progress: number;
   total_indicators: number;
+  exceeding_target: number;
   on_track: number;
   at_risk: number;
   behind: number;
@@ -42,7 +43,7 @@ interface IndicatorDetail {
   current_value: number;
   target_value: number;
   progress: number;
-  status: 'on_track' | 'at_risk' | 'behind';
+  status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
 }
 
 export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps) {
@@ -51,7 +52,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
   const [loading, setLoading] = useState(true);
   const currentYear = selectedYear || new Date().getFullYear();
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<'exceeding_target' | 'on_track' | 'at_risk' | 'behind' | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
 
@@ -159,6 +160,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         setData({
           overall_progress: 0,
           total_indicators: 0,
+          exceeding_target: 0,
           on_track: 0,
           at_risk: 0,
           behind: 0,
@@ -243,6 +245,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
 
       const indicatorProgress: Array<{ id: string; name: string; progress: number }> = [];
       let totalProgress = 0;
+      let exceedingTarget = 0;
       let onTrack = 0;
       let atRisk = 0;
       let behind = 0;
@@ -269,7 +272,8 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         indicatorProgress.push({ id: ind.id, name: ind.name, progress });
         totalProgress += progress;
 
-        if (progress >= 70) onTrack++;
+        if (progress >= 200) exceedingTarget++;
+        else if (progress >= 70) onTrack++;
         else if (progress >= 50) atRisk++;
         else behind++;
       });
@@ -328,6 +332,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       setData({
         overall_progress: overallProgress,
         total_indicators: indicators.length,
+        exceeding_target: exceedingTarget,
         on_track: onTrack,
         at_risk: atRisk,
         behind: behind,
@@ -363,7 +368,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     exportToExcel(exportData, 'Yonetici_Ozeti');
   };
 
-  const loadIndicatorDetails = async (status: 'on_track' | 'at_risk' | 'behind') => {
+  const loadIndicatorDetails = async (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
     if (!profile?.organization_id) return;
 
     setSelectedStatus(status);
@@ -463,8 +468,9 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
             currentValue: currentValue,
           });
 
-          let indicatorStatus: 'on_track' | 'at_risk' | 'behind';
-          if (progress >= 70) indicatorStatus = 'on_track';
+          let indicatorStatus: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+          if (progress >= 200) indicatorStatus = 'exceeding_target';
+          else if (progress >= 70) indicatorStatus = 'on_track';
           else if (progress >= 50) indicatorStatus = 'at_risk';
           else indicatorStatus = 'behind';
 
@@ -491,16 +497,18 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     }
   };
 
-  const getStatusLabel = (status: 'on_track' | 'at_risk' | 'behind') => {
+  const getStatusLabel = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
     switch (status) {
+      case 'exceeding_target': return 'Hedef Sapması';
       case 'on_track': return 'Hedefte';
       case 'at_risk': return 'Risk Altında';
       case 'behind': return 'Geride';
     }
   };
 
-  const getStatusColor = (status: 'on_track' | 'at_risk' | 'behind') => {
+  const getStatusColor = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
     switch (status) {
+      case 'exceeding_target': return 'text-purple-600 bg-purple-50';
       case 'on_track': return 'text-green-600 bg-green-50';
       case 'at_risk': return 'text-yellow-600 bg-yellow-50';
       case 'behind': return 'text-red-600 bg-red-50';
@@ -612,11 +620,21 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
           <div className="text-3xl font-bold text-slate-900">{data.total_indicators}</div>
           <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
         </div>
+        <button
+          onClick={() => data.exceeding_target > 0 && loadIndicatorDetails('exceeding_target')}
+          disabled={data.exceeding_target === 0}
+          className={`bg-purple-50 border border-purple-200 rounded-lg p-4 text-center transition-all ${
+            data.exceeding_target > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-purple-600">{data.exceeding_target}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+        </button>
         <button
           onClick={() => data.on_track > 0 && loadIndicatorDetails('on_track')}
           disabled={data.on_track === 0}

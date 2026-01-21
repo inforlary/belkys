@@ -12,6 +12,7 @@ interface DepartmentPerformance {
   department_name: string;
   total_indicators: number;
   avg_progress: number;
+  exceeding_target: number;
   on_track: number;
   at_risk: number;
   behind: number;
@@ -24,7 +25,7 @@ interface IndicatorDetail {
   current_value: number;
   target_value: number;
   progress: number;
-  status: 'on_track' | 'at_risk' | 'behind';
+  status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
 }
 
 interface PerformanceDashboardProps {
@@ -42,7 +43,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
   const [sortBy, setSortBy] = useState<SortOption>('progress-desc');
   const currentYear = selectedYear || new Date().getFullYear();
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<'exceeding_target' | 'on_track' | 'at_risk' | 'behind' | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentPerformance | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
@@ -109,6 +110,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 department_name: dept.name,
                 total_indicators: 0,
                 avg_progress: 0,
+                exceeding_target: 0,
                 on_track: 0,
                 at_risk: 0,
                 behind: 0,
@@ -129,6 +131,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 department_name: dept.name,
                 total_indicators: 0,
                 avg_progress: 0,
+                exceeding_target: 0,
                 on_track: 0,
                 at_risk: 0,
                 behind: 0,
@@ -175,6 +178,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             });
 
             let totalProgress = 0;
+            let exceedingTarget = 0;
             let onTrack = 0;
             let atRisk = 0;
             let behind = 0;
@@ -197,7 +201,8 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 totalProgress += progress;
                 validCount++;
 
-                if (progress >= 70) onTrack++;
+                if (progress >= 200) exceedingTarget++;
+                else if (progress >= 70) onTrack++;
                 else if (progress >= 50) atRisk++;
                 else behind++;
               }
@@ -208,6 +213,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
               department_name: dept.name,
               total_indicators: validCount,
               avg_progress: validCount > 0 ? totalProgress / validCount : 0,
+              exceeding_target: exceedingTarget,
               on_track: onTrack,
               at_risk: atRisk,
               behind: behind,
@@ -237,6 +243,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
       'Birim': dept.department_name,
       'Gösterge Sayısı': dept.total_indicators,
       'Ortalama İlerleme (%)': Math.round(dept.avg_progress),
+      'Hedef Sapması': dept.exceeding_target,
       'Hedefte': dept.on_track,
       'Risk Altında': dept.at_risk,
       'Geride': dept.behind,
@@ -249,7 +256,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     generatePerformanceDashboardPDF(sortedDepartments, overallProgress);
   };
 
-  const loadIndicatorDetails = async (dept: DepartmentPerformance, status: 'on_track' | 'at_risk' | 'behind') => {
+  const loadIndicatorDetails = async (dept: DepartmentPerformance, status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
     if (!profile?.organization_id) return;
 
     setSelectedDepartment(dept);
@@ -341,8 +348,9 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             currentValue: currentValue,
           });
 
-          let indicatorStatus: 'on_track' | 'at_risk' | 'behind';
-          if (progress >= 70) indicatorStatus = 'on_track';
+          let indicatorStatus: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+          if (progress >= 200) indicatorStatus = 'exceeding_target';
+          else if (progress >= 70) indicatorStatus = 'on_track';
           else if (progress >= 50) indicatorStatus = 'at_risk';
           else indicatorStatus = 'behind';
 
@@ -369,16 +377,18 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     }
   };
 
-  const getStatusLabel = (status: 'on_track' | 'at_risk' | 'behind') => {
+  const getStatusLabel = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
     switch (status) {
+      case 'exceeding_target': return 'Hedef Sapması';
       case 'on_track': return 'Hedefte';
       case 'at_risk': return 'Risk Altında';
       case 'behind': return 'Geride';
     }
   };
 
-  const getStatusColor = (status: 'on_track' | 'at_risk' | 'behind') => {
+  const getStatusColor = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
     switch (status) {
+      case 'exceeding_target': return 'text-purple-600 bg-purple-50';
       case 'on_track': return 'text-green-600 bg-green-50';
       case 'at_risk': return 'text-yellow-600 bg-yellow-50';
       case 'behind': return 'text-red-600 bg-red-50';
@@ -506,7 +516,17 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
+                <button
+                  onClick={() => dept.exceeding_target > 0 && loadIndicatorDetails(dept, 'exceeding_target')}
+                  disabled={dept.exceeding_target === 0}
+                  className={`bg-purple-50 rounded-lg p-3 text-center transition-all ${
+                    dept.exceeding_target > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-purple-600">{dept.exceeding_target}</div>
+                  <div className="text-xs text-slate-600">Hedef Sapması</div>
+                </button>
                 <button
                   onClick={() => dept.on_track > 0 && loadIndicatorDetails(dept, 'on_track')}
                   disabled={dept.on_track === 0}
