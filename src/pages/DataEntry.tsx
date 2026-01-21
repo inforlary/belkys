@@ -637,9 +637,9 @@ export default function DataEntry() {
                     <div className="text-sm text-slate-600">
                       <span className="font-medium">Başlangıç:</span> {indicator.baseline_value?.toLocaleString('tr-TR') || '-'} {indicator.unit}
                     </div>
-                    <div className="text-sm text-slate-700">
-                      <span className="font-medium">Güncel:</span> {currentValue.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {indicator.unit} {latestLabel && `(${latestLabel})`}
-                    </div>
+                   <div className="text-sm text-slate-700">
+  <span className="font-medium">Güncel:</span> {currentValue.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {indicator.unit} {getCurrentValueLabel(indicator) && `(${getCurrentValueLabel(indicator)})`}
+</div>
                     <div className={`text-sm font-semibold ${
                       progress >= 70 ? 'text-green-600' : progress >= 50 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
