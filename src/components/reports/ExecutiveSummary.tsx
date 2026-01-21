@@ -6,6 +6,16 @@ import { exportToExcel, exportToPDF } from '../../utils/exportHelpers';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 import Modal from '../ui/Modal';
 
+interface PlanSummary {
+  id: string;
+  name: string;
+  start_year: number;
+  end_year: number;
+  objectives_count: number;
+  goals_count: number;
+  indicators_count: number;
+}
+
 interface ExecutiveData {
   overall_progress: number;
   total_indicators: number;
@@ -18,6 +28,7 @@ interface ExecutiveData {
   pending_approvals: number;
   data_completion: number;
   recommendations: string[];
+  strategic_plans: PlanSummary[];
 }
 
 interface ExecutiveSummaryProps {
@@ -52,6 +63,70 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     if (!profile?.organization_id) return;
 
     try {
+      // Load strategic plans
+      const { data: plansData } = await supabase
+        .from('strategic_plans')
+        .select('id, name, start_year, end_year')
+        .eq('organization_id', profile.organization_id)
+        .order('start_year', { ascending: false });
+
+      let strategicPlans: PlanSummary[] = [];
+
+      if (plansData && plansData.length > 0) {
+        strategicPlans = await Promise.all(
+          plansData.map(async (plan) => {
+            const { data: objectives, count: objectivesCount } = await supabase
+              .from('objectives')
+              .select('id', { count: 'exact' })
+              .eq('strategic_plan_id', plan.id);
+
+            if (!objectives || objectives.length === 0) {
+              return {
+                id: plan.id,
+                name: plan.name,
+                start_year: plan.start_year,
+                end_year: plan.end_year,
+                objectives_count: 0,
+                goals_count: 0,
+                indicators_count: 0,
+              };
+            }
+
+            const objectiveIds = objectives.map(o => o.id);
+
+            let goalsQuery = supabase
+              .from('goals')
+              .select('id', { count: 'exact' })
+              .in('objective_id', objectiveIds);
+
+            if (profile.role !== 'admin' && profile.role !== 'manager' && profile.department_id) {
+              goalsQuery = goalsQuery.eq('department_id', profile.department_id);
+            }
+
+            const { data: goals, count: goalsCount } = await goalsQuery;
+
+            let indicatorCount = 0;
+            if (goals && goals.length > 0) {
+              const goalIds = goals.map(g => g.id);
+              const { count } = await supabase
+                .from('indicators')
+                .select('id', { count: 'exact', head: true })
+                .in('goal_id', goalIds);
+              indicatorCount = count || 0;
+            }
+
+            return {
+              id: plan.id,
+              name: plan.name,
+              start_year: plan.start_year,
+              end_year: plan.end_year,
+              objectives_count: objectivesCount || 0,
+              goals_count: goalsCount || 0,
+              indicators_count: indicatorCount,
+            };
+          })
+        );
+      }
 
       // Get allowed goals first (department filtering)
       let goalsQuery = supabase
@@ -93,6 +168,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           pending_approvals: 0,
           data_completion: 0,
           recommendations: ['Henüz gösterge bulunmuyor. Stratejik planınızı tamamlayın.'],
+          strategic_plans: strategicPlans,
         });
         setLoading(false);
         return;
@@ -261,6 +337,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         pending_approvals: pendingApprovalsData.count || 0,
         data_completion: dataCompletion,
         recommendations: recommendations,
+        strategic_plans: strategicPlans,
       });
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
@@ -571,6 +648,50 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           <div className="text-sm text-slate-600 mt-1">Geride</div>
         </button>
       </div>
+
+      {data.strategic_plans.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-500" />
+            Stratejik Planlar
+          </h3>
+          <div className="space-y-4">
+            {data.strategic_plans.map((plan) => (
+              <div
+                key={plan.id}
+                className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h4 className="font-medium text-slate-900">{plan.name}</h4>
+                    <div className="flex items-center gap-2 mt-1 text-sm text-slate-600">
+                      <Calendar className="w-4 h-4" />
+                      <span>
+                        {plan.start_year} - {plan.end_year}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-600">{plan.objectives_count}</div>
+                    <div className="text-xs text-slate-600 mt-1">Amaç</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-green-600">{plan.goals_count}</div>
+                    <div className="text-xs text-slate-600 mt-1">Hedef</div>
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-orange-600">{plan.indicators_count}</div>
+                    <div className="text-xs text-slate-600 mt-1">Gösterge</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4">

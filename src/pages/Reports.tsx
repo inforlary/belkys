@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { FileText, TrendingUp, BarChart3, Users, Briefcase, ClipboardCheck, Target, Award, Calendar } from 'lucide-react';
-import StrategicPlanSummary from '../components/reports/StrategicPlanSummary';
+import { TrendingUp, BarChart3, Users, Briefcase, ClipboardCheck, Target, Award, Calendar } from 'lucide-react';
 import PerformanceDashboard from '../components/reports/PerformanceDashboard';
 import IndicatorPerformance from '../components/reports/IndicatorPerformance';
 import DepartmentPerformance from '../components/reports/DepartmentPerformance';
@@ -11,7 +10,6 @@ import ExecutiveSummary from '../components/reports/ExecutiveSummary';
 import { PeriodicDataComparison } from '../components/reports/PeriodicDataComparison';
 
 type ReportTab =
-  | 'strategic-plan'
   | 'performance-dashboard'
   | 'indicator-performance'
   | 'department-performance'
@@ -32,15 +30,8 @@ export default function Reports() {
       id: 'executive-summary' as ReportTab,
       name: 'Yönetici Özeti',
       icon: Award,
-      description: 'Yüksek seviye performans özeti ve öneriler',
+      description: 'Yüksek seviye performans özeti, stratejik planlar ve öneriler',
       component: ExecutiveSummary,
-    },
-    {
-      id: 'strategic-plan' as ReportTab,
-      name: 'Stratejik Plan Özeti',
-      icon: FileText,
-      description: 'Tüm stratejik planların genel durumu',
-      component: StrategicPlanSummary,
     },
     {
       id: 'performance-dashboard' as ReportTab,
