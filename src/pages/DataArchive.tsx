@@ -222,39 +222,47 @@ export default function DataArchive() {
     const indicatorEntries = entries.filter(
       e => e.indicator_id === indicator.id && e.status === 'approved'
     );
-
     if (indicatorEntries.length === 0) return null;
-
+    
     const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
+    const periodCount = indicatorEntries.length;
+    const average = sumOfEntries / periodCount;
     const baselineValue = indicator.baseline_value || 0;
     const calculationMethod = indicator.calculation_method || 'cumulative';
 
     let currentValue = 0;
-
+    
     switch (calculationMethod) {
       case 'cumulative':
+      case 'cumulative_increasing':
       case 'increasing':
         currentValue = baselineValue + sumOfEntries;
         break;
-
+        
       case 'cumulative_decreasing':
       case 'decreasing':
         currentValue = baselineValue - sumOfEntries;
         break;
-
-      case 'maintenance':
+        
       case 'percentage':
-        currentValue = sumOfEntries;
+      case 'percentage_increasing':
+      case 'percentage_decreasing':
+        currentValue = average;
         break;
-
+        
+      case 'maintenance':
+      case 'maintenance_increasing':
+      case 'maintenance_decreasing':
+        currentValue = average;
+        break;
+        
       default:
         currentValue = baselineValue + sumOfEntries;
         break;
     }
-
+    
     return currentValue;
   };
-
   const getEnteredPeriods = (indicatorId: string, indicator: Indicator) => {
     const indicatorEntries = entries
       .filter(e => e.indicator_id === indicatorId && e.status === 'approved')
