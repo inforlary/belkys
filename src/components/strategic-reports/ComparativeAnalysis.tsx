@@ -118,24 +118,50 @@ export default function ComparativeAnalysis() {
 
       const indicatorIds = indicators?.map(i => i.id) || [];
 
+      const { data: targets } = await supabase
+        .from('indicator_targets')
+        .select('indicator_id, target_value')
+        .in('indicator_id', indicatorIds)
+        .eq('year', selectedYear);
+
+      const targetMap: Record<string, number> = {};
+      targets?.forEach(t => {
+        if (t.target_value !== null && t.target_value !== undefined) {
+          targetMap[t.indicator_id] = t.target_value;
+        }
+      });
+
       const { data: dataEntries } = await supabase
         .from('indicator_data_entries')
-        .select('value, indicator:indicators!inner(target_value)')
+        .select('value, indicator_id, indicator:indicators!inner(target_value)')
         .in('indicator_id', indicatorIds)
         .eq('year', selectedYear)
-        .eq('status', 'approved');
+        .eq('status', 'admin_approved');
 
-      const totalAchievement = dataEntries?.reduce((sum, entry) => {
-        const target = entry.indicator?.target_value || 1;
-        return sum + ((entry.value / target) * 100);
-      }, 0) || 0;
+      let totalAchievement = 0;
+      let validEntries = 0;
 
-      const avgAchievement = dataEntries?.length ? totalAchievement / dataEntries.length : 0;
+      dataEntries?.forEach(entry => {
+        const target = targetMap[entry.indicator_id] !== undefined && targetMap[entry.indicator_id] !== null
+          ? targetMap[entry.indicator_id]
+          : (entry.indicator?.target_value !== undefined && entry.indicator?.target_value !== null ? entry.indicator.target_value : null);
+
+        if (target !== null && target !== 0) {
+          totalAchievement += (entry.value / target) * 100;
+          validEntries++;
+        }
+      });
+
+      const avgAchievement = validEntries > 0 ? totalAchievement / validEntries : 0;
 
       const { data: risks } = await supabase
         .from('risks')
         .select('id')
         .eq('department_id', dept.id);
+
+      const totalExpectedEntries = indicatorIds.length * 4;
+      const totalActualEntries = dataEntries?.length || 0;
+      const dataEntryRate = totalExpectedEntries > 0 ? Math.round((totalActualEntries / totalExpectedEntries) * 100) : 0;
 
       comparisons.push({
         department: dept.name,
@@ -143,8 +169,8 @@ export default function ComparativeAnalysis() {
         goalCount: goals?.length || 0,
         indicatorCount: indicators?.length || 0,
         riskCount: risks?.length || 0,
-        budgetUtilization: Math.floor(Math.random() * 40) + 50,
-        dataEntryRate: Math.floor(Math.random() * 30) + 70
+        budgetUtilization: 0,
+        dataEntryRate
       });
     }
 

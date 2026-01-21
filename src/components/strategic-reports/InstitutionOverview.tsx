@@ -86,24 +86,50 @@ export default function InstitutionOverview() {
       console.error('Goals error:', goalsError);
     }
 
+    const goalIds = goals?.map(g => g.id) || [];
+
     const { data: indicators } = await supabase
       .from('indicators')
       .select('id, goal_id')
-      .in('goal_id', goals?.map(g => g.id) || []);
+      .in('goal_id', goalIds);
+
+    const indicatorIds = indicators?.map(i => i.id) || [];
+
+    const { data: targets } = await supabase
+      .from('indicator_targets')
+      .select('indicator_id, target_value')
+      .in('indicator_id', indicatorIds)
+      .eq('year', selectedYear);
+
+    const targetMap: Record<string, number> = {};
+    targets?.forEach(t => {
+      if (t.target_value !== null && t.target_value !== undefined) {
+        targetMap[t.indicator_id] = t.target_value;
+      }
+    });
 
     const { data: dataEntries } = await supabase
       .from('indicator_data_entries')
-      .select('value, indicator:indicators!inner(target_value)')
-      .in('indicator_id', indicators?.map(i => i.id) || [])
+      .select('value, indicator_id, indicator:indicators!inner(target_value)')
+      .in('indicator_id', indicatorIds)
       .eq('year', selectedYear)
-      .eq('status', 'approved');
+      .eq('status', 'admin_approved');
 
-    const totalAchievement = dataEntries?.reduce((sum, entry) => {
-      const target = entry.indicator?.target_value || 1;
-      return sum + ((entry.value / target) * 100);
-    }, 0) || 0;
+    let totalAchievement = 0;
+    let validEntries = 0;
 
-    const avgAchievement = dataEntries?.length ? totalAchievement / dataEntries.length : 0;
+    dataEntries?.forEach(entry => {
+      const target = targetMap[entry.indicator_id] !== undefined && targetMap[entry.indicator_id] !== null
+        ? targetMap[entry.indicator_id]
+        : (entry.indicator?.target_value !== undefined && entry.indicator?.target_value !== null ? entry.indicator.target_value : null);
+
+      if (target !== null && target !== 0) {
+        totalAchievement += (entry.value / target) * 100;
+        validEntries++;
+      }
+    });
+
+    const avgAchievement = validEntries > 0 ? totalAchievement / validEntries : 0;
 
     const { data: risks } = await supabase
       .from('risks')
@@ -111,41 +137,83 @@ export default function InstitutionOverview() {
       .eq('organization_id', profile?.organization_id);
 
     const { data: activities } = await supabase
-      .from('activities')
+      .from('sub_program_activities')
       .select('id, status')
       .eq('organization_id', profile?.organization_id);
 
-    const completedActivities = activities?.filter(a => a.status === 'completed').length || 0;
+    const completedActivities = activities?.filter(a => a.status === 'approved').length || 0;
+
+    const totalExpectedEntries = indicatorIds.length * 4;
+    const totalActualEntries = dataEntries?.length || 0;
+    const dataEntryRate = totalExpectedEntries > 0 ? Math.round((totalActualEntries / totalExpectedEntries) * 100) : 0;
 
     setKpiData({
       totalGoals: goals?.length || 0,
       totalIndicators: indicators?.length || 0,
       avgAchievement: Math.round(avgAchievement),
       totalRisks: risks?.length || 0,
-      budgetUtilization: 67,
-      activeActivities: activities?.filter(a => a.status === 'in_progress').length || 0,
+      budgetUtilization: 0,
+      activeActivities: activities?.filter(a => a.status === 'draft' || a.status === 'director_review').length || 0,
       completedActivities,
-      dataEntryRate: 85
+      dataEntryRate
     });
   };
 
   const loadQuarterlyTrends = async () => {
+    const { data: goals } = await supabase
+      .from('goals')
+      .select('id')
+      .eq('organization_id', profile?.organization_id)
+      .eq('fiscal_year', selectedYear);
+
+    const goalIds = goals?.map(g => g.id) || [];
+
+    const { data: indicators } = await supabase
+      .from('indicators')
+      .select('id')
+      .in('goal_id', goalIds);
+
+    const indicatorIds = indicators?.map(i => i.id) || [];
+
+    const { data: targets } = await supabase
+      .from('indicator_targets')
+      .select('indicator_id, target_value')
+      .in('indicator_id', indicatorIds)
+      .eq('year', selectedYear);
+
+    const targetMap: Record<string, number> = {};
+    targets?.forEach(t => {
+      if (t.target_value !== null && t.target_value !== undefined) {
+        targetMap[t.indicator_id] = t.target_value;
+      }
+    });
+
     const trends: QuarterlyTrend[] = [];
     for (let q = 1; q <= 4; q++) {
       const { data } = await supabase
         .from('indicator_data_entries')
-        .select('value, indicator:indicators!inner(target_value)')
+        .select('value, indicator_id, indicator:indicators!inner(target_value)')
+        .in('indicator_id', indicatorIds)
         .eq('year', selectedYear)
         .eq('period_type', 'quarterly')
-        .eq('quarter', q)
-        .eq('status', 'approved');
+        .eq('period_quarter', q)
+        .eq('status', 'admin_approved');
 
-      const totalAchievement = data?.reduce((sum, entry) => {
-        const target = entry.indicator?.target_value || 1;
-        return sum + ((entry.value / target) * 100);
-      }, 0) || 0;
+      let totalAchievement = 0;
+      let validEntries = 0;
 
-      const avgAchievement = data?.length ? totalAchievement / data.length : 0;
+      data?.forEach(entry => {
+        const target = targetMap[entry.indicator_id] !== undefined && targetMap[entry.indicator_id] !== null
+          ? targetMap[entry.indicator_id]
+          : (entry.indicator?.target_value !== undefined && entry.indicator?.target_value !== null ? entry.indicator.target_value : null);
+
+        if (target !== null && target !== 0) {
+          totalAchievement += (entry.value / target) * 100;
+          validEntries++;
+        }
+      });
+
+      const avgAchievement = validEntries > 0 ? totalAchievement / validEntries : 0;
 
       trends.push({
         period: `Ç${q}`,
@@ -173,24 +241,49 @@ export default function InstitutionOverview() {
         .eq('department_id', dept.id)
         .eq('fiscal_year', selectedYear);
 
+      const goalIds = goals?.map(g => g.id) || [];
       const { data: indicators } = await supabase
         .from('indicators')
         .select('id')
-        .in('goal_id', goals?.map(g => g.id) || []);
+        .in('goal_id', goalIds);
+
+      const indicatorIds = indicators?.map(i => i.id) || [];
+
+      const { data: targets } = await supabase
+        .from('indicator_targets')
+        .select('indicator_id, target_value')
+        .in('indicator_id', indicatorIds)
+        .eq('year', selectedYear);
+
+      const targetMap: Record<string, number> = {};
+      targets?.forEach(t => {
+        if (t.target_value !== null && t.target_value !== undefined) {
+          targetMap[t.indicator_id] = t.target_value;
+        }
+      });
 
       const { data: dataEntries } = await supabase
         .from('indicator_data_entries')
-        .select('value, indicator:indicators!inner(target_value)')
-        .in('indicator_id', indicators?.map(i => i.id) || [])
+        .select('value, indicator_id, indicator:indicators!inner(target_value)')
+        .in('indicator_id', indicatorIds)
         .eq('year', selectedYear)
-        .eq('status', 'approved');
+        .eq('status', 'admin_approved');
 
-      const totalAchievement = dataEntries?.reduce((sum, entry) => {
-        const target = entry.indicator?.target_value || 1;
-        return sum + ((entry.value / target) * 100);
-      }, 0) || 0;
+      let totalAchievement = 0;
+      let validEntries = 0;
 
-      const avgAchievement = dataEntries?.length ? totalAchievement / dataEntries.length : 0;
+      dataEntries?.forEach(entry => {
+        const target = targetMap[entry.indicator_id] !== undefined && targetMap[entry.indicator_id] !== null
+          ? targetMap[entry.indicator_id]
+          : (entry.indicator?.target_value !== undefined && entry.indicator?.target_value !== null ? entry.indicator.target_value : null);
+
+        if (target !== null && target !== 0) {
+          totalAchievement += (entry.value / target) * 100;
+          validEntries++;
+        }
+      });
+
+      const avgAchievement = validEntries > 0 ? totalAchievement / validEntries : 0;
 
       deptPerf.push({
         department: dept.name,
@@ -233,26 +326,73 @@ export default function InstitutionOverview() {
   };
 
   const loadGoalProgress = async () => {
-    const { data: strategicPlans } = await supabase
-      .from('strategic_plans')
-      .select('id, objectives(id, name, goals(id, name, indicators(id, target_value)))')
-      .eq('organization_id', profile?.organization_id)
-      .eq('start_year', selectedYear)
-      .single();
+    const { data: objectives } = await supabase
+      .from('objectives')
+      .select('id, title')
+      .eq('organization_id', profile?.organization_id);
 
-    if (!strategicPlans?.objectives) return;
+    if (!objectives) return;
 
-    const progress = strategicPlans.objectives.map((obj: any) => {
-      const totalGoals = obj.goals?.length || 0;
-      const totalIndicators = obj.goals?.reduce((sum: number, g: any) => sum + (g.indicators?.length || 0), 0) || 0;
+    const progress = [];
 
-      return {
-        objective: obj.name.substring(0, 30) + '...',
-        goals: totalGoals,
-        indicators: totalIndicators,
-        achievement: Math.floor(Math.random() * 40) + 60
-      };
-    });
+    for (const obj of objectives) {
+      const { data: goals } = await supabase
+        .from('goals')
+        .select('id')
+        .eq('objective_id', obj.id)
+        .eq('fiscal_year', selectedYear);
+
+      const goalIds = goals?.map(g => g.id) || [];
+      const { data: indicators } = await supabase
+        .from('indicators')
+        .select('id')
+        .in('goal_id', goalIds);
+
+      const indicatorIds = indicators?.map(i => i.id) || [];
+
+      const { data: targets } = await supabase
+        .from('indicator_targets')
+        .select('indicator_id, target_value')
+        .in('indicator_id', indicatorIds)
+        .eq('year', selectedYear);
+
+      const targetMap: Record<string, number> = {};
+      targets?.forEach(t => {
+        if (t.target_value !== null && t.target_value !== undefined) {
+          targetMap[t.indicator_id] = t.target_value;
+        }
+      });
+
+      const { data: dataEntries } = await supabase
+        .from('indicator_data_entries')
+        .select('value, indicator_id, indicator:indicators!inner(target_value)')
+        .in('indicator_id', indicatorIds)
+        .eq('year', selectedYear)
+        .eq('status', 'admin_approved');
+
+      let totalAchievement = 0;
+      let validEntries = 0;
+
+      dataEntries?.forEach(entry => {
+        const target = targetMap[entry.indicator_id] !== undefined && targetMap[entry.indicator_id] !== null
+          ? targetMap[entry.indicator_id]
+          : (entry.indicator?.target_value !== undefined && entry.indicator?.target_value !== null ? entry.indicator.target_value : null);
+
+        if (target !== null && target !== 0) {
+          totalAchievement += (entry.value / target) * 100;
+          validEntries++;
+        }
+      });
+
+      const avgAchievement = validEntries > 0 ? totalAchievement / validEntries : 0;
+
+      progress.push({
+        objective: obj.title.length > 30 ? obj.title.substring(0, 30) + '...' : obj.title,
+        goals: goalIds.length,
+        indicators: indicatorIds.length,
+        achievement: Math.round(avgAchievement)
+      });
+    }
 
     setGoalProgress(progress);
   };

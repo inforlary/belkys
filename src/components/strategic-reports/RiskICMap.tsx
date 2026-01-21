@@ -62,7 +62,7 @@ export default function RiskICMap() {
     const { data } = await supabase
       .from('departments')
       .select('id, name')
-      .eq('organization_id', user.organizationId)
+      .eq('organization_id', profile.organization_id)
       .order('name');
 
     setDepartments(data || []);
