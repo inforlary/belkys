@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
+import { getIndicatorStatus, getStatusConfig } from '../utils/indicatorStatus';
 import {
   LineChart,
   Line,
@@ -76,7 +77,7 @@ interface ActivityTrend {
   overdue: number;
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const COLORS = ['#9333ea', '#059669', '#10b981', '#eab308', '#ef4444', '#d97706'];
 
 export default function EnhancedDashboard() {
   const { profile } = useAuth();
@@ -331,9 +332,12 @@ export default function EnhancedDashboard() {
       .select('indicator_id, target_value')
       .eq('year', new Date().getFullYear());
 
-    let onTrack = 0;
-    let atRisk = 0;
-    let behind = 0;
+    let exceedingTarget = 0;
+    let excellent = 0;
+    let good = 0;
+    let moderate = 0;
+    let weak = 0;
+    let veryWeak = 0;
 
     indicators?.forEach(indicator => {
       const indicatorEntries = entries?.filter(e => e.indicator_id === indicator.id);
@@ -343,16 +347,23 @@ export default function EnhancedDashboard() {
         const avgActual = indicatorEntries.reduce((sum, e) => sum + (e.value || 0), 0) / indicatorEntries.length;
         const achievement = (avgActual / target.target_value) * 100;
 
-        if (achievement >= 90) onTrack++;
-        else if (achievement >= 70) atRisk++;
-        else behind++;
+        const status = getIndicatorStatus(achievement);
+        if (status === 'exceedingTarget') exceedingTarget++;
+        else if (status === 'excellent') excellent++;
+        else if (status === 'good') good++;
+        else if (status === 'moderate') moderate++;
+        else if (status === 'weak') weak++;
+        else veryWeak++;
       }
     });
 
     setIndicatorStatus([
-      { name: 'Hedefte', value: onTrack },
-      { name: 'Risk Altında', value: atRisk },
-      { name: 'Geride', value: behind }
+      { name: getStatusConfig('exceedingTarget').label, value: exceedingTarget },
+      { name: getStatusConfig('excellent').label, value: excellent },
+      { name: getStatusConfig('good').label, value: good },
+      { name: getStatusConfig('moderate').label, value: moderate },
+      { name: getStatusConfig('weak').label, value: weak },
+      { name: getStatusConfig('veryWeak').label, value: veryWeak }
     ]);
   };
 

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card, CardBody } from '../components/ui/Card';
 import { TrendingUp, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
+import { getIndicatorStatus, getStatusConfig, type IndicatorStatus } from '../utils/indicatorStatus';
 
 interface Department {
   id: string;
@@ -40,9 +41,12 @@ interface IndicatorData {
 interface GroupedData {
   goal: Goal;
   department?: Department;
-  onTarget: IndicatorData[];
-  atRisk: IndicatorData[];
-  behind: IndicatorData[];
+  exceedingTarget: IndicatorData[];
+  excellent: IndicatorData[];
+  good: IndicatorData[];
+  moderate: IndicatorData[];
+  weak: IndicatorData[];
+  veryWeak: IndicatorData[];
   avgProgress: number;
 }
 
@@ -180,28 +184,52 @@ export default function PerformanceKPIDashboard() {
             department_id: indicator.goals.department_id
           },
           department: indicator.goals.departments,
-          onTarget: [],
-          atRisk: [],
-          behind: [],
+          exceedingTarget: [],
+          excellent: [],
+          good: [],
+          moderate: [],
+          weak: [],
+          veryWeak: [],
           avgProgress: 0
         };
       }
 
       const achievementRate = indicator.achievement_rate || 0;
+      const status = getIndicatorStatus(achievementRate);
 
-      if (achievementRate >= 80) {
-        grouped[goalId].onTarget.push(indicator);
-      } else if (achievementRate >= 60) {
-        grouped[goalId].atRisk.push(indicator);
-      } else {
-        grouped[goalId].behind.push(indicator);
+      switch (status) {
+        case 'exceeding_target':
+          grouped[goalId].exceedingTarget.push(indicator);
+          break;
+        case 'excellent':
+          grouped[goalId].excellent.push(indicator);
+          break;
+        case 'good':
+          grouped[goalId].good.push(indicator);
+          break;
+        case 'moderate':
+          grouped[goalId].moderate.push(indicator);
+          break;
+        case 'weak':
+          grouped[goalId].weak.push(indicator);
+          break;
+        case 'very_weak':
+          grouped[goalId].veryWeak.push(indicator);
+          break;
       }
     });
 
     const result = Object.values(grouped);
 
     result.forEach(group => {
-      const allIndicators = [...group.onTarget, ...group.atRisk, ...group.behind];
+      const allIndicators = [
+        ...group.exceedingTarget,
+        ...group.excellent,
+        ...group.good,
+        ...group.moderate,
+        ...group.weak,
+        ...group.veryWeak
+      ];
       const sum = allIndicators.reduce((acc, i) => acc + (i.achievement_rate || 0), 0);
       group.avgProgress = allIndicators.length > 0 ? sum / allIndicators.length : 0;
     });
@@ -227,60 +255,64 @@ export default function PerformanceKPIDashboard() {
       </div>
 
       {/* ÖZET İSTATİSTİKLER */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
         <Card>
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-600">Toplam Gösterge</div>
-                <div className="text-2xl font-bold text-gray-900">{indicators.length}</div>
-              </div>
-              <TrendingUp className="w-8 h-8 text-blue-500" />
+          <CardBody className="p-3">
+            <div className="text-xs text-gray-600 mb-1">Toplam</div>
+            <div className="text-xl font-bold text-gray-900">{indicators.length}</div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody className="p-3 bg-purple-50">
+            <div className="text-xs text-purple-700 mb-1">Hedef Üstü</div>
+            <div className="text-xl font-bold text-purple-600">
+              {indicators.filter(i => getIndicatorStatus(i.achievement_rate || 0) === 'exceeding_target').length}
             </div>
           </CardBody>
         </Card>
 
         <Card>
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-600">Hedefte</div>
-                <div className="text-2xl font-bold text-green-600">
-                  {indicators.filter(i => (i.achievement_rate || 0) >= 80).length}
-                </div>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
+          <CardBody className="p-3 bg-green-100">
+            <div className="text-xs text-green-800 mb-1">Çok İyi</div>
+            <div className="text-xl font-bold text-green-700">
+              {indicators.filter(i => getIndicatorStatus(i.achievement_rate || 0) === 'excellent').length}
             </div>
           </CardBody>
         </Card>
 
         <Card>
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-600">Risk Altında</div>
-                <div className="text-2xl font-bold text-yellow-600">
-                  {indicators.filter(i => {
-                    const rate = i.achievement_rate || 0;
-                    return rate >= 60 && rate < 80;
-                  }).length}
-                </div>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-yellow-500" />
+          <CardBody className="p-3 bg-green-50">
+            <div className="text-xs text-green-700 mb-1">İyi</div>
+            <div className="text-xl font-bold text-green-600">
+              {indicators.filter(i => getIndicatorStatus(i.achievement_rate || 0) === 'good').length}
             </div>
           </CardBody>
         </Card>
 
         <Card>
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-600">Geride</div>
-                <div className="text-2xl font-bold text-red-600">
-                  {indicators.filter(i => (i.achievement_rate || 0) < 60).length}
-                </div>
-              </div>
-              <XCircle className="w-8 h-8 text-red-500" />
+          <CardBody className="p-3 bg-yellow-50">
+            <div className="text-xs text-yellow-700 mb-1">Orta</div>
+            <div className="text-xl font-bold text-yellow-600">
+              {indicators.filter(i => getIndicatorStatus(i.achievement_rate || 0) === 'moderate').length}
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody className="p-3 bg-red-50">
+            <div className="text-xs text-red-700 mb-1">Zayıf</div>
+            <div className="text-xl font-bold text-red-600">
+              {indicators.filter(i => getIndicatorStatus(i.achievement_rate || 0) === 'weak').length}
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody className="p-3 bg-amber-100">
+            <div className="text-xs text-amber-900 mb-1">Çok Zayıf</div>
+            <div className="text-xl font-bold text-amber-800">
+              {indicators.filter(i => getIndicatorStatus(i.achievement_rate || 0) === 'very_weak').length}
             </div>
           </CardBody>
         </Card>
@@ -289,7 +321,8 @@ export default function PerformanceKPIDashboard() {
       {/* HEDEF KARTLARI */}
       <div className="space-y-6">
         {groupedByGoal.map((group, index) => {
-          const totalCount = group.onTarget.length + group.atRisk.length + group.behind.length;
+          const totalCount = group.exceedingTarget.length + group.excellent.length + group.good.length +
+                            group.moderate.length + group.weak.length + group.veryWeak.length;
 
           return (
             <Card key={group.goal.id} className="overflow-hidden">
@@ -328,145 +361,86 @@ export default function PerformanceKPIDashboard() {
                 {/* İÇERİK */}
                 <div className="p-4">
                   {/* ÖZET */}
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-semibold text-green-700">Hedefte</span>
-                      </div>
-                      <div className="text-2xl font-bold text-green-700">{group.onTarget.length}</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                      <span className="text-xs font-semibold text-purple-700 block mb-1">Hedef Üstü</span>
+                      <div className="text-lg font-bold text-purple-600">{group.exceedingTarget.length}</div>
                     </div>
 
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                        <span className="text-sm font-semibold text-yellow-700">Risk Altında</span>
-                      </div>
-                      <div className="text-2xl font-bold text-yellow-700">{group.atRisk.length}</div>
+                    <div className="bg-green-100 border border-green-300 rounded-lg p-2">
+                      <span className="text-xs font-semibold text-green-800 block mb-1">Çok İyi</span>
+                      <div className="text-lg font-bold text-green-700">{group.excellent.length}</div>
                     </div>
 
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <XCircle className="w-4 h-4 text-red-600" />
-                        <span className="text-sm font-semibold text-red-700">Geride</span>
-                      </div>
-                      <div className="text-2xl font-bold text-red-700">{group.behind.length}</div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                      <span className="text-xs font-semibold text-green-700 block mb-1">İyi</span>
+                      <div className="text-lg font-bold text-green-600">{group.good.length}</div>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                      <span className="text-xs font-semibold text-yellow-700 block mb-1">Orta</span>
+                      <div className="text-lg font-bold text-yellow-600">{group.moderate.length}</div>
+                    </div>
+
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                      <span className="text-xs font-semibold text-red-700 block mb-1">Zayıf</span>
+                      <div className="text-lg font-bold text-red-600">{group.weak.length}</div>
+                    </div>
+
+                    <div className="bg-amber-100 border border-amber-300 rounded-lg p-2">
+                      <span className="text-xs font-semibold text-amber-900 block mb-1">Çok Zayıf</span>
+                      <div className="text-lg font-bold text-amber-800">{group.veryWeak.length}</div>
                     </div>
                   </div>
 
-                  {/* HEDEFTE OLANLAR */}
-                  {group.onTarget.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        Hedefte Olan Göstergeler ({group.onTarget.length})
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {group.onTarget.map(indicator => (
-                          <div key={indicator.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-green-700 mb-1">{indicator.code}</div>
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">{indicator.name}</h4>
-                            <div className="space-y-1 text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Başarı Oranı:</span>
-                                <span className="font-bold text-green-700">
-                                  %{(indicator.achievement_rate || 0).toFixed(1)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Hedef:</span>
-                                <span className="font-medium">
-                                  {indicator.target_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Gerçekleşen:</span>
-                                <span className="font-medium">
-                                  {indicator.latest_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Sadece 0'dan büyük kategorileri göster */}
+                  {[
+                    { key: 'exceedingTarget', label: 'Hedef Üstü', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', textColor: 'text-purple-700' },
+                    { key: 'excellent', label: 'Çok İyi', bgColor: 'bg-green-100', borderColor: 'border-green-300', textColor: 'text-green-800' },
+                    { key: 'good', label: 'İyi', bgColor: 'bg-green-50', borderColor: 'border-green-200', textColor: 'text-green-700' },
+                    { key: 'moderate', label: 'Orta', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200', textColor: 'text-yellow-700' },
+                    { key: 'weak', label: 'Zayıf', bgColor: 'bg-red-50', borderColor: 'border-red-200', textColor: 'text-red-700' },
+                    { key: 'veryWeak', label: 'Çok Zayıf', bgColor: 'bg-amber-100', borderColor: 'border-amber-300', textColor: 'text-amber-900' }
+                  ].map(category => {
+                    const indicators = group[category.key as keyof GroupedData] as IndicatorData[];
+                    if (!indicators || indicators.length === 0) return null;
 
-                  {/* RİSK ALTINDA OLANLAR */}
-                  {group.atRisk.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        Risk Altında Olan Göstergeler ({group.atRisk.length})
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {group.atRisk.map(indicator => (
-                          <div key={indicator.id} className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-yellow-700 mb-1">{indicator.code}</div>
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">{indicator.name}</h4>
-                            <div className="space-y-1 text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Başarı Oranı:</span>
-                                <span className="font-bold text-yellow-700">
-                                  %{(indicator.achievement_rate || 0).toFixed(1)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Hedef:</span>
-                                <span className="font-medium">
-                                  {indicator.target_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Gerçekleşen:</span>
-                                <span className="font-medium">
-                                  {indicator.latest_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* GERİDE OLANLAR */}
-                  {group.behind.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
-                        <XCircle className="w-4 h-4" />
-                        Geride Kalan Göstergeler ({group.behind.length})
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {group.behind.map(indicator => (
-                          <div key={indicator.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-red-700 mb-1">{indicator.code}</div>
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">{indicator.name}</h4>
-                            <div className="space-y-1 text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Başarı Oranı:</span>
-                                <span className="font-bold text-red-700">
-                                  %{(indicator.achievement_rate || 0).toFixed(1)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Hedef:</span>
-                                <span className="font-medium">
-                                  {indicator.target_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Gerçekleşen:</span>
-                                <span className="font-medium">
-                                  {indicator.latest_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
-                                </span>
+                    return (
+                      <div key={category.key} className="mb-6">
+                        <h3 className={`text-sm font-semibold ${category.textColor} mb-3`}>
+                          {category.label} Göstergeler ({indicators.length})
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {indicators.map(indicator => (
+                            <div key={indicator.id} className={`${category.bgColor} ${category.borderColor} border rounded-lg p-4`}>
+                              <div className={`text-xs font-semibold ${category.textColor} mb-1`}>{indicator.code}</div>
+                              <h4 className="text-sm font-medium text-gray-900 mb-2">{indicator.name}</h4>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Başarı Oranı:</span>
+                                  <span className={`font-bold ${category.textColor}`}>
+                                    %{(indicator.achievement_rate || 0).toFixed(1)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Hedef:</span>
+                                  <span className="font-medium">
+                                    {indicator.target_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Gerçekleşen:</span>
+                                  <span className="font-medium">
+                                    {indicator.latest_value?.toLocaleString('tr-TR') || '0'} {indicator.unit}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               </CardBody>
             </Card>

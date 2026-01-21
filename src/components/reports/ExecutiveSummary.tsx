@@ -4,6 +4,15 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Calendar, FileText, X } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../../utils/exportHelpers';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
+import {
+  IndicatorStatus,
+  getIndicatorStatus,
+  getStatusConfig,
+  getStatusLabel,
+  createEmptyStats,
+  incrementStatusInStats,
+  type IndicatorStats as StatusStats
+} from '../../utils/indicatorStatus';
 import Modal from '../ui/Modal';
 
 interface PlanSummary {
@@ -19,10 +28,12 @@ interface PlanSummary {
 interface ExecutiveData {
   overall_progress: number;
   total_indicators: number;
-  exceeding_target: number;
-  on_track: number;
-  at_risk: number;
-  behind: number;
+  exceedingTarget: number;
+  excellent: number;
+  good: number;
+  moderate: number;
+  weak: number;
+  veryWeak: number;
   top_performers: Array<{ name: string; progress: number }>;
   concerns: Array<{ name: string; progress: number }>;
   overdue_activities: number;
@@ -43,7 +54,7 @@ interface IndicatorDetail {
   current_value: number;
   target_value: number;
   progress: number;
-  status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+  status: IndicatorStatus;
 }
 
 export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps) {
@@ -52,7 +63,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
   const [loading, setLoading] = useState(true);
   const currentYear = selectedYear || new Date().getFullYear();
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<'exceeding_target' | 'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<IndicatorStatus | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
 
@@ -160,10 +171,12 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         setData({
           overall_progress: 0,
           total_indicators: 0,
-          exceeding_target: 0,
-          on_track: 0,
-          at_risk: 0,
-          behind: 0,
+          exceedingTarget: 0,
+          excellent: 0,
+          good: 0,
+          moderate: 0,
+          weak: 0,
+          veryWeak: 0,
           top_performers: [],
           concerns: [],
           overdue_activities: 0,
@@ -245,16 +258,14 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
 
       const indicatorProgress: Array<{ id: string; name: string; progress: number }> = [];
       let totalProgress = 0;
-      let exceedingTarget = 0;
-      let onTrack = 0;
-      let atRisk = 0;
-      let behind = 0;
+      const stats = createEmptyStats();
 
       indicators.forEach(ind => {
         const targetData = targetsByIndicator[ind.id];
         if (!targetData || targetData.target === 0) {
           indicatorProgress.push({ id: ind.id, name: ind.name, progress: 0 });
-          behind++;
+          const status = getIndicatorStatus(0);
+          incrementStatusInStats(stats, status);
           return;
         }
 
@@ -272,10 +283,8 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         indicatorProgress.push({ id: ind.id, name: ind.name, progress });
         totalProgress += progress;
 
-        if (progress >= 200) exceedingTarget++;
-        else if (progress >= 70) onTrack++;
-        else if (progress >= 50) atRisk++;
-        else behind++;
+        const status = getIndicatorStatus(progress);
+        incrementStatusInStats(stats, status);
       });
 
       indicatorProgress.sort((a, b) => b.progress - a.progress);
@@ -299,9 +308,9 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       if (overallProgress < 50) {
         recommendations.push('Kurum genel performansı düşük seviyede. Acil eylem planı gerekli.');
       }
-      if (behind > 0) {
+      if (stats.veryWeak > 0 || stats.weak > 0) {
         recommendations.push(
-          `${behind} gösterge ciddi şekilde geride. Bu göstergelere öncelik verilmeli.`
+          `${stats.veryWeak + stats.weak} gösterge ciddi şekilde geride. Bu göstergelere öncelik verilmeli.`
         );
       }
       if (overdueActivities > 0) {
@@ -319,9 +328,9 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           'Çok sayıda onay bekleyen veri girişi var. Onay süreçleri hızlandırılmalı.'
         );
       }
-      if (atRisk > 0) {
+      if (stats.moderate > 0) {
         recommendations.push(
-          `${atRisk} gösterge risk altında. Performans iyileştirme çalışmaları başlatılmalı.`
+          `${stats.moderate} gösterge orta seviyede. Performans iyileştirme çalışmaları başlatılmalı.`
         );
       }
 
@@ -329,18 +338,20 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         recommendations.push('Genel performans iyi durumda. Mevcut çalışmalara devam edilmeli.');
       }
 
-      const exceedingTargetIndicators = indicatorProgress.filter(ind => ind.progress >= 200);
-      const behindIndicators = indicatorProgress.filter(ind => ind.progress < 50);
+      const exceedingTargetIndicators = indicatorProgress.filter(ind => ind.progress >= 115);
+      const weakIndicators = indicatorProgress.filter(ind => ind.progress < 55);
 
       setData({
         overall_progress: overallProgress,
         total_indicators: indicators.length,
-        exceeding_target: exceedingTarget,
-        on_track: onTrack,
-        at_risk: atRisk,
-        behind: behind,
+        exceedingTarget: stats.exceedingTarget,
+        excellent: stats.excellent,
+        good: stats.good,
+        moderate: stats.moderate,
+        weak: stats.weak,
+        veryWeak: stats.veryWeak,
         top_performers: exceedingTargetIndicators,
-        concerns: behindIndicators,
+        concerns: weakIndicators,
         overdue_activities: overdueActivities,
         pending_approvals: pendingApprovalsData.count || 0,
         data_completion: dataCompletion,
@@ -371,7 +382,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     exportToExcel(exportData, 'Yonetici_Ozeti');
   };
 
-  const loadIndicatorDetails = async (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
+  const loadIndicatorDetails = async (status: IndicatorStatus) => {
     if (!profile?.organization_id) return;
 
     setSelectedStatus(status);
@@ -471,11 +482,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
             currentValue: currentValue,
           });
 
-          let indicatorStatus: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
-          if (progress >= 200) indicatorStatus = 'exceeding_target';
-          else if (progress >= 70) indicatorStatus = 'on_track';
-          else if (progress >= 50) indicatorStatus = 'at_risk';
-          else indicatorStatus = 'behind';
+          const indicatorStatus = getIndicatorStatus(progress);
 
           if (indicatorStatus === status) {
             details.push({
@@ -500,22 +507,9 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     }
   };
 
-  const getStatusLabel = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'Hedef Sapması';
-      case 'on_track': return 'Hedefte';
-      case 'at_risk': return 'Risk Altında';
-      case 'behind': return 'Geride';
-    }
-  };
-
-  const getStatusColor = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'text-purple-600 bg-purple-50';
-      case 'on_track': return 'text-green-600 bg-green-50';
-      case 'at_risk': return 'text-yellow-600 bg-yellow-50';
-      case 'behind': return 'text-red-600 bg-red-50';
-    }
+  const getStatusColorClass = (status: IndicatorStatus) => {
+    const config = getStatusConfig(status);
+    return `${config.color} ${config.bgColor}`;
   };
 
   const handlePDFExport = () => {
@@ -671,50 +665,70 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         </div>
       )}
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-7 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
           <div className="text-3xl font-bold text-slate-900">{data.total_indicators}</div>
           <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
         </div>
         <button
-          onClick={() => data.exceeding_target > 0 && loadIndicatorDetails('exceeding_target')}
-          disabled={data.exceeding_target === 0}
+          onClick={() => data.exceedingTarget > 0 && loadIndicatorDetails('exceeding_target')}
+          disabled={data.exceedingTarget === 0}
           className={`bg-purple-50 border border-purple-200 rounded-lg p-4 text-center transition-all ${
-            data.exceeding_target > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            data.exceedingTarget > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-purple-600">{data.exceeding_target}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+          <div className="text-3xl font-bold text-purple-600">{data.exceedingTarget}</div>
+          <div className="text-sm text-slate-600 mt-1">Hedef Üstü</div>
         </button>
         <button
-          onClick={() => data.on_track > 0 && loadIndicatorDetails('on_track')}
-          disabled={data.on_track === 0}
+          onClick={() => data.excellent > 0 && loadIndicatorDetails('excellent')}
+          disabled={data.excellent === 0}
+          className={`bg-green-100 border border-green-300 rounded-lg p-4 text-center transition-all ${
+            data.excellent > 0 ? 'hover:bg-green-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-green-700">{data.excellent}</div>
+          <div className="text-sm text-slate-600 mt-1">Çok İyi</div>
+        </button>
+        <button
+          onClick={() => data.good > 0 && loadIndicatorDetails('good')}
+          disabled={data.good === 0}
           className={`bg-green-50 border border-green-200 rounded-lg p-4 text-center transition-all ${
-            data.on_track > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            data.good > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-green-600">{data.on_track}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedefte</div>
+          <div className="text-3xl font-bold text-green-600">{data.good}</div>
+          <div className="text-sm text-slate-600 mt-1">İyi</div>
         </button>
         <button
-          onClick={() => data.at_risk > 0 && loadIndicatorDetails('at_risk')}
-          disabled={data.at_risk === 0}
+          onClick={() => data.moderate > 0 && loadIndicatorDetails('moderate')}
+          disabled={data.moderate === 0}
           className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center transition-all ${
-            data.at_risk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            data.moderate > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-yellow-600">{data.at_risk}</div>
-          <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
+          <div className="text-3xl font-bold text-yellow-600">{data.moderate}</div>
+          <div className="text-sm text-slate-600 mt-1">Orta</div>
         </button>
         <button
-          onClick={() => data.behind > 0 && loadIndicatorDetails('behind')}
-          disabled={data.behind === 0}
+          onClick={() => data.weak > 0 && loadIndicatorDetails('weak')}
+          disabled={data.weak === 0}
           className={`bg-red-50 border border-red-200 rounded-lg p-4 text-center transition-all ${
-            data.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            data.weak > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-red-600">{data.behind}</div>
-          <div className="text-sm text-slate-600 mt-1">Geride</div>
+          <div className="text-3xl font-bold text-red-600">{data.weak}</div>
+          <div className="text-sm text-slate-600 mt-1">Zayıf</div>
+        </button>
+        <button
+          onClick={() => data.veryWeak > 0 && loadIndicatorDetails('very_weak')}
+          disabled={data.veryWeak === 0}
+          className={`bg-amber-100 border border-amber-300 rounded-lg p-4 text-center transition-all ${
+            data.veryWeak > 0 ? 'hover:bg-amber-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-amber-800">{data.veryWeak}</div>
+          <div className="text-sm text-slate-600 mt-1">Çok Zayıf</div>
         </button>
       </div>
 
@@ -822,7 +836,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
                     Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
                   </div>
                   {selectedStatus && (
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedStatus)}`}>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColorClass(selectedStatus)}`}>
                       {getStatusLabel(selectedStatus)}
                     </div>
                   )}
@@ -841,7 +855,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
                           {indicator.code}
                         </span>
                         {selectedStatus && (
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(selectedStatus)}`}>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColorClass(selectedStatus)}`}>
                             {getStatusLabel(selectedStatus)}
                           </span>
                         )}
@@ -872,13 +886,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
                       <div className="mt-3">
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full transition-all ${
-                              indicator.status === 'on_track'
-                                ? 'bg-green-500'
-                                : indicator.status === 'at_risk'
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
-                            }`}
+                            className={`h-2 rounded-full transition-all ${getStatusConfig(indicator.status).progressBarColor}`}
                             style={{ width: `${Math.min(indicator.progress, 100)}%` }}
                           />
                         </div>

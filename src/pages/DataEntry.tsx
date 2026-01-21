@@ -5,6 +5,7 @@ import { Search, CheckCircle, XCircle, Clock, Plus, CreditCard as Edit2, Trash2,
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
 import { calculatePerformancePercentage, CalculationMethod } from '../utils/indicatorCalculations';
 import Modal from '../components/ui/Modal';
+import { getIndicatorStatus, getStatusConfig, type IndicatorStatus } from '../utils/indicatorStatus';
 
 interface Indicator {
   id: string;
@@ -59,7 +60,7 @@ interface IndicatorDetail {
   current_value: number;
   target_value: number;
   progress: number;
-  status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+  status: IndicatorStatus;
 }
 
 export default function DataEntry() {
@@ -78,7 +79,7 @@ export default function DataEntry() {
     value: string;
   } | null>(null);
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<'exceeding_target' | 'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<IndicatorStatus | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
 
@@ -668,14 +669,16 @@ const getIndicatorTarget = (indicator: Indicator) => {
 
   const getIndicatorStats = () => {
     let exceedingTarget = 0;
-    let onTrack = 0;
-    let atRisk = 0;
-    let behind = 0;
+    let excellent = 0;
+    let good = 0;
+    let moderate = 0;
+    let weak = 0;
+    let veryWeak = 0;
 
     indicators.forEach(ind => {
       const target = getIndicatorTarget(ind);
       if (target === 0) {
-        behind++;
+        veryWeak++;
         return;
       }
 
@@ -695,16 +698,19 @@ const getIndicatorTarget = (indicator: Indicator) => {
         currentValue: 0,
       });
 
-      if (progress >= 200) exceedingTarget++;
-      else if (progress >= 70) onTrack++;
-      else if (progress >= 50) atRisk++;
-      else behind++;
+      const status = getIndicatorStatus(progress);
+      if (status === 'exceedingTarget') exceedingTarget++;
+      else if (status === 'excellent') excellent++;
+      else if (status === 'good') good++;
+      else if (status === 'moderate') moderate++;
+      else if (status === 'weak') weak++;
+      else veryWeak++;
     });
 
-    return { exceedingTarget, onTrack, atRisk, behind, total: indicators.length };
+    return { exceedingTarget, excellent, good, moderate, weak, veryWeak, total: indicators.length };
   };
 
-  const loadIndicatorDetails = async (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
+  const loadIndicatorDetails = async (status: IndicatorStatus) => {
     setSelectedStatus(status);
     setShowIndicatorModal(true);
     setLoadingIndicators(true);
@@ -741,11 +747,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
           currentValue: currentValue,
         });
 
-        let indicatorStatus: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
-        if (progress >= 200) indicatorStatus = 'exceeding_target';
-        else if (progress >= 70) indicatorStatus = 'on_track';
-        else if (progress >= 50) indicatorStatus = 'at_risk';
-        else indicatorStatus = 'behind';
+        const indicatorStatus = getIndicatorStatus(progress);
 
         if (indicatorStatus === status) {
           details.push({
@@ -769,22 +771,12 @@ const getIndicatorTarget = (indicator: Indicator) => {
     }
   };
 
-  const getStatusLabel = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'Hedef Sapması';
-      case 'on_track': return 'Hedefte';
-      case 'at_risk': return 'Risk Altında';
-      case 'behind': return 'Geride';
-    }
+  const getStatusLabel = (status: IndicatorStatus) => {
+    return getStatusConfig(status).label;
   };
 
-  const getStatusColor = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'text-purple-600 bg-purple-50';
-      case 'on_track': return 'text-green-600 bg-green-50';
-      case 'at_risk': return 'text-yellow-600 bg-yellow-50';
-      case 'behind': return 'text-red-600 bg-red-50';
-    }
+  const getStatusColor = (status: IndicatorStatus) => {
+    return getStatusConfig(status).className;
   };
 
   const filteredIndicators = indicators.filter(indicator =>
@@ -811,50 +803,70 @@ const getIndicatorTarget = (indicator: Indicator) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-5 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
-          <div className="text-3xl font-bold text-slate-900">{stats.total}</div>
-          <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
+      <div className="grid grid-cols-7 gap-3 mb-6">
+        <div className="bg-white border border-slate-200 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
+          <div className="text-xs text-slate-600 mt-1">Toplam</div>
         </div>
         <button
-          onClick={() => stats.exceedingTarget > 0 && loadIndicatorDetails('exceeding_target')}
+          onClick={() => stats.exceedingTarget > 0 && loadIndicatorDetails('exceedingTarget')}
           disabled={stats.exceedingTarget === 0}
-          className={`bg-purple-50 border border-purple-200 rounded-lg p-4 text-center transition-all ${
+          className={`bg-purple-50 border border-purple-200 rounded-lg p-3 text-center transition-all ${
             stats.exceedingTarget > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-purple-600">{stats.exceedingTarget}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+          <div className="text-2xl font-bold text-purple-600">{stats.exceedingTarget}</div>
+          <div className="text-xs text-slate-600 mt-1">Hedef Üstü</div>
         </button>
         <button
-          onClick={() => stats.onTrack > 0 && loadIndicatorDetails('on_track')}
-          disabled={stats.onTrack === 0}
-          className={`bg-green-50 border border-green-200 rounded-lg p-4 text-center transition-all ${
-            stats.onTrack > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          onClick={() => stats.excellent > 0 && loadIndicatorDetails('excellent')}
+          disabled={stats.excellent === 0}
+          className={`bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center transition-all ${
+            stats.excellent > 0 ? 'hover:bg-emerald-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-green-600">{stats.onTrack}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedefte</div>
+          <div className="text-2xl font-bold text-emerald-600">{stats.excellent}</div>
+          <div className="text-xs text-slate-600 mt-1">Çok İyi</div>
         </button>
         <button
-          onClick={() => stats.atRisk > 0 && loadIndicatorDetails('at_risk')}
-          disabled={stats.atRisk === 0}
-          className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center transition-all ${
-            stats.atRisk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          onClick={() => stats.good > 0 && loadIndicatorDetails('good')}
+          disabled={stats.good === 0}
+          className={`bg-green-50 border border-green-200 rounded-lg p-3 text-center transition-all ${
+            stats.good > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-yellow-600">{stats.atRisk}</div>
-          <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
+          <div className="text-2xl font-bold text-green-600">{stats.good}</div>
+          <div className="text-xs text-slate-600 mt-1">İyi</div>
         </button>
         <button
-          onClick={() => stats.behind > 0 && loadIndicatorDetails('behind')}
-          disabled={stats.behind === 0}
-          className={`bg-red-50 border border-red-200 rounded-lg p-4 text-center transition-all ${
-            stats.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          onClick={() => stats.moderate > 0 && loadIndicatorDetails('moderate')}
+          disabled={stats.moderate === 0}
+          className={`bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center transition-all ${
+            stats.moderate > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-red-600">{stats.behind}</div>
-          <div className="text-sm text-slate-600 mt-1">Geride</div>
+          <div className="text-2xl font-bold text-yellow-600">{stats.moderate}</div>
+          <div className="text-xs text-slate-600 mt-1">Orta</div>
+        </button>
+        <button
+          onClick={() => stats.weak > 0 && loadIndicatorDetails('weak')}
+          disabled={stats.weak === 0}
+          className={`bg-red-50 border border-red-200 rounded-lg p-3 text-center transition-all ${
+            stats.weak > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-2xl font-bold text-red-600">{stats.weak}</div>
+          <div className="text-xs text-slate-600 mt-1">Zayıf</div>
+        </button>
+        <button
+          onClick={() => stats.veryWeak > 0 && loadIndicatorDetails('veryWeak')}
+          disabled={stats.veryWeak === 0}
+          className={`bg-amber-50 border border-amber-200 rounded-lg p-3 text-center transition-all ${
+            stats.veryWeak > 0 ? 'hover:bg-amber-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-2xl font-bold text-amber-600">{stats.veryWeak}</div>
+          <div className="text-xs text-slate-600 mt-1">Çok Zayıf</div>
         </button>
       </div>
 
@@ -1131,13 +1143,17 @@ const getIndicatorTarget = (indicator: Indicator) => {
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full transition-all ${
-                              indicator.status === 'exceeding_target'
+                              indicator.status === 'exceedingTarget'
                                 ? 'bg-purple-500'
-                                : indicator.status === 'on_track'
+                                : indicator.status === 'excellent'
+                                ? 'bg-emerald-500'
+                                : indicator.status === 'good'
                                 ? 'bg-green-500'
-                                : indicator.status === 'at_risk'
+                                : indicator.status === 'moderate'
                                 ? 'bg-yellow-500'
-                                : 'bg-red-500'
+                                : indicator.status === 'weak'
+                                ? 'bg-red-500'
+                                : 'bg-amber-600'
                             }`}
                             style={{ width: `${Math.min(indicator.progress, 100)}%` }}
                           />

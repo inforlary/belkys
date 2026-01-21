@@ -6,16 +6,27 @@ import { exportToExcel } from '../../utils/exportHelpers';
 import { generatePerformanceDashboardPDF } from '../../utils/reportPDFGenerators';
 import Modal from '../ui/Modal';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
+import {
+  IndicatorStatus,
+  getIndicatorStatus,
+  getStatusConfig,
+  getStatusLabel,
+  createEmptyStats,
+  incrementStatusInStats,
+  type IndicatorStats as StatusStats
+} from '../../utils/indicatorStatus';
 
 interface DepartmentPerformance {
   department_id: string;
   department_name: string;
   total_indicators: number;
   avg_progress: number;
-  exceeding_target: number;
-  on_track: number;
-  at_risk: number;
-  behind: number;
+  exceedingTarget: number;
+  excellent: number;
+  good: number;
+  moderate: number;
+  weak: number;
+  veryWeak: number;
 }
 
 interface IndicatorDetail {
@@ -25,7 +36,7 @@ interface IndicatorDetail {
   current_value: number;
   target_value: number;
   progress: number;
-  status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+  status: IndicatorStatus;
 }
 
 interface PerformanceDashboardProps {
@@ -43,11 +54,11 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
   const [sortBy, setSortBy] = useState<SortOption>('progress-desc');
   const currentYear = selectedYear || new Date().getFullYear();
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<'exceeding_target' | 'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<IndicatorStatus | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentPerformance | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
-  const [overallStats, setOverallStats] = useState({ exceedingTarget: 0, onTrack: 0, atRisk: 0, behind: 0, total: 0 });
+  const [overallStats, setOverallStats] = useState<StatusStats>(createEmptyStats());
 
   useEffect(() => {
     loadData();
@@ -111,10 +122,12 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 department_name: dept.name,
                 total_indicators: 0,
                 avg_progress: 0,
-                exceeding_target: 0,
-                on_track: 0,
-                at_risk: 0,
-                behind: 0,
+                exceedingTarget: 0,
+                excellent: 0,
+                good: 0,
+                moderate: 0,
+                weak: 0,
+                veryWeak: 0,
               };
             }
 
@@ -132,10 +145,12 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 department_name: dept.name,
                 total_indicators: 0,
                 avg_progress: 0,
-                exceeding_target: 0,
-                on_track: 0,
-                at_risk: 0,
-                behind: 0,
+                exceedingTarget: 0,
+                excellent: 0,
+                good: 0,
+                moderate: 0,
+                weak: 0,
+                veryWeak: 0,
               };
             }
 
@@ -179,11 +194,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             });
 
             let totalProgress = 0;
-            let exceedingTarget = 0;
-            let onTrack = 0;
-            let atRisk = 0;
-            let behind = 0;
-            let validCount = 0;
+            const stats = createEmptyStats();
 
             indicatorIds.forEach(id => {
               const targetData = targetsByIndicator[id];
@@ -200,24 +211,22 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 });
 
                 totalProgress += progress;
-                validCount++;
-
-                if (progress >= 200) exceedingTarget++;
-                else if (progress >= 70) onTrack++;
-                else if (progress >= 50) atRisk++;
-                else behind++;
+                const status = getIndicatorStatus(progress);
+                incrementStatusInStats(stats, status);
               }
             });
 
             return {
               department_id: dept.id,
               department_name: dept.name,
-              total_indicators: validCount,
-              avg_progress: validCount > 0 ? totalProgress / validCount : 0,
-              exceeding_target: exceedingTarget,
-              on_track: onTrack,
-              at_risk: atRisk,
-              behind: behind,
+              total_indicators: stats.total,
+              avg_progress: stats.total > 0 ? totalProgress / stats.total : 0,
+              exceedingTarget: stats.exceedingTarget,
+              excellent: stats.excellent,
+              good: stats.good,
+              moderate: stats.moderate,
+              weak: stats.weak,
+              veryWeak: stats.veryWeak,
             };
           })
         );
@@ -231,18 +240,18 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         );
         setOverallProgress(totalValidIndicators > 0 ? weightedProgress / totalValidIndicators : 0);
 
-        const totalExceedingTarget = performanceData.reduce((sum, d) => sum + d.exceeding_target, 0);
-        const totalOnTrack = performanceData.reduce((sum, d) => sum + d.on_track, 0);
-        const totalAtRisk = performanceData.reduce((sum, d) => sum + d.at_risk, 0);
-        const totalBehind = performanceData.reduce((sum, d) => sum + d.behind, 0);
-
-        setOverallStats({
-          exceedingTarget: totalExceedingTarget,
-          onTrack: totalOnTrack,
-          atRisk: totalAtRisk,
-          behind: totalBehind,
-          total: totalValidIndicators,
+        const aggregatedStats = createEmptyStats();
+        performanceData.forEach(d => {
+          aggregatedStats.exceedingTarget += d.exceedingTarget;
+          aggregatedStats.excellent += d.excellent;
+          aggregatedStats.good += d.good;
+          aggregatedStats.moderate += d.moderate;
+          aggregatedStats.weak += d.weak;
+          aggregatedStats.veryWeak += d.veryWeak;
+          aggregatedStats.total += d.total_indicators;
         });
+
+        setOverallStats(aggregatedStats);
       }
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
@@ -270,7 +279,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     generatePerformanceDashboardPDF(sortedDepartments, overallProgress);
   };
 
-  const loadIndicatorDetails = async (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind', dept?: DepartmentPerformance) => {
+  const loadIndicatorDetails = async (status: IndicatorStatus, dept?: DepartmentPerformance) => {
     if (!profile?.organization_id) return;
 
     setSelectedDepartment(dept || null);
@@ -369,11 +378,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             currentValue: currentValue,
           });
 
-          let indicatorStatus: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
-          if (progress >= 200) indicatorStatus = 'exceeding_target';
-          else if (progress >= 70) indicatorStatus = 'on_track';
-          else if (progress >= 50) indicatorStatus = 'at_risk';
-          else indicatorStatus = 'behind';
+          const indicatorStatus = getIndicatorStatus(progress);
 
           if (indicatorStatus === status) {
             details.push({
@@ -398,22 +403,9 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     }
   };
 
-  const getStatusLabel = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'Hedef Sapması';
-      case 'on_track': return 'Hedefte';
-      case 'at_risk': return 'Risk Altında';
-      case 'behind': return 'Geride';
-    }
-  };
-
-  const getStatusColor = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'text-purple-600 bg-purple-50';
-      case 'on_track': return 'text-green-600 bg-green-50';
-      case 'at_risk': return 'text-yellow-600 bg-yellow-50';
-      case 'behind': return 'text-red-600 bg-red-50';
-    }
+  const getStatusColorClass = (status: IndicatorStatus) => {
+    const config = getStatusConfig(status);
+    return `${config.color} ${config.bgColor}`;
   };
 
   if (loading) {
@@ -480,7 +472,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-7 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
           <div className="text-3xl font-bold text-slate-900">{overallStats.total}</div>
           <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
@@ -493,37 +485,57 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
           }`}
         >
           <div className="text-3xl font-bold text-purple-600">{overallStats.exceedingTarget}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+          <div className="text-sm text-slate-600 mt-1">Hedef Üstü</div>
         </button>
         <button
-          onClick={() => overallStats.onTrack > 0 && loadIndicatorDetails('on_track')}
-          disabled={overallStats.onTrack === 0}
+          onClick={() => overallStats.excellent > 0 && loadIndicatorDetails('excellent')}
+          disabled={overallStats.excellent === 0}
+          className={`bg-green-100 border border-green-300 rounded-lg p-4 text-center transition-all ${
+            overallStats.excellent > 0 ? 'hover:bg-green-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-green-700">{overallStats.excellent}</div>
+          <div className="text-sm text-slate-600 mt-1">Çok İyi</div>
+        </button>
+        <button
+          onClick={() => overallStats.good > 0 && loadIndicatorDetails('good')}
+          disabled={overallStats.good === 0}
           className={`bg-green-50 border border-green-200 rounded-lg p-4 text-center transition-all ${
-            overallStats.onTrack > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            overallStats.good > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-green-600">{overallStats.onTrack}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedefte</div>
+          <div className="text-3xl font-bold text-green-600">{overallStats.good}</div>
+          <div className="text-sm text-slate-600 mt-1">İyi</div>
         </button>
         <button
-          onClick={() => overallStats.atRisk > 0 && loadIndicatorDetails('at_risk')}
-          disabled={overallStats.atRisk === 0}
+          onClick={() => overallStats.moderate > 0 && loadIndicatorDetails('moderate')}
+          disabled={overallStats.moderate === 0}
           className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center transition-all ${
-            overallStats.atRisk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            overallStats.moderate > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-yellow-600">{overallStats.atRisk}</div>
-          <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
+          <div className="text-3xl font-bold text-yellow-600">{overallStats.moderate}</div>
+          <div className="text-sm text-slate-600 mt-1">Orta</div>
         </button>
         <button
-          onClick={() => overallStats.behind > 0 && loadIndicatorDetails('behind')}
-          disabled={overallStats.behind === 0}
+          onClick={() => overallStats.weak > 0 && loadIndicatorDetails('weak')}
+          disabled={overallStats.weak === 0}
           className={`bg-red-50 border border-red-200 rounded-lg p-4 text-center transition-all ${
-            overallStats.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            overallStats.weak > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-red-600">{overallStats.behind}</div>
-          <div className="text-sm text-slate-600 mt-1">Geride</div>
+          <div className="text-3xl font-bold text-red-600">{overallStats.weak}</div>
+          <div className="text-sm text-slate-600 mt-1">Zayıf</div>
+        </button>
+        <button
+          onClick={() => overallStats.veryWeak > 0 && loadIndicatorDetails('very_weak')}
+          disabled={overallStats.veryWeak === 0}
+          className={`bg-amber-100 border border-amber-300 rounded-lg p-4 text-center transition-all ${
+            overallStats.veryWeak > 0 ? 'hover:bg-amber-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-amber-800">{overallStats.veryWeak}</div>
+          <div className="text-sm text-slate-600 mt-1">Çok Zayıf</div>
         </button>
       </div>
 
@@ -584,46 +596,66 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-6 gap-3">
                 <button
-                  onClick={() => dept.exceeding_target > 0 && loadIndicatorDetails('exceeding_target', dept)}
-                  disabled={dept.exceeding_target === 0}
+                  onClick={() => dept.exceedingTarget > 0 && loadIndicatorDetails('exceeding_target', dept)}
+                  disabled={dept.exceedingTarget === 0}
                   className={`bg-purple-50 rounded-lg p-3 text-center transition-all ${
-                    dept.exceeding_target > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                    dept.exceedingTarget > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className="text-2xl font-bold text-purple-600">{dept.exceeding_target}</div>
-                  <div className="text-xs text-slate-600">Hedef Sapması</div>
+                  <div className="text-2xl font-bold text-purple-600">{dept.exceedingTarget}</div>
+                  <div className="text-xs text-slate-600">Hedef Üstü</div>
                 </button>
                 <button
-                  onClick={() => dept.on_track > 0 && loadIndicatorDetails('on_track', dept)}
-                  disabled={dept.on_track === 0}
+                  onClick={() => dept.excellent > 0 && loadIndicatorDetails('excellent', dept)}
+                  disabled={dept.excellent === 0}
+                  className={`bg-green-100 rounded-lg p-3 text-center transition-all ${
+                    dept.excellent > 0 ? 'hover:bg-green-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-green-700">{dept.excellent}</div>
+                  <div className="text-xs text-slate-600">Çok İyi</div>
+                </button>
+                <button
+                  onClick={() => dept.good > 0 && loadIndicatorDetails('good', dept)}
+                  disabled={dept.good === 0}
                   className={`bg-green-50 rounded-lg p-3 text-center transition-all ${
-                    dept.on_track > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                    dept.good > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className="text-2xl font-bold text-green-600">{dept.on_track}</div>
-                  <div className="text-xs text-slate-600">Hedefte</div>
+                  <div className="text-2xl font-bold text-green-600">{dept.good}</div>
+                  <div className="text-xs text-slate-600">İyi</div>
                 </button>
                 <button
-                  onClick={() => dept.at_risk > 0 && loadIndicatorDetails('at_risk', dept)}
-                  disabled={dept.at_risk === 0}
+                  onClick={() => dept.moderate > 0 && loadIndicatorDetails('moderate', dept)}
+                  disabled={dept.moderate === 0}
                   className={`bg-yellow-50 rounded-lg p-3 text-center transition-all ${
-                    dept.at_risk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                    dept.moderate > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className="text-2xl font-bold text-yellow-600">{dept.at_risk}</div>
-                  <div className="text-xs text-slate-600">Risk Altında</div>
+                  <div className="text-2xl font-bold text-yellow-600">{dept.moderate}</div>
+                  <div className="text-xs text-slate-600">Orta</div>
                 </button>
                 <button
-                  onClick={() => dept.behind > 0 && loadIndicatorDetails('behind', dept)}
-                  disabled={dept.behind === 0}
+                  onClick={() => dept.weak > 0 && loadIndicatorDetails('weak', dept)}
+                  disabled={dept.weak === 0}
                   className={`bg-red-50 rounded-lg p-3 text-center transition-all ${
-                    dept.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                    dept.weak > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className="text-2xl font-bold text-red-600">{dept.behind}</div>
-                  <div className="text-xs text-slate-600">Geride</div>
+                  <div className="text-2xl font-bold text-red-600">{dept.weak}</div>
+                  <div className="text-xs text-slate-600">Zayıf</div>
+                </button>
+                <button
+                  onClick={() => dept.veryWeak > 0 && loadIndicatorDetails('very_weak', dept)}
+                  disabled={dept.veryWeak === 0}
+                  className={`bg-amber-100 rounded-lg p-3 text-center transition-all ${
+                    dept.veryWeak > 0 ? 'hover:bg-amber-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-amber-800">{dept.veryWeak}</div>
+                  <div className="text-xs text-slate-600">Çok Zayıf</div>
                 </button>
               </div>
               </div>
@@ -651,7 +683,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                     Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
                   </div>
                   {selectedStatus && (
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedStatus)}`}>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColorClass(selectedStatus)}`}>
                       {getStatusLabel(selectedStatus)}
                     </div>
                   )}
@@ -670,7 +702,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                           {indicator.code}
                         </span>
                         {selectedStatus && (
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(selectedStatus)}`}>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColorClass(selectedStatus)}`}>
                             {getStatusLabel(selectedStatus)}
                           </span>
                         )}
@@ -701,13 +733,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                       <div className="mt-3">
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full transition-all ${
-                              indicator.status === 'on_track'
-                                ? 'bg-green-500'
-                                : indicator.status === 'at_risk'
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
-                            }`}
+                            className={`h-2 rounded-full transition-all ${getStatusConfig(indicator.status).progressBarColor}`}
                             style={{ width: `${Math.min(indicator.progress, 100)}%` }}
                           />
                         </div>

@@ -5,6 +5,15 @@ import { Download, Target, AlertTriangle, FileText } from 'lucide-react';
 import { exportToExcel } from '../../utils/exportHelpers';
 import { generateGoalAchievementPDF } from '../../utils/reportPDFGenerators';
 import { calculateIndicatorProgress } from '../../utils/progressCalculations';
+import {
+  IndicatorStatus,
+  getIndicatorStatus,
+  getStatusConfig,
+  getStatusLabel,
+  createEmptyStats,
+  incrementStatusInStats,
+  type IndicatorStats as StatusStats
+} from '../../utils/indicatorStatus';
 
 interface GoalData {
   id: string;
@@ -14,9 +23,12 @@ interface GoalData {
   department_name: string;
   indicators_count: number;
   avg_progress: number;
-  on_track_indicators: number;
-  at_risk_indicators: number;
-  behind_indicators: number;
+  exceedingTarget: number;
+  excellent: number;
+  good: number;
+  moderate: number;
+  weak: number;
+  veryWeak: number;
   forecast: string;
 }
 
@@ -80,9 +92,12 @@ export default function GoalAchievement({ selectedYear }: GoalAchievementProps) 
                 department_name: (goal.departments as any)?.name || '',
                 indicators_count: 0,
                 avg_progress: 0,
-                on_track_indicators: 0,
-                at_risk_indicators: 0,
-                behind_indicators: 0,
+                exceedingTarget: 0,
+                excellent: 0,
+                good: 0,
+                moderate: 0,
+                weak: 0,
+                veryWeak: 0,
                 forecast: 'Veri Yok',
               };
             }
@@ -110,10 +125,7 @@ export default function GoalAchievement({ selectedYear }: GoalAchievementProps) 
             });
 
             let totalProgress = 0;
-            let validCount = 0;
-            let onTrack = 0;
-            let atRisk = 0;
-            let behind = 0;
+            const stats = createEmptyStats();
 
             indicators.forEach(indicator => {
               const yearlyTarget = targetsByIndicator[indicator.id] || indicator.target_value;
@@ -129,15 +141,13 @@ export default function GoalAchievement({ selectedYear }: GoalAchievementProps) 
                 }, entriesData.data || []);
 
                 totalProgress += progress;
-                validCount++;
 
-                if (progress >= 70) onTrack++;
-                else if (progress >= 50) atRisk++;
-                else behind++;
+                const status = getIndicatorStatus(progress);
+                incrementStatusInStats(stats, status);
               }
             });
 
-            const avgProgress = validCount > 0 ? totalProgress / validCount : 0;
+            const avgProgress = stats.total > 0 ? totalProgress / stats.total : 0;
             let forecast = 'Belirsiz';
             if (avgProgress >= 80) forecast = 'Başarılı';
             else if (avgProgress >= 60) forecast = 'Büyük İhtimalle Başarılı';
@@ -150,11 +160,14 @@ export default function GoalAchievement({ selectedYear }: GoalAchievementProps) 
               title: goal.title,
               objective_title: (goal.objectives as any)?.title || '',
               department_name: (goal.departments as any)?.name || '',
-              indicators_count: validCount,
+              indicators_count: stats.total,
               avg_progress: avgProgress,
-              on_track_indicators: onTrack,
-              at_risk_indicators: atRisk,
-              behind_indicators: behind,
+              exceedingTarget: stats.exceedingTarget,
+              excellent: stats.excellent,
+              good: stats.good,
+              moderate: stats.moderate,
+              weak: stats.weak,
+              veryWeak: stats.veryWeak,
               forecast: forecast,
             };
           })
@@ -288,18 +301,30 @@ export default function GoalAchievement({ selectedYear }: GoalAchievementProps) 
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-7 gap-3">
+                <div className="bg-purple-50 rounded-lg p-3 text-center border border-purple-200">
+                  <div className="text-2xl font-bold text-purple-600">{goal.exceedingTarget}</div>
+                  <div className="text-xs text-slate-600">Hedef Üstü</div>
+                </div>
+                <div className="bg-green-100 rounded-lg p-3 text-center border border-green-300">
+                  <div className="text-2xl font-bold text-green-700">{goal.excellent}</div>
+                  <div className="text-xs text-slate-600">Çok İyi</div>
+                </div>
                 <div className="bg-green-50 rounded-lg p-3 text-center border border-green-200">
-                  <div className="text-2xl font-bold text-green-600">{goal.on_track_indicators}</div>
-                  <div className="text-xs text-slate-600">Hedefte</div>
+                  <div className="text-2xl font-bold text-green-600">{goal.good}</div>
+                  <div className="text-xs text-slate-600">İyi</div>
                 </div>
                 <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
-                  <div className="text-2xl font-bold text-yellow-600">{goal.at_risk_indicators}</div>
-                  <div className="text-xs text-slate-600">Risk Altında</div>
+                  <div className="text-2xl font-bold text-yellow-600">{goal.moderate}</div>
+                  <div className="text-xs text-slate-600">Orta</div>
                 </div>
                 <div className="bg-red-50 rounded-lg p-3 text-center border border-red-200">
-                  <div className="text-2xl font-bold text-red-600">{goal.behind_indicators}</div>
-                  <div className="text-xs text-slate-600">Geride</div>
+                  <div className="text-2xl font-bold text-red-600">{goal.weak}</div>
+                  <div className="text-xs text-slate-600">Zayıf</div>
+                </div>
+                <div className="bg-amber-100 rounded-lg p-3 text-center border border-amber-300">
+                  <div className="text-2xl font-bold text-amber-800">{goal.veryWeak}</div>
+                  <div className="text-xs text-slate-600">Çok Zayıf</div>
                 </div>
                 <div
                   className={`rounded-lg p-3 text-center border ${getForecastColor(goal.forecast)}`}

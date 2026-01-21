@@ -5,6 +5,15 @@ import { Download, Filter, TrendingUp, FileText, X } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
 import { calculateIndicatorProgress } from '../../utils/progressCalculations';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
+import {
+  IndicatorStatus,
+  getIndicatorStatus,
+  getStatusConfig,
+  getStatusLabel,
+  createEmptyStats,
+  incrementStatusInStats,
+  type IndicatorStats as StatusStats
+} from '../../utils/indicatorStatus';
 import Modal from '../ui/Modal';
 
 interface IndicatorData {
@@ -46,7 +55,7 @@ interface IndicatorDetail {
   current_value: number;
   target_value: number;
   progress: number;
-  status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
+  status: IndicatorStatus;
 }
 
 export default function IndicatorPerformance({ selectedYear }: IndicatorPerformanceProps) {
@@ -62,7 +71,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const [loading, setLoading] = useState(true);
   const currentYear = selectedYear || new Date().getFullYear();
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<'exceeding_target' | 'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<IndicatorStatus | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
 
@@ -314,14 +323,12 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   };
 
   const getIndicatorStats = () => {
-    let exceedingTarget = 0;
-    let onTrack = 0;
-    let atRisk = 0;
-    let behind = 0;
+    const stats = createEmptyStats();
 
     indicators.forEach(ind => {
       if (ind.target_value === 0) {
-        behind++;
+        const status = getIndicatorStatus(0);
+        incrementStatusInStats(stats, status);
         return;
       }
 
@@ -336,16 +343,14 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         currentValue: 0,
       });
 
-      if (progress >= 200) exceedingTarget++;
-      else if (progress >= 70) onTrack++;
-      else if (progress >= 50) atRisk++;
-      else behind++;
+      const status = getIndicatorStatus(progress);
+      incrementStatusInStats(stats, status);
     });
 
-    return { exceedingTarget, onTrack, atRisk, behind, total: indicators.length };
+    return stats;
   };
 
-  const loadIndicatorDetails = async (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
+  const loadIndicatorDetails = async (status: IndicatorStatus) => {
     setSelectedStatus(status);
     setShowIndicatorModal(true);
     setLoadingIndicators(true);
@@ -376,11 +381,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           currentValue: currentValue,
         });
 
-        let indicatorStatus: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind';
-        if (progress >= 200) indicatorStatus = 'exceeding_target';
-        else if (progress >= 70) indicatorStatus = 'on_track';
-        else if (progress >= 50) indicatorStatus = 'at_risk';
-        else indicatorStatus = 'behind';
+        const indicatorStatus = getIndicatorStatus(progress);
 
         if (indicatorStatus === status) {
           details.push({
@@ -404,22 +405,9 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     }
   };
 
-  const getStatusLabel = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'Hedef Sapması';
-      case 'on_track': return 'Hedefte';
-      case 'at_risk': return 'Risk Altında';
-      case 'behind': return 'Geride';
-    }
-  };
-
-  const getStatusColor = (status: 'exceeding_target' | 'on_track' | 'at_risk' | 'behind') => {
-    switch (status) {
-      case 'exceeding_target': return 'text-purple-600 bg-purple-50';
-      case 'on_track': return 'text-green-600 bg-green-50';
-      case 'at_risk': return 'text-yellow-600 bg-yellow-50';
-      case 'behind': return 'text-red-600 bg-red-50';
-    }
+  const getStatusColorClass = (status: IndicatorStatus) => {
+    const config = getStatusConfig(status);
+    return `${config.color} ${config.bgColor}`;
   };
 
   const calculateSelectedTotal = (ind: IndicatorData) => {
@@ -853,7 +841,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-7 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
           <div className="text-3xl font-bold text-slate-900">{stats.total}</div>
           <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
@@ -866,37 +854,57 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           }`}
         >
           <div className="text-3xl font-bold text-purple-600">{stats.exceedingTarget}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedef Sapması</div>
+          <div className="text-sm text-slate-600 mt-1">Hedef Üstü</div>
         </button>
         <button
-          onClick={() => stats.onTrack > 0 && loadIndicatorDetails('on_track')}
-          disabled={stats.onTrack === 0}
+          onClick={() => stats.excellent > 0 && loadIndicatorDetails('excellent')}
+          disabled={stats.excellent === 0}
+          className={`bg-green-100 border border-green-300 rounded-lg p-4 text-center transition-all ${
+            stats.excellent > 0 ? 'hover:bg-green-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-green-700">{stats.excellent}</div>
+          <div className="text-sm text-slate-600 mt-1">Çok İyi</div>
+        </button>
+        <button
+          onClick={() => stats.good > 0 && loadIndicatorDetails('good')}
+          disabled={stats.good === 0}
           className={`bg-green-50 border border-green-200 rounded-lg p-4 text-center transition-all ${
-            stats.onTrack > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            stats.good > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-green-600">{stats.onTrack}</div>
-          <div className="text-sm text-slate-600 mt-1">Hedefte</div>
+          <div className="text-3xl font-bold text-green-600">{stats.good}</div>
+          <div className="text-sm text-slate-600 mt-1">İyi</div>
         </button>
         <button
-          onClick={() => stats.atRisk > 0 && loadIndicatorDetails('at_risk')}
-          disabled={stats.atRisk === 0}
+          onClick={() => stats.moderate > 0 && loadIndicatorDetails('moderate')}
+          disabled={stats.moderate === 0}
           className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center transition-all ${
-            stats.atRisk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            stats.moderate > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-yellow-600">{stats.atRisk}</div>
-          <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
+          <div className="text-3xl font-bold text-yellow-600">{stats.moderate}</div>
+          <div className="text-sm text-slate-600 mt-1">Orta</div>
         </button>
         <button
-          onClick={() => stats.behind > 0 && loadIndicatorDetails('behind')}
-          disabled={stats.behind === 0}
+          onClick={() => stats.weak > 0 && loadIndicatorDetails('weak')}
+          disabled={stats.weak === 0}
           className={`bg-red-50 border border-red-200 rounded-lg p-4 text-center transition-all ${
-            stats.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+            stats.weak > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
           }`}
         >
-          <div className="text-3xl font-bold text-red-600">{stats.behind}</div>
-          <div className="text-sm text-slate-600 mt-1">Geride</div>
+          <div className="text-3xl font-bold text-red-600">{stats.weak}</div>
+          <div className="text-sm text-slate-600 mt-1">Zayıf</div>
+        </button>
+        <button
+          onClick={() => stats.veryWeak > 0 && loadIndicatorDetails('very_weak')}
+          disabled={stats.veryWeak === 0}
+          className={`bg-amber-100 border border-amber-300 rounded-lg p-4 text-center transition-all ${
+            stats.veryWeak > 0 ? 'hover:bg-amber-200 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
+          <div className="text-3xl font-bold text-amber-800">{stats.veryWeak}</div>
+          <div className="text-sm text-slate-600 mt-1">Çok Zayıf</div>
         </button>
       </div>
 
@@ -1187,7 +1195,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                     Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
                   </div>
                   {selectedStatus && (
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedStatus)}`}>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColorClass(selectedStatus)}`}>
                       {getStatusLabel(selectedStatus)}
                     </div>
                   )}
@@ -1206,7 +1214,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                           {indicator.code}
                         </span>
                         {selectedStatus && (
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(selectedStatus)}`}>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColorClass(selectedStatus)}`}>
                             {getStatusLabel(selectedStatus)}
                           </span>
                         )}
@@ -1237,15 +1245,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                       <div className="mt-3">
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full transition-all ${
-                              indicator.status === 'exceeding_target'
-                                ? 'bg-purple-500'
-                                : indicator.status === 'on_track'
-                                ? 'bg-green-500'
-                                : indicator.status === 'at_risk'
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
-                            }`}
+                            className={`h-2 rounded-full transition-all ${getStatusConfig(indicator.status).progressBarColor}`}
                             style={{ width: `${Math.min(indicator.progress, 100)}%` }}
                           />
                         </div>
