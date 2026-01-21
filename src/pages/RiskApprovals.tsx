@@ -402,21 +402,21 @@ export default function RiskApprovals() {
       )}
 
       {showDetailModal && selectedRisk && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg max-w-4xl w-full my-8">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg z-10">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900">Risk Detayı</h2>
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-gray-400 hover:text-gray-600 transition-colors text-3xl leading-none"
                 >
                   ×
                 </button>
               </div>
             </div>
 
-            <div className="px-6 py-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
+            <div className="px-6 py-6 space-y-6 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Risk Kodu</label>
@@ -538,62 +538,60 @@ export default function RiskApprovals() {
               )}
             </div>
 
-            {activeTab === 'pending' && (
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg flex justify-end gap-3">
-                <button
-                  onClick={() => setShowDetailModal(false)}
-                  className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Kapat
-                </button>
+            <div className="bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg flex justify-end gap-3 flex-shrink-0">
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Kapat
+              </button>
 
-                {canReview && selectedRisk.approval_status === 'IN_REVIEW' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setShowRejectModal(true);
-                      }}
-                      disabled={processing}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
-                    >
-                      <XCircle className="w-5 h-5" />
-                      Reddet
-                    </button>
-                    <button
-                      onClick={() => handleDirectorReview(selectedRisk.id, 'approve')}
-                      disabled={processing}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Yöneticiye Gönder
-                    </button>
-                  </>
-                )}
+              {activeTab === 'pending' && canReview && selectedRisk.approval_status === 'IN_REVIEW' && (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowRejectModal(true);
+                    }}
+                    disabled={processing}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                  >
+                    <XCircle className="w-5 h-5" />
+                    Reddet
+                  </button>
+                  <button
+                    onClick={() => handleDirectorReview(selectedRisk.id, 'approve')}
+                    disabled={processing}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Yöneticiye Gönder
+                  </button>
+                </>
+              )}
 
-                {canApprove && selectedRisk.approval_status === 'PENDING_APPROVAL' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setShowRejectModal(true);
-                      }}
-                      disabled={processing}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
-                    >
-                      <XCircle className="w-5 h-5" />
-                      Reddet
-                    </button>
-                    <button
-                      onClick={() => handleAdminApproval(selectedRisk.id, 'approve')}
-                      disabled={processing}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Onayla
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+              {activeTab === 'pending' && canApprove && selectedRisk.approval_status === 'PENDING_APPROVAL' && (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowRejectModal(true);
+                    }}
+                    disabled={processing}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                  >
+                    <XCircle className="w-5 h-5" />
+                    Reddet
+                  </button>
+                  <button
+                    onClick={() => handleAdminApproval(selectedRisk.id, 'approve')}
+                    disabled={processing}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Onayla
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
