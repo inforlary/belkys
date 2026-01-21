@@ -38,16 +38,9 @@ export function calculateIndicatorProgress(
   if (indicatorEntries.length === 0) return 0;
 
   const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
+  const periodCount = indicatorEntries.length;
+  const average = sumOfEntries / periodCount;
   const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
-
-  const measurementFrequencyMap: { [key: string]: number } = {
-    monthly: 12,
-    quarterly: 4,
-    semi_annual: 2,
-    annual: 1
-  };
-
-  const measurementFrequencyCount = measurementFrequencyMap[indicator.measurement_frequency || 'annual'] || 1;
 
   let progress = 0;
 
@@ -55,58 +48,55 @@ export function calculateIndicatorProgress(
     case 'cumulative':
     case 'cumulative_increasing':
     case 'increasing': {
-      const C = baselineValue + sumOfEntries;
+      const currentValue = baselineValue + sumOfEntries;
       const denominator = targetValue - baselineValue;
       if (denominator === 0) return 0;
-      progress = ((C - baselineValue) / denominator) * 100;
+      progress = ((currentValue - baselineValue) / denominator) * 100;
       break;
     }
 
     case 'cumulative_decreasing':
     case 'decreasing': {
-      const C = baselineValue - sumOfEntries;
+      const currentValue = baselineValue - sumOfEntries;
       const denominator = targetValue - baselineValue;
       if (denominator === 0) return 0;
-      progress = ((C - baselineValue) / denominator) * 100;
+      progress = ((currentValue - baselineValue) / denominator) * 100;
       break;
     }
 
     case 'percentage_increasing': {
-      const average = sumOfEntries / measurementFrequencyCount;
       progress = (average / targetValue) * 100;
       break;
     }
 
     case 'percentage_decreasing': {
-      const average = sumOfEntries / measurementFrequencyCount;
-      const denominator = targetValue - baselineValue;
-      if (denominator === 0) return 0;
-      progress = ((average - baselineValue) / denominator) * 100;
+      if (average === 0) return 0;
+      progress = (targetValue / average) * 100;
       break;
     }
 
     case 'maintenance_increasing': {
-      progress = (sumOfEntries / targetValue) * 100;
+      progress = (average / targetValue) * 100;
       break;
     }
 
     case 'maintenance_decreasing': {
-      if (sumOfEntries === 0) return 0;
-      progress = (targetValue / sumOfEntries) * 100;
+      if (average === 0) return 0;
+      progress = (targetValue / average) * 100;
       break;
     }
 
     case 'percentage':
     case 'maintenance': {
-      progress = (sumOfEntries / targetValue) * 100;
+      progress = (average / targetValue) * 100;
       break;
     }
 
     default: {
-      const C = baselineValue + sumOfEntries;
+      const currentValue = baselineValue + sumOfEntries;
       const denominator = targetValue - baselineValue;
       if (denominator === 0) return 0;
-      progress = ((C - baselineValue) / denominator) * 100;
+      progress = ((currentValue - baselineValue) / denominator) * 100;
       break;
     }
   }
