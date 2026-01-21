@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Calendar, FileText } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Calendar, FileText, X } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../../utils/exportHelpers';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
+import Modal from '../ui/Modal';
 
 interface ExecutiveData {
   overall_progress: number;
@@ -23,11 +24,25 @@ interface ExecutiveSummaryProps {
   selectedYear?: number;
 }
 
+interface IndicatorDetail {
+  id: string;
+  name: string;
+  code: string;
+  current_value: number;
+  target_value: number;
+  progress: number;
+  status: 'on_track' | 'at_risk' | 'behind';
+}
+
 export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps) {
   const { profile } = useAuth();
   const [data, setData] = useState<ExecutiveData | null>(null);
   const [loading, setLoading] = useState(true);
   const currentYear = selectedYear || new Date().getFullYear();
+  const [showIndicatorModal, setShowIndicatorModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<'on_track' | 'at_risk' | 'behind' | null>(null);
+  const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
+  const [loadingIndicators, setLoadingIndicators] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -271,6 +286,150 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     exportToExcel(exportData, 'Yonetici_Ozeti');
   };
 
+  const loadIndicatorDetails = async (status: 'on_track' | 'at_risk' | 'behind') => {
+    if (!profile?.organization_id) return;
+
+    setSelectedStatus(status);
+    setShowIndicatorModal(true);
+    setLoadingIndicators(true);
+
+    try {
+      let goalsQuery = supabase
+        .from('goals')
+        .select('id')
+        .eq('organization_id', profile.organization_id);
+
+      if (profile.role !== 'admin' && profile.role !== 'manager' && profile.department_id) {
+        goalsQuery = goalsQuery.eq('department_id', profile.department_id);
+      }
+
+      const { data: allowedGoals } = await goalsQuery;
+      const allowedGoalIds = allowedGoals?.map(g => g.id) || [];
+
+      let indicatorsQuery = supabase
+        .from('indicators')
+        .select('id, name, code, goal_id, calculation_method')
+        .eq('organization_id', profile.organization_id);
+
+      if (allowedGoalIds.length > 0) {
+        indicatorsQuery = indicatorsQuery.in('goal_id', allowedGoalIds);
+      } else if (profile.role !== 'admin' && profile.role !== 'manager') {
+        setIndicatorDetails([]);
+        setLoadingIndicators(false);
+        return;
+      }
+
+      const { data: indicators } = await indicatorsQuery;
+
+      if (!indicators || indicators.length === 0) {
+        setIndicatorDetails([]);
+        setLoadingIndicators(false);
+        return;
+      }
+
+      const indicatorIds = indicators.map(i => i.id);
+
+      const [entriesResult, targetsResult] = await Promise.all([
+        supabase
+          .from('indicator_data_entries')
+          .select('indicator_id, value, period_quarter')
+          .eq('organization_id', profile.organization_id)
+          .eq('period_year', currentYear)
+          .in('status', ['approved', 'submitted'])
+          .in('indicator_id', indicatorIds)
+          .order('period_quarter', { ascending: true }),
+        supabase
+          .from('indicator_targets')
+          .select('indicator_id, target_value, baseline_value')
+          .eq('year', currentYear)
+          .in('indicator_id', indicatorIds),
+      ]);
+
+      const entriesByIndicator: Record<string, number[]> = {};
+      entriesResult.data?.forEach(entry => {
+        if (!entriesByIndicator[entry.indicator_id]) {
+          entriesByIndicator[entry.indicator_id] = [];
+        }
+        entriesByIndicator[entry.indicator_id].push(entry.value || 0);
+      });
+
+      const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
+      targetsResult.data?.forEach(target => {
+        targetsByIndicator[target.indicator_id] = {
+          target: target.target_value,
+          baseline: target.baseline_value || 0,
+        };
+      });
+
+      const details: IndicatorDetail[] = [];
+
+      indicators.forEach(indicator => {
+        const targetData = targetsByIndicator[indicator.id];
+        if (targetData && targetData.target > 0) {
+          const periodValues = entriesByIndicator[indicator.id] || [];
+          const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
+
+          const sum = periodValues.reduce((acc, val) => acc + val, 0);
+          let currentValue = sum;
+
+          if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+            currentValue = targetData.baseline + sum;
+          } else if (calculationMethod === 'decreasing') {
+            currentValue = targetData.baseline - sum;
+          }
+
+          const progress = calculatePerformancePercentage({
+            method: calculationMethod,
+            baselineValue: targetData.baseline,
+            targetValue: targetData.target,
+            periodValues: periodValues,
+            currentValue: currentValue,
+          });
+
+          let indicatorStatus: 'on_track' | 'at_risk' | 'behind';
+          if (progress >= 70) indicatorStatus = 'on_track';
+          else if (progress >= 50) indicatorStatus = 'at_risk';
+          else indicatorStatus = 'behind';
+
+          if (indicatorStatus === status) {
+            details.push({
+              id: indicator.id,
+              name: indicator.name,
+              code: indicator.code || '',
+              current_value: currentValue,
+              target_value: targetData.target,
+              progress: progress,
+              status: indicatorStatus,
+            });
+          }
+        }
+      });
+
+      details.sort((a, b) => a.code.localeCompare(b.code));
+      setIndicatorDetails(details);
+    } catch (error) {
+      console.error('Gösterge detayları yükleme hatası:', error);
+    } finally {
+      setLoadingIndicators(false);
+    }
+  };
+
+  const getStatusLabel = (status: 'on_track' | 'at_risk' | 'behind') => {
+    switch (status) {
+      case 'on_track': return 'Hedefte';
+      case 'at_risk': return 'Risk Altında';
+      case 'behind': return 'Geride';
+    }
+  };
+
+  const getStatusColor = (status: 'on_track' | 'at_risk' | 'behind') => {
+    switch (status) {
+      case 'on_track': return 'text-green-600 bg-green-50';
+      case 'at_risk': return 'text-yellow-600 bg-yellow-50';
+      case 'behind': return 'text-red-600 bg-red-50';
+    }
+  };
+
   const handlePDFExport = () => {
     if (!data) return;
 
@@ -381,18 +540,36 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           <div className="text-3xl font-bold text-slate-900">{data.total_indicators}</div>
           <div className="text-sm text-slate-600 mt-1">Toplam Gösterge</div>
         </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+        <button
+          onClick={() => data.on_track > 0 && loadIndicatorDetails('on_track')}
+          disabled={data.on_track === 0}
+          className={`bg-green-50 border border-green-200 rounded-lg p-4 text-center transition-all ${
+            data.on_track > 0 ? 'hover:bg-green-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
           <div className="text-3xl font-bold text-green-600">{data.on_track}</div>
           <div className="text-sm text-slate-600 mt-1">Hedefte</div>
-        </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+        </button>
+        <button
+          onClick={() => data.at_risk > 0 && loadIndicatorDetails('at_risk')}
+          disabled={data.at_risk === 0}
+          className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center transition-all ${
+            data.at_risk > 0 ? 'hover:bg-yellow-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
           <div className="text-3xl font-bold text-yellow-600">{data.at_risk}</div>
           <div className="text-sm text-slate-600 mt-1">Risk Altında</div>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+        </button>
+        <button
+          onClick={() => data.behind > 0 && loadIndicatorDetails('behind')}
+          disabled={data.behind === 0}
+          className={`bg-red-50 border border-red-200 rounded-lg p-4 text-center transition-all ${
+            data.behind > 0 ? 'hover:bg-red-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+          }`}
+        >
           <div className="text-3xl font-bold text-red-600">{data.behind}</div>
           <div className="text-sm text-slate-600 mt-1">Geride</div>
-        </div>
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -479,6 +656,104 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           ))}
         </ul>
       </div>
+
+      <Modal
+        isOpen={showIndicatorModal}
+        onClose={() => setShowIndicatorModal(false)}
+        title={`${selectedStatus ? getStatusLabel(selectedStatus) : ''} Göstergeler - Kurum Geneli`}
+        size="large"
+      >
+        <div className="space-y-4">
+          {loadingIndicators ? (
+            <div className="text-center py-8 text-slate-500">Göstergeler yükleniyor...</div>
+          ) : indicatorDetails.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">Bu kategoride gösterge bulunmuyor</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="mb-4 p-4 bg-slate-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-slate-600">
+                    Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
+                  </div>
+                  {selectedStatus && (
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedStatus)}`}>
+                      {getStatusLabel(selectedStatus)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {indicatorDetails.map((indicator) => (
+                <div
+                  key={indicator.id}
+                  className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                          {indicator.code}
+                        </span>
+                        {selectedStatus && (
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(selectedStatus)}`}>
+                            {getStatusLabel(selectedStatus)}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-medium text-slate-900 mb-3">{indicator.name}</h4>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Gerçekleşen</div>
+                          <div className="text-lg font-semibold text-blue-600">
+                            {indicator.current_value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">Hedef</div>
+                          <div className="text-lg font-semibold text-slate-700">
+                            {indicator.target_value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 mb-1">İlerleme</div>
+                          <div className="text-lg font-semibold text-slate-900">
+                            {Math.round(indicator.progress)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              indicator.status === 'on_track'
+                                ? 'bg-green-500'
+                                : indicator.status === 'at_risk'
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(indicator.progress, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t">
+            <button
+              onClick={() => setShowIndicatorModal(false)}
+              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
