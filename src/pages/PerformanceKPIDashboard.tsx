@@ -513,11 +513,20 @@ export default function PerformanceKPIDashboard() {
                   {/* TÜM GÖSTERGELER - KATEGORİSİZ */}
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Tüm Göstergeler ({group.indicators.length})
+                      Tüm Göstergeler ({group.indicators?.length || 0})
                     </h3>
+                    {console.log('🎨 RENDER GROUP:', {
+                      goalCode: group.goal.code,
+                      indicatorsCount: group.indicators?.length,
+                      indicators: group.indicators,
+                      onTargetCount: group.onTarget?.length,
+                      onTarget: group.onTarget
+                    })}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {group.indicators.map((indicator, idx) => (
-                        <div key={`${indicator.id}-${idx}`} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                      {(group.indicators || []).map((indicator, idx) => {
+                        console.log('🎨 RENDER INDICATOR:', indicator.code, indicator);
+                        return (
+                        <div key={`${indicator.id}-${idx}`} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                           <div className="mb-2">
                             <div className="text-xs font-semibold text-blue-600 mb-1">{indicator.code || 'N/A'}</div>
                             <h4 className="text-sm font-medium text-gray-900">{indicator.name || 'İsimsiz Gösterge'}</h4>
@@ -537,11 +546,12 @@ export default function PerformanceKPIDashboard() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   </div>
 
-                  {false && (group.onTarget && group.onTarget.length > 0) && (
+                  {false && (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
