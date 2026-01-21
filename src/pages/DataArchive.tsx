@@ -229,40 +229,32 @@ export default function DataArchive() {
     const average = sumOfEntries / periodCount;
     const baselineValue = indicator.baseline_value || 0;
     const calculationMethod = indicator.calculation_method || 'cumulative';
+    const periodLabels = indicatorEntries.map((_, index) => `Ç${index + 1}`).join('+');
 
     let currentValue = 0;
     
-    switch (calculationMethod) {
-      case 'cumulative':
-      case 'cumulative_increasing':
-      case 'increasing':
-        currentValue = baselineValue + sumOfEntries;
-        break;
-        
-      case 'cumulative_decreasing':
-      case 'decreasing':
-        currentValue = baselineValue - sumOfEntries;
-        break;
-        
-      case 'percentage':
-      case 'percentage_increasing':
-      case 'percentage_decreasing':
-        currentValue = average;
-        break;
-        
-      case 'maintenance':
-      case 'maintenance_increasing':
-      case 'maintenance_decreasing':
-        currentValue = average;
-        break;
-        
-      default:
-        currentValue = baselineValue + sumOfEntries;
-        break;
-    }
-    
-    return currentValue;
-  };
+      switch (calculationMethod) {
+    case 'cumulative':
+    case 'cumulative_increasing':
+    case 'increasing':
+      return `Başlangıç + ${periodLabels}`;
+      
+    case 'cumulative_decreasing':
+    case 'decreasing':
+      return `Başlangıç - ${periodLabels}`;
+      
+    case 'percentage':
+    case 'percentage_increasing':
+    case 'percentage_decreasing':
+    case 'maintenance':
+    case 'maintenance_increasing':
+    case 'maintenance_decreasing':
+      return `Ort: ${periodLabels}`;
+      
+    default:
+      return periodLabels;
+  }
+};
   const getEnteredPeriods = (indicatorId: string, indicator: Indicator) => {
     const indicatorEntries = entries
       .filter(e => e.indicator_id === indicatorId && e.status === 'approved')
