@@ -47,6 +47,7 @@ export default function RiskDetail() {
   const [showDepartmentImpactModal, setShowDepartmentImpactModal] = useState(false);
   const [showRiskRelationModal, setShowRiskRelationModal] = useState(false);
   const [editingImpactIndex, setEditingImpactIndex] = useState<number | null>(null);
+  const [enableTargetRisk, setEnableTargetRisk] = useState(false);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -160,6 +161,10 @@ export default function RiskDetail() {
     }
 
     const categoryIds = data.categories?.map((c: any) => c.category_id) || [];
+
+    const hasTargetRisk = data.target_probability !== null && data.target_impact !== null;
+    setEnableTargetRisk(hasTargetRisk);
+
     setFormData({
       code: data.code,
       name: data.name,
@@ -460,9 +465,9 @@ export default function RiskDetail() {
         inherent_impact: formData.inherent_impact,
         residual_likelihood: formData.residual_likelihood,
         residual_impact: formData.residual_impact,
-        target_probability: formData.target_probability,
-        target_impact: formData.target_impact,
-        target_date: formData.target_date || null,
+        target_probability: enableTargetRisk ? formData.target_probability : null,
+        target_impact: enableTargetRisk ? formData.target_impact : null,
+        target_date: enableTargetRisk ? (formData.target_date || null) : null,
         risk_response: formData.risk_response,
         review_period: formData.review_period,
         last_review_date: formData.last_review_date,
@@ -698,9 +703,15 @@ export default function RiskDetail() {
             </div>
             <div>
               <div className="text-sm text-slate-600">Hedef Risk</div>
-              <div className={`text-lg font-bold ${getRiskLevel(targetScore).color} px-2 py-1 rounded inline-block mt-1`}>
-                {targetScore} - {getRiskLevel(targetScore).label}
-              </div>
+              {enableTargetRisk ? (
+                <div className={`text-lg font-bold ${getRiskLevel(targetScore).color} px-2 py-1 rounded inline-block mt-1`}>
+                  {targetScore} - {getRiskLevel(targetScore).label}
+                </div>
+              ) : (
+                <div className="text-sm text-slate-500 italic mt-1">
+                  Hedef risk belirlenmedi
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -1365,10 +1376,23 @@ export default function RiskDetail() {
 
               {/* Hedef Risk */}
               <div className="bg-purple-50 rounded-lg p-4">
-                <h4 className="text-md font-semibold text-slate-900 mb-3">Hedef Risk</h4>
-                <p className="text-xs text-slate-600 mb-4">İlave tedbirler sonrası hedeflenen risk</p>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 className="text-md font-semibold text-slate-900">Hedef Risk</h4>
+                    <p className="text-xs text-slate-600 mt-1">İlave tedbirler sonrası hedeflenen risk</p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableTargetRisk}
+                      onChange={(e) => setEnableTargetRisk(e.target.checked)}
+                      className="w-4 h-4 text-purple-600 border-slate-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-medium text-slate-700">Hedef Belirle</span>
+                  </label>
+                </div>
 
-                <div className="space-y-3">
+                <div className={`space-y-3 ${!enableTargetRisk ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Olasılık</label>
                     <div className="flex gap-2">
@@ -1378,7 +1402,8 @@ export default function RiskDetail() {
                           <button
                             key={val}
                             type="button"
-                            onClick={() => setFormData({ ...formData, target_probability: val })}
+                            onClick={() => enableTargetRisk && setFormData({ ...formData, target_probability: val })}
+                            disabled={!enableTargetRisk}
                             className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.target_probability || formData.target_probability !== val ? colors.hover : ''}`}
                           >
                             {val}
@@ -1397,7 +1422,8 @@ export default function RiskDetail() {
                           <button
                             key={val}
                             type="button"
-                            onClick={() => setFormData({ ...formData, target_impact: val })}
+                            onClick={() => enableTargetRisk && setFormData({ ...formData, target_impact: val })}
+                            disabled={!enableTargetRisk}
                             className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors border ${colors.bg} ${colors.text} ${colors.border} ${!formData.target_impact || formData.target_impact !== val ? colors.hover : ''}`}
                           >
                             {val}
@@ -1408,21 +1434,22 @@ export default function RiskDetail() {
                   </div>
                 </div>
 
-                <div className="mt-4 p-3 bg-white rounded-lg border-2 border-purple-300">
+                <div className={`mt-4 p-3 bg-white rounded-lg border-2 border-purple-300 ${!enableTargetRisk ? 'opacity-50' : ''}`}>
                   <div className="text-center">
                     <div className="text-xs text-slate-600 mb-1">SKOR</div>
                     <div className={`text-2xl font-bold ${getRiskLevel(targetScore).color} px-3 py-1 rounded inline-block`}>
-                      {targetScore} - {getRiskLevel(targetScore).label}
+                      {enableTargetRisk ? `${targetScore} - ${getRiskLevel(targetScore).label}` : '-'}
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-3">
+                <div className={`mt-3 ${!enableTargetRisk ? 'opacity-50 pointer-events-none' : ''}`}>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Hedef Tarih</label>
                   <input
                     type="date"
                     value={formData.target_date}
                     onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                    disabled={!enableTargetRisk}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                   />
                 </div>
