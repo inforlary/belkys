@@ -333,7 +333,7 @@ export default function Activities() {
     });
 
     sortedGroups.forEach(group => {
-      group.activities.sort((a, b) => a.code.localeCompare(b.code));
+      group.activities.sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }));
     });
 
     return sortedGroups;

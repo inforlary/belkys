@@ -137,8 +137,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             )
           )
         `)
-        .eq('organization_id', profile.organization_id)
-        .order('code');
+        .eq('organization_id', profile.organization_id);
+
 
       // Filter by allowed goals
       if (allowedGoalIds.length > 0) {
@@ -266,6 +266,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             hasQ4Entry: hasQ4Entry,
           };
         });
+
+        processedIndicators.sort((a, b) =>
+          a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
+        );
 
         setIndicators(processedIndicators);
         setDataEntries(entriesData.data || []);
@@ -401,7 +405,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         }
       });
 
-      details.sort((a, b) => a.code.localeCompare(b.code));
+      details.sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }));
       setIndicatorDetails(details);
     } catch (error) {
       console.error('Gösterge detayları yükleme hatası:', error);

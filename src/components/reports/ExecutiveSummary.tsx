@@ -640,7 +640,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         }
       });
 
-      details.sort((a, b) => a.code.localeCompare(b.code));
+      details.sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }));
       setIndicatorDetails(details);
     } catch (error) {
       console.error('Gösterge detayları yükleme hatası:', error);

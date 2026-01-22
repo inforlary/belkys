@@ -275,7 +275,7 @@ export default function BudgetPerformanceInformation() {
       });
     });
 
-    return Array.from(level1Map.values()).sort((a, b) => a.code.localeCompare(b.code));
+    return Array.from(level1Map.values()).sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }));
   };
 
   const getLevel1Name = (code: string): string => {
@@ -363,7 +363,7 @@ export default function BudgetPerformanceInformation() {
       prog.amount_2028 += ac.amount_2028;
     });
 
-    return Array.from(programMap.values()).sort((a, b) => a.program.code.localeCompare(b.program.code));
+    return Array.from(programMap.values()).sort((a, b) => a.program.code.localeCompare(b.program.code, 'tr', { numeric: true, sensitivity: 'base' }));
   };
 
   const getSubProgramSummary = () => {
