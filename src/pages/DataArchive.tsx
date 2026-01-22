@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, ChevronDown, ChevronRight, CreditCard as Edit2, Trash2, Plus, CheckCircle, Clock, XCircle, Send, X, FileSpreadsheet, FileText } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, CreditCard as Edit2, Trash2, Plus, CheckCircle, Clock, XCircle, Send, X, FileSpreadsheet, FileText, TrendingUp } from 'lucide-react';
 import Modal from '../components/ui/Modal';
-import { calculateIndicatorProgress } from '../utils/progressCalculations';
+import { calculateIndicatorProgress, calculateGoalProgress, calculateObjectiveProgress, getProgressColor } from '../utils/progressCalculations';
 import {
   IndicatorStatus,
   getIndicatorStatus,
@@ -1120,6 +1120,45 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                   {objective.goals.length} Hedef, {objective.goals.reduce((sum, g) => sum + g.indicators.length, 0)} Gösterge
                 </div>
               </div>
+              <div className="flex items-center gap-3 mr-4">
+                {(() => {
+                  const allGoals = objective.goals.map(g => ({ id: g.id, objective_id: objective.id }));
+                  const allIndicators = objective.goals.flatMap(g =>
+                    g.indicators.map(ind => ({
+                      id: ind.id,
+                      goal_id: g.id,
+                      goal_impact_percentage: null,
+                      yearly_target: ind.yearly_target,
+                      target_value: ind.target_value,
+                      baseline_value: ind.baseline_value || ind.yearly_baseline,
+                      calculation_method: ind.calculation_method
+                    }))
+                  );
+                  const approvedEntries = entries.filter(e => e.status === 'approved').map(e => ({
+                    indicator_id: e.indicator_id,
+                    value: e.value,
+                    status: e.status
+                  }));
+                  const progress = calculateObjectiveProgress(objective.id, allGoals, allIndicators, approvedEntries);
+
+                  return (
+                    <>
+                      <TrendingUp className="w-4 h-4 text-slate-400" />
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-slate-200 rounded-full h-2 w-20">
+                          <div
+                            className={`h-2 rounded-full ${getProgressColor(progress)}`}
+                            style={{ width: `${Math.min(100, progress)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">
+                          %{progress}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             </button>
 
             {expandedObjectives.has(objective.id) && (
@@ -1148,8 +1187,41 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                           <div className="text-sm text-gray-600">{goal.department.name}</div>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {goal.indicators.length} Gösterge
+                      <div className="flex items-center gap-3">
+                        <div className="text-sm text-gray-600 mr-3">
+                          {goal.indicators.length} Gösterge
+                        </div>
+                        {(() => {
+                          const goalIndicators = goal.indicators.map(ind => ({
+                            id: ind.id,
+                            goal_id: goal.id,
+                            goal_impact_percentage: null,
+                            yearly_target: ind.yearly_target,
+                            target_value: ind.target_value,
+                            baseline_value: ind.baseline_value || ind.yearly_baseline,
+                            calculation_method: ind.calculation_method
+                          }));
+                          const approvedEntries = entries.filter(e => e.status === 'approved').map(e => ({
+                            indicator_id: e.indicator_id,
+                            value: e.value,
+                            status: e.status
+                          }));
+                          const progress = calculateGoalProgress(goal.id, goalIndicators, approvedEntries);
+
+                          return (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-slate-200 rounded-full h-2 w-20">
+                                <div
+                                  className={`h-2 rounded-full ${getProgressColor(progress)}`}
+                                  style={{ width: `${Math.min(100, progress)}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium text-slate-700">
+                                %{progress}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </button>
 
