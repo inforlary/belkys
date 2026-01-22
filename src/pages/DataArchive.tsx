@@ -46,6 +46,7 @@ interface Indicator {
   calculation_method: string;
   baseline_value?: number | null;
   measurement_frequency?: string;
+  goal_impact_percentage?: number | null;
 }
 
 interface IndicatorTarget {
@@ -182,7 +183,8 @@ export default function DataArchive() {
               target_value,
               calculation_method,
               baseline_value,
-              measurement_frequency
+              measurement_frequency,
+              goal_impact_percentage
             )
           )
         `)
@@ -1127,7 +1129,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                     g.indicators.map(ind => ({
                       id: ind.id,
                       goal_id: g.id,
-                      goal_impact_percentage: null,
+                      goal_impact_percentage: ind.goal_impact_percentage,
                       yearly_target: ind.yearly_target,
                       target_value: ind.target_value,
                       baseline_value: ind.baseline_value || ind.yearly_baseline,
@@ -1195,7 +1197,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                           const goalIndicators = goal.indicators.map(ind => ({
                             id: ind.id,
                             goal_id: goal.id,
-                            goal_impact_percentage: null,
+                            goal_impact_percentage: ind.goal_impact_percentage,
                             yearly_target: ind.yearly_target,
                             target_value: ind.target_value,
                             baseline_value: ind.baseline_value || ind.yearly_baseline,
