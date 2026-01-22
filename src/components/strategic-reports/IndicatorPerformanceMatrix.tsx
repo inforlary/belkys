@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, TrendingUp, TrendingDown, AlertCircle, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Filter, TrendingUp, TrendingDown, AlertCircle, Download, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Indicator {
   id: string;
@@ -276,6 +279,123 @@ export default function IndicatorPerformanceMatrix() {
     }
   };
 
+  const exportToExcel = () => {
+    const exportData = filteredIndicators.map(ind => ({
+      'Kod': ind.code,
+      'Gösterge': ind.name,
+      'Hedef': ind.goal,
+      'Müdürlük': ind.department,
+      'Hedef Değer': `${ind.targetValue} ${ind.unit}`,
+      'Ç1 Gerçekleşen': ind.q1Actual !== null ? `${ind.q1Actual} ${ind.unit}` : '-',
+      'Ç2 Gerçekleşen': ind.q2Actual !== null ? `${ind.q2Actual} ${ind.unit}` : '-',
+      'Ç3 Gerçekleşen': ind.q3Actual !== null ? `${ind.q3Actual} ${ind.unit}` : '-',
+      'Ç4 Gerçekleşen': ind.q4Actual !== null ? `${ind.q4Actual} ${ind.unit}` : '-',
+      'Yıl Gerçekleşen': ind.yearActual !== null ? `${ind.yearActual} ${ind.unit}` : '-',
+      'Başarı Oranı (%)': ind.achievement,
+      'Sapma': ind.deviation,
+      'Trend': ind.trend === 'up' ? 'Yükseliş' : ind.trend === 'down' ? 'Düşüş' : 'Sabit',
+      'Durum': getStatusText(ind.status),
+      'Son Güncelleme': ind.lastUpdated ? new Date(ind.lastUpdated).toLocaleDateString('tr-TR') : '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+
+    const colWidths = [
+      { wch: 10 }, { wch: 40 }, { wch: 30 }, { wch: 20 },
+      { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+      { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 10 },
+      { wch: 10 }, { wch: 10 }, { wch: 15 }
+    ];
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Gösterge Performans Matrisi');
+
+    const summaryData = [
+      { 'Metrik': 'Toplam Gösterge', 'Değer': indicators.length },
+      { 'Metrik': 'İyi Performans', 'Değer': goodCount },
+      { 'Metrik': 'Orta Performans', 'Değer': warningCount },
+      { 'Metrik': 'Düşük Performans', 'Değer': dangerCount },
+      { 'Metrik': 'Bekliyor', 'Değer': pendingCount }
+    ];
+    const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Özet');
+
+    XLSX.writeFile(wb, `Gösterge_Performans_Matrisi_${selectedYear}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    doc.setFontSize(16);
+    doc.text('Gösterge Performans Matrisi', 14, 15);
+
+    doc.setFontSize(10);
+    doc.text(`Mali Yıl: ${selectedYear}`, 14, 22);
+    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 14, 27);
+
+    if (selectedDepartment !== 'all') {
+      doc.text(`Müdürlük: ${selectedDepartment}`, 14, 32);
+    }
+
+    const summaryData = [
+      ['Toplam Gösterge', indicators.length.toString()],
+      ['İyi Performans', goodCount.toString()],
+      ['Orta Performans', warningCount.toString()],
+      ['Düşük Performans', dangerCount.toString()],
+      ['Bekliyor', pendingCount.toString()]
+    ];
+
+    autoTable(doc, {
+      startY: selectedDepartment !== 'all' ? 37 : 32,
+      head: [['Metrik', 'Değer']],
+      body: summaryData,
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+      styles: { fontSize: 8 }
+    });
+
+    const tableData = filteredIndicators.map(ind => [
+      ind.code,
+      ind.name.length > 30 ? ind.name.substring(0, 30) + '...' : ind.name,
+      ind.department.length > 15 ? ind.department.substring(0, 15) + '...' : ind.department,
+      `${ind.targetValue} ${ind.unit}`,
+      ind.q1Actual !== null ? ind.q1Actual.toString() : '-',
+      ind.q2Actual !== null ? ind.q2Actual.toString() : '-',
+      ind.q3Actual !== null ? ind.q3Actual.toString() : '-',
+      ind.q4Actual !== null ? ind.q4Actual.toString() : '-',
+      ind.yearActual !== null ? ind.yearActual.toString() : '-',
+      `${ind.achievement}%`,
+      ind.deviation.toString(),
+      getStatusText(ind.status)
+    ]);
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      head: [['Kod', 'Gösterge', 'Müdürlük', 'Hedef', 'Ç1', 'Ç2', 'Ç3', 'Ç4', 'Yıl', 'Başarı', 'Sapma', 'Durum']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246], fontSize: 7 },
+      styles: { fontSize: 7, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 12 },
+        5: { cellWidth: 12 },
+        6: { cellWidth: 12 },
+        7: { cellWidth: 12 },
+        8: { cellWidth: 12 },
+        9: { cellWidth: 15 },
+        10: { cellWidth: 15 },
+        11: { cellWidth: 15 }
+      }
+    });
+
+    doc.save(`Gösterge_Performans_Matrisi_${selectedYear}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const pendingCount = indicators.filter(i => i.status === 'pending').length;
   const goodCount = indicators.filter(i => i.status === 'good').length;
   const warningCount = indicators.filter(i => i.status === 'warning').length;
@@ -294,6 +414,23 @@ export default function IndicatorPerformanceMatrix() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end gap-2 mb-4">
+        <button
+          onClick={exportToExcel}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Excel İndir
+        </button>
+        <button
+          onClick={exportToPDF}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Download className="w-4 h-4" />
+          PDF İndir
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-sm text-gray-600 mb-1">Toplam Gösterge</div>

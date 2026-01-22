@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Building2, TrendingUp, Target, DollarSign, AlertTriangle, BarChart3, Download, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import InstitutionOverview from '../components/strategic-reports/InstitutionOverview';
@@ -54,11 +54,19 @@ export default function StrategicPlanReports() {
   ];
 
   const handleExportPDF = () => {
-    alert('PDF export işlevi yakında eklenecek...');
+    if (activeTab === 'indicators') {
+      alert('Gösterge Performans Matrisi için PDF indirme butonu, tablonun üstünde bulunmaktadır.');
+    } else {
+      alert('Bu rapor için PDF export işlevi yakında eklenecek...');
+    }
   };
 
   const handleExportExcel = () => {
-    alert('Excel export işlevi yakında eklenecek...');
+    if (activeTab === 'indicators') {
+      alert('Gösterge Performans Matrisi için Excel indirme butonu, tablonun üstünde bulunmaktadır.');
+    } else {
+      alert('Bu rapor için Excel export işlevi yakında eklenecek...');
+    }
   };
 
   return (
