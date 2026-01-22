@@ -699,7 +699,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
       });
 
       const status = getIndicatorStatus(progress);
-      if (status === 'exceedingTarget') exceedingTarget++;
+      if (status === 'exceeding_target') exceedingTarget++;
       else if (status === 'excellent') excellent++;
       else if (status === 'good') good++;
       else if (status === 'moderate') moderate++;
@@ -809,7 +809,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
           <div className="text-xs text-slate-600 mt-1">Toplam</div>
         </div>
         <button
-          onClick={() => stats.exceedingTarget > 0 && loadIndicatorDetails('exceedingTarget')}
+          onClick={() => stats.exceedingTarget > 0 && loadIndicatorDetails('exceeding_target')}
           disabled={stats.exceedingTarget === 0}
           className={`bg-purple-50 border border-purple-200 rounded-lg p-3 text-center transition-all ${
             stats.exceedingTarget > 0 ? 'hover:bg-purple-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
@@ -859,7 +859,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
           <div className="text-xs text-slate-600 mt-1">Zayıf</div>
         </button>
         <button
-          onClick={() => stats.veryWeak > 0 && loadIndicatorDetails('veryWeak')}
+          onClick={() => stats.veryWeak > 0 && loadIndicatorDetails('very_weak')}
           disabled={stats.veryWeak === 0}
           className={`bg-amber-50 border border-amber-200 rounded-lg p-3 text-center transition-all ${
             stats.veryWeak > 0 ? 'hover:bg-amber-100 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
@@ -897,8 +897,6 @@ const getIndicatorTarget = (indicator: Indicator) => {
           const currentValue = calculateCurrentValue(indicator);
           const progress = calculateProgress(indicator);
           const latestLabel = getLatestEntryLabel(indicator);
-      console.log('indicator:', indicator);
-
           return (
             <div key={indicator.id} className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="mb-4">
