@@ -4,14 +4,13 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Trash2, Filter, TrendingUp, Calendar, ExternalLink, MoreVertical, Search, X, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit, Trash2, Filter, Target, ExternalLink, MoreVertical, Search, FileDown, FileSpreadsheet, Upload, FileText } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Risk {
   id: string;
   code: string;
   name: string;
-  owner_department_id?: string;
 }
 
 interface Department {
@@ -19,55 +18,42 @@ interface Department {
   name: string;
 }
 
-interface Control {
+interface Profile {
   id: string;
-  name: string;
-  risk_id: string;
+  full_name: string;
+  department_id: string;
 }
 
 interface Treatment {
   id: string;
+  organization_id: string;
+  code: string;
   risk_id: string;
-  target_control_id?: string;
-  action_type: string;
-  title: string;
-  description?: string;
-  responsible_person?: string;
-  responsible_department_id?: string;
+  name: string;
+  description: string;
+  resources_required: string;
+  actual_cost: number;
+  responsible_department_id: string;
+  responsible_person_id: string;
+  start_date: string;
+  target_date: string;
   status: string;
-  progress_percent: number;
-  planned_start_date?: string;
-  planned_end_date?: string;
-  actual_start_date?: string;
-  actual_end_date?: string;
-  expected_residual_likelihood?: number;
-  expected_residual_impact?: number;
-  estimated_cost?: number;
-  actual_cost?: number;
-  resources_required?: string;
-  approval_status: string;
-  approved_by?: string;
-  approved_at?: string;
-  notes?: string;
+  progress_percentage: number;
+  notes: string;
+  evidence_file: string;
   risk?: Risk;
-  responsible_department?: Department;
+  department?: Department;
+  responsible_person?: Profile;
 }
 
-const statusLabels: Record<string, { label: string; color: string; emoji: string }> = {
-  PLANNED: { label: 'Planlandı', color: 'bg-gray-100 text-gray-800', emoji: '○' },
-  IN_PROGRESS: { label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-800', emoji: '🔄' },
-  COMPLETED: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800', emoji: '✅' },
-  CANCELLED: { label: 'İptal Edildi', color: 'bg-red-100 text-red-800', emoji: '✖' },
-  ON_HOLD: { label: 'Beklemede', color: 'bg-yellow-100 text-yellow-800', emoji: '⏸' }
-};
+const resourceOptions = ['Bütçe', 'Personel', 'Yazılım', 'Eğitim'];
+const statusOptions = ['Planlandı', 'Devam Ediyor', 'Tamamlandı', 'İptal'];
 
-const actionTypeLabels: Record<string, { label: string; desc: string; icon: string }> = {
-  NEW_CONTROL: { label: 'Yeni Kontrol Ekle', desc: 'Yeni kontrol mekanizması oluştur', icon: '➕' },
-  IMPROVE_CONTROL: { label: 'Kontrolü İyileştir', desc: 'Mevcut kontrolü güçlendir', icon: '⬆️' },
-  AUTOMATE_CONTROL: { label: 'Kontrolü Otomatikleştir', desc: 'Manuel kontrolü otomatik yap', icon: '🤖' },
-  TRANSFER_RISK: { label: 'Riski Transfer Et', desc: 'Riski üçüncü tarafa aktar', icon: '↪️' },
-  ELIMINATE_RISK: { label: 'Riski Ortadan Kaldır', desc: 'Risk kaynağını yok et', icon: '🗑️' },
-  ACCEPT_RISK: { label: 'Riski Kabul Et', desc: 'Mevcut risk seviyesini kabul et', icon: '✓' }
+const statusColors: Record<string, string> = {
+  'Planlandı': 'bg-gray-100 text-gray-800',
+  'Devam Ediyor': 'bg-blue-100 text-blue-800',
+  'Tamamlandı': 'bg-green-100 text-green-800',
+  'İptal': 'bg-red-100 text-red-800'
 };
 
 export default function RiskTreatments() {
@@ -77,11 +63,10 @@ export default function RiskTreatments() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [controls, setControls] = useState<Control[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
-  const [showProgressModal, setShowProgressModal] = useState(false);
   const [editingTreatment, setEditingTreatment] = useState<Treatment | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -89,28 +74,28 @@ export default function RiskTreatments() {
     risk_id: '',
     status: '',
     department_id: '',
-    date_from: '',
-    date_to: '',
     search: ''
   });
 
   const [formData, setFormData] = useState({
+    code: '',
     risk_id: '',
-    target_control_id: '',
-    action_type: 'IMPROVE_CONTROL',
-    title: '',
+    name: '',
     description: '',
+    resources_required: 'Bütçe',
+    actual_cost: 0,
     responsible_department_id: '',
-    planned_end_date: '',
-    notes: ''
+    responsible_person_id: '',
+    start_date: '',
+    target_date: '',
+    status: 'Planlandı',
+    progress_percentage: 0,
+    notes: '',
+    evidence_file: ''
   });
 
-  const [progressData, setProgressData] = useState({
-    progress_percent: 0,
-    status: 'IN_PROGRESS',
-    notes: '',
-    completed_date: ''
-  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string>('');
 
   useEffect(() => {
     if (profile?.organization_id) {
@@ -122,23 +107,22 @@ export default function RiskTreatments() {
     try {
       setLoading(true);
 
-      const [treatmentsRes, risksRes, departmentsRes, controlsRes] = await Promise.all([
+      const [treatmentsRes, risksRes, departmentsRes, usersRes] = await Promise.all([
         supabase
-          .from('risk_improvement_actions')
+          .from('risk_treatments')
           .select(`
             *,
-            risk:risks!inner(id, code, name, organization_id),
-            responsible_department:departments!responsible_department_id(id, name),
-            target_control:risk_controls!target_control_id(id, name)
+            risk:risks!risk_id(id, code, name),
+            department:departments!responsible_department_id(id, name),
+            responsible_person:profiles!responsible_person_id(id, full_name)
           `)
-          .eq('risk.organization_id', profile?.organization_id)
+          .eq('organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
 
         supabase
           .from('risks')
-          .select('id, code, name, owner_department_id')
+          .select('id, code, name')
           .eq('organization_id', profile?.organization_id)
-          .eq('is_active', true)
           .order('code'),
 
         supabase
@@ -148,30 +132,24 @@ export default function RiskTreatments() {
           .order('name'),
 
         supabase
-          .from('risk_controls')
-          .select(`
-            id,
-            name,
-            risk_id,
-            risk:risks!inner(organization_id)
-          `)
-          .eq('risk.organization_id', profile?.organization_id)
-          .eq('is_active', true)
-          .order('name')
+          .from('profiles')
+          .select('id, full_name, department_id')
+          .eq('organization_id', profile?.organization_id)
+          .order('full_name')
       ]);
 
       if (treatmentsRes.error) throw treatmentsRes.error;
       if (risksRes.error) throw risksRes.error;
       if (departmentsRes.error) throw departmentsRes.error;
-      if (controlsRes.error) throw controlsRes.error;
+      if (usersRes.error) throw usersRes.error;
 
       setTreatments(treatmentsRes.data || []);
       setRisks(risksRes.data || []);
       setDepartments(departmentsRes.data || []);
-      setControls(controlsRes.data || []);
+      setUsers(usersRes.data || []);
     } catch (error: any) {
-      console.error('[RiskTreatments] Veriler yüklenirken hata:', error);
-      alert(`Veriler yüklenirken hata oluştu: ${error?.message || 'Bilinmeyen hata'}`);
+      console.error('Veriler yüklenirken hata:', error);
+      alert(`Veriler yüklenirken hata: ${error?.message}`);
     } finally {
       setLoading(false);
     }
@@ -179,40 +157,51 @@ export default function RiskTreatments() {
 
   function openModal(treatment?: Treatment) {
     if (risks.length === 0) {
-      alert('Önce en az bir risk tanımlamalısınız. Risk Kaydı sayfasına yönlendiriliyorsunuz.');
-      navigate('risk-management/risks');
-      return;
-    }
-
-    if (departments.length === 0) {
-      alert('Sistem ayarlarında hiç birim tanımlanmamış. Lütfen sistem yöneticisi ile iletişime geçin.');
+      alert('Önce en az bir risk tanımlamalısınız.');
       return;
     }
 
     if (treatment) {
       setEditingTreatment(treatment);
       setFormData({
+        code: treatment.code || '',
         risk_id: treatment.risk_id,
-        target_control_id: treatment.target_control_id || '',
-        action_type: treatment.action_type,
-        title: treatment.title,
+        name: treatment.name,
         description: treatment.description || '',
+        resources_required: treatment.resources_required || 'Bütçe',
+        actual_cost: treatment.actual_cost || 0,
         responsible_department_id: treatment.responsible_department_id || '',
-        planned_end_date: treatment.planned_end_date || '',
-        notes: treatment.notes || ''
+        responsible_person_id: treatment.responsible_person_id || '',
+        start_date: treatment.start_date || '',
+        target_date: treatment.target_date || '',
+        status: treatment.status || 'Planlandı',
+        progress_percentage: treatment.progress_percentage || 0,
+        notes: treatment.notes || '',
+        evidence_file: treatment.evidence_file || ''
       });
+      if (treatment.evidence_file) {
+        setFilePreview(treatment.evidence_file);
+      }
     } else {
       setEditingTreatment(null);
       setFormData({
+        code: '',
         risk_id: '',
-        target_control_id: '',
-        action_type: 'IMPROVE_CONTROL',
-        title: '',
+        name: '',
         description: '',
+        resources_required: 'Bütçe',
+        actual_cost: 0,
         responsible_department_id: '',
-        planned_end_date: '',
-        notes: ''
+        responsible_person_id: '',
+        start_date: '',
+        target_date: '',
+        status: 'Planlandı',
+        progress_percentage: 0,
+        notes: '',
+        evidence_file: ''
       });
+      setSelectedFile(null);
+      setFilePreview('');
     }
     setShowModal(true);
   }
@@ -220,162 +209,114 @@ export default function RiskTreatments() {
   function closeModal() {
     setShowModal(false);
     setEditingTreatment(null);
+    setSelectedFile(null);
+    setFilePreview('');
   }
 
-  function handleRiskChange(riskId: string) {
-    const selectedRisk = risks.find(r => r.id === riskId);
-    setFormData({
-      ...formData,
-      risk_id: riskId,
-      target_control_id: '',
-      responsible_department_id: selectedRisk?.owner_department_id || ''
-    });
-  }
-
-  const availableControls = formData.risk_id
-    ? controls.filter(c => c.risk_id === formData.risk_id)
-    : [];
-
-  const showControlSelection = ['IMPROVE_CONTROL', 'AUTOMATE_CONTROL'].includes(formData.action_type);
-
-  function openProgressModal(treatment: Treatment) {
-    setEditingTreatment(treatment);
-    setProgressData({
-      progress_percent: treatment.progress_percent ?? 0,
-      status: treatment.status || 'IN_PROGRESS',
-      notes: '',
-      completed_date: treatment.actual_end_date || ''
-    });
-    setShowProgressModal(true);
-  }
-
-  function closeProgressModal() {
-    setShowProgressModal(false);
-    setEditingTreatment(null);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Dosya boyutu 5MB\'dan küçük olmalıdır');
+        return;
+      }
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFilePreview(base64String);
+        setFormData({ ...formData, evidence_file: base64String });
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.risk_id || !formData.title || !formData.planned_end_date) {
-      alert('Lütfen zorunlu alanları doldurun');
+    if (!formData.risk_id) {
+      alert('Lütfen bir risk seçin');
+      return;
+    }
+
+    if (!formData.name?.trim()) {
+      alert('Lütfen eylem adını girin');
+      return;
+    }
+
+    if (!formData.responsible_department_id) {
+      alert('Lütfen sorumlu birim seçin');
+      return;
+    }
+
+    if (formData.start_date && formData.target_date && formData.start_date > formData.target_date) {
+      alert('Hedef bitiş tarihi başlangıç tarihinden önce olamaz');
       return;
     }
 
     try {
       const treatmentData = {
-        risk_id: formData.risk_id,
-        target_control_id: formData.target_control_id || null,
         organization_id: profile?.organization_id,
-        action_type: formData.action_type,
-        title: formData.title,
-        description: formData.description,
-        responsible_department_id: formData.responsible_department_id || null,
-        planned_end_date: formData.planned_end_date,
-        notes: formData.notes,
-        status: editingTreatment ? editingTreatment.status : 'PLANNED',
-        progress_percent: editingTreatment ? editingTreatment.progress_percent : 0,
-        approval_status: 'DRAFT'
+        risk_id: formData.risk_id,
+        name: formData.name.trim(),
+        description: formData.description?.trim() || null,
+        resources_required: formData.resources_required,
+        actual_cost: formData.actual_cost || 0,
+        responsible_department_id: formData.responsible_department_id,
+        responsible_person_id: formData.responsible_person_id || null,
+        start_date: formData.start_date || null,
+        target_date: formData.target_date || null,
+        status: formData.status,
+        progress_percentage: formData.progress_percentage,
+        notes: formData.notes?.trim() || null,
+        evidence_file: formData.evidence_file || null
       };
 
       if (editingTreatment) {
         const { error } = await supabase
-          .from('risk_improvement_actions')
+          .from('risk_treatments')
           .update(treatmentData)
           .eq('id', editingTreatment.id);
 
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('risk_improvement_actions')
+          .from('risk_treatments')
           .insert(treatmentData);
 
         if (error) throw error;
       }
 
       closeModal();
-      loadData();
-    } catch (error) {
-      console.error('Faaliyet kaydedilirken hata:', error);
-      alert('Faaliyet kaydedilemedi');
-    }
-  }
-
-  async function handleProgressUpdate(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!editingTreatment || !progressData.notes) {
-      alert('Lütfen güncelleme notu girin');
-      return;
-    }
-
-    if (progressData.progress_percent === 100 && progressData.status !== 'COMPLETED') {
-      if (!confirm('İlerleme %100 ancak durum Tamamlandı değil. Durumu Tamamlandı olarak işaretlemek ister misiniz?')) {
-        return;
-      }
-      progressData.status = 'COMPLETED';
-    }
-
-    try {
-      const updateData: any = {
-        progress_percent: progressData.progress_percent,
-        status: progressData.status
-      };
-
-      if (progressData.status === 'COMPLETED' && progressData.completed_date) {
-        updateData.actual_end_date = progressData.completed_date;
-      }
-
-      const { error: updateError } = await supabase
-        .from('risk_improvement_actions')
-        .update(updateData)
-        .eq('id', editingTreatment.id);
-
-      if (updateError) throw updateError;
-
-      closeProgressModal();
-      loadData();
-    } catch (error) {
-      console.error('İlerleme güncellenirken hata:', error);
-      alert('İlerleme güncellenemedi');
+      await loadData();
+    } catch (error: any) {
+      console.error('Eylem kaydedilirken hata:', error);
+      alert(`Eylem kaydedilemedi: ${error?.message}`);
     }
   }
 
   async function handleDelete(treatment: Treatment) {
-    if (!confirm(`${treatment.code} - ${treatment.title} faaliyetini silmek istediğinize emin misiniz?\n\nİlerleme geçmişi de silinecektir.`)) return;
+    if (!confirm(`${treatment.name} eylemini silmek istediğinize emin misiniz?`)) return;
 
     try {
       const { error } = await supabase
-        .from('risk_improvement_actions')
+        .from('risk_treatments')
         .delete()
         .eq('id', treatment.id);
 
       if (error) throw error;
       loadData();
-    } catch (error) {
-      console.error('Faaliyet silinirken hata:', error);
-      alert('Faaliyet silinemedi');
+    } catch (error: any) {
+      console.error('Eylem silinirken hata:', error);
+      alert('Eylem silinemedi');
     }
   }
 
-  function getDelayDays(treatment: Treatment | null): number {
-    if (!treatment || !treatment.planned_end_date) return 0;
-    if (treatment.status === 'COMPLETED' || treatment.status === 'CANCELLED') return 0;
-    const endDate = new Date(treatment.planned_end_date);
+  function isDelayed(treatment: Treatment): boolean {
+    if (!treatment.target_date || treatment.status === 'Tamamlandı' || treatment.status === 'İptal') return false;
+    const targetDate = new Date(treatment.target_date);
     const today = new Date();
-    if (endDate < today) {
-      return Math.floor((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
-    }
-    return 0;
-  }
-
-  function isDueSoon(treatment: Treatment | null): boolean {
-    if (!treatment || !treatment.planned_end_date) return false;
-    if (treatment.status === 'COMPLETED' || treatment.status === 'CANCELLED') return false;
-    const endDate = new Date(treatment.planned_end_date);
-    const today = new Date();
-    const diffDays = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays <= 7;
+    return targetDate < today;
   }
 
   const filteredTreatments = treatments.filter(t => {
@@ -383,48 +324,21 @@ export default function RiskTreatments() {
     if (filters.risk_id && t.risk_id !== filters.risk_id) return false;
     if (filters.status && t.status !== filters.status) return false;
     if (filters.department_id && t.responsible_department_id !== filters.department_id) return false;
-    if (filters.date_from && t.planned_end_date && t.planned_end_date < filters.date_from) return false;
-    if (filters.date_to && t.planned_end_date && t.planned_end_date > filters.date_to) return false;
     if (filters.search) {
       const search = filters.search.toLowerCase();
-      return t.code?.toLowerCase().includes(search) || t.title?.toLowerCase().includes(search);
+      return t.name?.toLowerCase().includes(search) ||
+             t.description?.toLowerCase().includes(search) ||
+             t.code?.toLowerCase().includes(search);
     }
     return true;
   });
 
-  const sortedTreatments = [...filteredTreatments].sort((a, b) => {
-    if (!a || !b) return 0;
-
-    const aDelayed = getDelayDays(a) > 0;
-    const bDelayed = getDelayDays(b) > 0;
-
-    if (aDelayed && !bDelayed) return -1;
-    if (!aDelayed && bDelayed) return 1;
-
-    const statusOrder: Record<string, number> = {
-      'DELAYED': 1,
-      'IN_PROGRESS': 2,
-      'NOT_STARTED': 3,
-      'COMPLETED': 4,
-      'CANCELLED': 5
-    };
-
-    const aOrder = statusOrder[a.status || ''] || 999;
-    const bOrder = statusOrder[b.status || ''] || 999;
-
-    if (aOrder !== bOrder) return aOrder - bOrder;
-
-    const aDate = a.planned_end_date ? new Date(a.planned_end_date).getTime() : 0;
-    const bDate = b.planned_end_date ? new Date(b.planned_end_date).getTime() : 0;
-
-    return aDate - bDate;
-  });
-
   const stats = {
     total: filteredTreatments.length,
-    inProgress: filteredTreatments.filter(t => t && t.status === 'IN_PROGRESS').length,
-    completed: filteredTreatments.filter(t => t && t.status === 'COMPLETED').length,
-    delayed: filteredTreatments.filter(t => t && getDelayDays(t) > 0).length
+    planned: filteredTreatments.filter(t => t && t.status === 'Planlandı').length,
+    ongoing: filteredTreatments.filter(t => t && t.status === 'Devam Ediyor').length,
+    completed: filteredTreatments.filter(t => t && t.status === 'Tamamlandı').length,
+    delayed: filteredTreatments.filter(t => t && isDelayed(t)).length
   };
 
   function clearFilters() {
@@ -432,67 +346,73 @@ export default function RiskTreatments() {
       risk_id: '',
       status: '',
       department_id: '',
-      date_from: '',
-      date_to: '',
       search: ''
     });
   }
 
   const exportToExcelHandler = () => {
-    const exportData = sortedTreatments.map(treatment => ({
-      'Faaliyet Kodu': treatment.code || '-',
+    const exportData = filteredTreatments.map(treatment => ({
+      'Eylem Numarası': treatment.code || '-',
       'Risk Kodu': treatment.risk?.code || '-',
       'Risk Adı': treatment.risk?.name || '-',
-      'Faaliyet Başlığı': treatment.title,
+      'Eylem Adı': treatment.name,
       'Açıklama': treatment.description || '-',
-      'Sorumlu Birim': treatment.responsible_department?.name || '-',
-      'Planlanan Bitiş': treatment.planned_end_date || '-',
-      'Gerçekleşen Bitiş': treatment.actual_end_date || '-',
-      'İlerleme (%)': treatment.progress_percent || 0,
-      'Durum': statusLabels[treatment.status || 'NOT_STARTED']?.label || '-',
-      'Notlar': treatment.notes || '-'
+      'Gerekli Kaynak': treatment.resources_required,
+      'Tahmini Maliyet': treatment.actual_cost,
+      'Sorumlu Birim': treatment.department?.name || '-',
+      'Sorumlu Kişi': treatment.responsible_person?.full_name || '-',
+      'Başlangıç': treatment.start_date || '-',
+      'Hedef Bitiş': treatment.target_date || '-',
+      'Durum': treatment.status,
+      'İlerleme': `${treatment.progress_percentage}%`
     }));
-    exportToExcel(exportData, `risk_faaliyetleri_${new Date().toISOString().split('T')[0]}`);
+    exportToExcel(exportData, `eylem_planlari_${new Date().toISOString().split('T')[0]}`);
   };
 
   const exportToPDFHandler = () => {
-    const headers = ['Kod', 'Risk', 'Faaliyet', 'Sorumlu', 'Planlanan Bitiş', 'İlerleme', 'Durum'];
-    const rows = sortedTreatments.map(treatment => [
+    const headers = ['Eylem No', 'Risk', 'Eylem Adı', 'Kaynak', 'Durum', 'İlerleme', 'Hedef Tarih'];
+    const rows = filteredTreatments.map(treatment => [
       treatment.code || '-',
       treatment.risk?.code || '-',
-      treatment.title,
-      treatment.responsible_department?.name || '-',
-      treatment.planned_end_date || '-',
-      `${treatment.progress_percent || 0}%`,
-      statusLabels[treatment.status || 'NOT_STARTED']?.label || '-'
+      treatment.name,
+      treatment.resources_required,
+      treatment.status,
+      `${treatment.progress_percentage}%`,
+      treatment.target_date || '-'
     ]);
 
     const content = `
-      <h2>Faaliyet İstatistikleri</h2>
+      <h2>Eylem Planı İstatistikleri</h2>
       <div class="stats-grid">
         <div class="stat-box">
           <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Toplam Faaliyet</div>
+          <div class="stat-label">Toplam Eylem</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #6b7280;">
+          <div class="stat-value" style="color: #6b7280;">${stats.planned}</div>
+          <div class="stat-label">Planlandı</div>
         </div>
         <div class="stat-box" style="border-left: 4px solid #2563eb;">
-          <div class="stat-value" style="color: #2563eb;">${stats.inProgress}</div>
-          <div class="stat-label">Devam Eden</div>
+          <div class="stat-value" style="color: #2563eb;">${stats.ongoing}</div>
+          <div class="stat-label">Devam Ediyor</div>
         </div>
         <div class="stat-box" style="border-left: 4px solid #16a34a;">
           <div class="stat-value" style="color: #16a34a;">${stats.completed}</div>
-          <div class="stat-label">Tamamlanan</div>
+          <div class="stat-label">Tamamlandı</div>
         </div>
         <div class="stat-box" style="border-left: 4px solid #dc2626;">
           <div class="stat-value" style="color: #dc2626;">${stats.delayed}</div>
           <div class="stat-label">Gecikmiş</div>
         </div>
       </div>
-      <h2>Risk Faaliyetleri Listesi</h2>
+      <h2>Eylem Planları Listesi</h2>
       ${generateTableHTML(headers, rows)}
     `;
 
-    exportToPDF('Risk Faaliyetleri Raporu', content, `risk_faaliyetleri_${new Date().toISOString().split('T')[0]}`);
+    exportToPDF('Eylem Planları Raporu', content, `eylem_planlari_${new Date().toISOString().split('T')[0]}`);
   };
+
+  const filteredUsers = users.filter(u => u.department_id === formData.responsible_department_id);
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
@@ -503,10 +423,10 @@ export default function RiskTreatments() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <TrendingUp className="w-7 h-7" />
-            Risk Faaliyetleri
+            <Target className="w-7 h-7" />
+            Eylem Planı
           </h1>
-          <p className="text-gray-600 mt-1">Risk azaltma faaliyetleri takibi</p>
+          <p className="text-gray-600 mt-1">Risk azaltma eylem planları yönetimi</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -528,54 +448,43 @@ export default function RiskTreatments() {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             <Plus className="w-4 h-4" />
-            Yeni Faaliyet
+            Yeni Eylem
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card
-          className="cursor-pointer hover:shadow-md transition"
-          onClick={() => setFilters({ ...filters, status: '' })}
-        >
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => clearFilters()}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-gray-900">{stats.total}</div>
-            <div className="text-sm text-gray-600 mt-1">Toplam</div>
-            <div className="text-xs text-gray-500 mt-1">Faaliyet</div>
+            <div className="text-sm text-gray-600 mt-1">Toplam Eylem</div>
           </div>
         </Card>
 
-        <Card
-          className="cursor-pointer hover:shadow-md transition"
-          onClick={() => setFilters({ ...filters, status: 'IN_PROGRESS' })}
-        >
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, status: 'Planlandı' })}>
           <div className="p-6 text-center">
-            <div className="text-3xl font-bold text-blue-600">{stats.inProgress}</div>
-            <div className="text-sm text-gray-600 mt-1">Devam Eden</div>
-            <div className="text-xs text-gray-500 mt-1">🔄 Aktif</div>
+            <div className="text-3xl font-bold text-gray-600">{stats.planned}</div>
+            <div className="text-sm text-gray-600 mt-1">Planlandı</div>
           </div>
         </Card>
 
-        <Card
-          className="cursor-pointer hover:shadow-md transition"
-          onClick={() => setFilters({ ...filters, status: 'COMPLETED' })}
-        >
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, status: 'Devam Ediyor' })}>
+          <div className="p-6 text-center">
+            <div className="text-3xl font-bold text-blue-600">{stats.ongoing}</div>
+            <div className="text-sm text-gray-600 mt-1">Devam Ediyor</div>
+          </div>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, status: 'Tamamlandı' })}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-green-600">{stats.completed}</div>
-            <div className="text-sm text-gray-600 mt-1">Tamamlanan</div>
-            <div className="text-xs text-gray-500 mt-1">✅ Biten</div>
+            <div className="text-sm text-gray-600 mt-1">Tamamlandı</div>
           </div>
         </Card>
 
-        <Card
-          className="cursor-pointer hover:shadow-md transition"
-          onClick={() => setFilters({ ...filters, status: 'DELAYED' })}
-        >
-          <div className="p-6 text-center">
-            <div className="text-3xl font-bold text-red-600">{stats.delayed}</div>
-            <div className="text-sm text-gray-600 mt-1">Geciken</div>
-            <div className="text-xs text-gray-500 mt-1">⚠️ Gecikmiş</div>
-          </div>
+        <Card className="p-6 text-center">
+          <div className="text-3xl font-bold text-red-600">{stats.delayed}</div>
+          <div className="text-sm text-gray-600 mt-1">Gecikmiş</div>
         </Card>
       </div>
 
@@ -586,39 +495,23 @@ export default function RiskTreatments() {
               <Filter className="w-5 h-5 text-gray-500" />
               <h3 className="font-semibold text-gray-900">Filtreler</h3>
             </div>
-            {(filters.risk_id || filters.status || filters.department_id || filters.date_from || filters.date_to || filters.search) && (
-              <button
-                onClick={clearFilters}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
+            {(filters.risk_id || filters.status || filters.department_id || filters.search) && (
+              <button onClick={clearFilters} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                 Temizle
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <select
                 value={filters.risk_id}
                 onChange={(e) => setFilters({ ...filters, risk_id: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Risk ▼</option>
+                <option value="">Tüm Riskler</option>
                 {risks.map((risk) => (
                   <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <select
-                value={filters.department_id}
-                onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Birim ▼</option>
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
               </select>
             </div>
@@ -629,31 +522,24 @@ export default function RiskTreatments() {
                 onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Durum ▼</option>
-                {Object.entries(statusLabels).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
+                <option value="">Tüm Durumlar</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <input
-                type="date"
-                value={filters.date_from}
-                onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
+              <select
+                value={filters.department_id}
+                onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="Başlangıç"
-              />
-            </div>
-
-            <div>
-              <input
-                type="date"
-                value={filters.date_to}
-                onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="Bitiş"
-              />
+              >
+                <option value="">Tüm Birimler</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
+              </select>
             </div>
 
             <div className="relative">
@@ -675,84 +561,92 @@ export default function RiskTreatments() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kod</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faaliyet Adı</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Eylem No</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlişkili Risk</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu Birim</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Eylem Adı</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gerekli Kaynak</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Maliyet</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hedef Tarih</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlerleme</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İşlem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {sortedTreatments.length === 0 ? (
+              {filteredTreatments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                    Faaliyet bulunamadı
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                    Eylem bulunamadı
                   </td>
                 </tr>
               ) : (
-                sortedTreatments.map((treatment) => {
-                  const delayDays = getDelayDays(treatment);
-                  const isDelayed = delayDays > 0;
-                  const dueSoon = isDueSoon(treatment);
-                  const statusInfo = statusLabels[treatment.status] || statusLabels['NOT_STARTED'];
+                filteredTreatments.map((treatment) => {
+                  const delayed = isDelayed(treatment);
 
                   return (
-                    <tr
-                      key={treatment.id}
-                      className="hover:bg-gray-50 cursor-pointer transition"
-                      onClick={() => openProgressModal(treatment)}
-                    >
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{treatment.code}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{treatment.title}</td>
+                    <tr key={treatment.id} className="hover:bg-gray-50 transition">
+                      <td className="px-4 py-3">
+                        <div className="font-mono text-sm font-medium text-blue-600">{treatment.code}</div>
+                      </td>
                       <td className="px-4 py-3">
                         {treatment.risk ? (
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">{treatment.risk.code}</div>
-                            <div className="text-xs text-gray-500">{treatment.risk.name}</div>
+                            <div className="text-xs text-gray-500 line-clamp-1">{treatment.risk.name}</div>
                           </div>
                         ) : (
-                          <span className="text-sm text-red-600">-</span>
+                          <span className="text-sm text-gray-400">-</span>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{treatment.name}</div>
+                        {treatment.description && (
+                          <div className="text-xs text-gray-500 mt-1 line-clamp-1">{treatment.description}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{treatment.resources_required}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {treatment.responsible_department?.name || '-'}
+                        {treatment.actual_cost ? `${treatment.actual_cost.toLocaleString('tr-TR')} TL` : '-'}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm">
-                          <div className={isDelayed ? 'text-red-600 font-medium' : dueSoon ? 'text-yellow-600 font-medium' : 'text-gray-700'}>
-                            {treatment.planned_end_date ? new Date(treatment.planned_end_date).toLocaleDateString('tr-TR') : '-'}
-                          </div>
-                          {isDelayed && (
-                            <div className="text-xs text-red-600 font-medium">
-                              🔴 {delayDays} gün
-                            </div>
-                          )}
-                          {dueSoon && !isDelayed && (
-                            <div className="text-xs text-yellow-600">
-                              🟡 Yaklaşıyor
-                            </div>
-                          )}
+                        <div className="text-sm text-gray-700">{treatment.department?.name || '-'}</div>
+                        {treatment.responsible_person && (
+                          <div className="text-xs text-gray-500">{treatment.responsible_person.full_name}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className={`text-sm ${delayed ? 'text-red-600 font-medium' : 'text-gray-700'}`}>
+                          {treatment.target_date ? new Date(treatment.target_date).toLocaleDateString('tr-TR') : '-'}
                         </div>
+                        {delayed && (
+                          <div className="text-xs text-red-600 font-medium">Gecikmiş</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusColors[treatment.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {treatment.status}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                              <span>{statusInfo.emoji}</span>
-                              <span>{treatment.progress_percent ?? 0}%</span>
-                              {isDelayed && treatment.status !== 'COMPLETED' && (
-                                <span className="ml-1">Gecikmiş</span>
-                              )}
-                              {treatment.status === 'NOT_STARTED' && (
-                                <span className="ml-1">Başlamadı</span>
-                              )}
-                            </span>
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${
+                                treatment.progress_percentage === 100 ? 'bg-green-500' :
+                                treatment.progress_percentage >= 75 ? 'bg-blue-500' :
+                                treatment.progress_percentage >= 50 ? 'bg-yellow-500' :
+                                'bg-orange-500'
+                              }`}
+                              style={{ width: `${treatment.progress_percentage}%` }}
+                            />
                           </div>
+                          <span className="text-xs font-medium text-gray-700 w-10 text-right">
+                            {treatment.progress_percentage}%
+                          </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-4 py-3 text-center">
                         <div className="relative inline-block">
                           <button
                             onClick={(e) => {
@@ -774,17 +668,6 @@ export default function RiskTreatments() {
                                 }}
                               />
                               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenu(null);
-                                    openProgressModal(treatment);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <TrendingUp className="w-4 h-4" />
-                                  İlerleme Güncelle
-                                </button>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -832,105 +715,47 @@ export default function RiskTreatments() {
         </div>
       </Card>
 
-      <Modal isOpen={showModal} onClose={closeModal} title={editingTreatment ? 'Faaliyet Düzenle' : 'Yeni Faaliyet Ekle'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal isOpen={showModal} onClose={closeModal} title={editingTreatment ? 'Eylem Düzenle' : 'Yeni Eylem Ekle'}>
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Eylem Numarası
+            </label>
+            <input
+              type="text"
+              value={formData.code || 'Otomatik oluşturulacak'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+              disabled
+              readOnly
+            />
+            <p className="text-xs text-gray-500 mt-1">Eylem numarası otomatik olarak E-YYYY-XXX formatında oluşturulacaktır</p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               İlişkili Risk <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.risk_id}
-              onChange={(e) => handleRiskChange(e.target.value)}
+              onChange={(e) => setFormData({ ...formData, risk_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
-              disabled={!!editingTreatment}
             >
               <option value="">Seçiniz...</option>
               {risks.map((risk) => (
                 <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
               ))}
             </select>
-            {risks.length === 0 && (
-              <p className="text-xs text-yellow-600 mt-1">
-                ⚠ Henüz risk tanımlanmamış. Lütfen önce Risk Kaydı sayfasından risk ekleyin.
-              </p>
-            )}
-            {formData.risk_id && formData.responsible_department_id && !editingTreatment && (
-              <p className="text-xs text-green-600 mt-1">
-                ✓ Sorumlu birim otomatik olarak yüklendi
-              </p>
-            )}
           </div>
-
-          {!editingTreatment && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Faaliyet Kodu</label>
-              <input
-                type="text"
-                value="Otomatik oluşturulacak"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                disabled
-              />
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Faaliyet Türü <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.action_type}
-              onChange={(e) => setFormData({ ...formData, action_type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              {Object.entries(actionTypeLabels).map(([key, { label, desc, icon }]) => (
-                <option key={key} value={key}>
-                  {icon} {label} - {desc}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Seçilen türe göre faaliyet stratejisi belirlenir
-            </p>
-          </div>
-
-          {showControlSelection && formData.risk_id && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Hedef Kontrol {formData.action_type === 'IMPROVE_CONTROL' && <span className="text-xs text-gray-500">(opsiyonel)</span>}
-              </label>
-              <select
-                value={formData.target_control_id}
-                onChange={(e) => setFormData({ ...formData, target_control_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Seçiniz...</option>
-                {availableControls.map((control) => (
-                  <option key={control.id} value={control.id}>{control.name}</option>
-                ))}
-              </select>
-              {availableControls.length === 0 && (
-                <p className="text-xs text-yellow-600 mt-1">
-                  ⚠ Bu risk için henüz kontrol tanımlanmamış. Kontroller sayfasından ekleyebilirsiniz.
-                </p>
-              )}
-              {formData.action_type === 'AUTOMATE_CONTROL' && !formData.target_control_id && (
-                <p className="text-xs text-orange-600 mt-1">
-                  ℹ Otomatikleştirme için bir kontrol seçmeniz önerilir
-                </p>
-              )}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Faaliyet Adı <span className="text-red-500">*</span>
+              Eylem Adı <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             />
@@ -946,13 +771,44 @@ export default function RiskTreatments() {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gerekli Kaynak <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.resources_required}
+                onChange={(e) => setFormData({ ...formData, resources_required: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                {resourceOptions.map((resource) => (
+                  <option key={resource} value={resource}>{resource}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tahmini Maliyet (TL)</label>
+              <input
+                type="number"
+                value={formData.actual_cost}
+                onChange={(e) => setFormData({ ...formData, actual_cost: parseFloat(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                min="0"
+                step="0.01"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Sorumlu Birim <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.responsible_department_id}
-              onChange={(e) => setFormData({ ...formData, responsible_department_id: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, responsible_department_id: e.target.value, responsible_person_id: '' });
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
@@ -961,24 +817,78 @@ export default function RiskTreatments() {
                 <option key={dept.id} value={dept.id}>{dept.name}</option>
               ))}
             </select>
-            {departments.length === 0 && (
-              <p className="text-xs text-yellow-600 mt-1">
-                ⚠ Birim bulunamadı. Lütfen sistem yöneticisi ile iletişime geçin.
-              </p>
-            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Hedef Tarih <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={formData.planned_end_date}
-              onChange={(e) => setFormData({ ...formData, planned_end_date: e.target.value })}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Kişi</label>
+            <select
+              value={formData.responsible_person_id}
+              onChange={(e) => setFormData({ ...formData, responsible_person_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
-            />
+              disabled={!formData.responsible_department_id}
+            >
+              <option value="">Seçiniz...</option>
+              {filteredUsers.map((user) => (
+                <option key={user.id} value={user.id}>{user.full_name}</option>
+              ))}
+            </select>
+            {!formData.responsible_department_id && (
+              <p className="text-xs text-gray-500 mt-1">Önce sorumlu birim seçiniz</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+              <input
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Hedef Bitiş Tarihi</label>
+              <input
+                type="date"
+                value={formData.target_date}
+                onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Durum <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gerçekleşme Yüzdesi ({formData.progress_percentage}%)
+              </label>
+              <input
+                type="range"
+                value={formData.progress_percentage}
+                onChange={(e) => setFormData({ ...formData, progress_percentage: parseInt(e.target.value) })}
+                className="w-full"
+                min="0"
+                max="100"
+                step="5"
+              />
+            </div>
           </div>
 
           <div>
@@ -989,6 +899,35 @@ export default function RiskTreatments() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               rows={2}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kanıt Dosyası</label>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                <Upload className="w-4 h-4" />
+                <span className="text-sm">Dosya Seç</span>
+                <input
+                  type="file"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                />
+              </label>
+              {selectedFile && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <FileText className="w-4 h-4" />
+                  <span>{selectedFile.name}</span>
+                </div>
+              )}
+              {!selectedFile && filePreview && (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <FileText className="w-4 h-4" />
+                  <span>Dosya mevcut</span>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Maksimum dosya boyutu: 5MB</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
@@ -1004,116 +943,6 @@ export default function RiskTreatments() {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
               Kaydet
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal isOpen={showProgressModal} onClose={closeProgressModal} title="İlerleme Güncelle">
-        <form onSubmit={handleProgressUpdate} className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-            <div className="text-sm font-medium text-gray-900">
-              {editingTreatment?.code} - {editingTreatment?.title}
-            </div>
-            <div className="text-sm text-gray-600">
-              Risk: {editingTreatment?.risk?.code} - {editingTreatment?.risk?.name}
-            </div>
-            <div className="text-sm text-gray-600">
-              Sorumlu: {editingTreatment?.responsible_department?.name || '-'}
-            </div>
-            <div className="text-sm">
-              Hedef Tarih: <span className={getDelayDays(editingTreatment) > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
-                {editingTreatment?.planned_end_date && new Date(editingTreatment.planned_end_date).toLocaleDateString('tr-TR')}
-                {getDelayDays(editingTreatment) > 0 && (
-                  <span className="ml-2">🔴 {getDelayDays(editingTreatment)} gün gecikmiş</span>
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">
-              Mevcut İlerleme: %{editingTreatment?.progress_percent ?? 0}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Yeni İlerleme <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={progressData.progress_percent}
-              onChange={(e) => setProgressData({ ...progressData, progress_percent: parseInt(e.target.value) })}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between text-sm mt-2">
-              <span className="text-gray-600">0%</span>
-              <span className="text-lg font-semibold text-blue-600">%{progressData.progress_percent}</span>
-              <span className="text-gray-600">100%</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Durum <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={progressData.status}
-              onChange={(e) => setProgressData({ ...progressData, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="NOT_STARTED">Başlamadı</option>
-              <option value="IN_PROGRESS">Devam Ediyor</option>
-              <option value="COMPLETED">Tamamlandı</option>
-              <option value="CANCELLED">İptal Edildi</option>
-            </select>
-          </div>
-
-          {progressData.status === 'COMPLETED' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tamamlanma Tarihi
-              </label>
-              <input
-                type="date"
-                value={progressData.completed_date}
-                onChange={(e) => setProgressData({ ...progressData, completed_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Güncelleme Notu <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={progressData.notes}
-              onChange={(e) => setProgressData({ ...progressData, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Yapılan çalışmayı açıklayın..."
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button
-              type="button"
-              onClick={closeProgressModal}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-            >
-              İptal
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              Güncelle
             </button>
           </div>
         </form>

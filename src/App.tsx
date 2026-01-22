@@ -85,6 +85,7 @@ import RiskIndicatorEntry from './pages/RiskIndicatorEntry';
 import RiskControls from './pages/RiskControls';
 import RiskTreatments from './pages/RiskTreatments';
 import RiskTreatmentDetail from './pages/RiskTreatmentDetail';
+import RiskMonitoring from './pages/RiskMonitoring';
 import RiskCategories from './pages/RiskCategories';
 import RiskReports from './pages/RiskReports';
 import Projects from './pages/Projects';
@@ -388,6 +389,8 @@ const renderPage = () => {
         return <RiskControls />;
       case 'risk-management/treatments':
         return <RiskTreatments />;
+      case 'risk-management/monitoring':
+        return <RiskMonitoring />;
       case 'risk-management/indicators':
         return <RiskIndicators />;
       case 'risk-management/indicators/entry':

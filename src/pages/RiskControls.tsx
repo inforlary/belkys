@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Trash2, Filter, Shield, Calendar, ExternalLink, MoreVertical, Search, X, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit, Trash2, Filter, Shield, ExternalLink, MoreVertical, Search, FileDown, FileSpreadsheet, Upload, FileText } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Risk {
@@ -18,52 +18,38 @@ interface Department {
   name: string;
 }
 
-interface ImprovementAction {
+interface Profile {
   id: string;
-  title: string;
-  status: string;
-  progress_percent: number;
+  full_name: string;
+  department_id: string;
 }
 
 interface Control {
   id: string;
+  organization_id: string;
+  code: string;
   risk_id: string;
   name: string;
   description: string;
   control_type: string;
-  control_nature: string;
-  responsible_department_id: string;
-  design_effectiveness: number;
-  operating_effectiveness: number;
-  evidence: string;
   frequency: string;
-  is_active: boolean;
-  last_test_date?: string;
-  next_test_date?: string;
+  responsible_department_id: string;
+  responsible_person_id: string;
+  effectiveness_status: string;
+  evidence_file: string;
   risk?: Risk;
   department?: Department;
-  improvement_actions?: ImprovementAction[];
+  responsible_person?: Profile;
 }
 
 const controlTypeLabels: Record<string, { label: string; color: string }> = {
-  PREVENTIVE: { label: 'Önleyici', color: 'bg-green-100 text-green-800' },
-  DETECTIVE: { label: 'Tespit Edici', color: 'bg-blue-100 text-blue-800' },
-  CORRECTIVE: { label: 'Düzeltici', color: 'bg-orange-100 text-orange-800' }
+  'Önleyici': { label: 'Önleyici', color: 'bg-green-100 text-green-800' },
+  'Tespit Edici': { label: 'Tespit Edici', color: 'bg-blue-100 text-blue-800' },
+  'Düzeltici': { label: 'Düzeltici', color: 'bg-orange-100 text-orange-800' }
 };
 
-const controlNatureLabels: Record<string, { label: string; color: string }> = {
-  MANUAL: { label: 'Manuel', color: 'bg-gray-100 text-gray-800' },
-  AUTOMATED: { label: 'Otomatik', color: 'bg-purple-100 text-purple-800' },
-  SEMI_AUTOMATED: { label: 'Yarı Otomatik', color: 'bg-yellow-100 text-yellow-800' }
-};
-
-const effectivenessLevels = [
-  { value: 1, label: 'Etkisiz', color: 'text-red-600' },
-  { value: 2, label: 'Kısmen Etkili', color: 'text-orange-600' },
-  { value: 3, label: 'Orta Düzeyde Etkili', color: 'text-yellow-600' },
-  { value: 4, label: 'Büyük Ölçüde Etkili', color: 'text-blue-600' },
-  { value: 5, label: 'Tam Etkili', color: 'text-green-600' }
-];
+const frequencyOptions = ['Her işlem', 'Günlük', 'Haftalık', 'Aylık'];
+const effectivenessOptions = ['Etkili', 'Kısmen Etkili', 'Etkisiz'];
 
 export default function RiskControls() {
   const { navigate } = useLocation();
@@ -72,6 +58,7 @@ export default function RiskControls() {
   const [controls, setControls] = useState<Control[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -81,26 +68,26 @@ export default function RiskControls() {
   const [filters, setFilters] = useState({
     risk_id: '',
     control_type: '',
-    control_nature: '',
     department_id: '',
-    min_effectiveness: 0,
+    effectiveness_status: '',
     search: ''
   });
 
   const [formData, setFormData] = useState({
+    code: '',
     risk_id: '',
     name: '',
     description: '',
-    control_type: 'PREVENTIVE',
-    control_nature: 'MANUAL',
+    control_type: 'Önleyici',
+    frequency: 'Aylık',
     responsible_department_id: '',
-    design_effectiveness: 3,
-    operating_effectiveness: 3,
-    evidence: '',
-    frequency: '',
-    last_test_date: '',
-    next_test_date: ''
+    responsible_person_id: '',
+    effectiveness_status: 'Etkili',
+    evidence_file: ''
   });
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string>('');
 
   useEffect(() => {
     if (profile?.organization_id) {
@@ -112,166 +99,93 @@ export default function RiskControls() {
     try {
       setLoading(true);
 
-      console.log('[RiskControls] Veriler yükleniyor...', {
-        organization_id: profile?.organization_id,
-        timestamp: new Date().toISOString()
-      });
-
-      const [controlsRes, risksRes, departmentsRes] = await Promise.all([
+      const [controlsRes, risksRes, departmentsRes, usersRes] = await Promise.all([
         supabase
           .from('risk_controls')
           .select(`
             *,
-            risk:risks!inner(id, code, name, organization_id),
+            risk:risks!risk_id(id, code, name),
             department:departments!responsible_department_id(id, name),
-            improvement_actions:risk_improvement_actions!target_control_id(id, title, status, progress_percent)
+            responsible_person:profiles!responsible_person_id(id, full_name)
           `)
-          .eq('risk.organization_id', profile?.organization_id)
-          .eq('is_active', true)
+          .eq('organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
 
         supabase
           .from('risks')
           .select('id, code, name')
           .eq('organization_id', profile?.organization_id)
-          .eq('is_active', true)
           .order('code'),
 
         supabase
           .from('departments')
           .select('id, name')
           .eq('organization_id', profile?.organization_id)
-          .order('name')
+          .order('name'),
+
+        supabase
+          .from('profiles')
+          .select('id, full_name, department_id')
+          .eq('organization_id', profile?.organization_id)
+          .order('full_name')
       ]);
 
-      if (controlsRes.error) {
-        console.error('[RiskControls] Kontroller yüklenirken hata:', {
-          error: controlsRes.error,
-          message: controlsRes.error.message,
-          code: controlsRes.error.code
-        });
-        throw controlsRes.error;
-      }
-
-      if (risksRes.error) {
-        console.error('[RiskControls] Riskler yüklenirken hata:', {
-          error: risksRes.error,
-          message: risksRes.error.message,
-          code: risksRes.error.code
-        });
-        throw risksRes.error;
-      }
-
-      if (departmentsRes.error) {
-        console.error('[RiskControls] Birimler yüklenirken hata:', {
-          error: departmentsRes.error,
-          message: departmentsRes.error.message,
-          code: departmentsRes.error.code
-        });
-        throw departmentsRes.error;
-      }
-
-      console.log('[RiskControls] Veriler başarıyla yüklendi:', {
-        controls: controlsRes.data?.length || 0,
-        risks: risksRes.data?.length || 0,
-        departments: departmentsRes.data?.length || 0
-      });
+      if (controlsRes.error) throw controlsRes.error;
+      if (risksRes.error) throw risksRes.error;
+      if (departmentsRes.error) throw departmentsRes.error;
+      if (usersRes.error) throw usersRes.error;
 
       setControls(controlsRes.data || []);
       setRisks(risksRes.data || []);
       setDepartments(departmentsRes.data || []);
-
-      if (!risksRes.data || risksRes.data.length === 0) {
-        console.warn('[RiskControls] Hiç risk bulunamadı. Kullanıcıya bildirim göster.');
-      }
-
-      if (!departmentsRes.data || departmentsRes.data.length === 0) {
-        console.warn('[RiskControls] Hiç birim bulunamadı. Kullanıcıya bildirim göster.');
-      }
+      setUsers(usersRes.data || []);
     } catch (error: any) {
-      console.error('[RiskControls] Veriler yüklenirken kritik hata:', {
-        error,
-        message: error?.message,
-        stack: error?.stack
-      });
-      alert(`Veriler yüklenirken hata oluştu: ${error?.message || 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin veya sistem yöneticisine başvurun.`);
+      console.error('Veriler yüklenirken hata:', error);
+      alert(`Veriler yüklenirken hata: ${error?.message}`);
     } finally {
       setLoading(false);
     }
   }
 
   function openModal(control?: Control) {
-    console.log('[RiskControls] Modal açılıyor:', {
-      editMode: !!control,
-      controlId: control?.id,
-      availableRisks: risks.length,
-      availableDepartments: departments.length
-    });
-
     if (risks.length === 0) {
-      alert('Önce en az bir risk tanımlamalısınız. Risk Kaydı sayfasına yönlendiriliyorsunuz.');
-      console.warn('[RiskControls] Hiç risk yok, modal açılamıyor');
-      navigate('risk-management/risks');
-      return;
-    }
-
-    if (departments.length === 0) {
-      alert('Sistem ayarlarında hiç birim tanımlanmamış. Lütfen sistem yöneticisi ile iletişime geçin.');
-      console.error('[RiskControls] Hiç birim yok, modal açılamıyor');
+      alert('Önce en az bir risk tanımlamalısınız.');
       return;
     }
 
     if (control) {
-      console.log('[RiskControls] Düzenleme modu:', {
-        controlId: control.id,
-        controlName: control.name,
-        riskId: control.risk_id,
-        departmentId: control.responsible_department_id
-      });
-
-      const riskExists = risks.some(r => r.id === control.risk_id);
-      const departmentExists = departments.some(d => d.id === control.responsible_department_id);
-
-      if (!riskExists) {
-        console.warn('[RiskControls] Kontrolün riski bulunamadı:', control.risk_id);
-      }
-
-      if (!departmentExists && control.responsible_department_id) {
-        console.warn('[RiskControls] Kontrolün sorumlu birimi bulunamadı:', control.responsible_department_id);
-      }
-
       setEditingControl(control);
       setFormData({
+        code: control.code || '',
         risk_id: control.risk_id,
         name: control.name,
         description: control.description || '',
-        control_type: control.control_type,
-        control_nature: control.control_nature,
+        control_type: control.control_type || 'Önleyici',
+        frequency: control.frequency || 'Aylık',
         responsible_department_id: control.responsible_department_id || '',
-        design_effectiveness: control.design_effectiveness,
-        operating_effectiveness: control.operating_effectiveness,
-        evidence: control.evidence || '',
-        frequency: control.frequency || '',
-        last_test_date: control.last_test_date || '',
-        next_test_date: control.next_test_date || ''
+        responsible_person_id: control.responsible_person_id || '',
+        effectiveness_status: control.effectiveness_status || 'Etkili',
+        evidence_file: control.evidence_file || ''
       });
+      if (control.evidence_file) {
+        setFilePreview(control.evidence_file);
+      }
     } else {
-      console.log('[RiskControls] Yeni kayıt modu');
       setEditingControl(null);
       setFormData({
+        code: '',
         risk_id: '',
         name: '',
         description: '',
-        control_type: 'PREVENTIVE',
-        control_nature: 'MANUAL',
+        control_type: 'Önleyici',
+        frequency: 'Aylık',
         responsible_department_id: '',
-        design_effectiveness: 3,
-        operating_effectiveness: 3,
-        evidence: '',
-        frequency: '',
-        last_test_date: '',
-        next_test_date: ''
+        responsible_person_id: '',
+        effectiveness_status: 'Etkili',
+        evidence_file: ''
       });
+      setSelectedFile(null);
+      setFilePreview('');
     }
     setShowModal(true);
   }
@@ -279,117 +193,80 @@ export default function RiskControls() {
   function closeModal() {
     setShowModal(false);
     setEditingControl(null);
+    setSelectedFile(null);
+    setFilePreview('');
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Dosya boyutu 5MB\'dan küçük olmalıdır');
+        return;
+      }
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFilePreview(base64String);
+        setFormData({ ...formData, evidence_file: base64String });
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    console.log('[RiskControls] Form gönderiliyor:', {
-      editMode: !!editingControl,
-      formData: {
-        risk_id: formData.risk_id,
-        name: formData.name,
-        responsible_department_id: formData.responsible_department_id
-      }
-    });
-
     if (!formData.risk_id) {
       alert('Lütfen bir risk seçin');
-      console.warn('[RiskControls] Risk seçilmedi');
       return;
     }
 
     if (!formData.name?.trim()) {
       alert('Lütfen kontrol adını girin');
-      console.warn('[RiskControls] Kontrol adı boş');
       return;
     }
 
     if (!formData.responsible_department_id) {
       alert('Lütfen sorumlu birim seçin');
-      console.warn('[RiskControls] Sorumlu birim seçilmedi');
-      return;
-    }
-
-    if (formData.design_effectiveness < 1 || formData.design_effectiveness > 5) {
-      alert('Tasarım etkinliği 1-5 arasında olmalıdır');
-      console.warn('[RiskControls] Geçersiz tasarım etkinliği:', formData.design_effectiveness);
       return;
     }
 
     try {
       const controlData = {
+        organization_id: profile?.organization_id,
         risk_id: formData.risk_id,
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
         control_type: formData.control_type,
-        control_nature: formData.control_nature,
+        frequency: formData.frequency,
         responsible_department_id: formData.responsible_department_id,
-        design_effectiveness: formData.design_effectiveness,
-        evidence: formData.evidence?.trim() || null,
-        frequency: formData.frequency?.trim() || null,
-        last_test_date: formData.last_test_date || null,
-        next_test_date: formData.next_test_date || null,
-        is_active: true
+        responsible_person_id: formData.responsible_person_id || null,
+        effectiveness_status: formData.effectiveness_status,
+        evidence_file: formData.evidence_file || null
       };
 
-      console.log('[RiskControls] Kontrol kaydediliyor:', controlData);
-
       if (editingControl) {
-        console.log('[RiskControls] Güncelleme modu, ID:', editingControl.id);
         const { error } = await supabase
           .from('risk_controls')
           .update(controlData)
           .eq('id', editingControl.id);
 
-        if (error) {
-          console.error('[RiskControls] Güncelleme hatası:', {
-            error,
-            message: error.message,
-            code: error.code,
-            details: error.details
-          });
-          throw error;
-        }
-        console.log('[RiskControls] Kontrol başarıyla güncellendi');
+        if (error) throw error;
       } else {
-        console.log('[RiskControls] Yeni kayıt modu');
         const { error } = await supabase
           .from('risk_controls')
           .insert(controlData);
 
-        if (error) {
-          console.error('[RiskControls] Ekleme hatası:', {
-            error,
-            message: error.message,
-            code: error.code,
-            details: error.details
-          });
-          throw error;
-        }
-        console.log('[RiskControls] Kontrol başarıyla eklendi');
+        if (error) throw error;
       }
 
       closeModal();
       await loadData();
     } catch (error: any) {
-      console.error('[RiskControls] Kontrol kaydedilirken kritik hata:', {
-        error,
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint
-      });
-
-      let errorMessage = 'Kontrol kaydedilemedi';
-      if (error?.message) {
-        errorMessage += `: ${error.message}`;
-      }
-      if (error?.hint) {
-        errorMessage += `\n\nİpucu: ${error.hint}`;
-      }
-
-      alert(errorMessage);
+      console.error('Kontrol kaydedilirken hata:', error);
+      alert(`Kontrol kaydedilemedi: ${error?.message}`);
     }
   }
 
@@ -399,105 +276,76 @@ export default function RiskControls() {
     try {
       const { error } = await supabase
         .from('risk_controls')
-        .update({ is_active: false })
+        .delete()
         .eq('id', control.id);
 
       if (error) throw error;
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Kontrol silinirken hata:', error);
       alert('Kontrol silinemedi');
     }
-  }
-
-  function getEffectivenessLabel(value: number) {
-    const level = effectivenessLevels.find(l => l.value === value);
-    return level || effectivenessLevels[2];
-  }
-
-  function getEffectivenessStars(value: number) {
-    return Array.from({ length: 5 }, (_, i) => (
-      <span key={i} className={i < value ? 'text-yellow-500' : 'text-gray-300'}>★</span>
-    ));
-  }
-
-  function isTestDue(control: Control): boolean {
-    if (!control.next_test_date) return false;
-    const nextDate = new Date(control.next_test_date);
-    const today = new Date();
-    const diffDays = Math.floor((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays <= 30;
-  }
-
-  function isTestOverdue(control: Control): boolean {
-    if (!control.next_test_date) return false;
-    const nextDate = new Date(control.next_test_date);
-    const today = new Date();
-    return nextDate < today;
   }
 
   const filteredControls = controls.filter(c => {
     if (!c) return false;
     if (filters.risk_id && c.risk_id !== filters.risk_id) return false;
     if (filters.control_type && c.control_type !== filters.control_type) return false;
-    if (filters.control_nature && c.control_nature !== filters.control_nature) return false;
     if (filters.department_id && c.responsible_department_id !== filters.department_id) return false;
-    if (filters.min_effectiveness && c.operating_effectiveness < filters.min_effectiveness) return false;
+    if (filters.effectiveness_status && c.effectiveness_status !== filters.effectiveness_status) return false;
     if (filters.search) {
       const search = filters.search.toLowerCase();
-      return c.name?.toLowerCase().includes(search) || c.description?.toLowerCase().includes(search);
+      return c.name?.toLowerCase().includes(search) ||
+             c.description?.toLowerCase().includes(search) ||
+             c.code?.toLowerCase().includes(search);
     }
     return true;
   });
 
   const stats = {
     total: filteredControls.length,
-    preventive: filteredControls.filter(c => c && c.control_type === 'PREVENTIVE').length,
-    detective: filteredControls.filter(c => c && c.control_type === 'DETECTIVE').length,
-    testDue: filteredControls.filter(c => c && isTestDue(c)).length,
-    overdue: filteredControls.filter(c => c && isTestOverdue(c)).length
+    preventive: filteredControls.filter(c => c && c.control_type === 'Önleyici').length,
+    detective: filteredControls.filter(c => c && c.control_type === 'Tespit Edici').length,
+    corrective: filteredControls.filter(c => c && c.control_type === 'Düzeltici').length,
+    effective: filteredControls.filter(c => c && c.effectiveness_status === 'Etkili').length
   };
 
   function clearFilters() {
     setFilters({
       risk_id: '',
       control_type: '',
-      control_nature: '',
       department_id: '',
-      min_effectiveness: 0,
+      effectiveness_status: '',
       search: ''
     });
   }
 
   const exportToExcelHandler = () => {
     const exportData = filteredControls.map(control => ({
+      'Kontrol Numarası': control.code || '-',
       'Risk Kodu': control.risk?.code || '-',
       'Risk Adı': control.risk?.name || '-',
       'Kontrol Adı': control.name,
-      'Açıklama': control.description,
-      'Kontrol Tipi': controlTypeLabels[control.control_type]?.label || '-',
-      'Kontrol Doğası': controlNatureLabels[control.control_nature]?.label || '-',
+      'Açıklama': control.description || '-',
+      'Kontrol Tipi': control.control_type,
+      'Uygulama Sıklığı': control.frequency,
       'Sorumlu Birim': control.department?.name || '-',
-      'Tasarım Etkinliği': `${control.design_effectiveness} - ${getEffectivenessLabel(control.design_effectiveness).label}`,
-      'Operasyonel Etkinlik': `${control.operating_effectiveness} - ${getEffectivenessLabel(control.operating_effectiveness).label}`,
-      'Sıklık': control.frequency,
-      'Son Test': control.last_test_date || '-',
-      'Sonraki Test': control.next_test_date || '-',
-      'Kanıt': control.evidence
+      'Sorumlu Kişi': control.responsible_person?.full_name || '-',
+      'Etkinlik Durumu': control.effectiveness_status
     }));
     exportToExcel(exportData, `risk_kontrolleri_${new Date().toISOString().split('T')[0]}`);
   };
 
   const exportToPDFHandler = () => {
-    const headers = ['Risk', 'Kontrol Adı', 'Tip', 'Tasarım Etkinliği', 'Op. Etkinlik', 'Sıklık', 'Sonraki Test'];
+    const headers = ['Kontrol No', 'Risk', 'Kontrol Adı', 'Tip', 'Sıklık', 'Sorumlu Birim', 'Etkinlik'];
     const rows = filteredControls.map(control => [
+      control.code || '-',
       control.risk?.code || '-',
       control.name,
-      controlTypeLabels[control.control_type]?.label || '-',
-      `${control.design_effectiveness}★`,
-      `${control.operating_effectiveness}★`,
+      control.control_type,
       control.frequency,
-      control.next_test_date || '-'
+      control.department?.name || '-',
+      control.effectiveness_status
     ]);
 
     const content = `
@@ -515,13 +363,13 @@ export default function RiskControls() {
           <div class="stat-value" style="color: #2563eb;">${stats.detective}</div>
           <div class="stat-label">Tespit Edici</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #f59e0b;">
-          <div class="stat-value" style="color: #f59e0b;">${stats.testDue}</div>
-          <div class="stat-label">Test Yaklaşan</div>
+        <div class="stat-box" style="border-left: 4px solid #ea580c;">
+          <div class="stat-value" style="color: #ea580c;">${stats.corrective}</div>
+          <div class="stat-label">Düzeltici</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #dc2626;">
-          <div class="stat-value" style="color: #dc2626;">${stats.overdue}</div>
-          <div class="stat-label">Gecikmiş Test</div>
+        <div class="stat-box" style="border-left: 4px solid #16a34a;">
+          <div class="stat-value" style="color: #16a34a;">${stats.effective}</div>
+          <div class="stat-label">Etkili</div>
         </div>
       </div>
       <h2>Risk Kontrolleri Listesi</h2>
@@ -530,6 +378,8 @@ export default function RiskControls() {
 
     exportToPDF('Risk Kontrolleri Raporu', content, `risk_kontrolleri_${new Date().toISOString().split('T')[0]}`);
   };
+
+  const filteredUsers = users.filter(u => u.department_id === formData.responsible_department_id);
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
@@ -541,9 +391,9 @@ export default function RiskControls() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Shield className="w-7 h-7" />
-            Risk Kontrolleri
+            Kontrol Tanımı
           </h1>
-          <p className="text-gray-600 mt-1">Risk kontrol faaliyetleri takibi</p>
+          <p className="text-gray-600 mt-1">Risk kontrol faaliyetleri yönetimi</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -571,36 +421,39 @@ export default function RiskControls() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: '' })}>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => clearFilters()}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-gray-900">{stats.total}</div>
             <div className="text-sm text-gray-600 mt-1">Toplam Kontrol</div>
           </div>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'PREVENTIVE' })}>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'Önleyici' })}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-green-600">{stats.preventive}</div>
             <div className="text-sm text-gray-600 mt-1">Önleyici</div>
           </div>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'DETECTIVE' })}>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'Tespit Edici' })}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-blue-600">{stats.detective}</div>
             <div className="text-sm text-gray-600 mt-1">Tespit Edici</div>
           </div>
         </Card>
 
-        <Card className="p-6 text-center">
-          <div className="text-3xl font-bold text-yellow-600">{stats.testDue}</div>
-          <div className="text-sm text-gray-600 mt-1">Test Yaklaşıyor</div>
-          <div className="text-xs text-gray-500 mt-1">30 gün içinde</div>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'Düzeltici' })}>
+          <div className="p-6 text-center">
+            <div className="text-3xl font-bold text-orange-600">{stats.corrective}</div>
+            <div className="text-sm text-gray-600 mt-1">Düzeltici</div>
+          </div>
         </Card>
 
-        <Card className="p-6 text-center">
-          <div className="text-3xl font-bold text-red-600">{stats.overdue}</div>
-          <div className="text-sm text-gray-600 mt-1">Test Gecikmiş</div>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, effectiveness_status: 'Etkili' })}>
+          <div className="p-6 text-center">
+            <div className="text-3xl font-bold text-green-600">{stats.effective}</div>
+            <div className="text-sm text-gray-600 mt-1">Etkili Kontrol</div>
+          </div>
         </Card>
       </div>
 
@@ -611,21 +464,21 @@ export default function RiskControls() {
               <Filter className="w-5 h-5 text-gray-500" />
               <h3 className="font-semibold text-gray-900">Filtreler</h3>
             </div>
-            {(filters.risk_id || filters.control_type || filters.control_nature || filters.department_id || filters.min_effectiveness || filters.search) && (
+            {(filters.risk_id || filters.control_type || filters.department_id || filters.effectiveness_status || filters.search) && (
               <button onClick={clearFilters} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                 Temizle
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <select
                 value={filters.risk_id}
                 onChange={(e) => setFilters({ ...filters, risk_id: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Risk</option>
+                <option value="">Tüm Riskler</option>
                 {risks.map((risk) => (
                   <option key={risk.id} value={risk.id}>{risk.code} - {risk.name}</option>
                 ))}
@@ -638,22 +491,9 @@ export default function RiskControls() {
                 onChange={(e) => setFilters({ ...filters, control_type: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Kontrol Tipi</option>
-                {Object.entries(controlTypeLabels).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <select
-                value={filters.control_nature}
-                onChange={(e) => setFilters({ ...filters, control_nature: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Kontrol Yapısı</option>
-                {Object.entries(controlNatureLabels).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
+                <option value="">Tüm Tipler</option>
+                {Object.keys(controlTypeLabels).map((key) => (
+                  <option key={key} value={key}>{controlTypeLabels[key].label}</option>
                 ))}
               </select>
             </div>
@@ -664,7 +504,7 @@ export default function RiskControls() {
                 onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Birim</option>
+                <option value="">Tüm Birimler</option>
                 {departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
@@ -673,13 +513,13 @@ export default function RiskControls() {
 
             <div>
               <select
-                value={filters.min_effectiveness}
-                onChange={(e) => setFilters({ ...filters, min_effectiveness: parseInt(e.target.value) })}
+                value={filters.effectiveness_status}
+                onChange={(e) => setFilters({ ...filters, effectiveness_status: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="0">Min Etkinlik</option>
-                {effectivenessLevels.map((level) => (
-                  <option key={level.value} value={level.value}>{level.label}</option>
+                <option value="">Tüm Etkinlikler</option>
+                {effectivenessOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
             </div>
@@ -703,165 +543,129 @@ export default function RiskControls() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kontrol Adı</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kontrol No</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlişkili Risk</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kontrol Adı</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tip</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yapı</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tasarım</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uygulama</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faaliyetler</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sonraki Test</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sıklık</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu Birim</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu Kişi</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Etkinlik</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İşlem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredControls.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     Kontrol bulunamadı
                   </td>
                 </tr>
               ) : (
-                filteredControls.map((control) => {
-                  const testDue = isTestDue(control);
-                  const testOverdue = isTestOverdue(control);
-                  const operatingLevel = getEffectivenessLabel(control.operating_effectiveness);
-
-                  return (
-                    <tr key={control.id} className="hover:bg-gray-50 transition">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{control.name}</div>
-                        {control.description && (
-                          <div className="text-xs text-gray-500 mt-1 line-clamp-1">{control.description}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {control.risk ? (
-                          <div className="text-sm">
-                            <div className="font-medium text-gray-900">{control.risk.code}</div>
-                            <div className="text-xs text-gray-500 line-clamp-1">{control.risk.name}</div>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-red-600">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${controlTypeLabels[control.control_type]?.color}`}>
-                          {controlTypeLabels[control.control_type]?.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${controlNatureLabels[control.control_nature]?.color}`}>
-                          {controlNatureLabels[control.control_nature]?.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {getEffectivenessStars(control.design_effectiveness)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {getEffectivenessStars(control.operating_effectiveness)}
-                        </div>
-                        <div className={`text-xs mt-1 ${operatingLevel.color}`}>
-                          {operatingLevel.label}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {control.improvement_actions && control.improvement_actions.length > 0 ? (
-                          <div className="text-sm">
-                            <div className="font-medium text-blue-600">{control.improvement_actions.length} Faaliyet</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {control.improvement_actions.filter(a => a.status === 'IN_PROGRESS').length} devam ediyor
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-400">
-                            Faaliyet yok
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {control.department?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3">
+                filteredControls.map((control) => (
+                  <tr key={control.id} className="hover:bg-gray-50 transition">
+                    <td className="px-4 py-3">
+                      <div className="font-mono text-sm font-medium text-blue-600">{control.code}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {control.risk ? (
                         <div className="text-sm">
-                          <div className={testOverdue ? 'text-red-600 font-medium' : testDue ? 'text-yellow-600 font-medium' : 'text-gray-700'}>
-                            {control.next_test_date ? new Date(control.next_test_date).toLocaleDateString('tr-TR') : '-'}
-                          </div>
-                          {testOverdue && (
-                            <div className="text-xs text-red-600 font-medium">Gecikmiş</div>
-                          )}
-                          {testDue && !testOverdue && (
-                            <div className="text-xs text-yellow-600">Yaklaşıyor</div>
-                          )}
+                          <div className="font-medium text-gray-900">{control.risk.code}</div>
+                          <div className="text-xs text-gray-500 line-clamp-1">{control.risk.name}</div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="relative inline-block">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenu(activeMenu === control.id ? null : control.id);
-                            }}
-                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{control.name}</div>
+                      {control.description && (
+                        <div className="text-xs text-gray-500 mt-1 line-clamp-1">{control.description}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${controlTypeLabels[control.control_type]?.color || 'bg-gray-100 text-gray-800'}`}>
+                        {control.control_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{control.frequency}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {control.department?.name || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {control.responsible_person?.full_name || '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        control.effectiveness_status === 'Etkili' ? 'bg-green-100 text-green-800' :
+                        control.effectiveness_status === 'Kısmen Etkili' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {control.effectiveness_status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="relative inline-block">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenu(activeMenu === control.id ? null : control.id);
+                          }}
+                          className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
 
-                          {activeMenu === control.id && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-10"
+                        {activeMenu === control.id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenu(null);
+                              }}
+                            />
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                              <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setActiveMenu(null);
+                                  openModal(control);
                                 }}
-                              />
-                              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenu(null);
-                                    openModal(control);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                  Düzenle
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenu(null);
-                                    navigate(`risk-management/risks/${control.risk_id}`);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                  Riske Git
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenu(null);
-                                    handleDelete(control);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Sil
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Edit className="w-4 h-4" />
+                                Düzenle
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenu(null);
+                                  navigate(`risk-management/risks/${control.risk_id}`);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                                Riske Git
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenu(null);
+                                  handleDelete(control);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Sil
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -872,6 +676,20 @@ export default function RiskControls() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Kontrol Numarası
+            </label>
+            <input
+              type="text"
+              value={formData.code || 'Otomatik oluşturulacak'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+              disabled
+              readOnly
+            />
+            <p className="text-xs text-gray-500 mt-1">Kontrol numarası otomatik olarak K-YYYY-XXX formatında oluşturulacaktır</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               İlişkili Risk <span className="text-red-500">*</span>
             </label>
             <select
@@ -879,7 +697,6 @@ export default function RiskControls() {
               onChange={(e) => setFormData({ ...formData, risk_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
-              disabled={!!editingControl}
             >
               <option value="">Seçiniz...</option>
               {risks.map((risk) => (
@@ -914,31 +731,31 @@ export default function RiskControls() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kontrol Tipi <span className="text-red-500">*</span>
+                Kontrol Türü <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.control_type}
                 onChange={(e) => setFormData({ ...formData, control_type: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="PREVENTIVE">Önleyici</option>
-                <option value="DETECTIVE">Tespit Edici</option>
-                <option value="CORRECTIVE">Düzeltici</option>
+                <option value="Önleyici">Önleyici</option>
+                <option value="Tespit Edici">Tespit Edici</option>
+                <option value="Düzeltici">Düzeltici</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kontrol Yapısı <span className="text-red-500">*</span>
+                Uygulama Sıklığı <span className="text-red-500">*</span>
               </label>
               <select
-                value={formData.control_nature}
-                onChange={(e) => setFormData({ ...formData, control_nature: e.target.value })}
+                value={formData.frequency}
+                onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="MANUAL">Manuel</option>
-                <option value="AUTOMATED">Otomatik</option>
-                <option value="SEMI_AUTOMATED">Yarı Otomatik</option>
+                {frequencyOptions.map((freq) => (
+                  <option key={freq} value={freq}>{freq}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -949,7 +766,9 @@ export default function RiskControls() {
             </label>
             <select
               value={formData.responsible_department_id}
-              onChange={(e) => setFormData({ ...formData, responsible_department_id: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, responsible_department_id: e.target.value, responsible_person_id: '' });
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
@@ -961,92 +780,65 @@ export default function RiskControls() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Uygulama Sıklığı</label>
-            <input
-              type="text"
-              value={formData.frequency}
-              onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-              placeholder="Örn: Günlük, Haftalık, Her işlemde"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Kişi</label>
+            <select
+              value={formData.responsible_person_id}
+              onChange={(e) => setFormData({ ...formData, responsible_person_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tasarım Etkinliği <span className="text-red-500">*</span>
-            </label>
-            <div className="space-y-2">
-              {effectivenessLevels.map((level) => (
-                <label key={level.value} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="design_effectiveness"
-                    value={level.value}
-                    checked={formData.design_effectiveness === level.value}
-                    onChange={(e) => setFormData({ ...formData, design_effectiveness: parseInt(e.target.value) })}
-                    className="text-blue-600"
-                  />
-                  <span className="flex items-center gap-2">
-                    <span className="text-yellow-500">
-                      {Array.from({ length: level.value }, (_, i) => '★').join('')}
-                    </span>
-                    <span className="text-sm text-gray-700">{level.label}</span>
-                  </span>
-                </label>
+              disabled={!formData.responsible_department_id}
+            >
+              <option value="">Seçiniz...</option>
+              {filteredUsers.map((user) => (
+                <option key={user.id} value={user.id}>{user.full_name}</option>
               ))}
-            </div>
+            </select>
+            {!formData.responsible_department_id && (
+              <p className="text-xs text-gray-500 mt-1">Önce sorumlu birim seçiniz</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Uygulama Etkinliği
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Etkinlik Durumu <span className="text-red-500">*</span>
             </label>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center gap-1">
-                  {getEffectivenessStars(formData.operating_effectiveness)}
-                </div>
-                <span className="text-sm font-medium text-blue-900">
-                  {effectivenessLevels.find(l => l.value === formData.operating_effectiveness)?.label || 'Hesaplanacak'}
-                </span>
-              </div>
-              <p className="text-xs text-blue-700">
-                ℹ️ Bu alan otomatik olarak hesaplanır. Kontrol uygulama kayıtlarınıza göre ortalama etkinlik değeri sistemce belirlenir.
-              </p>
-            </div>
+            <select
+              value={formData.effectiveness_status}
+              onChange={(e) => setFormData({ ...formData, effectiveness_status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              {effectivenessOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Kanıtlar/Belgeler</label>
-            <textarea
-              value={formData.evidence}
-              onChange={(e) => setFormData({ ...formData, evidence: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              rows={2}
-              placeholder="Kontrol kanıtlarını açıklayın"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Son Test Tarihi</label>
-              <input
-                type="date"
-                value={formData.last_test_date}
-                onChange={(e) => setFormData({ ...formData, last_test_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kanıt Dosyası</label>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                <Upload className="w-4 h-4" />
+                <span className="text-sm">Dosya Seç</span>
+                <input
+                  type="file"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                />
+              </label>
+              {selectedFile && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <FileText className="w-4 h-4" />
+                  <span>{selectedFile.name}</span>
+                </div>
+              )}
+              {!selectedFile && filePreview && (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <FileText className="w-4 h-4" />
+                  <span>Dosya mevcut</span>
+                </div>
+              )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sonraki Test Tarihi</label>
-              <input
-                type="date"
-                value={formData.next_test_date}
-                onChange={(e) => setFormData({ ...formData, next_test_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <p className="text-xs text-gray-500 mt-1">Maksimum dosya boyutu: 5MB</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
