@@ -62,6 +62,7 @@ interface Component {
   id: string;
   code: string;
   name: string;
+  order_index?: number;
 }
 
 interface Standard {
@@ -308,83 +309,86 @@ export default function ICActions() {
         });
       }
 
-      const enrichedActions = await Promise.all((actionsData || []).map(async (action) => {
+      const standardIds = new Set<string>();
+      const componentIds = new Set<string>();
+      const allDeptIds = new Set<string>();
+
+      (actionsData || []).forEach(action => {
+        const standardId = action.ic_general_conditions?.standard_id;
+        if (standardId) standardIds.add(standardId);
+
+        [
+          ...(action.related_department_ids || []),
+          ...(action.responsible_department_ids || []),
+          ...(action.collaborating_departments_ids || [])
+        ].forEach(id => allDeptIds.add(id));
+      });
+
+      const [standardsData, deptsData] = await Promise.all([
+        standardIds.size > 0
+          ? supabase
+              .from('ic_standards')
+              .select('id, code, name, component_id')
+              .in('id', Array.from(standardIds))
+          : Promise.resolve({ data: [] }),
+        allDeptIds.size > 0
+          ? supabase
+              .from('departments')
+              .select('id, name')
+              .in('id', Array.from(allDeptIds))
+          : Promise.resolve({ data: [] })
+      ]);
+
+      const standardsMap = new Map(
+        (standardsData.data || []).map(s => [s.id, s])
+      );
+
+      (standardsData.data || []).forEach(s => {
+        if (s.component_id) componentIds.add(s.component_id);
+      });
+
+      const { data: componentsData } = componentIds.size > 0
+        ? await supabase
+            .from('ic_components')
+            .select('id, code, name')
+            .in('id', Array.from(componentIds))
+        : { data: [] };
+
+      const componentsMap = new Map(
+        (componentsData || []).map(c => [c.id, c])
+      );
+
+      const deptsMap = new Map(
+        (deptsData.data || []).map(d => [d.id, d.name])
+      );
+
+      const enrichedActions = (actionsData || []).map((action) => {
         const condition = action.ic_general_conditions;
-        let standard = null;
-        let component = null;
         const standardId = condition?.standard_id;
+        const standard = standardId ? standardsMap.get(standardId) : null;
+        const component = standard?.component_id ? componentsMap.get(standard.component_id) : null;
 
-        if (standardId) {
-          const { data: standardData } = await supabase
-            .from('ic_standards')
-            .select('code, name, component_id')
-            .eq('id', standardId)
-            .single();
+        const relatedDepts = (action.related_department_ids || [])
+          .map(id => deptsMap.get(id))
+          .filter(Boolean) as string[];
 
-          standard = standardData;
+        const responsibleDepts = (action.responsible_department_ids || [])
+          .map(id => deptsMap.get(id))
+          .filter(Boolean) as string[];
 
-          if (standardData?.component_id) {
-            const { data: componentData } = await supabase
-              .from('ic_components')
-              .select('code, name')
-              .eq('id', standardData.component_id)
-              .single();
+        const collaboratingDepts = (action.collaborating_departments_ids || [])
+          .map(id => deptsMap.get(id))
+          .filter(Boolean) as string[];
 
-            component = componentData;
-          }
-        }
+        const responsibleSpecialUnits = (action.special_responsible_types || []).map(type => {
+          const unit = SPECIAL_UNITS.find(u => u.value === type);
+          return unit?.label || type;
+        });
 
-        const relatedDepts: string[] = [];
-        if (action.related_department_ids && action.related_department_ids.length > 0) {
-          const { data: depts } = await supabase
-            .from('departments')
-            .select('name')
-            .in('id', action.related_department_ids);
-
-          if (depts) {
-            relatedDepts.push(...depts.map(d => d.name));
-          }
-        }
-
-        const responsibleDepts: string[] = [];
-        if (action.responsible_department_ids && action.responsible_department_ids.length > 0) {
-          const { data: depts } = await supabase
-            .from('departments')
-            .select('name')
-            .in('id', action.responsible_department_ids);
-
-          if (depts) {
-            responsibleDepts.push(...depts.map(d => d.name));
-          }
-        }
-
-        const collaboratingDepts: string[] = [];
-        if (action.collaborating_departments_ids && action.collaborating_departments_ids.length > 0) {
-          const { data: depts } = await supabase
-            .from('departments')
-            .select('name')
-            .in('id', action.collaborating_departments_ids);
-
-          if (depts) {
-            collaboratingDepts.push(...depts.map(d => d.name));
-          }
-        }
-
-        const responsibleSpecialUnits: string[] = [];
-        if (action.special_responsible_types && action.special_responsible_types.length > 0) {
-          responsibleSpecialUnits.push(...action.special_responsible_types.map(type => {
-            const unit = SPECIAL_UNITS.find(u => u.value === type);
-            return unit?.label || type;
-          }));
-        }
-
-        const collaboratingSpecialUnits: string[] = [];
-        if (action.related_special_responsible_types && action.related_special_responsible_types.length > 0) {
-          collaboratingSpecialUnits.push(...action.related_special_responsible_types.map(type => {
-            const unit = SPECIAL_UNITS.find(u => u.value === type);
-            return unit?.label || type;
-          }));
-        }
+        const collaboratingSpecialUnits = (action.related_special_responsible_types || []).map(type => {
+          const unit = SPECIAL_UNITS.find(u => u.value === type);
+          return unit?.label || type;
+        });
 
         const delayDays = action.target_date &&
           new Date(action.target_date) < new Date() &&
@@ -414,43 +418,22 @@ export default function ICActions() {
           current_status_description: currentStatusDescription,
           delay_days: delayDays
         };
-      }));
+      });
 
-      const conditionsWithoutActionsData = await Promise.all(
-        conditionsWithoutActions.map(async (conditionId) => {
-          const { data: conditionData } = await supabase
-            .from('ic_general_conditions')
-            .select('code, description, standard_id, provides_reasonable_assurance')
-            .eq('id', conditionId)
-            .single();
+      let conditionsWithoutActionsData: Action[] = [];
 
-          if (!conditionData) return null;
+      if (conditionsWithoutActions.length > 0) {
+        const { data: conditionsData } = await supabase
+          .from('ic_general_conditions')
+          .select('id, code, description, standard_id, provides_reasonable_assurance')
+          .in('id', conditionsWithoutActions);
 
-          let standard = null;
-          let component = null;
+        conditionsData?.forEach(conditionData => {
+          const standard = conditionData.standard_id ? standardsMap.get(conditionData.standard_id) : null;
+          const component = standard?.component_id ? componentsMap.get(standard.component_id) : null;
 
-          if (conditionData.standard_id) {
-            const { data: standardData } = await supabase
-              .from('ic_standards')
-              .select('code, name, component_id')
-              .eq('id', conditionData.standard_id)
-              .single();
-
-            standard = standardData;
-
-            if (standardData?.component_id) {
-              const { data: componentData } = await supabase
-                .from('ic_components')
-                .select('code, name')
-                .eq('id', standardData.component_id)
-                .single();
-
-              component = componentData;
-            }
-          }
-
-          return {
-            id: `no-action-${conditionId}`,
+          conditionsWithoutActionsData.push({
+            id: `no-action-${conditionData.id}`,
             code: conditionData.code,
             title: 'Makul güvenceyi sağlayan mevcut düzenleme ve uygulamalar bulunduğundan eylem öngörülmemiştir.',
             description: '',
@@ -466,7 +449,7 @@ export default function ICActions() {
             related_special_responsible_types: [],
             all_units_responsible: false,
             all_units_collaborating: false,
-            condition_id: conditionId,
+            condition_id: conditionData.id,
             standard_id: conditionData.standard_id,
             component_id: standard?.component_id,
             action_plan_id: selectedPlanId,
@@ -487,16 +470,12 @@ export default function ICActions() {
             collaborating_departments: [],
             responsible_special_units: [],
             collaborating_special_units: [],
-            current_status_description: assessmentsMap.get(conditionId) || ''
-          };
-        })
-      );
+            current_status_description: assessmentsMap.get(conditionData.id) || ''
+          });
+        });
+      }
 
-      const validConditionsWithoutActions = conditionsWithoutActionsData.filter(
-        (item): item is Action => item !== null
-      );
-
-      const allActionsAndConditions = [...enrichedActions, ...validConditionsWithoutActions];
+      const allActionsAndConditions = [...enrichedActions, ...conditionsWithoutActionsData];
 
       allActionsAndConditions.sort((a, b) => {
         const codeA = a.condition_code || '';
@@ -822,6 +801,7 @@ export default function ICActions() {
       id: string;
       code: string;
       name: string;
+      order_index: number;
       standards: Set<string>;
       conditions: Set<string>;
       reasonableAssuranceConditions: Set<string>;
@@ -832,10 +812,12 @@ export default function ICActions() {
       if (!action.component_id || !action.component_code || !action.component_name) return;
 
       if (!componentMap.has(action.component_id)) {
+        const component = components.find(c => c.id === action.component_id);
         componentMap.set(action.component_id, {
           id: action.component_id,
           code: action.component_code,
           name: action.component_name,
+          order_index: component?.order_index || 999,
           standards: new Set(),
           conditions: new Set(),
           reasonableAssuranceConditions: new Set(),
@@ -876,6 +858,7 @@ export default function ICActions() {
         id: comp.id,
         code: comp.code,
         name: comp.name,
+        order_index: comp.order_index,
         standardCount: comp.standards.size,
         conditionCount: comp.conditions.size,
         conditionsWithReasonableAssurance: comp.reasonableAssuranceConditions.size,
@@ -885,12 +868,8 @@ export default function ICActions() {
         ongoingCount,
         delayedCount
       };
-    }).sort((a, b) => {
-      const codeA = a.code.match(/KİKS-(\d+)/)?.[1] || '0';
-      const codeB = b.code.match(/KİKS-(\d+)/)?.[1] || '0';
-      return parseInt(codeA) - parseInt(codeB);
-    });
-  }, [actions]);
+    }).sort((a, b) => a.order_index - b.order_index);
+  }, [actions, components]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
