@@ -66,10 +66,10 @@ interface Document {
 
 export default function ICActionDetail() {
   const { profile } = useAuth();
-  const navigate = useLocation();
-  const pathParts = window.location.pathname.split('/');
+  const { navigate: navigateTo, currentPath, getPathParam } = useLocation();
+  const pathParts = currentPath.split('/');
   const planId = pathParts[pathParts.indexOf('action-plans') + 1];
-  const actionId = pathParts[pathParts.length - 1];
+  const actionId = getPathParam();
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
@@ -635,7 +635,7 @@ export default function ICActionDetail() {
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <button
-          onClick={() => navigate(`/internal-control/action-plans/${planId}`)}
+          onClick={() => navigateTo(`internal-control/action-plans/${planId}`)}
           className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -654,7 +654,7 @@ export default function ICActionDetail() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => navigate(`/internal-control/action-plans/${planId}/actions/${actionId}/edit`)}
+              onClick={() => navigateTo(`internal-control/action-plans/${planId}/actions/${actionId}/edit`)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
             >
               <Edit className="w-4 h-4" />
@@ -748,7 +748,7 @@ export default function ICActionDetail() {
                       📊 Risk Modülü Verileri (Otomatik)
                     </h3>
                     <button
-                      onClick={() => navigate.navigate('/risk-management/risks')}
+                      onClick={() => navigateTo('risk-management/risks')}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -816,7 +816,7 @@ export default function ICActionDetail() {
                       📊 Risk Modülü Verileri (Otomatik)
                     </h3>
                     <button
-                      onClick={() => navigate.navigate('/risk-management/treatments')}
+                      onClick={() => navigateTo('risk-management/treatments')}
                       className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -1103,7 +1103,7 @@ export default function ICActionDetail() {
                       {linkedRisk.code} - {linkedRisk.name}
                     </span>
                     <button
-                      onClick={() => navigate(`/risk-management/register/${linkedRisk.id}`)}
+                      onClick={() => navigateTo(`risk-management/risks/${linkedRisk.id}`)}
                       className="text-green-600 hover:text-green-700"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -1120,7 +1120,7 @@ export default function ICActionDetail() {
                       {linkedControl.name}
                     </span>
                     <button
-                      onClick={() => navigate(`/internal-control/controls/${linkedControl.id}`)}
+                      onClick={() => navigateTo(`risk-management/controls/${linkedControl.id}`)}
                       className="text-green-600 hover:text-green-700"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -1137,7 +1137,7 @@ export default function ICActionDetail() {
                       {linkedActivity.code} - {linkedActivity.title}
                     </span>
                     <button
-                      onClick={() => navigate(`/risk-management/treatments/${linkedActivity.id}`)}
+                      onClick={() => navigateTo(`risk-management/treatments/${linkedActivity.id}`)}
                       className="text-green-600 hover:text-green-700"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -1154,7 +1154,7 @@ export default function ICActionDetail() {
                       {linkedGoal.code} - {linkedGoal.title}
                     </span>
                     <button
-                      onClick={() => navigate(`/goals/${linkedGoal.id}`)}
+                      onClick={() => navigateTo(`goals/${linkedGoal.id}`)}
                       className="text-green-600 hover:text-green-700"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -1180,7 +1180,7 @@ export default function ICActionDetail() {
                       Bu İç Kontrol eylemine <span className="font-semibold text-green-600">{linkedRiskTreatments.length}</span> risk faaliyeti bağlanmıştır.
                     </p>
                     <button
-                      onClick={() => navigate.navigate('/risk-management/risk-treatments')}
+                      onClick={() => navigateTo('risk-management/treatments')}
                       className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -1256,7 +1256,7 @@ export default function ICActionDetail() {
                             </div>
 
                             <button
-                              onClick={() => navigate.navigate(`/risk-management/risk-treatments`)}
+                              onClick={() => navigateTo('risk-management/treatments')}
                               className="text-green-600 hover:text-green-700 flex-shrink-0"
                               title="Risk faaliyetine git"
                             >

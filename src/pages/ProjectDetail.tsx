@@ -64,15 +64,24 @@ const TABS = [
 
 export default function ProjectDetail() {
   const { profile } = useAuth();
-  const { navigate } = useLocation();
-  const pathParts = window.location.pathname.split('/');
-  const projectId = pathParts[pathParts.length - 1];
+  const { navigate, getPathParam } = useLocation();
+  const projectId = getPathParam();
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('general');
 
   useEffect(() => {
+    console.log('[ProjectDetail] projectId:', projectId);
+    console.log('[ProjectDetail] organization_id:', profile?.organization_id);
+
+    if (!projectId) {
+      console.error('[ProjectDetail] Proje ID bulunamadı!');
+      alert('Proje ID bulunamadı');
+      navigate('project-management/projects');
+      return;
+    }
+
     if (projectId && profile?.organization_id) {
       loadProject();
     }
@@ -81,6 +90,8 @@ export default function ProjectDetail() {
   const loadProject = async () => {
     try {
       setLoading(true);
+      console.log('[ProjectDetail] Proje yükleniyor, ID:', projectId);
+
       const { data, error } = await supabase
         .from('projects')
         .select('*')
@@ -88,11 +99,21 @@ export default function ProjectDetail() {
         .eq('organization_id', profile?.organization_id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[ProjectDetail] Supabase hatası:', error);
+        throw error;
+      }
+
+      if (!data) {
+        console.error('[ProjectDetail] Proje bulunamadı');
+        throw new Error('Proje bulunamadı');
+      }
+
+      console.log('[ProjectDetail] Proje yüklendi:', data);
       setProject(data);
-    } catch (error) {
-      console.error('Proje yüklenirken hata:', error);
-      alert('Proje bulunamadı');
+    } catch (error: any) {
+      console.error('[ProjectDetail] Proje yüklenirken hata:', error);
+      alert(`Proje bulunamadı: ${error.message || 'Bilinmeyen hata'}`);
       navigate('project-management/projects');
     } finally {
       setLoading(false);

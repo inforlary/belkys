@@ -55,6 +55,7 @@ const statusLabels: Record<string, string> = {
 
 export default function RiskTreatmentDetail() {
   const { profile } = useAuth();
+  const { getPathParam } = useLocation();
   const [treatment, setTreatment] = useState<Treatment | null>(null);
   const [progressHistory, setProgressHistory] = useState<ProgressRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +65,7 @@ export default function RiskTreatmentDetail() {
     notes: ''
   });
 
-  const treatmentId = window.location.pathname.split('/').pop();
+  const treatmentId = getPathParam();
 
   useEffect(() => {
     if (treatmentId && profile?.organization_id) {
