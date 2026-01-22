@@ -1241,25 +1241,16 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                                       {targetValue !== null && (
                                         <div className="space-y-1">
                                           <div className="flex items-center justify-between text-xs">
-                                            <span className={`font-medium ${
-                                              progress >= 85 ? 'text-green-600' :
-                                              progress >= 70 ? 'text-green-500' :
-                                              progress >= 55 ? 'text-yellow-600' :
-                                              progress >= 45 ? 'text-red-600' :
-                                              'text-amber-700'
-                                            }`}>
+                                            <span className={`font-medium ${getStatusConfig(getIndicatorStatus(progress)).color}`}>
                                               İlerleme: %{progress}
+                                            </span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusConfig(getIndicatorStatus(progress)).bgColor} ${getStatusConfig(getIndicatorStatus(progress)).color}`}>
+                                              {getStatusLabel(getIndicatorStatus(progress))}
                                             </span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div
-                                              className={`h-2 rounded-full transition-all ${
-                                                progress >= 85 ? 'bg-green-500' :
-                                                progress >= 70 ? 'bg-green-400' :
-                                                progress >= 55 ? 'bg-yellow-500' :
-                                                progress >= 45 ? 'bg-red-500' :
-                                                'bg-amber-700'
-                                              }`}
+                                              className={`h-2 rounded-full transition-all ${getStatusConfig(getIndicatorStatus(progress)).progressBarColor}`}
                                               style={{ width: `${Math.min(progress, 100)}%` }}
                                             ></div>
                                           </div>

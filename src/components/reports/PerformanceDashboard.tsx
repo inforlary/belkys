@@ -432,6 +432,9 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         const targetData = targetsByIndicator[indicator.id];
         if (targetData && targetData.target > 0) {
           const periodValues = entriesByIndicator[indicator.id] || [];
+
+          if (periodValues.length === 0) return;
+
           const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
 
           const sum = periodValues.reduce((acc, val) => acc + val, 0);
@@ -441,6 +444,8 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             currentValue = targetData.baseline + sum;
           } else if (calculationMethod === 'decreasing') {
             currentValue = targetData.baseline - sum;
+          } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
+            currentValue = periodValues.length > 0 ? sum / periodValues.length : sum;
           }
 
           const progress = calculatePerformancePercentage({

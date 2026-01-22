@@ -419,6 +419,29 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     return `${config.color} ${config.bgColor}`;
   };
 
+  const calculateCurrentValue = (ind: IndicatorData) => {
+    const periodValues: number[] = [];
+    if (ind.hasQ1Entry) periodValues.push(ind.q1_value);
+    if (ind.hasQ2Entry) periodValues.push(ind.q2_value);
+    if (ind.hasQ3Entry) periodValues.push(ind.q3_value);
+    if (ind.hasQ4Entry) periodValues.push(ind.q4_value);
+
+    if (periodValues.length === 0) return ind.baseline_value || 0;
+
+    const sum = periodValues.reduce((acc, val) => acc + val, 0);
+    const calculationMethod = ind.calculation_method || 'cumulative';
+
+    if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+      return ind.baseline_value + sum;
+    } else if (calculationMethod === 'decreasing') {
+      return ind.baseline_value - sum;
+    } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
+      return Number((sum / periodValues.length).toFixed(2));
+    }
+
+    return sum;
+  };
+
   const calculateSelectedTotal = (ind: IndicatorData) => {
     let sum = 0;
     let count = 0;
@@ -642,10 +665,13 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
               data['Ç4'] = '';
             }
 
-            data['Toplam Veri'] = selectedTotal + (isAverage ? ' (Ortalama)' : ' (Toplam)');
+            const currentValue = calculateCurrentValue(ind);
+            data['Toplam Veri'] = `${currentValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${ind.unit}`;
             data['Başlangıç'] = ind.baseline_value;
             data['Hedef'] = ind.target_value;
-            data['İlerleme Durumu'] = `${Math.round(calculateSelectedProgress(ind))}%`;
+            const progressValue = calculateSelectedProgress(ind);
+            const statusLabel = getStatusLabel(getIndicatorStatus(progressValue));
+            data['İlerleme Durumu'] = `${Math.round(progressValue)}% - ${statusLabel}`;
 
             exportData.push(data);
 
@@ -774,12 +800,12 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           const rows: any[] = [];
 
           goalData.indicators.forEach((ind: IndicatorData) => {
-            const selectedTotal = calculateSelectedTotal(ind);
+            const currentValue = calculateCurrentValue(ind);
             const isAverage = ['maintenance', 'maintenance_increasing', 'maintenance_decreasing', 'percentage', 'percentage_increasing', 'percentage_decreasing'].includes(ind.calculation_method || 'cumulative');
 
             const row: any[] = [
               ind.code,
-              ind.name + (isAverage ? ' (Ortalama)' : ' (Toplam)'),
+              ind.name,
             ];
 
             if (selectedQuarters.includes(1)) row.push(ind.q1_value);
@@ -787,11 +813,14 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             if (selectedQuarters.includes(3)) row.push(ind.q3_value);
             if (selectedQuarters.includes(4)) row.push(ind.q4_value);
 
+            const progressValue = calculateSelectedProgress(ind);
+            const statusLabel = getStatusLabel(getIndicatorStatus(progressValue));
+
             row.push(
-              selectedTotal,
+              `${currentValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${ind.unit}`,
               ind.baseline_value,
               ind.target_value,
-              `${Math.round(calculateSelectedProgress(ind))}%`
+              `${Math.round(progressValue)}% - ${statusLabel}`
             );
 
             rows.push(row);
@@ -1142,7 +1171,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                         <td className="px-4 py-3 text-center text-sm text-slate-700">{ind.q4_value}</td>
                                       )}
                                       <td className="px-4 py-3 text-center text-sm font-medium text-slate-900 bg-blue-50">
-                                        {selectedTotal} {ind.unit}
+                                        {calculateCurrentValue(ind).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} {ind.unit}
                                       </td>
                                       <td className="px-4 py-3 text-center text-sm text-slate-700">
                                         {ind.baseline_value} {ind.unit}
@@ -1153,13 +1182,16 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                       <td className="px-4 py-3 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                           <div
-                                            className={`text-sm font-medium ${getProgressTextColor(selectedProgress)}`}
+                                            className={`text-sm font-medium ${getStatusConfig(getIndicatorStatus(selectedProgress)).color}`}
                                           >
                                             {Math.round(selectedProgress)}%
                                           </div>
+                                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusConfig(getIndicatorStatus(selectedProgress)).bgColor} ${getStatusConfig(getIndicatorStatus(selectedProgress)).color}`}>
+                                            {getStatusLabel(getIndicatorStatus(selectedProgress))}
+                                          </span>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div
-                                              className={`h-2 rounded-full ${getProgressColor(selectedProgress)}`}
+                                              className={`h-2 rounded-full ${getStatusConfig(getIndicatorStatus(selectedProgress)).progressBarColor}`}
                                               style={{ width: `${Math.min(100, selectedProgress)}%` }}
                                             />
                                           </div>
