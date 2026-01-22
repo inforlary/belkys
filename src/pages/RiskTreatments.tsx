@@ -134,8 +134,8 @@ export default function RiskTreatments() {
             *,
             risk:risks!inner(id, code, name, organization_id),
             responsible_department:departments!responsible_department_id(id, name),
-            ic_standard:ic_standards(id, code, name),
-            ic_action:ic_actions(id, code, title)
+            ic_standard:ic_standards!ic_standard_id(id, code, name),
+            ic_action:ic_actions!ic_action_id(id, code, title)
           `)
           .eq('risk.organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
