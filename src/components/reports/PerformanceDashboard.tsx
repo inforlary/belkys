@@ -5,6 +5,7 @@ import { Download, TrendingUp, TrendingDown, Minus, FileText, ArrowUpDown, X, Fi
 import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
 import Modal from '../ui/Modal';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
+import { calculateGoalProgress } from '../../utils/progressCalculations';
 import {
   IndicatorStatus,
   getIndicatorStatus,
@@ -133,7 +134,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
             const { data: indicators } = await supabase
               .from('indicators')
-              .select('id, calculation_method')
+              .select('id, calculation_method, goal_id, goal_impact_percentage, target_value, baseline_value')
               .eq('organization_id', profile.organization_id)
               .in('goal_id', goalIds);
 
@@ -154,76 +155,64 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
             const indicatorIds = indicators.map(i => i.id);
 
-            const [entriesResult, targetsResult] = await Promise.all([
-              supabase
-                .from('indicator_data_entries')
-                .select('indicator_id, value, period_quarter')
-                .eq('organization_id', profile.organization_id)
-                .eq('period_year', currentYear)
-                .eq('status', 'approved')
-                .in('indicator_id', indicatorIds)
-                .order('period_quarter', { ascending: true }),
-              supabase
-                .from('indicator_targets')
-                .select('indicator_id, target_value, baseline_value')
-                .eq('year', currentYear)
-                .in('indicator_id', indicatorIds),
-            ]);
+            const { data: dataEntries } = await supabase
+              .from('indicator_data_entries')
+              .select('indicator_id, value, status')
+              .eq('organization_id', profile.organization_id)
+              .eq('period_year', currentYear)
+              .eq('status', 'approved')
+              .in('indicator_id', indicatorIds);
 
-            const entriesByIndicator: Record<string, number[]> = {};
-            entriesResult.data?.forEach(entry => {
-              if (!entriesByIndicator[entry.indicator_id]) {
-                entriesByIndicator[entry.indicator_id] = [];
-              }
-              entriesByIndicator[entry.indicator_id].push(entry.value || 0);
-            });
-
-            const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
-            targetsResult.data?.forEach(target => {
-              targetsByIndicator[target.indicator_id] = {
-                target: target.target_value,
-                baseline: target.baseline_value || 0,
-              };
-            });
-
-            const indicatorMethodMap: Record<string, CalculationMethod> = {};
-            indicators.forEach(ind => {
-              indicatorMethodMap[ind.id] = (ind.calculation_method || 'standard') as CalculationMethod;
-            });
-
-            let totalProgress = 0;
             const stats = createEmptyStats();
+            let totalGoalProgress = 0;
+            let goalCount = 0;
 
-            indicatorIds.forEach(id => {
-              const targetData = targetsByIndicator[id];
+            goals.forEach(goal => {
+              const goalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => ({
+                id: ind.id,
+                goal_id: ind.goal_id,
+                goal_impact_percentage: ind.goal_impact_percentage,
+                target_value: ind.target_value,
+                baseline_value: ind.baseline_value,
+                calculation_method: ind.calculation_method
+              }));
 
-              if (!targetData || targetData.target === 0) {
-                const status = getIndicatorStatus(0);
+              if (goalIndicators.length === 0) return;
+
+              const goalProgress = calculateGoalProgress(goal.id, goalIndicators, dataEntries || []);
+              totalGoalProgress += goalProgress;
+              goalCount++;
+
+              goalIndicators.forEach(indicator => {
+                const indicatorEntries = (dataEntries || []).filter(e => e.indicator_id === indicator.id && e.status === 'approved');
+
+                if (indicatorEntries.length === 0) {
+                  const status = getIndicatorStatus(0);
+                  incrementStatusInStats(stats, status);
+                  return;
+                }
+
+                const periodValues = indicatorEntries.map(e => e.value || 0);
+                const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
+
+                const progress = calculatePerformancePercentage({
+                  method: calculationMethod,
+                  baselineValue: indicator.baseline_value || 0,
+                  targetValue: indicator.target_value || 0,
+                  periodValues: periodValues,
+                  currentValue: 0,
+                });
+
+                const status = getIndicatorStatus(progress);
                 incrementStatusInStats(stats, status);
-                return;
-              }
-
-              const periodValues = entriesByIndicator[id] || [];
-              const calculationMethod = indicatorMethodMap[id];
-
-              const progress = calculatePerformancePercentage({
-                method: calculationMethod,
-                baselineValue: targetData.baseline,
-                targetValue: targetData.target,
-                periodValues: periodValues,
-                currentValue: 0,
               });
-
-              totalProgress += progress;
-              const status = getIndicatorStatus(progress);
-              incrementStatusInStats(stats, status);
             });
 
             return {
               department_id: dept.id,
               department_name: dept.name,
               total_indicators: stats.total,
-              avg_progress: stats.total > 0 ? totalProgress / stats.total : 0,
+              avg_progress: goalCount > 0 ? totalGoalProgress / goalCount : 0,
               exceedingTarget: stats.exceedingTarget,
               excellent: stats.excellent,
               good: stats.good,
@@ -236,12 +225,9 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
         setDepartments(performanceData);
 
-        const totalValidIndicators = performanceData.reduce((sum, d) => sum + d.total_indicators, 0);
-        const weightedProgress = performanceData.reduce(
-          (sum, d) => sum + (d.avg_progress * d.total_indicators),
-          0
-        );
-        setOverallProgress(totalValidIndicators > 0 ? weightedProgress / totalValidIndicators : 0);
+        const totalDepartments = performanceData.filter(d => d.total_indicators > 0).length;
+        const sumOfDepartmentProgress = performanceData.reduce((sum, d) => sum + d.avg_progress, 0);
+        setOverallProgress(totalDepartments > 0 ? sumOfDepartmentProgress / totalDepartments : 0);
 
         const aggregatedStats = createEmptyStats();
         performanceData.forEach(d => {
