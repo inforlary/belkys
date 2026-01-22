@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { Search, ChevronDown, ChevronRight, CreditCard as Edit2, Trash2, Plus, CheckCircle, Clock, XCircle, Send, X, FileSpreadsheet, FileText } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
-import { calculatePerformancePercentage, CalculationMethod } from '../utils/indicatorCalculations';
 import {
   IndicatorStatus,
   getIndicatorStatus,
@@ -701,23 +700,8 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
             return;
           }
 
-          const indicatorEntries = entries.filter(
-            e => e.indicator_id === indicator.id && e.status === 'approved'
-          );
-
-          const periodValues = indicatorEntries.map(e => e.value || 0);
-          const calculationMethod = (indicator.calculation_method || 'cumulative') as CalculationMethod;
-          const baselineValue = indicator.yearly_baseline !== undefined && indicator.yearly_baseline !== null
-            ? indicator.yearly_baseline
-            : (indicator.baseline_value !== undefined && indicator.baseline_value !== null ? indicator.baseline_value : 0);
-
-          const progress = calculatePerformancePercentage({
-            method: calculationMethod,
-            baselineValue: baselineValue,
-            targetValue: target,
-            periodValues: periodValues,
-            currentValue: 0,
-          });
+          const currentValue = calculateCurrentValue(indicator);
+          const progress = calculateProgress(indicator, currentValue, target);
 
           const status = getIndicatorStatus(progress);
           incrementStatusInStats(stats, status);
@@ -742,32 +726,8 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
             const target = getIndicatorTarget(indicator.id, indicator);
             if (target === 0 || target === null) return;
 
-            const indicatorEntries = entries.filter(
-              e => e.indicator_id === indicator.id && e.status === 'approved'
-            );
-
-            const periodValues = indicatorEntries.map(e => e.value || 0);
-            const calculationMethod = (indicator.calculation_method || 'cumulative') as CalculationMethod;
-            const baselineValue = indicator.yearly_baseline !== undefined && indicator.yearly_baseline !== null
-              ? indicator.yearly_baseline
-              : (indicator.baseline_value !== undefined && indicator.baseline_value !== null ? indicator.baseline_value : 0);
-
-            const sum = periodValues.reduce((acc, val) => acc + val, 0);
-            let currentValue = sum;
-
-            if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
-              currentValue = baselineValue + sum;
-            } else if (calculationMethod === 'decreasing') {
-              currentValue = baselineValue - sum;
-            }
-
-            const progress = calculatePerformancePercentage({
-              method: calculationMethod,
-              baselineValue: baselineValue,
-              targetValue: target,
-              periodValues: periodValues,
-              currentValue: currentValue,
-            });
+            const currentValue = calculateCurrentValue(indicator);
+            const progress = calculateProgress(indicator, currentValue, target);
 
             const indicatorStatus = getIndicatorStatus(progress);
 
@@ -776,7 +736,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                 id: indicator.id,
                 name: indicator.name,
                 code: indicator.code || '',
-                current_value: currentValue,
+                current_value: currentValue !== null ? currentValue : 0,
                 target_value: target,
                 progress: progress,
                 status: indicatorStatus,
