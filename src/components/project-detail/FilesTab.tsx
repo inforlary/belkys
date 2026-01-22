@@ -231,8 +231,9 @@ export default function FilesTab({ projectId }: FilesTabProps) {
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900">Dosyalar</h3>
         <button
+          type="button"
           onClick={() => setShowUploadModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Dosya Yükle
@@ -263,8 +264,9 @@ export default function FilesTab({ projectId }: FilesTabProps) {
             {activeCategory === 'all' ? 'Henüz dosya yüklenmemiş' : `Bu kategoride dosya bulunmuyor`}
           </p>
           <button
+            type="button"
             onClick={() => setShowUploadModal(true)}
-            className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+            className="mt-4 text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
           >
             İlk dosyayı yükleyin
           </button>
@@ -438,16 +440,18 @@ export default function FilesTab({ projectId }: FilesTabProps) {
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button
+                type="button"
                 onClick={() => { setShowUploadModal(false); resetUploadForm(); }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer"
                 disabled={uploading}
               >
                 İptal
               </button>
               <button
+                type="button"
                 onClick={handleUpload}
                 disabled={uploading || !uploadForm.file}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {uploading ? 'Yükleniyor...' : 'Yükle'}
               </button>

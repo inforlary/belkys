@@ -272,8 +272,9 @@ export default function ProgressRecordsTab({ projectId, onUpdate }: ProgressReco
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900">İlerleme Kayıtları</h3>
         <button
+          type="button"
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           İlerleme Ekle
@@ -285,8 +286,9 @@ export default function ProgressRecordsTab({ projectId, onUpdate }: ProgressReco
           <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-500">Henüz ilerleme kaydı eklenmemiş</p>
           <button
+            type="button"
             onClick={() => setShowModal(true)}
-            className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+            className="mt-4 text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
           >
             İlk kaydı ekleyin
           </button>
@@ -535,16 +537,18 @@ export default function ProgressRecordsTab({ projectId, onUpdate }: ProgressReco
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button
+                type="button"
                 onClick={() => { setShowModal(false); resetForm(); }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer"
                 disabled={saving}
               >
                 İptal
               </button>
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {saving ? 'Kaydediliyor...' : 'Kaydet'}
               </button>
