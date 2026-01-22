@@ -104,6 +104,11 @@ export default function RiskControls() {
     try {
       setLoading(true);
 
+      console.log('[RiskControls] Veriler yükleniyor...', {
+        organization_id: profile?.organization_id,
+        timestamp: new Date().toISOString()
+      });
+
       const [controlsRes, risksRes, departmentsRes] = await Promise.all([
         supabase
           .from('risk_controls')
@@ -130,22 +135,102 @@ export default function RiskControls() {
           .order('name')
       ]);
 
-      if (controlsRes.error) throw controlsRes.error;
-      if (risksRes.error) throw risksRes.error;
-      if (departmentsRes.error) throw departmentsRes.error;
+      if (controlsRes.error) {
+        console.error('[RiskControls] Kontroller yüklenirken hata:', {
+          error: controlsRes.error,
+          message: controlsRes.error.message,
+          code: controlsRes.error.code
+        });
+        throw controlsRes.error;
+      }
+
+      if (risksRes.error) {
+        console.error('[RiskControls] Riskler yüklenirken hata:', {
+          error: risksRes.error,
+          message: risksRes.error.message,
+          code: risksRes.error.code
+        });
+        throw risksRes.error;
+      }
+
+      if (departmentsRes.error) {
+        console.error('[RiskControls] Birimler yüklenirken hata:', {
+          error: departmentsRes.error,
+          message: departmentsRes.error.message,
+          code: departmentsRes.error.code
+        });
+        throw departmentsRes.error;
+      }
+
+      console.log('[RiskControls] Veriler başarıyla yüklendi:', {
+        controls: controlsRes.data?.length || 0,
+        risks: risksRes.data?.length || 0,
+        departments: departmentsRes.data?.length || 0
+      });
 
       setControls(controlsRes.data || []);
       setRisks(risksRes.data || []);
       setDepartments(departmentsRes.data || []);
-    } catch (error) {
-      console.error('Veriler yüklenirken hata:', error);
+
+      if (!risksRes.data || risksRes.data.length === 0) {
+        console.warn('[RiskControls] Hiç risk bulunamadı. Kullanıcıya bildirim göster.');
+      }
+
+      if (!departmentsRes.data || departmentsRes.data.length === 0) {
+        console.warn('[RiskControls] Hiç birim bulunamadı. Kullanıcıya bildirim göster.');
+      }
+    } catch (error: any) {
+      console.error('[RiskControls] Veriler yüklenirken kritik hata:', {
+        error,
+        message: error?.message,
+        stack: error?.stack
+      });
+      alert(`Veriler yüklenirken hata oluştu: ${error?.message || 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin veya sistem yöneticisine başvurun.`);
     } finally {
       setLoading(false);
     }
   }
 
   function openModal(control?: Control) {
+    console.log('[RiskControls] Modal açılıyor:', {
+      editMode: !!control,
+      controlId: control?.id,
+      availableRisks: risks.length,
+      availableDepartments: departments.length
+    });
+
+    if (risks.length === 0) {
+      alert('Önce en az bir risk tanımlamalısınız. Risk Kaydı sayfasına yönlendiriliyorsunuz.');
+      console.warn('[RiskControls] Hiç risk yok, modal açılamıyor');
+      navigate('risk-management/risks');
+      return;
+    }
+
+    if (departments.length === 0) {
+      alert('Sistem ayarlarında hiç birim tanımlanmamış. Lütfen sistem yöneticisi ile iletişime geçin.');
+      console.error('[RiskControls] Hiç birim yok, modal açılamıyor');
+      return;
+    }
+
     if (control) {
+      console.log('[RiskControls] Düzenleme modu:', {
+        controlId: control.id,
+        controlName: control.name,
+        riskId: control.risk_id,
+        departmentId: control.responsible_department_id
+      });
+
+      const riskExists = risks.some(r => r.id === control.risk_id);
+      const departmentExists = departments.some(d => d.id === control.responsible_department_id);
+
+      if (!riskExists) {
+        console.warn('[RiskControls] Kontrolün riski bulunamadı:', control.risk_id);
+      }
+
+      if (!departmentExists && control.responsible_department_id) {
+        console.warn('[RiskControls] Kontrolün sorumlu birimi bulunamadı:', control.responsible_department_id);
+      }
+
       setEditingControl(control);
       setFormData({
         risk_id: control.risk_id,
@@ -162,6 +247,7 @@ export default function RiskControls() {
         next_test_date: control.next_test_date || ''
       });
     } else {
+      console.log('[RiskControls] Yeni kayıt modu');
       setEditingControl(null);
       setFormData({
         risk_id: '',
@@ -189,48 +275,119 @@ export default function RiskControls() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.risk_id || !formData.name || !formData.responsible_department_id) {
-      alert('Lütfen zorunlu alanları doldurun');
+    console.log('[RiskControls] Form gönderiliyor:', {
+      editMode: !!editingControl,
+      formData: {
+        risk_id: formData.risk_id,
+        name: formData.name,
+        responsible_department_id: formData.responsible_department_id
+      }
+    });
+
+    if (!formData.risk_id) {
+      alert('Lütfen bir risk seçin');
+      console.warn('[RiskControls] Risk seçilmedi');
+      return;
+    }
+
+    if (!formData.name?.trim()) {
+      alert('Lütfen kontrol adını girin');
+      console.warn('[RiskControls] Kontrol adı boş');
+      return;
+    }
+
+    if (!formData.responsible_department_id) {
+      alert('Lütfen sorumlu birim seçin');
+      console.warn('[RiskControls] Sorumlu birim seçilmedi');
+      return;
+    }
+
+    if (formData.design_effectiveness < 1 || formData.design_effectiveness > 5) {
+      alert('Tasarım etkinliği 1-5 arasında olmalıdır');
+      console.warn('[RiskControls] Geçersiz tasarım etkinliği:', formData.design_effectiveness);
+      return;
+    }
+
+    if (formData.operating_effectiveness < 1 || formData.operating_effectiveness > 5) {
+      alert('Uygulama etkinliği 1-5 arasında olmalıdır');
+      console.warn('[RiskControls] Geçersiz uygulama etkinliği:', formData.operating_effectiveness);
       return;
     }
 
     try {
       const controlData = {
         risk_id: formData.risk_id,
-        name: formData.name,
-        description: formData.description,
+        name: formData.name.trim(),
+        description: formData.description?.trim() || null,
         control_type: formData.control_type,
         control_nature: formData.control_nature,
         responsible_department_id: formData.responsible_department_id,
         design_effectiveness: formData.design_effectiveness,
         operating_effectiveness: formData.operating_effectiveness,
-        evidence: formData.evidence,
-        frequency: formData.frequency,
+        evidence: formData.evidence?.trim() || null,
+        frequency: formData.frequency?.trim() || null,
         last_test_date: formData.last_test_date || null,
         next_test_date: formData.next_test_date || null,
         is_active: true
       };
 
+      console.log('[RiskControls] Kontrol kaydediliyor:', controlData);
+
       if (editingControl) {
+        console.log('[RiskControls] Güncelleme modu, ID:', editingControl.id);
         const { error } = await supabase
           .from('risk_controls')
           .update(controlData)
           .eq('id', editingControl.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('[RiskControls] Güncelleme hatası:', {
+            error,
+            message: error.message,
+            code: error.code,
+            details: error.details
+          });
+          throw error;
+        }
+        console.log('[RiskControls] Kontrol başarıyla güncellendi');
       } else {
+        console.log('[RiskControls] Yeni kayıt modu');
         const { error } = await supabase
           .from('risk_controls')
           .insert(controlData);
 
-        if (error) throw error;
+        if (error) {
+          console.error('[RiskControls] Ekleme hatası:', {
+            error,
+            message: error.message,
+            code: error.code,
+            details: error.details
+          });
+          throw error;
+        }
+        console.log('[RiskControls] Kontrol başarıyla eklendi');
       }
 
       closeModal();
-      loadData();
+      await loadData();
     } catch (error: any) {
-      console.error('Kontrol kaydedilirken hata:', error);
-      alert(`Kontrol kaydedilemedi: ${error.message || 'Bilinmeyen hata'}`);
+      console.error('[RiskControls] Kontrol kaydedilirken kritik hata:', {
+        error,
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      });
+
+      let errorMessage = 'Kontrol kaydedilemedi';
+      if (error?.message) {
+        errorMessage += `: ${error.message}`;
+      }
+      if (error?.hint) {
+        errorMessage += `\n\nİpucu: ${error.hint}`;
+      }
+
+      alert(errorMessage);
     }
   }
 

@@ -122,6 +122,11 @@ export default function RiskTreatments() {
     try {
       setLoading(true);
 
+      console.log('[RiskTreatments] Veriler yükleniyor...', {
+        organization_id: profile?.organization_id,
+        timestamp: new Date().toISOString()
+      });
+
       const [treatmentsRes, risksRes, departmentsRes, icStandardsRes, icActionsRes] = await Promise.all([
         supabase
           .from('risk_treatments')
@@ -162,23 +167,47 @@ export default function RiskTreatments() {
       ]);
 
       if (treatmentsRes.error) {
-        console.error('Faaliyetler yüklenirken hata:', treatmentsRes.error);
+        console.error('[RiskTreatments] Faaliyetler yüklenirken hata:', {
+          error: treatmentsRes.error,
+          message: treatmentsRes.error.message,
+          code: treatmentsRes.error.code
+        });
         throw treatmentsRes.error;
       }
+
       if (risksRes.error) {
-        console.error('Riskler yüklenirken hata:', risksRes.error);
+        console.error('[RiskTreatments] Riskler yüklenirken hata:', {
+          error: risksRes.error,
+          message: risksRes.error.message,
+          code: risksRes.error.code
+        });
         throw risksRes.error;
       }
+
       if (departmentsRes.error) {
-        console.error('Birimler yüklenirken hata:', departmentsRes.error);
+        console.error('[RiskTreatments] Birimler yüklenirken hata:', {
+          error: departmentsRes.error,
+          message: departmentsRes.error.message,
+          code: departmentsRes.error.code
+        });
         throw departmentsRes.error;
       }
+
       if (icStandardsRes.error) {
-        console.error('İç Kontrol Standartları yüklenirken hata:', icStandardsRes.error);
+        console.error('[RiskTreatments] İç Kontrol Standartları yüklenirken hata:', {
+          error: icStandardsRes.error,
+          message: icStandardsRes.error.message,
+          code: icStandardsRes.error.code
+        });
         throw icStandardsRes.error;
       }
+
       if (icActionsRes.error) {
-        console.error('İç Kontrol Eylemleri yüklenirken hata:', icActionsRes.error);
+        console.error('[RiskTreatments] İç Kontrol Eylemleri yüklenirken hata:', {
+          error: icActionsRes.error,
+          message: icActionsRes.error.message,
+          code: icActionsRes.error.code
+        });
         throw icActionsRes.error;
       }
 
@@ -188,7 +217,7 @@ export default function RiskTreatments() {
       const icStandards = icStandardsRes.data || [];
       const icActions = icActionsRes.data || [];
 
-      console.log('Yüklenen veriler:', {
+      console.log('[RiskTreatments] Veriler başarıyla yüklendi:', {
         treatments: treatments.length,
         risks: risks.length,
         departments: departments.length,
@@ -196,20 +225,73 @@ export default function RiskTreatments() {
         icActions: icActions.length
       });
 
+      if (risks.length === 0) {
+        console.warn('[RiskTreatments] Hiç risk bulunamadı');
+      }
+
+      if (departments.length === 0) {
+        console.warn('[RiskTreatments] Hiç birim bulunamadı');
+      }
+
+      if (icStandards.length === 0) {
+        console.warn('[RiskTreatments] Hiç İç Kontrol standardı bulunamadı');
+      }
+
+      if (icActions.length === 0) {
+        console.warn('[RiskTreatments] Hiç İç Kontrol eylemi bulunamadı');
+      }
+
       setTreatments(treatments);
       setRisks(risks);
       setDepartments(departments);
       setIcStandards(icStandards);
       setIcActions(icActions);
-    } catch (error) {
-      console.error('Veriler yüklenirken hata:', error);
+    } catch (error: any) {
+      console.error('[RiskTreatments] Veriler yüklenirken kritik hata:', {
+        error,
+        message: error?.message,
+        stack: error?.stack
+      });
+      alert(`Veriler yüklenirken hata oluştu: ${error?.message || 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin veya sistem yöneticisine başvurun.`);
     } finally {
       setLoading(false);
     }
   }
 
   function openModal(treatment?: Treatment) {
+    console.log('[RiskTreatments] Modal açılıyor:', {
+      editMode: !!treatment,
+      treatmentId: treatment?.id,
+      availableRisks: risks.length,
+      availableDepartments: departments.length,
+      availableICStandards: icStandards.length,
+      availableICActions: icActions.length
+    });
+
+    if (risks.length === 0) {
+      alert('Önce en az bir risk tanımlamalısınız. Risk Kaydı sayfasına yönlendiriliyorsunuz.');
+      console.warn('[RiskTreatments] Hiç risk yok, modal açılamıyor');
+      navigate('risk-management/risks');
+      return;
+    }
+
+    if (departments.length === 0) {
+      alert('Sistem ayarlarında hiç birim tanımlanmamış. Lütfen sistem yöneticisi ile iletişime geçin.');
+      console.error('[RiskTreatments] Hiç birim yok, modal açılamıyor');
+      return;
+    }
+
     if (treatment) {
+      console.log('[RiskTreatments] Düzenleme modu:', {
+        treatmentId: treatment.id,
+        treatmentTitle: treatment.title,
+        riskId: treatment.risk_id,
+        departmentId: treatment.responsible_department_id,
+        isICAction: treatment.is_ic_action,
+        icStandardId: treatment.ic_standard_id,
+        icActionId: treatment.ic_action_id
+      });
+
       setEditingTreatment(treatment);
       setFormData({
         risk_id: treatment.risk_id,
@@ -225,9 +307,18 @@ export default function RiskTreatments() {
 
       if (treatment.ic_standard_id) {
         const filteredActions = icActions.filter(a => a.standard_id === treatment.ic_standard_id);
+        console.log('[RiskTreatments] IC standart için eylemler yüklendi:', {
+          standardId: treatment.ic_standard_id,
+          actionCount: filteredActions.length
+        });
         setFilteredIcActions(filteredActions);
+
+        if (filteredActions.length === 0) {
+          console.warn('[RiskTreatments] IC standardı için hiç eylem bulunamadı');
+        }
       }
     } else {
+      console.log('[RiskTreatments] Yeni kayıt modu');
       setEditingTreatment(null);
       setFormData({
         risk_id: '',
@@ -252,7 +343,39 @@ export default function RiskTreatments() {
   }
 
   function handleStandardChange(standardId: string) {
+    console.log('[RiskTreatments] Standart değiştirildi:', {
+      standardId,
+      availableActions: icActions.length
+    });
+
+    if (!standardId) {
+      console.log('[RiskTreatments] Standart temizlendi');
+      setFilteredIcActions([]);
+      setFormData({
+        ...formData,
+        ic_standard_id: '',
+        ic_action_id: ''
+      });
+      return;
+    }
+
+    const selectedStandard = icStandards.find(s => s.id === standardId);
+    console.log('[RiskTreatments] Seçilen standart:', {
+      id: selectedStandard?.id,
+      code: selectedStandard?.code,
+      name: selectedStandard?.name
+    });
+
     const filteredActions = icActions.filter(a => a.standard_id === standardId);
+    console.log('[RiskTreatments] Filtrelenen eylemler:', {
+      count: filteredActions.length,
+      actions: filteredActions.map(a => ({ id: a.id, code: a.code, title: a.title }))
+    });
+
+    if (filteredActions.length === 0) {
+      console.warn('[RiskTreatments] Bu standart için hiç eylem bulunamadı');
+    }
+
     setFilteredIcActions(filteredActions);
     setFormData({
       ...formData,
