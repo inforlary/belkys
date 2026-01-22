@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Trash2, Filter, TrendingUp, Calendar, ExternalLink, MoreVertical, Search, X, Link as LinkIcon, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit, Trash2, Filter, TrendingUp, Calendar, ExternalLink, MoreVertical, Search, X, FileDown, FileSpreadsheet } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Risk {
@@ -17,26 +17,6 @@ interface Risk {
 interface Department {
   id: string;
   name: string;
-}
-
-interface ICStandard {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface ICCondition {
-  id: string;
-  standard_id: string;
-  code: string;
-  description: string;
-}
-
-interface ICAction {
-  id: string;
-  code: string;
-  title: string;
-  condition_id: string;
 }
 
 interface Treatment {
@@ -58,11 +38,6 @@ interface Treatment {
   risk?: Risk;
   responsible_department?: Department;
   notes?: string;
-  is_ic_action?: boolean;
-  ic_condition_id?: string;
-  ic_action_id?: string;
-  ic_condition?: ICCondition;
-  ic_action?: ICAction;
 }
 
 const statusLabels: Record<string, { label: string; color: string; emoji: string }> = {
@@ -80,11 +55,6 @@ export default function RiskTreatments() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [icStandards, setIcStandards] = useState<ICStandard[]>([]);
-  const [icConditions, setIcConditions] = useState<ICCondition[]>([]);
-  const [filteredIcConditions, setFilteredIcConditions] = useState<ICCondition[]>([]);
-  const [icActions, setIcActions] = useState<ICAction[]>([]);
-  const [filteredIcActions, setFilteredIcActions] = useState<ICAction[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -98,8 +68,7 @@ export default function RiskTreatments() {
     department_id: '',
     date_from: '',
     date_to: '',
-    search: '',
-    has_ic_link: ''
+    search: ''
   });
 
   const [formData, setFormData] = useState({
@@ -108,11 +77,7 @@ export default function RiskTreatments() {
     description: '',
     responsible_department_id: '',
     planned_end_date: '',
-    notes: '',
-    is_ic_action: false,
-    ic_standard_id: '',
-    ic_condition_id: '',
-    ic_action_id: ''
+    notes: ''
   });
 
   const [progressData, setProgressData] = useState({
@@ -132,20 +97,13 @@ export default function RiskTreatments() {
     try {
       setLoading(true);
 
-      console.log('[RiskTreatments] Veriler yükleniyor...', {
-        organization_id: profile?.organization_id,
-        timestamp: new Date().toISOString()
-      });
-
-      const [treatmentsRes, risksRes, departmentsRes, icStandardsRes, icConditionsRes, icActionsRes] = await Promise.all([
+      const [treatmentsRes, risksRes, departmentsRes] = await Promise.all([
         supabase
           .from('risk_treatments')
           .select(`
             *,
             risk:risks!inner(id, code, name, organization_id),
-            responsible_department:departments!responsible_department_id(id, name),
-            ic_condition:ic_general_conditions!ic_condition_id(id, code, description, standard_id),
-            ic_action:ic_actions!ic_action_id(id, code, title)
+            responsible_department:departments!responsible_department_id(id, name)
           `)
           .eq('risk.organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
@@ -161,170 +119,37 @@ export default function RiskTreatments() {
           .from('departments')
           .select('id, name')
           .eq('organization_id', profile?.organization_id)
-          .order('name'),
-
-        supabase
-          .from('ic_standards')
-          .select('id, code, name')
-          .order('code'),
-
-        supabase
-          .from('ic_general_conditions')
-          .select('id, standard_id, code, description')
-          .order('code'),
-
-        supabase
-          .from('ic_actions')
-          .select('id, code, title, condition_id')
-          .or(`organization_id.is.null,organization_id.eq.${profile?.organization_id}`)
-          .order('code')
+          .order('name')
       ]);
 
-      if (treatmentsRes.error) {
-        console.error('[RiskTreatments] Faaliyetler yüklenirken hata:', {
-          error: treatmentsRes.error,
-          message: treatmentsRes.error.message,
-          code: treatmentsRes.error.code
-        });
-        throw treatmentsRes.error;
-      }
+      if (treatmentsRes.error) throw treatmentsRes.error;
+      if (risksRes.error) throw risksRes.error;
+      if (departmentsRes.error) throw departmentsRes.error;
 
-      if (risksRes.error) {
-        console.error('[RiskTreatments] Riskler yüklenirken hata:', {
-          error: risksRes.error,
-          message: risksRes.error.message,
-          code: risksRes.error.code
-        });
-        throw risksRes.error;
-      }
-
-      if (departmentsRes.error) {
-        console.error('[RiskTreatments] Birimler yüklenirken hata:', {
-          error: departmentsRes.error,
-          message: departmentsRes.error.message,
-          code: departmentsRes.error.code
-        });
-        throw departmentsRes.error;
-      }
-
-      if (icStandardsRes.error) {
-        console.error('[RiskTreatments] İç Kontrol Standartları yüklenirken hata:', {
-          error: icStandardsRes.error,
-          message: icStandardsRes.error.message,
-          code: icStandardsRes.error.code
-        });
-        throw icStandardsRes.error;
-      }
-
-      if (icConditionsRes.error) {
-        console.error('[RiskTreatments] İç Kontrol Genel Şartları yüklenirken hata:', {
-          error: icConditionsRes.error,
-          message: icConditionsRes.error.message,
-          code: icConditionsRes.error.code
-        });
-        throw icConditionsRes.error;
-      }
-
-      if (icActionsRes.error) {
-        console.error('[RiskTreatments] İç Kontrol Eylemleri yüklenirken hata:', {
-          error: icActionsRes.error,
-          message: icActionsRes.error.message,
-          code: icActionsRes.error.code
-        });
-        throw icActionsRes.error;
-      }
-
-      const treatments = treatmentsRes.data || [];
-      const risks = risksRes.data || [];
-      const departments = departmentsRes.data || [];
-      const icStandards = icStandardsRes.data || [];
-      const icConditions = icConditionsRes.data || [];
-      const icActions = icActionsRes.data || [];
-
-      console.log('[RiskTreatments] Veriler başarıyla yüklendi:', {
-        treatments: treatments.length,
-        risks: risks.length,
-        departments: departments.length,
-        icStandards: icStandards.length,
-        icConditions: icConditions.length,
-        icActions: icActions.length
-      });
-
-      if (risks.length === 0) {
-        console.warn('[RiskTreatments] Hiç risk bulunamadı');
-      }
-
-      if (departments.length === 0) {
-        console.warn('[RiskTreatments] Hiç birim bulunamadı');
-      }
-
-      if (icStandards.length === 0) {
-        console.warn('[RiskTreatments] Hiç İç Kontrol standardı bulunamadı');
-      }
-
-      if (icConditions.length === 0) {
-        console.warn('[RiskTreatments] Hiç İç Kontrol genel şartı bulunamadı');
-      }
-
-      if (icActions.length === 0) {
-        console.warn('[RiskTreatments] Hiç İç Kontrol eylemi bulunamadı');
-      }
-
-      setTreatments(treatments);
-      setRisks(risks);
-      setDepartments(departments);
-      setIcStandards(icStandards);
-      setIcConditions(icConditions);
-      setIcActions(icActions);
+      setTreatments(treatmentsRes.data || []);
+      setRisks(risksRes.data || []);
+      setDepartments(departmentsRes.data || []);
     } catch (error: any) {
-      console.error('[RiskTreatments] Veriler yüklenirken kritik hata:', {
-        error,
-        message: error?.message,
-        stack: error?.stack
-      });
-      alert(`Veriler yüklenirken hata oluştu: ${error?.message || 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin veya sistem yöneticisine başvurun.`);
+      console.error('[RiskTreatments] Veriler yüklenirken hata:', error);
+      alert(`Veriler yüklenirken hata oluştu: ${error?.message || 'Bilinmeyen hata'}`);
     } finally {
       setLoading(false);
     }
   }
 
   function openModal(treatment?: Treatment) {
-    console.log('[RiskTreatments] Modal açılıyor:', {
-      editMode: !!treatment,
-      treatmentId: treatment?.id,
-      availableRisks: risks.length,
-      availableDepartments: departments.length,
-      availableICStandards: icStandards.length,
-      availableICConditions: icConditions.length,
-      availableICActions: icActions.length
-    });
-
     if (risks.length === 0) {
       alert('Önce en az bir risk tanımlamalısınız. Risk Kaydı sayfasına yönlendiriliyorsunuz.');
-      console.warn('[RiskTreatments] Hiç risk yok, modal açılamıyor');
       navigate('risk-management/risks');
       return;
     }
 
     if (departments.length === 0) {
       alert('Sistem ayarlarında hiç birim tanımlanmamış. Lütfen sistem yöneticisi ile iletişime geçin.');
-      console.error('[RiskTreatments] Hiç birim yok, modal açılamıyor');
       return;
     }
 
     if (treatment) {
-      console.log('[RiskTreatments] Düzenleme modu:', {
-        treatmentId: treatment.id,
-        treatmentTitle: treatment.title,
-        riskId: treatment.risk_id,
-        departmentId: treatment.responsible_department_id,
-        isICAction: treatment.is_ic_action,
-        icConditionId: treatment.ic_condition_id,
-        icActionId: treatment.ic_action_id
-      });
-
-      const conditionStandardId = treatment.ic_condition?.standard_id || '';
-
       setEditingTreatment(treatment);
       setFormData({
         risk_id: treatment.risk_id,
@@ -332,32 +157,9 @@ export default function RiskTreatments() {
         description: treatment.description || '',
         responsible_department_id: treatment.responsible_department_id || '',
         planned_end_date: treatment.planned_end_date || '',
-        notes: treatment.notes || '',
-        is_ic_action: treatment.is_ic_action || false,
-        ic_standard_id: conditionStandardId,
-        ic_condition_id: treatment.ic_condition_id || '',
-        ic_action_id: treatment.ic_action_id || ''
+        notes: treatment.notes || ''
       });
-
-      if (conditionStandardId) {
-        const filteredConditions = icConditions.filter(c => c.standard_id === conditionStandardId);
-        setFilteredIcConditions(filteredConditions);
-      }
-
-      if (treatment.ic_condition_id) {
-        const filteredActions = icActions.filter(a => a.condition_id === treatment.ic_condition_id);
-        console.log('[RiskTreatments] IC genel şart için eylemler yüklendi:', {
-          conditionId: treatment.ic_condition_id,
-          actionCount: filteredActions.length
-        });
-        setFilteredIcActions(filteredActions);
-
-        if (filteredActions.length === 0) {
-          console.warn('[RiskTreatments] IC genel şartı için hiç eylem bulunamadı');
-        }
-      }
     } else {
-      console.log('[RiskTreatments] Yeni kayıt modu');
       setEditingTreatment(null);
       setFormData({
         risk_id: '',
@@ -365,14 +167,8 @@ export default function RiskTreatments() {
         description: '',
         responsible_department_id: '',
         planned_end_date: '',
-        notes: '',
-        is_ic_action: false,
-        ic_standard_id: '',
-        ic_condition_id: '',
-        ic_action_id: ''
+        notes: ''
       });
-      setFilteredIcConditions([]);
-      setFilteredIcActions([]);
     }
     setShowModal(true);
   }
@@ -380,96 +176,6 @@ export default function RiskTreatments() {
   function closeModal() {
     setShowModal(false);
     setEditingTreatment(null);
-    setFilteredIcConditions([]);
-    setFilteredIcActions([]);
-  }
-
-  function handleStandardChange(standardId: string) {
-    console.log('[RiskTreatments] Standart değiştirildi:', {
-      standardId,
-      availableConditions: icConditions.length
-    });
-
-    if (!standardId) {
-      console.log('[RiskTreatments] Standart temizlendi');
-      setFilteredIcConditions([]);
-      setFilteredIcActions([]);
-      setFormData({
-        ...formData,
-        ic_standard_id: '',
-        ic_condition_id: '',
-        ic_action_id: ''
-      });
-      return;
-    }
-
-    const selectedStandard = icStandards.find(s => s.id === standardId);
-    console.log('[RiskTreatments] Seçilen standart:', {
-      id: selectedStandard?.id,
-      code: selectedStandard?.code,
-      name: selectedStandard?.name
-    });
-
-    const filteredConditions = icConditions.filter(c => c.standard_id === standardId);
-    console.log('[RiskTreatments] Filtrelenen genel şartlar:', {
-      count: filteredConditions.length,
-      conditions: filteredConditions.map(c => ({ id: c.id, code: c.code, description: c.description }))
-    });
-
-    if (filteredConditions.length === 0) {
-      console.warn('[RiskTreatments] Bu standart için hiç genel şart bulunamadı');
-    }
-
-    setFilteredIcConditions(filteredConditions);
-    setFilteredIcActions([]);
-    setFormData({
-      ...formData,
-      ic_standard_id: standardId,
-      ic_condition_id: '',
-      ic_action_id: ''
-    });
-  }
-
-  function handleConditionChange(conditionId: string) {
-    console.log('[RiskTreatments] Genel şart değiştirildi:', {
-      conditionId,
-      availableActions: icActions.length
-    });
-
-    if (!conditionId) {
-      console.log('[RiskTreatments] Genel şart temizlendi');
-      setFilteredIcActions([]);
-      setFormData({
-        ...formData,
-        ic_condition_id: '',
-        ic_action_id: ''
-      });
-      return;
-    }
-
-    const selectedCondition = icConditions.find(c => c.id === conditionId);
-    console.log('[RiskTreatments] Seçilen genel şart:', {
-      id: selectedCondition?.id,
-      code: selectedCondition?.code,
-      description: selectedCondition?.description
-    });
-
-    const filteredActions = icActions.filter(a => a.condition_id === conditionId);
-    console.log('[RiskTreatments] Filtrelenen eylemler:', {
-      count: filteredActions.length,
-      actions: filteredActions.map(a => ({ id: a.id, code: a.code, title: a.title }))
-    });
-
-    if (filteredActions.length === 0) {
-      console.warn('[RiskTreatments] Bu genel şart için hiç eylem bulunamadı');
-    }
-
-    setFilteredIcActions(filteredActions);
-    setFormData({
-      ...formData,
-      ic_condition_id: conditionId,
-      ic_action_id: ''
-    });
   }
 
   function handleRiskChange(riskId: string) {
@@ -535,10 +241,7 @@ export default function RiskTreatments() {
         planned_end_date: formData.planned_end_date,
         notes: formData.notes,
         status: editingTreatment ? (editingTreatment.status || 'NOT_STARTED') : 'NOT_STARTED',
-        progress_percent: editingTreatment ? (editingTreatment.progress_percent ?? 0) : 0,
-        is_ic_action: formData.is_ic_action,
-        ic_condition_id: formData.is_ic_action && formData.ic_condition_id ? formData.ic_condition_id : null,
-        ic_action_id: formData.is_ic_action && formData.ic_action_id ? formData.ic_action_id : null
+        progress_percent: editingTreatment ? (editingTreatment.progress_percent ?? 0) : 0
       };
 
       if (editingTreatment) {
@@ -662,10 +365,6 @@ export default function RiskTreatments() {
     if (filters.department_id && t.responsible_department_id !== filters.department_id) return false;
     if (filters.date_from && t.planned_end_date && t.planned_end_date < filters.date_from) return false;
     if (filters.date_to && t.planned_end_date && t.planned_end_date > filters.date_to) return false;
-    if (filters.has_ic_link) {
-      if (filters.has_ic_link === 'yes' && !t.is_ic_action) return false;
-      if (filters.has_ic_link === 'no' && t.is_ic_action) return false;
-    }
     if (filters.search) {
       const search = filters.search.toLowerCase();
       return t.code?.toLowerCase().includes(search) || t.title?.toLowerCase().includes(search);
@@ -715,8 +414,7 @@ export default function RiskTreatments() {
       department_id: '',
       date_from: '',
       date_to: '',
-      search: '',
-      has_ic_link: ''
+      search: ''
     });
   }
 
@@ -732,9 +430,6 @@ export default function RiskTreatments() {
       'Gerçekleşen Bitiş': treatment.actual_end_date || '-',
       'İlerleme (%)': treatment.progress_percent || 0,
       'Durum': statusLabels[treatment.status || 'NOT_STARTED']?.label || '-',
-      'İÇ Kontrol Bağlantısı': treatment.is_ic_action ? 'Evet' : 'Hayır',
-      'İÇ Genel Şart': treatment.ic_condition?.description || '-',
-      'İÇ Faaliyet': treatment.ic_action?.title || '-',
       'Notlar': treatment.notes || '-'
     }));
     exportToExcel(exportData, `risk_faaliyetleri_${new Date().toISOString().split('T')[0]}`);
@@ -782,14 +477,6 @@ export default function RiskTreatments() {
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
   }
-
-  const getStandardName = (conditionId?: string) => {
-    if (!conditionId) return '';
-    const condition = icConditions.find(c => c.id === conditionId);
-    if (!condition) return '';
-    const standard = icStandards.find(s => s.id === condition.standard_id);
-    return standard ? `${standard.code} - ${standard.name}` : '';
-  };
 
   return (
     <div className="space-y-6">
@@ -889,7 +576,7 @@ export default function RiskTreatments() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div>
               <select
                 value={filters.risk_id}
@@ -926,18 +613,6 @@ export default function RiskTreatments() {
                 {Object.entries(statusLabels).map(([key, { label }]) => (
                   <option key={key} value={key}>{label}</option>
                 ))}
-              </select>
-            </div>
-
-            <div>
-              <select
-                value={filters.has_ic_link}
-                onChange={(e) => setFilters({ ...filters, has_ic_link: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">İK Bağlantısı ▼</option>
-                <option value="yes">Bağlantılı</option>
-                <option value="no">Bağlantısız</option>
               </select>
             </div>
 
@@ -984,7 +659,6 @@ export default function RiskTreatments() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faaliyet Adı</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlişkili Risk</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu Birim</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İK</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hedef Tarih</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlerleme</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İşlem</th>
@@ -993,7 +667,7 @@ export default function RiskTreatments() {
             <tbody className="divide-y divide-gray-200">
               {sortedTreatments.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     Faaliyet bulunamadı
                   </td>
                 </tr>
@@ -1024,13 +698,6 @@ export default function RiskTreatments() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {treatment.responsible_department?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {treatment.is_ic_action ? (
-                          <span className="text-green-600" title="İç Kontrol Bağlantılı">✅</span>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm">
@@ -1255,120 +922,6 @@ export default function RiskTreatments() {
             />
           </div>
 
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <LinkIcon className="w-5 h-5 text-blue-600" />
-              <h3 className="font-medium text-gray-900">İç Kontrol Bağlantısı</h3>
-            </div>
-
-            <div className="space-y-4 bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="is_ic_action"
-                  checked={formData.is_ic_action}
-                  onChange={(e) => {
-                    setFormData({
-                      ...formData,
-                      is_ic_action: e.target.checked,
-                      ic_standard_id: e.target.checked ? formData.ic_standard_id : '',
-                      ic_condition_id: e.target.checked ? formData.ic_condition_id : '',
-                      ic_action_id: e.target.checked ? formData.ic_action_id : ''
-                    });
-                    if (!e.target.checked) {
-                      setFilteredIcConditions([]);
-                      setFilteredIcActions([]);
-                    }
-                  }}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <label htmlFor="is_ic_action" className="text-sm font-medium text-gray-700 cursor-pointer">
-                  Bu faaliyet bir İç Kontrol eylemi mi?
-                </label>
-              </div>
-
-              {formData.is_ic_action && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Standart <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.ic_standard_id}
-                      onChange={(e) => handleStandardChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      required={formData.is_ic_action}
-                    >
-                      <option value="">Seçiniz...</option>
-                      {icStandards.map((standard) => (
-                        <option key={standard.id} value={standard.id}>
-                          {standard.code} - {standard.name}
-                        </option>
-                      ))}
-                    </select>
-                    {icStandards.length === 0 && (
-                      <p className="text-xs text-yellow-600 mt-1">
-                        ⚠ İç kontrol standartları yüklenemedi. Lütfen sayfayı yenileyin.
-                      </p>
-                    )}
-                  </div>
-
-                  {formData.ic_standard_id && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Genel Şart <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.ic_condition_id}
-                        onChange={(e) => handleConditionChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        required={formData.is_ic_action}
-                      >
-                        <option value="">Seçiniz...</option>
-                        {filteredIcConditions.map((condition) => (
-                          <option key={condition.id} value={condition.id}>
-                            {condition.code} - {condition.description}
-                          </option>
-                        ))}
-                      </select>
-                      {filteredIcConditions.length === 0 && (
-                        <p className="text-xs text-yellow-600 mt-1">
-                          ⚠ Bu standart için henüz genel şart tanımlanmamış
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {formData.ic_condition_id && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        İç Kontrol Eylemi <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.ic_action_id}
-                        onChange={(e) => setFormData({ ...formData, ic_action_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        required={formData.is_ic_action}
-                      >
-                        <option value="">Seçiniz...</option>
-                        {filteredIcActions.map((action) => (
-                          <option key={action.id} value={action.id}>
-                            {action.code} - {action.title}
-                          </option>
-                        ))}
-                      </select>
-                      {filteredIcActions.length === 0 && (
-                        <p className="text-xs text-yellow-600 mt-1">
-                          ⚠ Bu genel şart için henüz eylem tanımlanmamış
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
           <div className="flex justify-end gap-2 pt-4 border-t">
             <button
               type="button"
@@ -1407,34 +960,6 @@ export default function RiskTreatments() {
                 )}
               </span>
             </div>
-
-            {editingTreatment?.is_ic_action && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <LinkIcon className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-900">İç Kontrol Bağlantısı</span>
-                </div>
-                <div className="text-sm text-gray-700 space-y-1 ml-6">
-                  <div>
-                    <span className="font-medium">Standart:</span> {getStandardName(editingTreatment.ic_condition_id)}
-                  </div>
-                  <div>
-                    <span className="font-medium">Genel Şart:</span> {editingTreatment.ic_condition?.code} - {editingTreatment.ic_condition?.description}
-                  </div>
-                  <div>
-                    <span className="font-medium">Eylem:</span> {editingTreatment.ic_action?.code} - {editingTreatment.ic_action?.title}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/ic-actions/${editingTreatment.ic_action_id}`)}
-                  className="mt-2 ml-6 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  İç Kontrol Eylemine Git
-                </button>
-              </div>
-            )}
           </div>
 
           <div className="border-t border-gray-200 pt-4">
