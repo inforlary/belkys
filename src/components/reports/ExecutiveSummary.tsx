@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Calendar, FileText, X, FileSpreadsheet, FileDown } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
+import { calculateGoalProgress } from '../../utils/progressCalculations';
 import {
   IndicatorStatus,
   getIndicatorStatus,
@@ -154,16 +155,33 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       const { data: allowedGoals } = await goalsQuery;
       const allowedGoalIds = allowedGoals?.map(g => g.id) || [];
 
+      if (allowedGoalIds.length === 0) {
+        setData({
+          overall_progress: 0,
+          total_indicators: 0,
+          exceedingTarget: 0,
+          excellent: 0,
+          good: 0,
+          moderate: 0,
+          weak: 0,
+          veryWeak: 0,
+          top_performers: [],
+          concerns: [],
+          overdue_activities: 0,
+          pending_approvals: 0,
+          data_completion: 0,
+          recommendations: ['Henüz hedef bulunmuyor. Stratejik planınızı tamamlayın.'],
+          strategic_plans: strategicPlans,
+        });
+        setLoading(false);
+        return;
+      }
+
       let indicatorsQuery = supabase
         .from('indicators')
-        .select('id, name, goal_id, calculation_method')
-        .eq('organization_id', profile.organization_id);
-
-      if (allowedGoalIds.length > 0) {
-        indicatorsQuery = indicatorsQuery.in('goal_id', allowedGoalIds);
-      } else if (profile.role !== 'admin' && profile.role !== 'manager') {
-        indicatorsQuery = indicatorsQuery.eq('id', '00000000-0000-0000-0000-000000000000');
-      }
+        .select('id, name, goal_id, calculation_method, goal_impact_percentage, target_value, baseline_value')
+        .eq('organization_id', profile.organization_id)
+        .in('goal_id', allowedGoalIds);
 
       const { data: indicators } = await indicatorsQuery;
 
@@ -191,19 +209,13 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
 
       const indicatorIds = indicators.map(i => i.id);
 
-      const [entriesData, targetsData, activitiesData, pendingApprovalsData] = await Promise.all([
+      const [entriesData, activitiesData, pendingApprovalsData] = await Promise.all([
         supabase
           .from('indicator_data_entries')
-          .select('indicator_id, value, period_quarter')
+          .select('indicator_id, value, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
           .eq('status', 'approved')
-          .in('indicator_id', indicatorIds)
-          .order('period_quarter', { ascending: true }),
-        supabase
-          .from('indicator_targets')
-          .select('indicator_id, target_value, baseline_value')
-          .eq('year', currentYear)
           .in('indicator_id', indicatorIds),
         (async () => {
           let activitiesQuery = supabase
@@ -234,57 +246,60 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           .in('status', ['submitted', 'pending']),
       ]);
 
-      const entriesByIndicator: Record<string, number[]> = {};
-      const quartersByIndicator: Record<string, number> = {};
-      entriesData.data?.forEach(entry => {
-        if (!entriesByIndicator[entry.indicator_id]) {
-          entriesByIndicator[entry.indicator_id] = [];
-        }
-        entriesByIndicator[entry.indicator_id].push(entry.value || 0);
-
-        if (!quartersByIndicator[entry.indicator_id]) {
-          quartersByIndicator[entry.indicator_id] = 0;
-        }
-        quartersByIndicator[entry.indicator_id]++;
-      });
-
-      const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
-      targetsData.data?.forEach(target => {
-        targetsByIndicator[target.indicator_id] = {
-          target: target.target_value,
-          baseline: target.baseline_value || 0,
-        };
-      });
-
       const indicatorProgress: Array<{ id: string; name: string; progress: number }> = [];
-      let totalProgress = 0;
       const stats = createEmptyStats();
+      const quartersByIndicator: Record<string, number> = {};
 
-      indicators.forEach(ind => {
-        const targetData = targetsByIndicator[ind.id];
-        if (!targetData || targetData.target === 0) {
-          indicatorProgress.push({ id: ind.id, name: ind.name, progress: 0 });
-          const status = getIndicatorStatus(0);
+      let totalGoalProgress = 0;
+      let goalCount = 0;
+
+      allowedGoals.forEach(goal => {
+        const goalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => ({
+          id: ind.id,
+          goal_id: ind.goal_id,
+          goal_impact_percentage: ind.goal_impact_percentage,
+          target_value: ind.target_value,
+          baseline_value: ind.baseline_value,
+          calculation_method: ind.calculation_method
+        }));
+
+        if (goalIndicators.length === 0) return;
+
+        const goalProgress = calculateGoalProgress(goal.id, goalIndicators, entriesData.data || []);
+        totalGoalProgress += goalProgress;
+        goalCount++;
+
+        goalIndicators.forEach(indicator => {
+          const indicatorEntries = (entriesData.data || []).filter(e => e.indicator_id === indicator.id && e.status === 'approved');
+
+          if (!quartersByIndicator[indicator.id]) {
+            quartersByIndicator[indicator.id] = 0;
+          }
+          quartersByIndicator[indicator.id] += indicatorEntries.length;
+
+          if (indicatorEntries.length === 0) {
+            indicatorProgress.push({ id: indicator.id, name: indicators.find(i => i.id === indicator.id)?.name || '', progress: 0 });
+            const status = getIndicatorStatus(0);
+            incrementStatusInStats(stats, status);
+            return;
+          }
+
+          const periodValues = indicatorEntries.map(e => e.value || 0);
+          const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
+
+          const progress = calculatePerformancePercentage({
+            method: calculationMethod,
+            baselineValue: indicator.baseline_value || 0,
+            targetValue: indicator.target_value || 0,
+            periodValues: periodValues,
+            currentValue: 0,
+          });
+
+          indicatorProgress.push({ id: indicator.id, name: indicators.find(i => i.id === indicator.id)?.name || '', progress });
+
+          const status = getIndicatorStatus(progress);
           incrementStatusInStats(stats, status);
-          return;
-        }
-
-        const periodValues = entriesByIndicator[ind.id] || [];
-        const calculationMethod = (ind.calculation_method || 'standard') as CalculationMethod;
-
-        const progress = calculatePerformancePercentage({
-          method: calculationMethod,
-          baselineValue: targetData.baseline,
-          targetValue: targetData.target,
-          periodValues: periodValues,
-          currentValue: 0,
         });
-
-        indicatorProgress.push({ id: ind.id, name: ind.name, progress });
-        totalProgress += progress;
-
-        const status = getIndicatorStatus(progress);
-        incrementStatusInStats(stats, status);
       });
 
       indicatorProgress.sort((a, b) => b.progress - a.progress);
@@ -303,7 +318,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       const dataCompletion = (totalEntries / totalExpectedEntries) * 100;
 
       const recommendations: string[] = [];
-      const overallProgress = indicators.length > 0 ? totalProgress / indicators.length : 0;
+      const overallProgress = goalCount > 0 ? totalGoalProgress / goalCount : 0;
 
       if (overallProgress < 50) {
         recommendations.push('Kurum genel performansı düşük seviyede. Acil eylem planı gerekli.');
