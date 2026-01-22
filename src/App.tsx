@@ -89,6 +89,10 @@ import RiskCategories from './pages/RiskCategories';
 import RiskReports from './pages/RiskReports';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
+import ProjectForm from './pages/ProjectForm';
+import QuickProjectEntry from './pages/QuickProjectEntry';
+import SPTracking from './pages/SPTracking';
+import ProjectReports from './pages/ProjectReports';
 import ProjectManagementDashboard from './pages/ProjectManagementDashboard';
 import QualityDashboard from './pages/QualityDashboard';
 import QualityProcesses from './pages/QualityProcesses';
@@ -179,10 +183,16 @@ const renderPage = () => {
       console.log('[App.tsx] Rendering RiskDetail for path:', currentPath);
       return <RiskDetail />;
     }
-    if (currentPath.startsWith('projects/') && currentPath !== 'projects') {
+    if (currentPath === 'project-management/projects/new') {
+      return <ProjectForm />;
+    }
+    if (currentPath.match(/^project-management\/projects\/[^/]+\/edit$/)) {
+      return <ProjectForm />;
+    }
+    if (currentPath.startsWith('project-management/projects/') && currentPath !== 'project-management/projects') {
       return <ProjectDetail />;
     }
-    if (currentPath.startsWith('project-management/projects/')) {
+    if (currentPath.startsWith('projects/') && currentPath !== 'projects') {
       return <ProjectDetail />;
     }
     if (currentPath.startsWith('quality-management/processes/') && currentPath !== 'quality-management/processes') {
@@ -386,6 +396,12 @@ const renderPage = () => {
         return <RiskReports />;
       case 'project-management/dashboard':
         return <ProjectManagementDashboard />;
+      case 'project-management/quick-entry':
+        return <QuickProjectEntry />;
+      case 'project-management/sp-tracking':
+        return <SPTracking />;
+      case 'project-management/reports':
+        return <ProjectReports />;
       case 'project-management/projects':
         return <Projects />;
       case 'projects':
