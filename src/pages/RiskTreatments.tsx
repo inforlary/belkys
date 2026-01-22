@@ -21,31 +21,47 @@ interface Department {
 
 interface Treatment {
   id: string;
-  code?: string;
+  risk_id: string;
+  target_control_id?: string;
+  action_type: string;
   title: string;
   description?: string;
-  treatment_type?: string;
+  responsible_person?: string;
   responsible_department_id?: string;
-  responsible_person_id?: string;
+  status: string;
+  progress_percent: number;
   planned_start_date?: string;
   planned_end_date?: string;
   actual_start_date?: string;
   actual_end_date?: string;
-  estimated_budget?: number;
-  progress_percent?: number;
-  status?: string;
-  risk_id: string;
+  expected_residual_likelihood?: number;
+  expected_residual_impact?: number;
+  estimated_cost?: number;
+  actual_cost?: number;
+  resources_required?: string;
+  approval_status: string;
+  approved_by?: string;
+  approved_at?: string;
+  notes?: string;
   risk?: Risk;
   responsible_department?: Department;
-  notes?: string;
 }
 
 const statusLabels: Record<string, { label: string; color: string; emoji: string }> = {
-  NOT_STARTED: { label: 'Başlamadı', color: 'bg-gray-100 text-gray-800', emoji: '○' },
+  PLANNED: { label: 'Planlandı', color: 'bg-gray-100 text-gray-800', emoji: '○' },
   IN_PROGRESS: { label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-800', emoji: '🔄' },
   COMPLETED: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800', emoji: '✅' },
-  DELAYED: { label: 'Gecikmiş', color: 'bg-red-100 text-red-800', emoji: '⚠️' },
-  CANCELLED: { label: 'İptal', color: 'bg-gray-200 text-gray-700', emoji: '✖' }
+  CANCELLED: { label: 'İptal Edildi', color: 'bg-red-100 text-red-800', emoji: '✖' },
+  ON_HOLD: { label: 'Beklemede', color: 'bg-yellow-100 text-yellow-800', emoji: '⏸' }
+};
+
+const actionTypeLabels: Record<string, { label: string; desc: string; icon: string }> = {
+  NEW_CONTROL: { label: 'Yeni Kontrol Ekle', desc: 'Yeni kontrol mekanizması oluştur', icon: '➕' },
+  IMPROVE_CONTROL: { label: 'Kontrolü İyileştir', desc: 'Mevcut kontrolü güçlendir', icon: '⬆️' },
+  AUTOMATE_CONTROL: { label: 'Kontrolü Otomatikleştir', desc: 'Manuel kontrolü otomatik yap', icon: '🤖' },
+  TRANSFER_RISK: { label: 'Riski Transfer Et', desc: 'Riski üçüncü tarafa aktar', icon: '↪️' },
+  ELIMINATE_RISK: { label: 'Riski Ortadan Kaldır', desc: 'Risk kaynağını yok et', icon: '🗑️' },
+  ACCEPT_RISK: { label: 'Riski Kabul Et', desc: 'Mevcut risk seviyesini kabul et', icon: '✓' }
 };
 
 export default function RiskTreatments() {
@@ -73,6 +89,7 @@ export default function RiskTreatments() {
 
   const [formData, setFormData] = useState({
     risk_id: '',
+    action_type: 'IMPROVE_CONTROL',
     title: '',
     description: '',
     responsible_department_id: '',
@@ -99,7 +116,7 @@ export default function RiskTreatments() {
 
       const [treatmentsRes, risksRes, departmentsRes] = await Promise.all([
         supabase
-          .from('risk_treatments')
+          .from('risk_improvement_actions')
           .select(`
             *,
             risk:risks!inner(id, code, name, organization_id),
@@ -153,6 +170,7 @@ export default function RiskTreatments() {
       setEditingTreatment(treatment);
       setFormData({
         risk_id: treatment.risk_id,
+        action_type: treatment.action_type,
         title: treatment.title,
         description: treatment.description || '',
         responsible_department_id: treatment.responsible_department_id || '',
@@ -163,6 +181,7 @@ export default function RiskTreatments() {
       setEditingTreatment(null);
       setFormData({
         risk_id: '',
+        action_type: 'IMPROVE_CONTROL',
         title: '',
         description: '',
         responsible_department_id: '',
@@ -212,48 +231,30 @@ export default function RiskTreatments() {
     }
 
     try {
-      let code = '';
-      if (!editingTreatment) {
-        const { data: existingTreatments } = await supabase
-          .from('risk_treatments')
-          .select('code')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        let nextNumber = 1;
-        if (existingTreatments && existingTreatments.length > 0) {
-          const lastCode = existingTreatments[0].code;
-          const match = lastCode?.match(/F-(\d+)$/);
-          if (match) {
-            nextNumber = parseInt(match[1]) + 1;
-          }
-        }
-
-        code = `F-${nextNumber.toString().padStart(3, '0')}`;
-      }
-
       const treatmentData = {
         risk_id: formData.risk_id,
-        code: editingTreatment ? editingTreatment.code : code,
+        organization_id: profile?.organization_id,
+        action_type: formData.action_type,
         title: formData.title,
         description: formData.description,
         responsible_department_id: formData.responsible_department_id || null,
         planned_end_date: formData.planned_end_date,
         notes: formData.notes,
-        status: editingTreatment ? (editingTreatment.status || 'NOT_STARTED') : 'NOT_STARTED',
-        progress_percent: editingTreatment ? (editingTreatment.progress_percent ?? 0) : 0
+        status: editingTreatment ? editingTreatment.status : 'PLANNED',
+        progress_percent: editingTreatment ? editingTreatment.progress_percent : 0,
+        approval_status: 'DRAFT'
       };
 
       if (editingTreatment) {
         const { error } = await supabase
-          .from('risk_treatments')
+          .from('risk_improvement_actions')
           .update(treatmentData)
           .eq('id', editingTreatment.id);
 
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('risk_treatments')
+          .from('risk_improvement_actions')
           .insert(treatmentData);
 
         if (error) throw error;
@@ -293,25 +294,11 @@ export default function RiskTreatments() {
       }
 
       const { error: updateError } = await supabase
-        .from('risk_treatments')
+        .from('risk_improvement_actions')
         .update(updateData)
         .eq('id', editingTreatment.id);
 
       if (updateError) throw updateError;
-
-      const { error: historyError } = await supabase
-        .from('risk_treatment_updates')
-        .insert({
-          treatment_id: editingTreatment.id,
-          updated_by_id: profile?.id,
-          previous_progress: editingTreatment.progress_percent ?? 0,
-          new_progress: progressData.progress_percent,
-          previous_status: editingTreatment.status || 'NOT_STARTED',
-          new_status: progressData.status,
-          notes: progressData.notes
-        });
-
-      if (historyError) throw historyError;
 
       closeProgressModal();
       loadData();
@@ -326,7 +313,7 @@ export default function RiskTreatments() {
 
     try {
       const { error } = await supabase
-        .from('risk_treatments')
+        .from('risk_improvement_actions')
         .delete()
         .eq('id', treatment.id);
 

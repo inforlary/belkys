@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Plus, Edit, Trash2, Shield, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, X, CheckSquare } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import ControlExecutionsModal from './ControlExecutionsModal';
 
 interface Control {
   id: string;
@@ -61,6 +62,8 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingControl, setEditingControl] = useState<Control | null>(null);
+  const [showExecutionsModal, setShowExecutionsModal] = useState(false);
+  const [selectedControlForExecutions, setSelectedControlForExecutions] = useState<{ id: string; name: string } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -231,6 +234,17 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
     ));
   }
 
+  function openExecutionsModal(control: Control) {
+    setSelectedControlForExecutions({ id: control.id, name: control.name });
+    setShowExecutionsModal(true);
+  }
+
+  function closeExecutionsModal() {
+    setShowExecutionsModal(false);
+    setSelectedControlForExecutions(null);
+    loadControls();
+  }
+
   if (loading) {
     return <div className="text-gray-500 text-center py-8">Yükleniyor...</div>;
   }
@@ -322,6 +336,13 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openExecutionsModal(control)}
+                        className="p-1 text-green-600 hover:text-green-800"
+                        title="Uygulama Kayıtları"
+                      >
+                        <CheckSquare className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => openModal(control)}
                         className="p-1 text-blue-600 hover:text-blue-800"
@@ -532,6 +553,16 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
           </div>
         </form>
       </Modal>
+
+      {selectedControlForExecutions && (
+        <ControlExecutionsModal
+          controlId={selectedControlForExecutions.id}
+          controlName={selectedControlForExecutions.name}
+          isOpen={showExecutionsModal}
+          onClose={closeExecutionsModal}
+          onUpdate={loadControls}
+        />
+      )}
     </div>
   );
 }
