@@ -160,7 +160,7 @@ export default function RiskReports() {
   const loadMetrics = async () => {
     let risksQuery = supabase
       .from('risks')
-      .select('*, risk_treatments(*), risk_category_mappings(category_id)')
+      .select('*, risk_improvement_actions(*), risk_category_mappings(category_id)')
       .eq('organization_id', profile?.organization_id);
 
     if (filterDepartment !== 'all') {
@@ -213,12 +213,12 @@ export default function RiskReports() {
         }
       }
 
-      risk.risk_treatments?.forEach((treatment: any) => {
+      risk.risk_improvement_actions?.forEach((treatment: any) => {
         if (treatment.status === 'COMPLETED') {
           treatmentsCompleted++;
         } else if (treatment.status === 'IN_PROGRESS') {
           treatmentsInProgress++;
-          if (treatment.target_date && new Date(treatment.target_date) < now) {
+          if (treatment.planned_end_date && new Date(treatment.planned_end_date) < now) {
             treatmentsDelayed++;
           }
         }
@@ -1019,7 +1019,7 @@ function ExecutiveSummaryReport({ onClose }: { onClose: () => void }) {
     try {
       const { data: risks } = await supabase
         .from('risks')
-        .select('*, risk_treatments(*), department:departments(name)')
+        .select('*, risk_improvement_actions(*), department:departments(name)')
         .eq('organization_id', profile?.organization_id);
 
       const critical = risks?.filter(r => (r.residual_risk_score || r.inherent_risk_score) >= 20) || [];
@@ -1031,8 +1031,8 @@ function ExecutiveSummaryReport({ onClose }: { onClose: () => void }) {
       const delayedTreatments: any[] = [];
       const now = new Date();
       risks?.forEach(risk => {
-        risk.risk_treatments?.forEach((treatment: any) => {
-          if (treatment.status !== 'COMPLETED' && treatment.target_date && new Date(treatment.target_date) < now) {
+        risk.risk_improvement_actions?.forEach((treatment: any) => {
+          if (treatment.status !== 'COMPLETED' && treatment.planned_end_date && new Date(treatment.planned_end_date) < now) {
             delayedTreatments.push({ ...treatment, risk });
           }
         });

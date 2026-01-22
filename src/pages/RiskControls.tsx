@@ -18,6 +18,13 @@ interface Department {
   name: string;
 }
 
+interface ImprovementAction {
+  id: string;
+  title: string;
+  status: string;
+  progress_percent: number;
+}
+
 interface Control {
   id: string;
   risk_id: string;
@@ -35,6 +42,7 @@ interface Control {
   next_test_date?: string;
   risk?: Risk;
   department?: Department;
+  improvement_actions?: ImprovementAction[];
 }
 
 const controlTypeLabels: Record<string, { label: string; color: string }> = {
@@ -115,7 +123,8 @@ export default function RiskControls() {
           .select(`
             *,
             risk:risks!inner(id, code, name, organization_id),
-            department:departments!responsible_department_id(id, name)
+            department:departments!responsible_department_id(id, name),
+            improvement_actions:risk_improvement_actions!target_control_id(id, title, status, progress_percent)
           `)
           .eq('risk.organization_id', profile?.organization_id)
           .eq('is_active', true)
@@ -700,6 +709,7 @@ export default function RiskControls() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yapı</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tasarım</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uygulama</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faaliyetler</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sonraki Test</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İşlem</th>
@@ -708,7 +718,7 @@ export default function RiskControls() {
             <tbody className="divide-y divide-gray-200">
               {filteredControls.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                     Kontrol bulunamadı
                   </td>
                 </tr>
@@ -758,6 +768,20 @@ export default function RiskControls() {
                         <div className={`text-xs mt-1 ${operatingLevel.color}`}>
                           {operatingLevel.label}
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {control.improvement_actions && control.improvement_actions.length > 0 ? (
+                          <div className="text-sm">
+                            <div className="font-medium text-blue-600">{control.improvement_actions.length} Faaliyet</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {control.improvement_actions.filter(a => a.status === 'IN_PROGRESS').length} devam ediyor
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400">
+                            Faaliyet yok
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {control.department?.name || '-'}

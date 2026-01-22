@@ -113,12 +113,12 @@ export default function RiskTreatmentsTab({ riskId, riskCode }: Props) {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('risk_treatments')
+        .from('risk_improvement_actions')
         .select(`
           *,
           department:departments!responsible_department_id(name),
-          responsible:profiles!responsible_person_id(full_name),
-          control:risk_controls!risk_control_id(id, name)
+          responsible:profiles!responsible_person(full_name),
+          control:risk_controls!target_control_id(id, name)
         `)
         .eq('risk_id', riskId)
         .order('created_at', { ascending: false });
@@ -277,31 +277,32 @@ export default function RiskTreatmentsTab({ riskId, riskCode }: Props) {
 
       const treatmentData = {
         risk_id: riskId,
+        organization_id: profile?.organization_id,
         title: formData.title,
         description: formData.description,
-        treatment_type: formData.treatment_type,
-        action_type: formData.action_type || null,
-        risk_control_id: controlId,
+        action_type: formData.action_type || 'IMPROVE_CONTROL',
+        target_control_id: controlId,
         responsible_department_id: formData.responsible_department_id,
-        responsible_person_id: formData.responsible_person_id || null,
+        responsible_person: formData.responsible_person_id || null,
         planned_start_date: formData.planned_start_date || null,
         planned_end_date: formData.planned_end_date || null,
-        estimated_budget: formData.estimated_budget || 0,
+        estimated_cost: formData.estimated_budget || 0,
         progress_percent: 0,
         status: 'PLANNED',
+        approval_status: 'DRAFT',
         notes: formData.notes
       };
 
       if (editingTreatment) {
         const { error } = await supabase
-          .from('risk_treatments')
+          .from('risk_improvement_actions')
           .update(treatmentData)
           .eq('id', editingTreatment.id);
 
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('risk_treatments')
+          .from('risk_improvement_actions')
           .insert(treatmentData);
 
         if (error) throw error;
@@ -321,7 +322,7 @@ export default function RiskTreatmentsTab({ riskId, riskCode }: Props) {
 
     try {
       const { error } = await supabase
-        .from('risk_treatments')
+        .from('risk_improvement_actions')
         .delete()
         .eq('id', treatmentId);
 

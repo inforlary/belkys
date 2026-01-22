@@ -19,6 +19,12 @@ interface Department {
   name: string;
 }
 
+interface Control {
+  id: string;
+  name: string;
+  risk_id: string;
+}
+
 interface Treatment {
   id: string;
   risk_id: string;
@@ -71,6 +77,7 @@ export default function RiskTreatments() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [controls, setControls] = useState<Control[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -89,6 +96,7 @@ export default function RiskTreatments() {
 
   const [formData, setFormData] = useState({
     risk_id: '',
+    target_control_id: '',
     action_type: 'IMPROVE_CONTROL',
     title: '',
     description: '',
@@ -114,13 +122,14 @@ export default function RiskTreatments() {
     try {
       setLoading(true);
 
-      const [treatmentsRes, risksRes, departmentsRes] = await Promise.all([
+      const [treatmentsRes, risksRes, departmentsRes, controlsRes] = await Promise.all([
         supabase
           .from('risk_improvement_actions')
           .select(`
             *,
             risk:risks!inner(id, code, name, organization_id),
-            responsible_department:departments!responsible_department_id(id, name)
+            responsible_department:departments!responsible_department_id(id, name),
+            target_control:risk_controls!target_control_id(id, name)
           `)
           .eq('risk.organization_id', profile?.organization_id)
           .order('created_at', { ascending: false }),
@@ -136,16 +145,25 @@ export default function RiskTreatments() {
           .from('departments')
           .select('id, name')
           .eq('organization_id', profile?.organization_id)
+          .order('name'),
+
+        supabase
+          .from('risk_controls')
+          .select('id, name, risk_id')
+          .eq('organization_id', profile?.organization_id)
+          .eq('is_active', true)
           .order('name')
       ]);
 
       if (treatmentsRes.error) throw treatmentsRes.error;
       if (risksRes.error) throw risksRes.error;
       if (departmentsRes.error) throw departmentsRes.error;
+      if (controlsRes.error) throw controlsRes.error;
 
       setTreatments(treatmentsRes.data || []);
       setRisks(risksRes.data || []);
       setDepartments(departmentsRes.data || []);
+      setControls(controlsRes.data || []);
     } catch (error: any) {
       console.error('[RiskTreatments] Veriler yüklenirken hata:', error);
       alert(`Veriler yüklenirken hata oluştu: ${error?.message || 'Bilinmeyen hata'}`);
@@ -170,6 +188,7 @@ export default function RiskTreatments() {
       setEditingTreatment(treatment);
       setFormData({
         risk_id: treatment.risk_id,
+        target_control_id: treatment.target_control_id || '',
         action_type: treatment.action_type,
         title: treatment.title,
         description: treatment.description || '',
@@ -181,6 +200,7 @@ export default function RiskTreatments() {
       setEditingTreatment(null);
       setFormData({
         risk_id: '',
+        target_control_id: '',
         action_type: 'IMPROVE_CONTROL',
         title: '',
         description: '',
@@ -202,9 +222,16 @@ export default function RiskTreatments() {
     setFormData({
       ...formData,
       risk_id: riskId,
+      target_control_id: '',
       responsible_department_id: selectedRisk?.owner_department_id || ''
     });
   }
+
+  const availableControls = formData.risk_id
+    ? controls.filter(c => c.risk_id === formData.risk_id)
+    : [];
+
+  const showControlSelection = ['IMPROVE_CONTROL', 'AUTOMATE_CONTROL'].includes(formData.action_type);
 
   function openProgressModal(treatment: Treatment) {
     setEditingTreatment(treatment);
@@ -233,6 +260,7 @@ export default function RiskTreatments() {
     try {
       const treatmentData = {
         risk_id: formData.risk_id,
+        target_control_id: formData.target_control_id || null,
         organization_id: profile?.organization_id,
         action_type: formData.action_type,
         title: formData.title,
@@ -861,6 +889,34 @@ export default function RiskTreatments() {
               Seçilen türe göre faaliyet stratejisi belirlenir
             </p>
           </div>
+
+          {showControlSelection && formData.risk_id && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Hedef Kontrol {formData.action_type === 'IMPROVE_CONTROL' && <span className="text-xs text-gray-500">(opsiyonel)</span>}
+              </label>
+              <select
+                value={formData.target_control_id}
+                onChange={(e) => setFormData({ ...formData, target_control_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seçiniz...</option>
+                {availableControls.map((control) => (
+                  <option key={control.id} value={control.id}>{control.name}</option>
+                ))}
+              </select>
+              {availableControls.length === 0 && (
+                <p className="text-xs text-yellow-600 mt-1">
+                  ⚠ Bu risk için henüz kontrol tanımlanmamış. Kontroller sayfasından ekleyebilirsiniz.
+                </p>
+              )}
+              {formData.action_type === 'AUTOMATE_CONTROL' && !formData.target_control_id && (
+                <p className="text-xs text-orange-600 mt-1">
+                  ℹ Otomatikleştirme için bir kontrol seçmeniz önerilir
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
