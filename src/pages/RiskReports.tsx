@@ -55,7 +55,7 @@ import DepartmentRiskReport from '../components/risk-reports/DepartmentRiskRepor
 import PeriodComparisonReport from '../components/risk-reports/PeriodComparisonReport';
 import RiskICMap from '../components/strategic-reports/RiskICMap';
 
-type ReportType = 'status' | 'matrix' | 'activity' | 'indicator' | 'department' | 'period' | 'appetite' | 'executive' | 'goal_based' | 'risk_ic_map' | null;
+type ReportType = 'status' | 'matrix' | 'activity' | 'indicator' | 'department' | 'period' | 'appetite' | 'executive' | 'goal_based' | null;
 type ViewMode = 'dashboard' | 'reports';
 
 interface DashboardMetrics {
@@ -445,14 +445,6 @@ export default function RiskReports() {
       description: 'Stratejik hedeflere göre risk analizi, hedef-risk ilişkilendirmesi',
       color: 'bg-teal-50 text-teal-600 border-teal-200',
       hoverColor: 'hover:bg-teal-100'
-    },
-    {
-      id: 'risk_ic_map' as ReportType,
-      icon: Shield,
-      title: 'RİSK & İÇ KONTROL HARİTASI',
-      description: 'Risk-hedef-gösterge ilişki ağı, iç kontrol aksiyonları ve entegre analiz',
-      color: 'bg-slate-50 text-slate-600 border-slate-200',
-      hoverColor: 'hover:bg-slate-100'
     }
   ];
 
@@ -476,21 +468,6 @@ export default function RiskReports() {
         return <ExecutiveSummaryReport onClose={() => setSelectedReport(null)} />;
       case 'goal_based':
         return <GoalBasedRiskReport onClose={() => setSelectedReport(null)} />;
-      case 'risk_ic_map':
-        return (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Risk & İç Kontrol Haritası</h1>
-                <p className="text-sm text-gray-600 mt-1">Risk-hedef-gösterge ilişki ağı ve iç kontrol entegrasyonu</p>
-              </div>
-              <button onClick={() => setSelectedReport(null)} className="btn-secondary">
-                Geri Dön
-              </button>
-            </div>
-            <RiskICMap />
-          </div>
-        );
       default:
         return null;
     }
@@ -836,6 +813,14 @@ export default function RiskReports() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="mb-4">
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">Risk & İç Kontrol Haritası</h2>
+                  <p className="text-sm text-gray-600">Risk-hedef-gösterge ilişki ağı ve iç kontrol entegrasyonu</p>
+                </div>
+                <RiskICMap />
               </div>
             </>
           )}
