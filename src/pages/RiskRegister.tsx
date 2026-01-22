@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
-import { Plus, Search, X, Save, AlertTriangle, Trash2, CreditCard as Edit2, Eye, MoreVertical } from 'lucide-react';
+import { Plus, Search, X, Save, AlertTriangle, Trash2, CreditCard as Edit2, Eye, MoreVertical, FileDown, FileSpreadsheet } from 'lucide-react';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Risk {
   id: string;
@@ -680,6 +681,74 @@ export default function RiskRegister() {
     );
   }
 
+  const exportToExcelHandler = () => {
+    const exportData = sortedFilteredRisks.map(risk => ({
+      'Risk Kodu': risk.code,
+      'Risk Adı': risk.name,
+      'Kategori': risk.categories?.map(c => c.category.name).join(', ') || '-',
+      'Sorumlu Birim': risk.department?.name || '-',
+      'Hedef': risk.related_goal?.code || '-',
+      'Risk Kaynağı': risk.risk_source || '-',
+      'Risk İlişkisi': risk.risk_relation || '-',
+      'Kontrol Seviyesi': risk.control_level || '-',
+      'Doğal Olasılık': risk.inherent_likelihood,
+      'Doğal Etki': risk.inherent_impact,
+      'Doğal Risk Skoru': risk.inherent_score,
+      'Mevcut Olasılık': risk.residual_likelihood,
+      'Mevcut Etki': risk.residual_impact,
+      'Mevcut Risk Skoru': risk.residual_score,
+      'Hedef Olasılık': risk.target_probability || '-',
+      'Hedef Etki': risk.target_impact || '-',
+      'Hedef Risk Skoru': risk.target_score || '-',
+      'Risk Yanıtı': risk.risk_response,
+      'Durum': risk.status === 'active' ? 'Aktif' : risk.status === 'mitigated' ? 'Azaltıldı' : 'Kapalı',
+      'Onay Durumu': risk.approval_status === 'approved' ? 'Onaylandı' : risk.approval_status === 'pending' ? 'Beklemede' : 'Taslak',
+      'Son İnceleme': risk.last_review_date || '-',
+      'Sonraki İnceleme': risk.next_review_date || '-'
+    }));
+    exportToExcel(exportData, `risk_listesi_${new Date().toISOString().split('T')[0]}`);
+  };
+
+  const exportToPDFHandler = () => {
+    const headers = ['Risk Kodu', 'Risk Adı', 'Kategori', 'Sorumlu Birim', 'Doğal Risk', 'Mevcut Risk', 'Hedef Risk', 'Durum'];
+    const rows = sortedFilteredRisks.map(risk => [
+      risk.code,
+      risk.name,
+      risk.categories?.map(c => c.category.name).join(', ') || '-',
+      risk.department?.name || '-',
+      risk.inherent_score,
+      risk.residual_score,
+      risk.target_score || '-',
+      risk.status === 'active' ? 'Aktif' : risk.status === 'mitigated' ? 'Azaltıldı' : 'Kapalı'
+    ]);
+
+    const content = `
+      <h2>Risk İstatistikleri</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${sortedFilteredRisks.length}</div>
+          <div class="stat-label">Toplam Risk</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${sortedFilteredRisks.filter(r => r.status === 'active').length}</div>
+          <div class="stat-label">Aktif Risk</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${sortedFilteredRisks.filter(r => r.residual_score >= 12).length}</div>
+          <div class="stat-label">Yüksek Risk</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${sortedFilteredRisks.filter(r => r.approval_status === 'approved').length}</div>
+          <div class="stat-label">Onaylı Risk</div>
+        </div>
+      </div>
+      <h2>Risk Listesi</h2>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF('Risk Listesi Raporu', content, `risk_listesi_${new Date().toISOString().split('T')[0]}`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -687,15 +756,31 @@ export default function RiskRegister() {
           <h1 className="text-3xl font-bold text-gray-900">Riskler</h1>
           <p className="text-gray-600 mt-1">Kurumsal risk envanteri</p>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={openNewRiskModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            onClick={exportToExcelHandler}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
           >
-            <Plus className="w-5 h-5" />
-            Yeni Risk
+            <FileSpreadsheet className="w-5 h-5" />
+            Excel İndir
           </button>
-        )}
+          <button
+            onClick={exportToPDFHandler}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          >
+            <FileDown className="w-5 h-5" />
+            PDF İndir
+          </button>
+          {isAdmin && (
+            <button
+              onClick={openNewRiskModal}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              <Plus className="w-5 h-5" />
+              Yeni Risk
+            </button>
+          )}
+        </div>
       </div>
 
       <Card>

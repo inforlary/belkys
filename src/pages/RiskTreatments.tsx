@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Trash2, Filter, TrendingUp, Calendar, ExternalLink, MoreVertical, Search, X, Link as LinkIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, Filter, TrendingUp, Calendar, ExternalLink, MoreVertical, Search, X, Link as LinkIcon, FileDown, FileSpreadsheet } from 'lucide-react';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Risk {
   id: string;
@@ -508,6 +509,65 @@ export default function RiskTreatments() {
     });
   }
 
+  const exportToExcelHandler = () => {
+    const exportData = sortedTreatments.map(treatment => ({
+      'Faaliyet Kodu': treatment.code || '-',
+      'Risk Kodu': treatment.risk?.code || '-',
+      'Risk Adı': treatment.risk?.name || '-',
+      'Faaliyet Başlığı': treatment.title,
+      'Açıklama': treatment.description || '-',
+      'Sorumlu Birim': treatment.responsible_department?.name || '-',
+      'Planlanan Bitiş': treatment.planned_end_date || '-',
+      'Gerçekleşen Bitiş': treatment.actual_end_date || '-',
+      'İlerleme (%)': treatment.progress_percent || 0,
+      'Durum': statusLabels[treatment.status || 'NOT_STARTED']?.label || '-',
+      'İÇ Kontrol Bağlantısı': treatment.is_ic_action ? 'Evet' : 'Hayır',
+      'İÇ Standart': treatment.ic_standard?.name || '-',
+      'İÇ Faaliyet': treatment.ic_action?.title || '-',
+      'Notlar': treatment.notes || '-'
+    }));
+    exportToExcel(exportData, `risk_faaliyetleri_${new Date().toISOString().split('T')[0]}`);
+  };
+
+  const exportToPDFHandler = () => {
+    const headers = ['Kod', 'Risk', 'Faaliyet', 'Sorumlu', 'Planlanan Bitiş', 'İlerleme', 'Durum'];
+    const rows = sortedTreatments.map(treatment => [
+      treatment.code || '-',
+      treatment.risk?.code || '-',
+      treatment.title,
+      treatment.responsible_department?.name || '-',
+      treatment.planned_end_date || '-',
+      `${treatment.progress_percent || 0}%`,
+      statusLabels[treatment.status || 'NOT_STARTED']?.label || '-'
+    ]);
+
+    const content = `
+      <h2>Faaliyet İstatistikleri</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${stats.total}</div>
+          <div class="stat-label">Toplam Faaliyet</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #2563eb;">
+          <div class="stat-value" style="color: #2563eb;">${stats.inProgress}</div>
+          <div class="stat-label">Devam Eden</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #16a34a;">
+          <div class="stat-value" style="color: #16a34a;">${stats.completed}</div>
+          <div class="stat-label">Tamamlanan</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626;">
+          <div class="stat-value" style="color: #dc2626;">${stats.delayed}</div>
+          <div class="stat-label">Gecikmiş</div>
+        </div>
+      </div>
+      <h2>Risk Faaliyetleri Listesi</h2>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF('Risk Faaliyetleri Raporu', content, `risk_faaliyetleri_${new Date().toISOString().split('T')[0]}`);
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
   }
@@ -522,13 +582,29 @@ export default function RiskTreatments() {
           </h1>
           <p className="text-gray-600 mt-1">Risk azaltma faaliyetleri takibi</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="w-4 h-4" />
-          Yeni Faaliyet
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={exportToExcelHandler}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={exportToPDFHandler}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4" />
+            Yeni Faaliyet
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -7,6 +7,7 @@ import { Grid, FileDown, FileSpreadsheet, X, ExternalLink, TrendingDown } from '
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import { exportToPDF as exportToPDFUtil, generateTableHTML } from '../utils/exportHelpers';
 
 interface Risk {
   id: string;
@@ -188,17 +189,64 @@ export default function RiskMatrix() {
       });
 
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
+
+      const headers = ['Risk Kodu', 'Risk Adı', 'Kategori', 'Birim', 'Olasılık', 'Etki', 'Skor', 'Seviye'];
+      const rows = filteredRisks.map(risk => {
+        const likelihood = viewMode === 'inherent' ? risk.inherent_likelihood : risk.residual_likelihood;
+        const impact = viewMode === 'inherent' ? risk.inherent_impact : risk.residual_impact;
+        const score = viewMode === 'inherent' ? risk.inherent_score : risk.residual_score;
+
+        return [
+          risk.code,
+          risk.name,
+          risk.categories?.map(c => c.category?.name).filter(Boolean).join(', ') || '-',
+          risk.department?.name || '-',
+          likelihood,
+          impact,
+          score,
+          getRiskLevelLabel(score)
+        ];
       });
 
-      const imgWidth = 280;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const content = `
+        <h2>Risk Matrisi - ${viewMode === 'inherent' ? 'Doğal Risk' : 'Mevcut Risk'}</h2>
+        <div style="text-align: center; margin: 20px 0;">
+          <img src="${imgData}" style="max-width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 8px;" />
+        </div>
 
-      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
-      pdf.save(`risk-matrisi-${viewMode}-${new Date().toISOString().split('T')[0]}.pdf`);
+        <h2>Risk Seviye Dağılımı</h2>
+        <div class="stats-grid">
+          <div class="stat-box" style="border-left: 4px solid #dc2626;">
+            <div class="stat-value" style="color: #dc2626;">${riskDistribution.veryHigh}</div>
+            <div class="stat-label">Çok Yüksek Risk</div>
+          </div>
+          <div class="stat-box" style="border-left: 4px solid #f97316;">
+            <div class="stat-value" style="color: #f97316;">${riskDistribution.high}</div>
+            <div class="stat-label">Yüksek Risk</div>
+          </div>
+          <div class="stat-box" style="border-left: 4px solid #facc15;">
+            <div class="stat-value" style="color: #ca8a04;">${riskDistribution.medium}</div>
+            <div class="stat-label">Orta Risk</div>
+          </div>
+          <div class="stat-box" style="border-left: 4px solid #84cc16;">
+            <div class="stat-value" style="color: #65a30d;">${riskDistribution.lowMedium}</div>
+            <div class="stat-label">Düşük-Orta Risk</div>
+          </div>
+          <div class="stat-box" style="border-left: 4px solid #16a34a;">
+            <div class="stat-value" style="color: #16a34a;">${riskDistribution.low}</div>
+            <div class="stat-label">Düşük Risk</div>
+          </div>
+        </div>
+
+        <h2>Risk Listesi (${filteredRisks.length} Risk)</h2>
+        ${generateTableHTML(headers, rows)}
+      `;
+
+      exportToPDFUtil(
+        `Risk Matrisi Raporu - ${viewMode === 'inherent' ? 'Doğal Risk' : 'Mevcut Risk'}`,
+        content,
+        `risk-matrisi-${viewMode}-${new Date().toISOString().split('T')[0]}`
+      );
     } catch (error) {
       console.error('PDF export error:', error);
       alert('PDF oluşturulurken hata oluştu.');
@@ -209,9 +257,17 @@ export default function RiskMatrix() {
 
   async function exportToExcel() {
     try {
-      const wsData = [
-        ['Risk Matrisi - ' + (viewMode === 'inherent' ? 'Doğal Risk' : 'Artık Risk')],
+      const wsData1 = [
+        ['Risk Matrisi - ' + (viewMode === 'inherent' ? 'Doğal Risk' : 'Mevcut Risk')],
         ['Tarih: ' + new Date().toLocaleDateString('tr-TR')],
+        [],
+        ['Risk Seviye Dağılımı'],
+        ['Seviye', 'Adet'],
+        ['Çok Yüksek Risk', riskDistribution.veryHigh],
+        ['Yüksek Risk', riskDistribution.high],
+        ['Orta Risk', riskDistribution.medium],
+        ['Düşük-Orta Risk', riskDistribution.lowMedium],
+        ['Düşük Risk', riskDistribution.low],
         [],
         ['Kod', 'Risk Adı', 'Kategori', 'Birim', 'Olasılık', 'Etki', 'Skor', 'Seviye']
       ];
@@ -221,7 +277,7 @@ export default function RiskMatrix() {
         const impact = viewMode === 'inherent' ? risk.inherent_impact : risk.residual_impact;
         const score = viewMode === 'inherent' ? risk.inherent_score : risk.residual_score;
 
-        wsData.push([
+        wsData1.push([
           risk.code,
           risk.name,
           risk.categories && risk.categories.length > 0
@@ -235,9 +291,9 @@ export default function RiskMatrix() {
         ]);
       });
 
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const ws1 = XLSX.utils.aoa_to_sheet(wsData1);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Risk Matrisi');
+      XLSX.utils.book_append_sheet(wb, ws1, 'Risk Matrisi');
       XLSX.writeFile(wb, `risk-matrisi-${viewMode}-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (error) {
       console.error('Excel export error:', error);

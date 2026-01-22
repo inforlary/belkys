@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Trash2, Filter, Shield, Calendar, ExternalLink, MoreVertical, Search, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Filter, Shield, Calendar, ExternalLink, MoreVertical, Search, X, FileDown, FileSpreadsheet } from 'lucide-react';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Risk {
   id: string;
@@ -309,6 +310,68 @@ export default function RiskControls() {
     });
   }
 
+  const exportToExcelHandler = () => {
+    const exportData = filteredControls.map(control => ({
+      'Risk Kodu': control.risk?.code || '-',
+      'Risk Adı': control.risk?.name || '-',
+      'Kontrol Adı': control.name,
+      'Açıklama': control.description,
+      'Kontrol Tipi': controlTypeLabels[control.control_type]?.label || '-',
+      'Kontrol Doğası': controlNatureLabels[control.control_nature]?.label || '-',
+      'Sorumlu Birim': control.department?.name || '-',
+      'Tasarım Etkinliği': `${control.design_effectiveness} - ${getEffectivenessLabel(control.design_effectiveness).label}`,
+      'Operasyonel Etkinlik': `${control.operating_effectiveness} - ${getEffectivenessLabel(control.operating_effectiveness).label}`,
+      'Sıklık': control.frequency,
+      'Son Test': control.last_test_date || '-',
+      'Sonraki Test': control.next_test_date || '-',
+      'Kanıt': control.evidence
+    }));
+    exportToExcel(exportData, `risk_kontrolleri_${new Date().toISOString().split('T')[0]}`);
+  };
+
+  const exportToPDFHandler = () => {
+    const headers = ['Risk', 'Kontrol Adı', 'Tip', 'Tasarım Etkinliği', 'Op. Etkinlik', 'Sıklık', 'Sonraki Test'];
+    const rows = filteredControls.map(control => [
+      control.risk?.code || '-',
+      control.name,
+      controlTypeLabels[control.control_type]?.label || '-',
+      `${control.design_effectiveness}★`,
+      `${control.operating_effectiveness}★`,
+      control.frequency,
+      control.next_test_date || '-'
+    ]);
+
+    const content = `
+      <h2>Kontrol İstatistikleri</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${stats.total}</div>
+          <div class="stat-label">Toplam Kontrol</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #16a34a;">
+          <div class="stat-value" style="color: #16a34a;">${stats.preventive}</div>
+          <div class="stat-label">Önleyici</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #2563eb;">
+          <div class="stat-value" style="color: #2563eb;">${stats.detective}</div>
+          <div class="stat-label">Tespit Edici</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #f59e0b;">
+          <div class="stat-value" style="color: #f59e0b;">${stats.testDue}</div>
+          <div class="stat-label">Test Yaklaşan</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626;">
+          <div class="stat-value" style="color: #dc2626;">${stats.overdue}</div>
+          <div class="stat-label">Gecikmiş Test</div>
+        </div>
+      </div>
+      <h2>Risk Kontrolleri Listesi</h2>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF('Risk Kontrolleri Raporu', content, `risk_kontrolleri_${new Date().toISOString().split('T')[0]}`);
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
   }
@@ -323,13 +386,29 @@ export default function RiskControls() {
           </h1>
           <p className="text-gray-600 mt-1">Risk kontrol faaliyetleri takibi</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="w-4 h-4" />
-          Yeni Kontrol
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={exportToExcelHandler}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={exportToPDFHandler}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4" />
+            Yeni Kontrol
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">

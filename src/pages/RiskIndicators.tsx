@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, CreditCard as Edit, History, Grid3x3, List, TrendingUp, TrendingDown, Minus, X, Filter } from 'lucide-react';
+import { Plus, CreditCard as Edit, History, Grid3x3, List, TrendingUp, TrendingDown, Minus, X, Filter, FileDown, FileSpreadsheet } from 'lucide-react';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface Risk {
@@ -410,6 +411,68 @@ export default function RiskIndicators() {
     );
   }
 
+  const exportToExcelHandler = () => {
+    const exportData = filteredIndicators.map(indicator => ({
+      'Gösterge Kodu': indicator.code,
+      'Gösterge Adı': indicator.name,
+      'Risk Kodu': indicator.risk?.code || '-',
+      'Risk Adı': indicator.risk?.name || '-',
+      'Sorumlu Birim': indicator.responsible_department?.name || '-',
+      'Ölçüm Birimi': indicator.unit_of_measure,
+      'Ölçüm Sıklığı': indicator.measurement_frequency === 'MONTHLY' ? 'Aylık' : indicator.measurement_frequency === 'QUARTERLY' ? 'Çeyreklik' : 'Yıllık',
+      'Yön': indicator.direction === 'LOWER_BETTER' ? 'Düşük İyi' : indicator.direction === 'HIGHER_BETTER' ? 'Yüksek İyi' : 'Hedef',
+      'Yeşil Eşik': indicator.green_threshold,
+      'Sarı Eşik': indicator.yellow_threshold,
+      'Kırmızı Eşik': indicator.red_threshold,
+      'Son Değer': indicator.latest_value?.value || '-',
+      'Son Durum': indicator.latest_value ? statusConfig[indicator.latest_value.status].label : 'Veri Yok',
+      'Trend': indicator.latest_value?.trend ? trendIcons[indicator.latest_value.trend].label : '-',
+      'Son Ölçüm Tarihi': indicator.latest_value?.measurement_date || '-',
+      'Açıklama': indicator.description || '-'
+    }));
+    exportToExcel(exportData, `risk_gostergeleri_${new Date().toISOString().split('T')[0]}`);
+  };
+
+  const exportToPDFHandler = () => {
+    const headers = ['Kod', 'Gösterge', 'Risk', 'Birim', 'Sıklık', 'Son Değer', 'Durum', 'Trend'];
+    const rows = filteredIndicators.map(indicator => [
+      indicator.code,
+      indicator.name,
+      indicator.risk?.code || '-',
+      indicator.unit_of_measure,
+      indicator.measurement_frequency === 'MONTHLY' ? 'Aylık' : indicator.measurement_frequency === 'QUARTERLY' ? 'Çeyreklik' : 'Yıllık',
+      indicator.latest_value?.value || '-',
+      indicator.latest_value ? statusConfig[indicator.latest_value.status].label : 'Veri Yok',
+      indicator.latest_value?.trend ? trendIcons[indicator.latest_value.trend].icon : '-'
+    ]);
+
+    const content = `
+      <h2>Gösterge İstatistikleri</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${stats.total}</div>
+          <div class="stat-label">Toplam Gösterge</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #16a34a;">
+          <div class="stat-value" style="color: #16a34a;">${stats.green}</div>
+          <div class="stat-label">Yeşil - Normal</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #eab308;">
+          <div class="stat-value" style="color: #ca8a04;">${stats.yellow}</div>
+          <div class="stat-label">Sarı - Uyarı</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626;">
+          <div class="stat-value" style="color: #dc2626;">${stats.red}</div>
+          <div class="stat-label">Kırmızı - Alarm</div>
+        </div>
+      </div>
+      <h2>Risk Göstergeleri Listesi</h2>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF('Risk Göstergeleri Raporu', content, `risk_gostergeleri_${new Date().toISOString().split('T')[0]}`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -419,8 +482,22 @@ export default function RiskIndicators() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => navigate('/risk-management/indicators/entry')}
+            onClick={exportToExcelHandler}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={exportToPDFHandler}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
+          </button>
+          <button
+            onClick={() => navigate('/risk-management/indicators/entry')}
+            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center gap-2"
           >
             <Edit className="w-4 h-4" />
             Değer Girişi
