@@ -1047,11 +1047,29 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                       <h4 className="text-sm font-semibold text-blue-900">AMAÇ: {objData.title}</h4>
                     </div>
 
-                    {Object.entries(objData.goals).map(([goalId, goalData]: [string, any]) => (
+                    {Object.entries(objData.goals).map(([goalId, goalData]: [string, any]) => {
+                      const goalProgress = goalData.indicators.length > 0
+                        ? goalData.indicators.reduce((sum: number, ind: IndicatorData) => sum + calculateSelectedProgress(ind), 0) / goalData.indicators.length
+                        : 0;
+
+                      return (
                       <div key={goalId} className="border-b border-slate-100 last:border-b-0">
                         <div className="bg-green-50 px-4 py-2">
                           <div className="flex items-center justify-between">
-                            <h5 className="text-sm font-medium text-green-900">HEDEF: {goalData.title}</h5>
+                            <div className="flex items-center gap-3">
+                              <h5 className="text-sm font-medium text-green-900">HEDEF: {goalData.title}</h5>
+                              <div className="flex items-center gap-2">
+                                <div className={`text-sm font-semibold ${getProgressTextColor(goalProgress)}`}>
+                                  {Math.round(goalProgress)}%
+                                </div>
+                                <div className="w-24 bg-green-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full ${getProgressColor(goalProgress)}`}
+                                    style={{ width: `${Math.min(100, goalProgress)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
                             <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded">
                               {goalData.department}
                             </span>
@@ -1168,7 +1186,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                           </table>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
               </div>
