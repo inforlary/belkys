@@ -363,9 +363,9 @@ export default function RiskRegister() {
           .order('code', { ascending: true }),
         supabase
           .from('projects')
-          .select('id, name, department_id')
+          .select('id, project_name, responsible_unit')
           .eq('organization_id', profile?.organization_id)
-          .order('name', { ascending: true }),
+          .order('project_name', { ascending: true }),
         supabase
           .from('profiles')
           .select('id, full_name, department_id')
