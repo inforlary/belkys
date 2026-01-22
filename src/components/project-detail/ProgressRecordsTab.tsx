@@ -204,7 +204,9 @@ export default function ProgressRecordsTab({ projectId, onUpdate }: ProgressReco
             file_url: publicUrl,
             file_name: file.name,
             file_type: file.type,
-            file_size: file.size
+            file_size: file.size,
+            category: 'photo',
+            description: null
           });
       }
 
