@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Download, Filter, TrendingUp, FileText, X, FileSpreadsheet, FileDown } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
-import { calculateIndicatorProgress, getProgressColor, getProgressTextColor } from '../../utils/progressCalculations';
+import { calculateIndicatorProgress, calculateGoalProgress, getProgressColor, getProgressTextColor } from '../../utils/progressCalculations';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 import {
   IndicatorStatus,
@@ -42,6 +42,8 @@ interface IndicatorData {
   target_value: number;
   progress: number;
   calculation_method: string;
+  goal_impact_percentage?: number | null;
+  yearly_target?: number | null;
   hasQ1Entry?: boolean;
   hasQ2Entry?: boolean;
   hasQ3Entry?: boolean;
@@ -78,6 +80,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const [selectedStatus, setSelectedStatus] = useState<IndicatorStatus | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
+  const [dataEntries, setDataEntries] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -119,6 +122,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           baseline_value,
           target_value,
           calculation_method,
+          goal_impact_percentage,
           goal:goals!goal_id (
             id,
             title,
@@ -254,6 +258,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             target_value: target,
             progress: progress,
             calculation_method: ind.calculation_method || 'cumulative',
+            goal_impact_percentage: ind.goal_impact_percentage,
+            yearly_target: target,
             hasQ1Entry: hasQ1Entry,
             hasQ2Entry: hasQ2Entry,
             hasQ3Entry: hasQ3Entry,
@@ -262,8 +268,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         });
 
         setIndicators(processedIndicators);
+        setDataEntries(entriesData.data || []);
       } else {
         setIndicators([]);
+        setDataEntries([]);
       }
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
@@ -1048,9 +1056,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                     </div>
 
                     {Object.entries(objData.goals).map(([goalId, goalData]: [string, any]) => {
-                      const goalProgress = goalData.indicators.length > 0
-                        ? goalData.indicators.reduce((sum: number, ind: IndicatorData) => sum + calculateSelectedProgress(ind), 0) / goalData.indicators.length
-                        : 0;
+                      const goalProgress = calculateGoalProgress(goalId, indicators, dataEntries);
 
                       return (
                       <div key={goalId} className="border-b border-slate-100 last:border-b-0">
