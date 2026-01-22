@@ -209,6 +209,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         internal_control: true,
         risk_management: true,
         quality_management: true,
+        project_management: true,
         settings: true,
         administration: true,
       };
@@ -220,6 +221,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       internal_control: profile?.organization?.module_internal_control ?? true,
       risk_management: profile?.organization?.module_risk_management ?? true,
       quality_management: profile?.organization?.module_quality_management ?? true,
+      project_management: profile?.organization?.module_project_management ?? true,
       settings: profile?.organization?.module_settings ?? true,
       administration: profile?.organization?.module_administration ?? true,
     };
@@ -294,7 +296,11 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       label: 'Proje Yönetimi',
       icon: FolderOpen,
       items: [
-        { icon: FolderOpen, label: 'Projeler', path: 'projects' },
+        { icon: LayoutDashboard, label: 'Dashboard', path: 'project-management/dashboard' },
+        { icon: FolderOpen, label: 'Projeler', path: 'project-management/projects' },
+        { icon: Lightbulb, label: 'Hızlı Giriş', path: 'project-management/quick-entry' },
+        { icon: Target, label: 'SP Takip', path: 'project-management/sp-tracking' },
+        { icon: FileText, label: 'Raporlar', path: 'project-management/reports' },
       ],
     },
     {
@@ -399,6 +405,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     if (section.label === 'İç Kontrol') return moduleAccess.internal_control;
     if (section.label === 'Risk Yönetimi') return moduleAccess.risk_management;
     if (section.label === 'Kalite Yönetimi') return moduleAccess.quality_management;
+    if (section.label === 'Proje Yönetimi') return moduleAccess.project_management;
     if (section.label === 'Ayarlar') return moduleAccess.settings;
     if (section.label === 'Yönetim') return moduleAccess.administration;
 
