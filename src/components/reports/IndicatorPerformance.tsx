@@ -671,7 +671,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             data['Hedef'] = ind.target_value;
             const progressValue = calculateSelectedProgress(ind);
             const statusLabel = getStatusLabel(getIndicatorStatus(progressValue));
-            data['İlerleme Durumu'] = `${Math.round(progressValue)}% - ${statusLabel}`;
+            data['İlerleme Durumu'] = `${Math.round(progressValue)}%`;
+            data['Başarı Düzeyi'] = statusLabel;
 
             exportData.push(data);
 
@@ -709,6 +710,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
               notesData['Başlangıç'] = '';
               notesData['Hedef'] = '';
               notesData['İlerleme Durumu'] = '';
+              notesData['Başarı Düzeyi'] = '';
 
               exportData.push(notesData);
             }
@@ -795,7 +797,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           if (selectedQuarters.includes(2)) headers.push('Ç2');
           if (selectedQuarters.includes(3)) headers.push('Ç3');
           if (selectedQuarters.includes(4)) headers.push('Ç4');
-          headers.push('Toplam Veri', 'Başlangıç', 'Hedef', 'İlerleme Durumu');
+          headers.push('Toplam Veri', 'Başlangıç', 'Hedef', 'İlerleme Durumu', 'Başarı Düzeyi');
 
           const rows: any[] = [];
 
@@ -820,7 +822,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
               `${currentValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${ind.unit}`,
               ind.baseline_value,
               ind.target_value,
-              `${Math.round(progressValue)}% - ${statusLabel}`
+              `${Math.round(progressValue)}%`,
+              statusLabel
             );
 
             rows.push(row);
@@ -833,7 +836,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
               if (selectedQuarters.includes(3)) notesRow.push(`<i>${ind.q3_notes || '-'}</i>`);
               if (selectedQuarters.includes(4)) notesRow.push(`<i>${ind.q4_notes || '-'}</i>`);
 
-              notesRow.push('', '', '', '');
+              notesRow.push('', '', '', '', '');
               rows.push(notesRow);
             }
           });
@@ -1136,6 +1139,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">Başlangıç</th>
                                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">Hedef</th>
                                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">İlerleme Durumu</th>
+                                <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase">Başarı Düzeyi</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
@@ -1186,9 +1190,6 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                           >
                                             {Math.round(selectedProgress)}%
                                           </div>
-                                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusConfig(getIndicatorStatus(selectedProgress)).bgColor} ${getStatusConfig(getIndicatorStatus(selectedProgress)).color}`}>
-                                            {getStatusLabel(getIndicatorStatus(selectedProgress))}
-                                          </span>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div
                                               className={`h-2 rounded-full ${getStatusConfig(getIndicatorStatus(selectedProgress)).progressBarColor}`}
@@ -1196,6 +1197,11 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                             />
                                           </div>
                                         </div>
+                                      </td>
+                                      <td className="px-4 py-3 text-center">
+                                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${getStatusConfig(getIndicatorStatus(selectedProgress)).bgColor} ${getStatusConfig(getIndicatorStatus(selectedProgress)).color}`}>
+                                          {getStatusLabel(getIndicatorStatus(selectedProgress))}
+                                        </span>
                                       </td>
                                     </tr>
                                     {!hideNotes && hasNotes && (
@@ -1214,6 +1220,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
                                         {selectedQuarters.includes(4) && (
                                           <td className="px-4 py-2 text-xs text-slate-600 italic">{ind.q4_notes || '-'}</td>
                                         )}
+                                        <td className="px-4 py-2"></td>
                                         <td className="px-4 py-2"></td>
                                         <td className="px-4 py-2"></td>
                                         <td className="px-4 py-2"></td>
