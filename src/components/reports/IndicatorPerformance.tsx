@@ -502,7 +502,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
       }
     }
 
-    return Math.max(0, Math.round(progress));
+    return Math.max(0, progress);
   };
 
   const handleExportExcel = () => {
