@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import Modal from '../components/ui/Modal';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
-import { getIndicatorStatus, getStatusConfig } from '../utils/indicatorStatus';
+import { getIndicatorStatus, getStatusConfig, IndicatorStatus } from '../utils/indicatorStatus';
+import { exportToExcel, exportToPDF } from '../utils/exportHelpers';
 import {
   LineChart,
   Line,
@@ -37,7 +39,10 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Zap
+  Zap,
+  FileSpreadsheet,
+  FileDown,
+  X
 } from 'lucide-react';
 
 interface Stats {
@@ -77,6 +82,17 @@ interface ActivityTrend {
   overdue: number;
 }
 
+interface IndicatorDetail {
+  id: string;
+  code: string;
+  name: string;
+  department_name: string;
+  current_value: number;
+  target_value: number;
+  progress: number;
+  status: IndicatorStatus;
+}
+
 const COLORS = ['#9333ea', '#059669', '#10b981', '#eab308', '#ef4444', '#d97706'];
 
 export default function EnhancedDashboard() {
@@ -96,6 +112,10 @@ export default function EnhancedDashboard() {
   const [indicatorStatus, setIndicatorStatus] = useState<IndicatorStatus[]>([]);
   const [activityTrend, setActivityTrend] = useState<ActivityTrend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showIndicatorModal, setShowIndicatorModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<IndicatorStatus | null>(null);
+  const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
+  const [loadingIndicators, setLoadingIndicators] = useState(false);
 
   useEffect(() => {
     if (profile?.organization_id) {
@@ -340,14 +360,27 @@ export default function EnhancedDashboard() {
     let veryWeak = 0;
 
     indicators?.forEach(indicator => {
-      const indicatorEntries = entries?.filter(e => e.indicator_id === indicator.id);
       const target = targets?.find(t => t.indicator_id === indicator.id);
 
-      if (indicatorEntries && indicatorEntries.length > 0 && target && target.target_value > 0) {
+      if (!target || !target.target_value || target.target_value <= 0) {
+        return;
+      }
+
+      const indicatorEntries = entries?.filter(e => e.indicator_id === indicator.id);
+
+      if (indicatorEntries && indicatorEntries.length > 0) {
         const avgActual = indicatorEntries.reduce((sum, e) => sum + (e.value || 0), 0) / indicatorEntries.length;
         const achievement = (avgActual / target.target_value) * 100;
 
         const status = getIndicatorStatus(achievement);
+        if (status === 'exceedingTarget') exceedingTarget++;
+        else if (status === 'excellent') excellent++;
+        else if (status === 'good') good++;
+        else if (status === 'moderate') moderate++;
+        else if (status === 'weak') weak++;
+        else veryWeak++;
+      } else {
+        const status = getIndicatorStatus(0);
         if (status === 'exceedingTarget') exceedingTarget++;
         else if (status === 'excellent') excellent++;
         else if (status === 'good') good++;
@@ -398,6 +431,150 @@ export default function EnhancedDashboard() {
     }
 
     setActivityTrend(trend);
+  };
+
+  const loadIndicatorDetails = async (status: IndicatorStatus) => {
+    if (!profile?.organization_id) return;
+
+    setLoadingIndicators(true);
+    setSelectedStatus(status);
+    setShowIndicatorModal(true);
+
+    try {
+      const currentYear = new Date().getFullYear();
+
+      const { data: indicators } = await supabase
+        .from('indicators')
+        .select(`
+          id,
+          code,
+          name,
+          calculation_method,
+          baseline_value,
+          target_value,
+          goals!inner(
+            id,
+            department_id,
+            departments!inner(
+              id,
+              name
+            )
+          )
+        `)
+        .eq('organization_id', profile.organization_id);
+
+      if (!indicators) {
+        setIndicatorDetails([]);
+        setLoadingIndicators(false);
+        return;
+      }
+
+      const indicatorIds = indicators.map(i => i.id);
+
+      const [entriesData, targetsData] = await Promise.all([
+        supabase
+          .from('indicator_data_entries')
+          .select('indicator_id, value, status')
+          .eq('organization_id', profile.organization_id)
+          .eq('period_year', currentYear)
+          .eq('status', 'approved')
+          .in('indicator_id', indicatorIds),
+        supabase
+          .from('indicator_targets')
+          .select('indicator_id, target_value, baseline_value')
+          .eq('year', currentYear)
+          .in('indicator_id', indicatorIds),
+      ]);
+
+      const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
+      targetsData.data?.forEach(target => {
+        targetsByIndicator[target.indicator_id] = {
+          target: target.target_value,
+          baseline: target.baseline_value || 0,
+        };
+      });
+
+      const details: IndicatorDetail[] = [];
+
+      indicators.forEach(indicator => {
+        const targetData = targetsByIndicator[indicator.id];
+        const targetValue = targetData?.target || indicator.target_value || 0;
+
+        if (targetValue <= 0) {
+          return;
+        }
+
+        const indicatorEntries = entriesData.data?.filter(e => e.indicator_id === indicator.id) || [];
+
+        let progress = 0;
+        if (indicatorEntries.length > 0) {
+          const avgActual = indicatorEntries.reduce((sum, e) => sum + (e.value || 0), 0) / indicatorEntries.length;
+          progress = (avgActual / targetValue) * 100;
+        }
+
+        const indicatorStatus = getIndicatorStatus(progress);
+
+        if (indicatorStatus === status) {
+          details.push({
+            id: indicator.id,
+            code: indicator.code,
+            name: indicator.name,
+            department_name: indicator.goals?.departments?.name || 'Bilinmeyen',
+            current_value: indicatorEntries.length > 0
+              ? indicatorEntries.reduce((sum, e) => sum + (e.value || 0), 0) / indicatorEntries.length
+              : 0,
+            target_value: targetValue,
+            progress: Math.round(progress),
+            status: indicatorStatus,
+          });
+        }
+      });
+
+      setIndicatorDetails(details);
+    } catch (error) {
+      console.error('Gösterge detayları yüklenirken hata:', error);
+      setIndicatorDetails([]);
+    } finally {
+      setLoadingIndicators(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!selectedStatus) return;
+
+    const exportData = indicatorDetails.map((ind, index) => ({
+      'Sıra': index + 1,
+      'Kod': ind.code,
+      'Gösterge': ind.name,
+      'Birim': ind.department_name,
+      'Mevcut Değer': ind.current_value.toFixed(2),
+      'Hedef Değer': ind.target_value.toFixed(2),
+      'Başarı (%)': ind.progress,
+      'Durum': getStatusConfig(ind.status).label,
+    }));
+
+    const statusLabel = getStatusConfig(selectedStatus).label;
+    exportToExcel(exportData, `${statusLabel}_Gostergeler_${new Date().toISOString().split('T')[0]}`);
+  };
+
+  const handleExportPDF = () => {
+    if (!selectedStatus) return;
+
+    const statusLabel = getStatusConfig(selectedStatus).label;
+
+    const headers = ['Sıra', 'Kod', 'Gösterge', 'Birim', 'Mevcut', 'Hedef', 'Başarı (%)', 'Durum'];
+    const rows = indicatorDetails.map((ind, index) => [
+      index + 1,
+      ind.code,
+      ind.name,
+      ind.department_name,
+      ind.current_value.toFixed(2),
+      ind.target_value.toFixed(2),
+      ind.progress,
+      getStatusConfig(ind.status).label,
+    ]);
+
+    exportToPDF(headers, rows, `Kurum Geneli - ${statusLabel}`, `${statusLabel} Göstergeler`);
   };
 
   if (loading) {
@@ -524,7 +701,7 @@ export default function EnhancedDashboard() {
         <Card>
           <CardHeader>
             <h3 className="text-lg font-semibold text-gray-900">Gösterge Durumu</h3>
-            <p className="text-sm text-gray-600">Performans dağılımı</p>
+            <p className="text-sm text-gray-600">Performans dağılımı (tıklayarak detay görüntüleyin)</p>
           </CardHeader>
           <CardBody>
             <ResponsiveContainer width="100%" height={300}>
@@ -538,6 +715,21 @@ export default function EnhancedDashboard() {
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
+                  onClick={(data) => {
+                    const statusMap: Record<string, IndicatorStatus> = {
+                      [getStatusConfig('exceedingTarget').label]: 'exceedingTarget',
+                      [getStatusConfig('excellent').label]: 'excellent',
+                      [getStatusConfig('good').label]: 'good',
+                      [getStatusConfig('moderate').label]: 'moderate',
+                      [getStatusConfig('weak').label]: 'weak',
+                      [getStatusConfig('veryWeak').label]: 'veryWeak',
+                    };
+                    const status = statusMap[data.name];
+                    if (status && data.value > 0) {
+                      loadIndicatorDetails(status);
+                    }
+                  }}
+                  cursor="pointer"
                 >
                   {indicatorStatus.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -611,6 +803,124 @@ export default function EnhancedDashboard() {
           </CardBody>
         </Card>
       )}
+
+      <Modal
+        isOpen={showIndicatorModal}
+        onClose={() => setShowIndicatorModal(false)}
+        title={selectedStatus ? `Kurum Geneli - ${getStatusConfig(selectedStatus).label}` : ''}
+        size="max"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-gray-600">
+              {selectedStatus && `${getStatusConfig(selectedStatus).label} kategorisindeki göstergeler`}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportExcel}
+                disabled={indicatorDetails.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel İndir
+              </button>
+              <button
+                onClick={handleExportPDF}
+                disabled={indicatorDetails.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileDown className="w-4 h-4" />
+                PDF İndir
+              </button>
+            </div>
+          </div>
+
+          {loadingIndicators ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          ) : indicatorDetails.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              Bu kategoride gösterge bulunmuyor.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Kod
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Gösterge
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Birim
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Mevcut Değer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Hedef Değer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Başarı (%)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Durum
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {indicatorDetails.map((indicator) => {
+                    const statusConfig = getStatusConfig(indicator.status);
+                    return (
+                      <tr key={indicator.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {indicator.code}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {indicator.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {indicator.department_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {indicator.current_value.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {indicator.target_value.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <span className={`${
+                            indicator.progress >= 100 ? 'text-green-600' :
+                            indicator.progress >= 70 ? 'text-blue-600' :
+                            indicator.progress >= 50 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {indicator.progress}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: statusConfig.bgColor,
+                              color: statusConfig.textColor,
+                            }}
+                          >
+                            {statusConfig.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

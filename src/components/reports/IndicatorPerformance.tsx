@@ -314,9 +314,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     const stats = createEmptyStats();
 
     indicators.forEach(ind => {
-      if (ind.target_value === 0) {
-        const status = getIndicatorStatus(0);
-        incrementStatusInStats(stats, status);
+      if (ind.target_value === 0 || !ind.target_value) {
         return;
       }
 
