@@ -3,6 +3,7 @@ import { Building2, Target, TrendingUp, AlertTriangle, DollarSign, Activity, Cal
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { getIndicatorStatus, getStatusConfig, getStatusLabel, type IndicatorStatus } from '../../utils/indicatorStatus';
 
 interface Department {
   id: string;
@@ -30,7 +31,7 @@ interface IndicatorPerformance {
   q4: number | null;
   year: number | null;
   achievement: number;
-  status: 'good' | 'warning' | 'danger';
+  status: IndicatorStatus;
 }
 
 interface ActivityBudget {
@@ -278,7 +279,7 @@ export default function DepartmentAnalysis() {
         target: targetValue,
         ...entries,
         achievement: Math.round(achievement),
-        status: achievement >= 80 ? 'good' : achievement >= 60 ? 'warning' : 'danger'
+        status: getIndicatorStatus(achievement)
       });
     }
 
@@ -488,12 +489,8 @@ export default function DepartmentAnalysis() {
                         {ind.achievement}%
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          ind.status === 'good' ? 'bg-green-100 text-green-800' :
-                          ind.status === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {ind.status === 'good' ? 'İyi' : ind.status === 'warning' ? 'Orta' : 'Düşük'}
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusConfig(ind.status).bgColor} ${getStatusConfig(ind.status).color}`}>
+                          {getStatusLabel(ind.status)}
                         </span>
                       </td>
                     </tr>

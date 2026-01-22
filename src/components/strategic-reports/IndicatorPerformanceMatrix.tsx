@@ -6,6 +6,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { getIndicatorStatus, getStatusConfig, getStatusLabel, type IndicatorStatus } from '../../utils/indicatorStatus';
 
 interface Indicator {
   id: string;
@@ -23,7 +24,7 @@ interface Indicator {
   achievement: number;
   deviation: number;
   trend: 'up' | 'down' | 'stable';
-  status: 'good' | 'warning' | 'danger' | 'pending';
+  status: IndicatorStatus;
   lastUpdated: string | null;
 }
 
@@ -162,12 +163,9 @@ export default function IndicatorPerformanceMatrix() {
             else if (entries.q3 < entries.q2) trend = 'down';
           }
 
-          let status: 'good' | 'warning' | 'danger' | 'pending' = 'pending';
-          if (latestValue !== null) {
-            if (achievement >= 80) status = 'good';
-            else if (achievement >= 60) status = 'warning';
-            else status = 'danger';
-          }
+          const status: IndicatorStatus = latestValue !== null
+            ? getIndicatorStatus(achievement)
+            : 'very_weak';
 
           indicatorsList.push({
             id: indicator.id,
@@ -259,25 +257,6 @@ export default function IndicatorPerformanceMatrix() {
     ];
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'good': return 'bg-green-100 text-green-800';
-      case 'warning': return 'bg-yellow-100 text-yellow-800';
-      case 'danger': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'good': return 'İyi';
-      case 'warning': return 'Orta';
-      case 'danger': return 'Düşük';
-      case 'pending': return 'Bekliyor';
-      default: return 'Belirsiz';
-    }
-  };
 
   const exportToExcel = () => {
     const exportData = filteredIndicators.map(ind => ({
@@ -294,7 +273,7 @@ export default function IndicatorPerformanceMatrix() {
       'Başarı Oranı (%)': ind.achievement,
       'Sapma': ind.deviation,
       'Trend': ind.trend === 'up' ? 'Yükseliş' : ind.trend === 'down' ? 'Düşüş' : 'Sabit',
-      'Durum': getStatusText(ind.status),
+      'Durum': getStatusLabel(ind.status),
       'Son Güncelleme': ind.lastUpdated ? new Date(ind.lastUpdated).toLocaleDateString('tr-TR') : '-'
     }));
 
@@ -313,10 +292,12 @@ export default function IndicatorPerformanceMatrix() {
 
     const summaryData = [
       { 'Metrik': 'Toplam Gösterge', 'Değer': indicators.length },
-      { 'Metrik': 'İyi Performans', 'Değer': goodCount },
-      { 'Metrik': 'Orta Performans', 'Değer': warningCount },
-      { 'Metrik': 'Düşük Performans', 'Değer': dangerCount },
-      { 'Metrik': 'Bekliyor', 'Değer': pendingCount }
+      { 'Metrik': 'Hedef Üstü', 'Değer': exceedingTargetCount },
+      { 'Metrik': 'Çok İyi', 'Değer': excellentCount },
+      { 'Metrik': 'İyi', 'Değer': goodCount },
+      { 'Metrik': 'Orta', 'Değer': moderateCount },
+      { 'Metrik': 'Zayıf', 'Değer': weakCount },
+      { 'Metrik': 'Çok Zayıf', 'Değer': veryWeakCount }
     ];
     const summaryWs = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, summaryWs, 'Özet');
@@ -340,10 +321,12 @@ export default function IndicatorPerformanceMatrix() {
 
     const summaryData = [
       ['Toplam Gösterge', indicators.length.toString()],
-      ['İyi Performans', goodCount.toString()],
-      ['Orta Performans', warningCount.toString()],
-      ['Düşük Performans', dangerCount.toString()],
-      ['Bekliyor', pendingCount.toString()]
+      ['Hedef Üstü', exceedingTargetCount.toString()],
+      ['Çok İyi', excellentCount.toString()],
+      ['İyi', goodCount.toString()],
+      ['Orta', moderateCount.toString()],
+      ['Zayıf', weakCount.toString()],
+      ['Çok Zayıf', veryWeakCount.toString()]
     ];
 
     autoTable(doc, {
@@ -367,7 +350,7 @@ export default function IndicatorPerformanceMatrix() {
       ind.yearActual !== null ? ind.yearActual.toString() : '-',
       `${ind.achievement}%`,
       ind.deviation.toString(),
-      getStatusText(ind.status)
+      getStatusLabel(ind.status)
     ]);
 
     autoTable(doc, {
@@ -396,10 +379,12 @@ export default function IndicatorPerformanceMatrix() {
     doc.save(`Gösterge_Performans_Matrisi_${selectedYear}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  const pendingCount = indicators.filter(i => i.status === 'pending').length;
+  const exceedingTargetCount = indicators.filter(i => i.status === 'exceeding_target').length;
+  const excellentCount = indicators.filter(i => i.status === 'excellent').length;
   const goodCount = indicators.filter(i => i.status === 'good').length;
-  const warningCount = indicators.filter(i => i.status === 'warning').length;
-  const dangerCount = indicators.filter(i => i.status === 'danger').length;
+  const moderateCount = indicators.filter(i => i.status === 'moderate').length;
+  const weakCount = indicators.filter(i => i.status === 'weak').length;
+  const veryWeakCount = indicators.filter(i => i.status === 'very_weak').length;
 
   if (loading) {
     return (
@@ -431,22 +416,34 @@ export default function IndicatorPerformanceMatrix() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-600 mb-1">Toplam Gösterge</div>
+          <div className="text-xs text-gray-600 mb-1">Toplam</div>
           <div className="text-2xl font-bold text-gray-900">{indicators.length}</div>
         </div>
+        <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+          <div className="text-xs text-purple-700 mb-1">Hedef Üstü</div>
+          <div className="text-2xl font-bold text-purple-900">{exceedingTargetCount}</div>
+        </div>
+        <div className="bg-green-100 p-4 rounded-lg border border-green-300">
+          <div className="text-xs text-green-700 mb-1">Çok İyi</div>
+          <div className="text-2xl font-bold text-green-900">{excellentCount}</div>
+        </div>
         <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-          <div className="text-sm text-green-700 mb-1">İyi Performans</div>
+          <div className="text-xs text-green-700 mb-1">İyi</div>
           <div className="text-2xl font-bold text-green-900">{goodCount}</div>
         </div>
         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-          <div className="text-sm text-yellow-700 mb-1">Orta Performans</div>
-          <div className="text-2xl font-bold text-yellow-900">{warningCount}</div>
+          <div className="text-xs text-yellow-700 mb-1">Orta</div>
+          <div className="text-2xl font-bold text-yellow-900">{moderateCount}</div>
         </div>
         <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-          <div className="text-sm text-red-700 mb-1">Düşük Performans</div>
-          <div className="text-2xl font-bold text-red-900">{dangerCount}</div>
+          <div className="text-xs text-red-700 mb-1">Zayıf</div>
+          <div className="text-2xl font-bold text-red-900">{weakCount}</div>
+        </div>
+        <div className="bg-amber-100 p-4 rounded-lg border border-amber-300">
+          <div className="text-xs text-amber-800 mb-1">Çok Zayıf</div>
+          <div className="text-2xl font-bold text-amber-900">{veryWeakCount}</div>
         </div>
       </div>
 
@@ -485,10 +482,12 @@ export default function IndicatorPerformanceMatrix() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Tümü</option>
+              <option value="exceeding_target">Hedef Üstü</option>
+              <option value="excellent">Çok İyi</option>
               <option value="good">İyi</option>
-              <option value="warning">Orta</option>
-              <option value="danger">Düşük</option>
-              <option value="pending">Bekliyor</option>
+              <option value="moderate">Orta</option>
+              <option value="weak">Zayıf</option>
+              <option value="very_weak">Çok Zayıf</option>
             </select>
           </div>
           <div className="md:col-span-2">
@@ -619,8 +618,8 @@ export default function IndicatorPerformanceMatrix() {
                     {indicator.trend === 'stable' && <div className="w-5 h-0.5 bg-gray-400 mx-auto" />}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(indicator.status)}`}>
-                      {getStatusText(indicator.status)}
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusConfig(indicator.status).bgColor} ${getStatusConfig(indicator.status).color}`}>
+                      {getStatusLabel(indicator.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">

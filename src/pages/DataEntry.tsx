@@ -1110,11 +1110,9 @@ const getIndicatorTarget = (indicator: Indicator) => {
                         <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded">
                           {indicator.code}
                         </span>
-                        {selectedStatus && (
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(selectedStatus)}`}>
-                            {getStatusLabel(selectedStatus)}
-                          </span>
-                        )}
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusConfig(indicator.status).bgColor} ${getStatusConfig(indicator.status).color}`}>
+                          {getStatusLabel(indicator.status)}
+                        </span>
                       </div>
                       <h4 className="font-medium text-slate-900 mb-3">{indicator.name}</h4>
 
@@ -1142,19 +1140,7 @@ const getIndicatorTarget = (indicator: Indicator) => {
                       <div className="mt-3">
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full transition-all ${
-                              indicator.status === 'exceedingTarget'
-                                ? 'bg-purple-500'
-                                : indicator.status === 'excellent'
-                                ? 'bg-emerald-500'
-                                : indicator.status === 'good'
-                                ? 'bg-green-500'
-                                : indicator.status === 'moderate'
-                                ? 'bg-yellow-500'
-                                : indicator.status === 'weak'
-                                ? 'bg-red-500'
-                                : 'bg-amber-600'
-                            }`}
+                            className={`h-2 rounded-full transition-all ${getStatusConfig(indicator.status).progressBarColor}`}
                             style={{ width: `${Math.min(indicator.progress, 100)}%` }}
                           />
                         </div>
