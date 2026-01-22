@@ -149,8 +149,13 @@ export default function RiskTreatments() {
 
         supabase
           .from('risk_controls')
-          .select('id, name, risk_id')
-          .eq('organization_id', profile?.organization_id)
+          .select(`
+            id,
+            name,
+            risk_id,
+            risk:risks!inner(organization_id)
+          `)
+          .eq('risk.organization_id', profile?.organization_id)
           .eq('is_active', true)
           .order('name')
       ]);
