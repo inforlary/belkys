@@ -5,7 +5,7 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import { calculateIndicatorProgress } from '../utils/progressCalculations';
 import { getIndicatorStatus, getStatusConfig, IndicatorStatus } from '../utils/indicatorStatus';
-import { exportToExcel, exportToPDF } from '../utils/exportHelpers';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 import {
   LineChart,
   Line,
@@ -361,12 +361,18 @@ export default function EnhancedDashboard() {
 
     indicators?.forEach(indicator => {
       const target = targets?.find(t => t.indicator_id === indicator.id);
+      const indicatorEntries = entries?.filter(e => e.indicator_id === indicator.id);
 
       if (!target || !target.target_value || target.target_value <= 0) {
+        const status = getIndicatorStatus(0);
+        if (status === 'exceedingTarget') exceedingTarget++;
+        else if (status === 'excellent') excellent++;
+        else if (status === 'good') good++;
+        else if (status === 'moderate') moderate++;
+        else if (status === 'weak') weak++;
+        else veryWeak++;
         return;
       }
-
-      const indicatorEntries = entries?.filter(e => e.indicator_id === indicator.id);
 
       if (indicatorEntries && indicatorEntries.length > 0) {
         const avgActual = indicatorEntries.reduce((sum, e) => sum + (e.value || 0), 0) / indicatorEntries.length;
@@ -499,15 +505,10 @@ export default function EnhancedDashboard() {
       indicators.forEach(indicator => {
         const targetData = targetsByIndicator[indicator.id];
         const targetValue = targetData?.target || indicator.target_value || 0;
-
-        if (targetValue <= 0) {
-          return;
-        }
-
         const indicatorEntries = entriesData.data?.filter(e => e.indicator_id === indicator.id) || [];
 
         let progress = 0;
-        if (indicatorEntries.length > 0) {
+        if (targetValue > 0 && indicatorEntries.length > 0) {
           const avgActual = indicatorEntries.reduce((sum, e) => sum + (e.value || 0), 0) / indicatorEntries.length;
           progress = (avgActual / targetValue) * 100;
         }
@@ -570,11 +571,20 @@ export default function EnhancedDashboard() {
       ind.department_name,
       ind.current_value.toFixed(2),
       ind.target_value.toFixed(2),
-      ind.progress,
+      `${ind.progress}%`,
       getStatusConfig(ind.status).label,
     ]);
 
-    exportToPDF(headers, rows, `Kurum Geneli - ${statusLabel}`, `${statusLabel} Göstergeler`);
+    const tableHTML = generateTableHTML(headers, rows);
+    const content = `
+      <div style="margin-bottom: 20px;">
+        <p><strong>Toplam Gösterge:</strong> ${indicatorDetails.length}</p>
+        <p><strong>Durum:</strong> ${statusLabel}</p>
+      </div>
+      ${tableHTML}
+    `;
+
+    exportToPDF(`Kurum Geneli - ${statusLabel}`, content);
   };
 
   if (loading) {

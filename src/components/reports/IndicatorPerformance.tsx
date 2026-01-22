@@ -315,6 +315,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
 
     indicators.forEach(ind => {
       if (ind.target_value === 0 || !ind.target_value) {
+        const status = getIndicatorStatus(0);
+        incrementStatusInStats(stats, status);
         return;
       }
 
@@ -356,15 +358,11 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
       const details: IndicatorDetail[] = [];
 
       indicators.forEach(indicator => {
-        if (indicator.target_value === 0) return;
-
         const periodValues: number[] = [];
         if (indicator.hasQ1Entry) periodValues.push(indicator.q1_value);
         if (indicator.hasQ2Entry) periodValues.push(indicator.q2_value);
         if (indicator.hasQ3Entry) periodValues.push(indicator.q3_value);
         if (indicator.hasQ4Entry) periodValues.push(indicator.q4_value);
-
-        if (periodValues.length === 0) return;
 
         const calculationMethod = (indicator.calculation_method || 'standard') as CalculationMethod;
 
@@ -377,13 +375,16 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           currentValue = indicator.baseline_value - sum;
         }
 
-        const progress = calculatePerformancePercentage({
-          method: calculationMethod,
-          baselineValue: indicator.baseline_value || 0,
-          targetValue: indicator.target_value,
-          periodValues: periodValues,
-          currentValue: currentValue,
-        });
+        let progress = 0;
+        if (indicator.target_value > 0 && periodValues.length > 0) {
+          progress = calculatePerformancePercentage({
+            method: calculationMethod,
+            baselineValue: indicator.baseline_value || 0,
+            targetValue: indicator.target_value,
+            periodValues: periodValues,
+            currentValue: currentValue,
+          });
+        }
 
         const indicatorStatus = getIndicatorStatus(progress);
 

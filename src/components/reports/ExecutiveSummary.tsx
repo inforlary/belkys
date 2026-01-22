@@ -267,7 +267,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       let goalCount = 0;
 
       allowedGoals.forEach(goal => {
-        const goalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => {
+        const allGoalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => {
           const targetData = targetsByIndicator[ind.id];
           return {
             id: ind.id,
@@ -277,15 +277,19 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
             baseline_value: targetData?.baseline || 0,
             calculation_method: ind.calculation_method
           };
-        }).filter(ind => ind.target_value > 0);
+        });
 
-        if (goalIndicators.length === 0) return;
+        if (allGoalIndicators.length === 0) return;
 
-        const goalProgress = calculateGoalProgress(goal.id, goalIndicators, entriesData.data || []);
-        totalGoalProgress += goalProgress;
-        goalCount++;
+        const goalIndicatorsWithTarget = allGoalIndicators.filter(ind => ind.target_value > 0);
 
-        goalIndicators.forEach(indicator => {
+        if (goalIndicatorsWithTarget.length > 0) {
+          const goalProgress = calculateGoalProgress(goal.id, goalIndicatorsWithTarget, entriesData.data || []);
+          totalGoalProgress += goalProgress;
+          goalCount++;
+        }
+
+        allGoalIndicators.forEach(indicator => {
           const indicatorEntries = (entriesData.data || []).filter(e => e.indicator_id === indicator.id && e.status === 'approved');
 
           if (!quartersByIndicator[indicator.id]) {
@@ -293,7 +297,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           }
           quartersByIndicator[indicator.id] += indicatorEntries.length;
 
-          if (indicatorEntries.length === 0) {
+          if (indicator.target_value <= 0 || indicatorEntries.length === 0) {
             indicatorProgress.push({ id: indicator.id, name: indicators.find(i => i.id === indicator.id)?.name || '', progress: 0 });
             const status = getIndicatorStatus(0);
             incrementStatusInStats(stats, status);

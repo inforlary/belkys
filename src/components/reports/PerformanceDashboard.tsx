@@ -185,7 +185,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             let goalCount = 0;
 
             goals.forEach(goal => {
-              const goalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => {
+              const allGoalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => {
                 const targetData = targetsByIndicator[ind.id];
                 return {
                   id: ind.id,
@@ -195,18 +195,22 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                   baseline_value: targetData?.baseline || 0,
                   calculation_method: ind.calculation_method
                 };
-              }).filter(ind => ind.target_value > 0);
+              });
 
-              if (goalIndicators.length === 0) return;
+              if (allGoalIndicators.length === 0) return;
 
-              const goalProgress = calculateGoalProgress(goal.id, goalIndicators, dataEntries || []);
-              totalGoalProgress += goalProgress;
-              goalCount++;
+              const goalIndicatorsWithTarget = allGoalIndicators.filter(ind => ind.target_value > 0);
 
-              goalIndicators.forEach(indicator => {
+              if (goalIndicatorsWithTarget.length > 0) {
+                const goalProgress = calculateGoalProgress(goal.id, goalIndicatorsWithTarget, dataEntries || []);
+                totalGoalProgress += goalProgress;
+                goalCount++;
+              }
+
+              allGoalIndicators.forEach(indicator => {
                 const indicatorEntries = (dataEntries || []).filter(e => e.indicator_id === indicator.id && e.status === 'approved');
 
-                if (indicatorEntries.length === 0) {
+                if (indicator.target_value <= 0 || indicatorEntries.length === 0) {
                   const status = getIndicatorStatus(0);
                   incrementStatusInStats(stats, status);
                   return;
