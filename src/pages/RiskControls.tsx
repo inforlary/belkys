@@ -308,12 +308,6 @@ export default function RiskControls() {
       return;
     }
 
-    if (formData.operating_effectiveness < 1 || formData.operating_effectiveness > 5) {
-      alert('Uygulama etkinliği 1-5 arasında olmalıdır');
-      console.warn('[RiskControls] Geçersiz uygulama etkinliği:', formData.operating_effectiveness);
-      return;
-    }
-
     try {
       const controlData = {
         risk_id: formData.risk_id,
@@ -323,7 +317,6 @@ export default function RiskControls() {
         control_nature: formData.control_nature,
         responsible_department_id: formData.responsible_department_id,
         design_effectiveness: formData.design_effectiveness,
-        operating_effectiveness: formData.operating_effectiveness,
         evidence: formData.evidence?.trim() || null,
         frequency: formData.frequency?.trim() || null,
         last_test_date: formData.last_test_date || null,
@@ -982,27 +975,20 @@ export default function RiskControls() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Uygulama Etkinliği <span className="text-red-500">*</span>
+              Uygulama Etkinliği
             </label>
-            <div className="space-y-2">
-              {effectivenessLevels.map((level) => (
-                <label key={level.value} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="operating_effectiveness"
-                    value={level.value}
-                    checked={formData.operating_effectiveness === level.value}
-                    onChange={(e) => setFormData({ ...formData, operating_effectiveness: parseInt(e.target.value) })}
-                    className="text-blue-600"
-                  />
-                  <span className="flex items-center gap-2">
-                    <span className="text-yellow-500">
-                      {Array.from({ length: level.value }, (_, i) => '★').join('')}
-                    </span>
-                    <span className="text-sm text-gray-700">{level.label}</span>
-                  </span>
-                </label>
-              ))}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1">
+                  {getEffectivenessStars(formData.operating_effectiveness)}
+                </div>
+                <span className="text-sm font-medium text-blue-900">
+                  {effectivenessLevels.find(l => l.value === formData.operating_effectiveness)?.label || 'Hesaplanacak'}
+                </span>
+              </div>
+              <p className="text-xs text-blue-700">
+                ℹ️ Bu alan otomatik olarak hesaplanır. Kontrol uygulama kayıtlarınıza göre ortalama etkinlik değeri sistemce belirlenir.
+              </p>
             </div>
           </div>
 
