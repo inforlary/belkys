@@ -4,7 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Download, Filter, TrendingUp, FileText, X, FileSpreadsheet, FileDown } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
 import { calculateIndicatorProgress, calculateGoalProgress, getProgressColor, getProgressTextColor } from '../../utils/progressCalculations';
-import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 import {
   IndicatorStatus,
   getIndicatorStatus,
@@ -418,92 +417,23 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const calculateSelectedProgress = (ind: IndicatorData) => {
     if (selectedQuarters.length === 0) return 0;
 
-    let sum = 0;
-    let count = 0;
-    if (selectedQuarters.includes(1)) { sum += ind.q1_value; count++; }
-    if (selectedQuarters.includes(2)) { sum += ind.q2_value; count++; }
-    if (selectedQuarters.includes(3)) { sum += ind.q3_value; count++; }
-    if (selectedQuarters.includes(4)) { sum += ind.q4_value; count++; }
+    const filteredEntries = dataEntries.filter(e =>
+      e.indicator_id === ind.id &&
+      e.status === 'approved' &&
+      selectedQuarters.includes(e.period_quarter)
+    );
 
-    if (count === 0) return 0;
+    const indicatorWithTarget = {
+      id: ind.id,
+      goal_id: ind.goal_id,
+      yearly_target: ind.yearly_target || ind.target_value,
+      baseline_value: ind.baseline_value || 0,
+      calculation_method: ind.calculation_method
+    };
 
-    const baselineValue = ind.baseline_value || 0;
-    const targetValue = ind.target_value;
-    const calculationMethod = ind.calculation_method || 'cumulative';
-
-    if (targetValue === 0 || targetValue === null) return 0;
-
-    let currentValue = 0;
-    let progress = 0;
-
-    switch (calculationMethod) {
-      case 'cumulative':
-      case 'cumulative_increasing':
-      case 'increasing': {
-        currentValue = baselineValue + sum;
-        const denominator = targetValue - baselineValue;
-        if (denominator === 0) {
-          progress = targetValue === 0 ? 0 : (currentValue / targetValue) * 100;
-        } else {
-          progress = ((currentValue - baselineValue) / denominator) * 100;
-        }
-        break;
-      }
-
-      case 'cumulative_decreasing':
-      case 'decreasing': {
-        currentValue = baselineValue - sum;
-        const denominator = targetValue - baselineValue;
-        if (denominator === 0) {
-          progress = targetValue === 0 ? 0 : (currentValue / targetValue) * 100;
-        } else {
-          progress = ((currentValue - baselineValue) / denominator) * 100;
-        }
-        break;
-      }
-
-      case 'percentage':
-      case 'percentage_increasing': {
-        const average = sum / count;
-        progress = (average / targetValue) * 100;
-        break;
-      }
-
-      case 'percentage_decreasing': {
-        const average = sum / count;
-        if (average === 0) return 0;
-        progress = (targetValue / average) * 100;
-        break;
-      }
-
-      case 'maintenance':
-      case 'maintenance_increasing': {
-        const average = sum / count;
-        progress = (average / targetValue) * 100;
-        break;
-      }
-
-      case 'maintenance_decreasing': {
-        const average = sum / count;
-        if (average === 0) return 0;
-        progress = (targetValue / average) * 100;
-        break;
-      }
-
-      default: {
-        currentValue = baselineValue + sum;
-        const denominator = targetValue - baselineValue;
-        if (denominator === 0) {
-          progress = targetValue === 0 ? 0 : (currentValue / targetValue) * 100;
-        } else {
-          progress = ((currentValue - baselineValue) / denominator) * 100;
-        }
-        break;
-      }
-    }
-
-    return Math.max(0, progress);
+    return calculateIndicatorProgress(indicatorWithTarget, filteredEntries);
   };
+
 
   const handleExportExcel = () => {
     const exportData: any[] = [];
