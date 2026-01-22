@@ -2,455 +2,229 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
-import { Card } from '../components/ui/Card';
-import { Modal } from '../components/ui/Modal';
-import { Plus, Edit, Trash2, Eye, Filter, FolderOpen, Target, Link as LinkIcon } from 'lucide-react';
-
-interface Department {
-  id: string;
-  name: string;
-}
-
-interface Manager {
-  id: string;
-  full_name: string;
-}
-
-interface Goal {
-  id: string;
-  code: string;
-  title: string;
-  objective_id: string;
-  objective?: {
-    id: string;
-    code: string;
-    title: string;
-  };
-}
-
-interface Activity {
-  id: string;
-  code: string;
-  name: string;
-  goal_id: string;
-}
+import { Plus, Eye, Edit, Trash2, Search } from 'lucide-react';
 
 interface Project {
   id: string;
-  code: string;
-  name: string;
-  description?: string;
-  department_id: string;
-  manager_id?: string;
-  budget?: number;
-  actual_cost?: number;
-  start_date: string;
-  end_date: string;
+  project_no: string;
+  project_name: string;
+  source: string;
+  responsible_unit: string;
+  physical_progress: number;
+  last_update_date: string;
   status: string;
-  progress: number;
-  related_goal_id?: string;
-  related_activity_id?: string;
-  department?: Department;
-  manager?: Manager;
-  goal?: Goal;
-  activity?: Activity;
+  year: number;
+  period: number;
+  strategic_plan_id?: string;
 }
 
-const statusLabels: Record<string, { label: string; color: string }> = {
-  PLANNED: { label: 'Planlandı', color: 'bg-gray-100 text-gray-800' },
-  IN_PROGRESS: { label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-800' },
-  ON_HOLD: { label: 'Beklemede', color: 'bg-yellow-100 text-yellow-800' },
-  COMPLETED: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800' },
-  CANCELLED: { label: 'İptal Edildi', color: 'bg-red-100 text-red-800' }
+const SOURCE_COLORS = {
+  ilyas: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
+  beyanname: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
+  genel: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200' }
+};
+
+const SOURCE_LABELS = {
+  ilyas: 'İLYAS',
+  beyanname: 'Beyanname',
+  genel: 'Genel'
+};
+
+const STATUS_CONFIG = {
+  completed: { label: 'Tamamlandı', bg: 'bg-green-100', text: 'text-green-800' },
+  in_progress: { label: 'Devam Ediyor', bg: 'bg-orange-100', text: 'text-orange-800' },
+  planned: { label: 'Planlandı', bg: 'bg-gray-100', text: 'text-gray-800' },
+  delayed: { label: 'Gecikmiş', bg: 'bg-red-100', text: 'text-red-800' }
 };
 
 export default function Projects() {
-  const { navigate } = useLocation();
   const { profile } = useAuth();
-
+  const { navigate } = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [managers, setManagers] = useState<Manager[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [showModal, setShowModal] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [filters, setFilters] = useState({
+    source: '',
+    year: '',
+    period: '',
     status: '',
-    department_id: '',
-    date_from: '',
-    date_to: '',
-    search: '',
-    sp_connection: ''
+    sp_connection: '',
+    search: ''
   });
-
-  const [formData, setFormData] = useState({
-    code: '',
-    name: '',
-    description: '',
-    department_id: '',
-    manager_id: '',
-    budget: '',
-    start_date: '',
-    end_date: '',
-    status: 'PLANNED',
-    progress: 0,
-    has_sp_connection: false,
-    related_goal_id: '',
-    related_activity_id: ''
-  });
-
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
-  const isDirector = profile?.role === 'director';
 
   useEffect(() => {
     if (profile?.organization_id) {
-      loadData();
+      loadProjects();
     }
   }, [profile?.organization_id]);
 
-  async function loadData() {
+  const loadProjects = async () => {
     try {
       setLoading(true);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('organization_id', profile?.organization_id)
+        .order('last_update_date', { ascending: false });
 
-      const [projectsRes, departmentsRes, managersRes, goalsRes, activitiesRes] = await Promise.all([
-        supabase
-          .from('projects')
-          .select(`
-            *,
-            department:departments!department_id(id, name),
-            manager:profiles!manager_id(id, full_name),
-            goal:goals!related_goal_id(id, code, title, objective_id, objective:objectives!objective_id(id, code, title)),
-            activity:activities!related_activity_id(id, code, name, goal_id)
-          `)
-          .eq('organization_id', profile?.organization_id)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('departments')
-          .select('id, name')
-          .eq('organization_id', profile?.organization_id)
-          .order('name'),
-
-        supabase
-          .from('profiles')
-          .select('id, full_name')
-          .eq('organization_id', profile?.organization_id)
-          .in('role', ['admin', 'director', 'user'])
-          .order('full_name'),
-
-        supabase
-          .from('goals')
-          .select(`
-            id, code, title, objective_id,
-            objective:objectives!objective_id(id, code, title)
-          `)
-          .eq('organization_id', profile?.organization_id)
-          .order('code'),
-
-        supabase
-          .from('activities')
-          .select('id, code, name, goal_id')
-          .eq('organization_id', profile?.organization_id)
-          .order('code')
-      ]);
-
-      if (projectsRes.error) throw projectsRes.error;
-      if (departmentsRes.error) throw departmentsRes.error;
-      if (managersRes.error) throw managersRes.error;
-      if (goalsRes.error) throw goalsRes.error;
-      if (activitiesRes.error) throw activitiesRes.error;
-
-      setProjects(projectsRes.data || []);
-      setDepartments(departmentsRes.data || []);
-      setManagers(managersRes.data || []);
-      setGoals(goalsRes.data || []);
-      setActivities(activitiesRes.data || []);
+      if (error) throw error;
+      setProjects(data || []);
     } catch (error) {
-      console.error('Veriler yüklenirken hata:', error);
+      console.error('Projeler yüklenirken hata:', error);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  function openModal(project?: Project) {
-    if (project) {
-      setEditingProject(project);
-      setFormData({
-        code: project.code,
-        name: project.name,
-        description: project.description || '',
-        department_id: project.department_id,
-        manager_id: project.manager_id || '',
-        budget: project.budget?.toString() || '',
-        start_date: project.start_date,
-        end_date: project.end_date,
-        status: project.status,
-        progress: project.progress,
-        has_sp_connection: !!(project.related_goal_id || project.related_activity_id),
-        related_goal_id: project.related_goal_id || '',
-        related_activity_id: project.related_activity_id || ''
-      });
-    } else {
-      setEditingProject(null);
-      setFormData({
-        code: '',
-        name: '',
-        description: '',
-        department_id: '',
-        manager_id: '',
-        budget: '',
-        start_date: '',
-        end_date: '',
-        status: 'PLANNED',
-        progress: 0,
-        has_sp_connection: false,
-        related_goal_id: '',
-        related_activity_id: ''
-      });
+  const getTimeAgo = (date: string) => {
+    const now = new Date();
+    const past = new Date(date);
+    const diffInDays = Math.floor((now.getTime() - past.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffInDays === 0) return { text: 'Bugün', days: 0 };
+    if (diffInDays === 1) return { text: 'Dün', days: 1 };
+    if (diffInDays < 7) return { text: `${diffInDays} gün önce`, days: diffInDays };
+    if (diffInDays < 30) return { text: `${Math.floor(diffInDays / 7)} hafta önce`, days: diffInDays };
+    return { text: `${Math.floor(diffInDays / 30)} ay önce`, days: diffInDays };
+  };
+
+  const getTimeColor = (days: number) => {
+    if (days >= 20) return 'text-red-600 font-semibold';
+    if (days >= 10) return 'text-orange-600 font-semibold';
+    return 'text-green-600';
+  };
+
+  const getProgressColor = (progress: number) => {
+    if (progress >= 100) return 'bg-green-500';
+    if (progress >= 71) return 'bg-blue-500';
+    if (progress >= 31) return 'bg-orange-500';
+    return 'bg-red-500';
+  };
+
+  const filteredProjects = projects.filter(p => {
+    if (filters.source && p.source !== filters.source) return false;
+    if (filters.year && p.year?.toString() !== filters.year) return false;
+    if (filters.period && p.period?.toString() !== filters.period) return false;
+    if (filters.status && p.status !== filters.status) return false;
+    if (filters.sp_connection === 'connected' && !p.strategic_plan_id) return false;
+    if (filters.sp_connection === 'not_connected' && p.strategic_plan_id) return false;
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      return (
+        p.project_no?.toLowerCase().includes(search) ||
+        p.project_name?.toLowerCase().includes(search) ||
+        p.responsible_unit?.toLowerCase().includes(search)
+      );
     }
-    setShowModal(true);
-  }
+    return true;
+  });
 
-  function closeModal() {
-    setShowModal(false);
-    setEditingProject(null);
-  }
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentProjects = filteredProjects.slice(startIndex, endIndex);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!formData.name || !formData.department_id || !formData.start_date || !formData.end_date) {
-      alert('Lütfen zorunlu alanları doldurun');
-      return;
-    }
-
-    if (formData.has_sp_connection && !formData.related_goal_id && !formData.related_activity_id) {
-      alert('Stratejik Plan bağlantısı için en az bir hedef veya faaliyet seçmelisiniz');
-      return;
-    }
-
-    try {
-      let code = formData.code;
-      if (!editingProject && !code) {
-        const year = new Date().getFullYear();
-        const { data: existingProjects } = await supabase
-          .from('projects')
-          .select('code')
-          .eq('organization_id', profile?.organization_id)
-          .like('code', `PRJ-${year}-%`)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        let nextNumber = 1;
-        if (existingProjects && existingProjects.length > 0) {
-          const lastCode = existingProjects[0].code;
-          const match = lastCode?.match(/PRJ-\d+-(\d+)$/);
-          if (match) {
-            nextNumber = parseInt(match[1]) + 1;
-          }
-        }
-
-        code = `PRJ-${year}-${nextNumber.toString().padStart(3, '0')}`;
-      }
-
-      const projectData = {
-        organization_id: profile?.organization_id,
-        code,
-        name: formData.name,
-        description: formData.description || null,
-        department_id: formData.department_id,
-        manager_id: formData.manager_id || null,
-        budget: formData.budget ? parseFloat(formData.budget) : null,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        status: formData.status,
-        progress: formData.progress,
-        related_goal_id: formData.has_sp_connection && formData.related_goal_id ? formData.related_goal_id : null,
-        related_activity_id: formData.has_sp_connection && formData.related_activity_id ? formData.related_activity_id : null
-      };
-
-      if (editingProject) {
-        const { error } = await supabase
-          .from('projects')
-          .update(projectData)
-          .eq('id', editingProject.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('projects')
-          .insert(projectData);
-
-        if (error) throw error;
-      }
-
-      closeModal();
-      loadData();
-    } catch (error) {
-      console.error('Proje kaydedilirken hata:', error);
-      alert('Proje kaydedilemedi');
-    }
-  }
-
-  async function handleDelete(project: Project) {
-    if (!confirm(`${project.code} - ${project.name} projesini silmek istediğinize emin misiniz?`)) return;
+  const handleDelete = async (id: string, projectNo: string) => {
+    if (!confirm(`${projectNo} numaralı projeyi silmek istediğinize emin misiniz?`)) return;
 
     try {
       const { error } = await supabase
         .from('projects')
         .delete()
-        .eq('id', project.id);
+        .eq('id', id);
 
       if (error) throw error;
-      loadData();
+      loadProjects();
     } catch (error) {
       console.error('Proje silinirken hata:', error);
       alert('Proje silinemedi');
     }
-  }
-
-  function getRemainingDays(endDate: string): number {
-    const end = new Date(endDate);
-    const today = new Date();
-    const diffTime = end.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  }
-
-  const filteredActivities = formData.related_goal_id
-    ? activities.filter(a => a.goal_id === formData.related_goal_id)
-    : activities;
-
-  const filteredProjects = projects.filter(p => {
-    if (!p) return false;
-    if (filters.status && p.status !== filters.status) return false;
-    if (filters.department_id && p.department_id !== filters.department_id) return false;
-    if (filters.date_from && p.start_date < filters.date_from) return false;
-    if (filters.date_to && p.end_date > filters.date_to) return false;
-    if (filters.sp_connection === 'connected' && !p.related_goal_id && !p.related_activity_id) return false;
-    if (filters.sp_connection === 'not_connected' && (p.related_goal_id || p.related_activity_id)) return false;
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      return p.code?.toLowerCase().includes(search) || p.name?.toLowerCase().includes(search);
-    }
-    return true;
-  });
-
-  function clearFilters() {
-    setFilters({
-      status: '',
-      department_id: '',
-      date_from: '',
-      date_to: '',
-      search: '',
-      sp_connection: ''
-    });
-  }
+  };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="text-gray-500">Yükleniyor...</div></div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
   }
 
-  const hasActiveFilters = filters.status || filters.department_id || filters.date_from || filters.date_to || filters.search || filters.sp_connection;
+  const years = Array.from(new Set(projects.map(p => p.year))).filter(Boolean).sort((a, b) => b - a);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FolderOpen className="w-8 h-8 text-blue-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Proje Yönetimi</h1>
-            <p className="text-sm text-gray-500">Organizasyon projelerini yönetin</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Projeler</h1>
+          <p className="mt-1 text-gray-600">Tüm projeleri görüntüle</p>
         </div>
-        {(isAdmin || isDirector) && (
-          <button
-            onClick={() => openModal()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            <Plus className="w-4 h-4" />
-            Yeni Proje
-          </button>
-        )}
+        <button
+          onClick={() => navigate('project-management/projects/new')}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          Yeni Proje
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600">{filteredProjects.length}</div>
-            <div className="text-sm text-gray-600">Toplam Proje</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-green-600">
-              {filteredProjects.filter(p => p.status === 'COMPLETED').length}
-            </div>
-            <div className="text-sm text-gray-600">Tamamlanan</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-yellow-600">
-              {filteredProjects.filter(p => p.status === 'IN_PROGRESS').length}
-            </div>
-            <div className="text-sm text-gray-600">Devam Eden</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-purple-600">
-              {filteredProjects.filter(p => p.related_goal_id || p.related_activity_id).length}
-            </div>
-            <div className="text-sm text-gray-600">SP Bağlantılı</div>
-          </div>
-        </Card>
-      </div>
-
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <h3 className="font-semibold text-gray-900">Filtreler</h3>
-          </div>
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Temizle
-            </button>
-          )}
-        </div>
-
+      <div className="bg-white rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div>
             <select
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              value={filters.source}
+              onChange={(e) => setFilters({ ...filters, source: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">Durum</option>
-              {Object.entries(statusLabels).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
+              <option value="">Kaynak (Tümü)</option>
+              <option value="ilyas">İLYAS</option>
+              <option value="beyanname">Beyanname</option>
+              <option value="genel">Genel</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={filters.year}
+              onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Yıl (Tümü)</option>
+              {years.map(year => (
+                <option key={year} value={year}>{year}</option>
               ))}
             </select>
           </div>
 
           <div>
             <select
-              value={filters.department_id}
-              onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              value={filters.period}
+              onChange={(e) => setFilters({ ...filters, period: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">Birim</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>{dept.name}</option>
-              ))}
+              <option value="">Dönem (Tümü)</option>
+              <option value="1">I. Dönem</option>
+              <option value="2">II. Dönem</option>
+              <option value="3">III. Dönem</option>
+              <option value="4">IV. Dönem</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Durum (Tümü)</option>
+              <option value="in_progress">Devam Ediyor</option>
+              <option value="completed">Tamamlandı</option>
+              <option value="planned">Planlandı</option>
+              <option value="delayed">Gecikmiş</option>
             </select>
           </div>
 
@@ -458,150 +232,145 @@ export default function Projects() {
             <select
               value={filters.sp_connection}
               onChange={(e) => setFilters({ ...filters, sp_connection: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">SP Bağlantısı</option>
-              <option value="connected">Bağlantılı</option>
-              <option value="not_connected">Bağlantısız</option>
+              <option value="">SP Bağlantısı (Tümü)</option>
+              <option value="connected">Bağlı</option>
+              <option value="not_connected">Bağlı Değil</option>
             </select>
           </div>
 
-          <div>
-            <input
-              type="date"
-              value={filters.date_from}
-              onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              placeholder="Başlangıç"
-            />
-          </div>
-
-          <div>
-            <input
-              type="date"
-              value={filters.date_to}
-              onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              placeholder="Bitiş"
-            />
-          </div>
-
-          <div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              placeholder="Ara..."
+              placeholder="Proje ara..."
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
-      </Card>
+      </div>
 
-      <Card>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proje Kodu</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proje Adı</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sorumlu Birim</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SP Bağlantısı</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İlerleme</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Proje No
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Proje Adı
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Kaynak
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sorumlu Birim
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fiziki %
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Son Güncelleme
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Durum
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  İşlem
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredProjects.length === 0 ? (
+              {currentProjects.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     Proje bulunamadı
                   </td>
                 </tr>
               ) : (
-                filteredProjects.map((project) => {
-                  const statusInfo = statusLabels[project.status] || statusLabels['PLANNED'];
-                  const remainingDays = getRemainingDays(project.end_date);
-                  const isOverdue = remainingDays < 0 && project.status !== 'COMPLETED' && project.status !== 'CANCELLED';
-                  const hasSpConnection = !!(project.related_goal_id || project.related_activity_id);
+                currentProjects.map((project) => {
+                  const sourceColors = SOURCE_COLORS[project.source as keyof typeof SOURCE_COLORS] || SOURCE_COLORS.genel;
+                  const statusConfig = STATUS_CONFIG[project.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.planned;
+                  const timeAgo = getTimeAgo(project.last_update_date);
+                  const timeColor = getTimeColor(timeAgo.days);
+                  const progressColor = getProgressColor(project.physical_progress);
 
                   return (
                     <tr
                       key={project.id}
-                      className="hover:bg-gray-50 cursor-pointer transition"
-                      onClick={() => navigate(`/projects/${project.id}`)}
+                      onClick={() => navigate(`project-management/projects/${project.id}`)}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
                     >
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{project.code}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{project.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {project.department?.name || '-'}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-bold text-gray-900">{project.project_no}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        {hasSpConnection ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Target className="w-4 h-4 text-green-600" />
-                            <span className="text-green-700 font-medium">
-                              {project.goal?.code || project.activity?.code || '-'}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-700">
-                          <div>{new Date(project.start_date).toLocaleDateString('tr-TR')}</div>
-                          <div className={isOverdue ? 'text-red-600 font-medium' : ''}>
-                            {new Date(project.end_date).toLocaleDateString('tr-TR')}
-                            {isOverdue && <span className="ml-1">⚠️</span>}
-                          </div>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 max-w-xs truncate" title={project.project_name}>
+                          {project.project_name}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                          {statusInfo.label}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${sourceColors.bg} ${sourceColors.text} ${sourceColors.border}`}
+                        >
+                          {SOURCE_LABELS[project.source as keyof typeof SOURCE_LABELS] || project.source}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{project.responsible_unit}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2.5 min-w-[100px]">
                             <div
-                              className="bg-blue-600 h-2 rounded-full transition-all"
-                              style={{ width: `${project.progress}%` }}
+                              className={`h-2.5 rounded-full transition-all ${progressColor}`}
+                              style={{ width: `${project.physical_progress}%` }}
                             />
                           </div>
-                          <span className="text-sm font-medium text-gray-700">{project.progress}%</span>
+                          <span className="text-sm font-medium text-gray-900 min-w-[42px]">
+                            {project.physical_progress}%
+                          </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-sm ${timeColor}`}>
+                          {timeAgo.text}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}
+                        >
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => navigate(`/projects/${project.id}`)}
-                            className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition"
+                            onClick={() => navigate(`project-management/projects/${project.id}`)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Detay"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {(isAdmin || (isDirector && project.department_id === profile?.department_id)) && (
-                            <>
-                              <button
-                                onClick={() => openModal(project)}
-                                className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition"
-                                title="Düzenle"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(project)}
-                                className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition"
-                                title="Sil"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => navigate(`project-management/projects/${project.id}/edit`)}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Düzenle"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(project.id, project.project_no)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -611,242 +380,49 @@ export default function Projects() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
-      <Modal isOpen={showModal} onClose={closeModal} title={editingProject ? 'Proje Düzenle' : 'Yeni Proje Ekle'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!editingProject && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Proje Kodu</label>
-              <input
-                type="text"
-                value={formData.code || 'Otomatik oluşturulacak'}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                placeholder="Boş bırakılırsa otomatik oluşturulur"
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Proje Adı <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
-            />
+      {filteredProjects.length > 0 && (
+        <div className="flex items-center justify-between bg-white px-6 py-4 rounded-lg shadow">
+          <div className="text-sm text-gray-700">
+            <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, filteredProjects.length)}</span>
+            {' / '}
+            <span className="font-medium">{filteredProjects.length}</span>
+            {' proje gösteriliyor'}
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sorumlu Birim <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.department_id}
-              onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Seçiniz...</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>{dept.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Proje Yöneticisi</label>
-            <select
-              value={formData.manager_id}
-              onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Seçiniz...</option>
-              {managers.map((manager) => (
-                <option key={manager.id} value={manager.id}>{manager.full_name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Planlanan Bütçe (TL)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.budget}
-              onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Başlangıç Tarihi <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bitiş Tarihi <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Durum <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              {Object.entries(statusLabels).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              İlerleme (%): <span className="font-semibold text-blue-600">{formData.progress}%</span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={formData.progress}
-              onChange={(e) => setFormData({ ...formData, progress: parseInt(e.target.value) })}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <input
-                type="checkbox"
-                id="has_sp_connection"
-                checked={formData.has_sp_connection}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  has_sp_connection: e.target.checked,
-                  related_goal_id: e.target.checked ? formData.related_goal_id : '',
-                  related_activity_id: e.target.checked ? formData.related_activity_id : ''
-                })}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <label htmlFor="has_sp_connection" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-600" />
-                Bu proje Stratejik Plana bağlı mı?
-              </label>
-            </div>
-
-            {formData.has_sp_connection && (
-              <div className="ml-6 space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Bağlı Hedef
-                  </label>
-                  <select
-                    value={formData.related_goal_id}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      related_goal_id: e.target.value,
-                      related_activity_id: ''
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="">Seçiniz...</option>
-                    {goals.map((goal) => (
-                      <option key={goal.id} value={goal.id}>
-                        {goal.objective?.code} - {goal.objective?.title} &gt; {goal.code} - {goal.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Bağlı Faaliyet
-                  </label>
-                  <select
-                    value={formData.related_activity_id}
-                    onChange={(e) => setFormData({ ...formData, related_activity_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                    disabled={!formData.related_goal_id}
-                  >
-                    <option value="">Seçiniz...</option>
-                    {filteredActivities.map((activity) => (
-                      <option key={activity.id} value={activity.id}>
-                        {activity.code} - {activity.name}
-                      </option>
-                    ))}
-                  </select>
-                  {!formData.related_goal_id && (
-                    <p className="text-xs text-gray-500 mt-1">Önce bir hedef seçmelisiniz</p>
-                  )}
-                </div>
-
-                <div className="text-xs text-blue-700 bg-blue-100 p-2 rounded">
-                  En az bir hedef veya faaliyet seçmelisiniz
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={closeModal}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              İptal
+              Önceki
             </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === page
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
             <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Kaydet
+              Sonraki
             </button>
           </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
   );
 }
