@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Download, Filter, TrendingUp, FileText, X } from 'lucide-react';
+import { Download, Filter, TrendingUp, FileText, X, FileSpreadsheet, FileDown } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
 import { calculateIndicatorProgress, getProgressColor, getProgressTextColor } from '../../utils/progressCalculations';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
@@ -523,7 +523,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     return Math.max(0, Math.round(progress));
   };
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const exportData: any[] = [];
 
     const groupedByPlan = filteredIndicators.reduce((acc, ind) => {
@@ -685,10 +685,10 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     });
 
     const quarterText = selectedQuarters.map(q => `C${q}`).join('_');
-    exportToExcel(exportData, `Gosterge_Performansi_${quarterText}`);
+    exportToExcel(exportData, `Gosterge_Performansi_${quarterText}_${currentYear}_${new Date().toISOString().split('T')[0]}`);
   };
 
-  const handlePDFExport = () => {
+  const handleExportPDF = () => {
     const groupedByPlan = filteredIndicators.reduce((acc, ind) => {
       const planKey = ind.strategic_plan_id || 'no-plan';
       if (!acc[planKey]) {
@@ -803,7 +803,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
       });
     });
 
-    exportToPDF('Gösterge Performans Raporu', contentHTML);
+    exportToPDF(`Gösterge Performans Raporu - ${currentYear}`, contentHTML, `Gosterge_Performansi_${currentYear}_${new Date().toISOString().split('T')[0]}`);
   };
 
   if (loading) {
@@ -823,18 +823,18 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handlePDFExport}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            PDF'e Aktar
-          </button>
-          <button
-            onClick={handleExport}
+            onClick={handleExportExcel}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <Download className="w-4 h-4" />
-            Excel'e Aktar
+            <FileSpreadsheet className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
           </button>
         </div>
       </div>

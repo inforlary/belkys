@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Calendar, FileText, X } from 'lucide-react';
-import { exportToExcel, exportToPDF } from '../../utils/exportHelpers';
+import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Calendar, FileText, X, FileSpreadsheet, FileDown } from 'lucide-react';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 import {
   IndicatorStatus,
@@ -365,21 +365,128 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     }
   };
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     if (!data) return;
 
     const exportData = [
       { 'Metrik': 'Genel İlerleme', 'Değer': `${Math.round(data.overall_progress)}%` },
       { 'Metrik': 'Toplam Gösterge', 'Değer': data.total_indicators },
-      { 'Metrik': 'Hedefte', 'Değer': data.on_track },
-      { 'Metrik': 'Risk Altında', 'Değer': data.at_risk },
-      { 'Metrik': 'Geride', 'Değer': data.behind },
+      { 'Metrik': 'Hedefi Aşan', 'Değer': data.exceedingTarget },
+      { 'Metrik': 'Mükemmel', 'Değer': data.excellent },
+      { 'Metrik': 'İyi', 'Değer': data.good },
+      { 'Metrik': 'Orta', 'Değer': data.moderate },
+      { 'Metrik': 'Zayıf', 'Değer': data.weak },
+      { 'Metrik': 'Çok Zayıf', 'Değer': data.veryWeak },
       { 'Metrik': 'Gecikmiş Faaliyet', 'Değer': data.overdue_activities },
       { 'Metrik': 'Bekleyen Onay', 'Değer': data.pending_approvals },
       { 'Metrik': 'Veri Giriş Oranı', 'Değer': `${Math.round(data.data_completion)}%` },
     ];
 
-    exportToExcel(exportData, 'Yonetici_Ozeti');
+    exportToExcel(exportData, `Yonetici_Ozeti_${currentYear}_${new Date().toISOString().split('T')[0]}`);
+  };
+
+  const handleExportPDF = () => {
+    if (!data) return;
+
+    const topPerformersHeaders = ['Gösterge', 'İlerleme'];
+    const topPerformersRows = data.top_performers.slice(0, 10).map(p => [
+      p.name,
+      `${Math.round(p.progress)}%`
+    ]);
+
+    const concernsHeaders = ['Gösterge', 'İlerleme'];
+    const concernsRows = data.concerns.slice(0, 10).map(c => [
+      c.name,
+      `${Math.round(c.progress)}%`
+    ]);
+
+    const plansHeaders = ['Stratejik Plan', 'Dönem', 'Amaç', 'Hedef', 'Gösterge'];
+    const plansRows = data.strategic_plans.map(plan => [
+      plan.name,
+      `${plan.start_year} - ${plan.end_year}`,
+      plan.objectives_count,
+      plan.goals_count,
+      plan.indicators_count
+    ]);
+
+    const content = `
+      <h2>Genel Performans Özeti</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${Math.round(data.overall_progress)}%</div>
+          <div class="stat-label">Genel İlerleme</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${data.total_indicators}</div>
+          <div class="stat-label">Toplam Gösterge</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #10b981;">
+          <div class="stat-value" style="color: #10b981;">${data.exceedingTarget}</div>
+          <div class="stat-label">Hedefi Aşan</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #3b82f6;">
+          <div class="stat-value" style="color: #3b82f6;">${data.excellent}</div>
+          <div class="stat-label">Mükemmel</div>
+        </div>
+      </div>
+
+      <div class="stats-grid" style="margin-top: 10px;">
+        <div class="stat-box" style="border-left: 4px solid #22c55e;">
+          <div class="stat-value" style="color: #22c55e;">${data.good}</div>
+          <div class="stat-label">İyi</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #eab308;">
+          <div class="stat-value" style="color: #ca8a04;">${data.moderate}</div>
+          <div class="stat-label">Orta</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #f97316;">
+          <div class="stat-value" style="color: #f97316;">${data.weak}</div>
+          <div class="stat-label">Zayıf</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626;">
+          <div class="stat-value" style="color: #dc2626;">${data.veryWeak}</div>
+          <div class="stat-label">Çok Zayıf</div>
+        </div>
+      </div>
+
+      <h2>Operasyonel Metrikler</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${data.overdue_activities}</div>
+          <div class="stat-label">Gecikmiş Faaliyet</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${data.pending_approvals}</div>
+          <div class="stat-label">Bekleyen Onay</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${Math.round(data.data_completion)}%</div>
+          <div class="stat-label">Veri Giriş Oranı</div>
+        </div>
+      </div>
+
+      ${data.top_performers.length > 0 ? `
+        <h2>En İyi Performans Gösteren Göstergeler</h2>
+        ${generateTableHTML(topPerformersHeaders, topPerformersRows)}
+      ` : ''}
+
+      ${data.concerns.length > 0 ? `
+        <h2>Dikkat Gerektiren Göstergeler</h2>
+        ${generateTableHTML(concernsHeaders, concernsRows)}
+      ` : ''}
+
+      ${data.strategic_plans.length > 0 ? `
+        <h2>Stratejik Planlar</h2>
+        ${generateTableHTML(plansHeaders, plansRows)}
+      ` : ''}
+
+      <h2>Öneriler</h2>
+      <ul>
+        ${data.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+      </ul>
+    `;
+
+    exportToPDF(`Yönetici Özeti - ${currentYear}`, content, `Yonetici_Ozeti_${currentYear}_${new Date().toISOString().split('T')[0]}`);
   };
 
   const loadIndicatorDetails = async (status: IndicatorStatus) => {
@@ -587,18 +694,18 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handlePDFExport}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            PDF'e Aktar
-          </button>
-          <button
-            onClick={handleExport}
+            onClick={handleExportExcel}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <Download className="w-4 h-4" />
-            Excel'e Aktar
+            <FileSpreadsheet className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
           </button>
         </div>
       </div>

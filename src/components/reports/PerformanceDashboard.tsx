@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Download, TrendingUp, TrendingDown, Minus, FileText, ArrowUpDown, X } from 'lucide-react';
-import { exportToExcel } from '../../utils/exportHelpers';
-import { generatePerformanceDashboardPDF } from '../../utils/reportPDFGenerators';
+import { Download, TrendingUp, TrendingDown, Minus, FileText, ArrowUpDown, X, FileSpreadsheet, FileDown } from 'lucide-react';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../../utils/exportHelpers';
 import Modal from '../ui/Modal';
 import { calculatePerformancePercentage, CalculationMethod } from '../../utils/indicatorCalculations';
 import {
@@ -264,23 +263,83 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     }
   };
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const exportData = sortedDepartments.map((dept, index) => ({
       'Sıra': index + 1,
       'Birim': dept.department_name,
       'Gösterge Sayısı': dept.total_indicators,
       'Ortalama İlerleme (%)': Math.round(dept.avg_progress),
-      'Hedef Sapması': dept.exceeding_target,
-      'Hedefte': dept.on_track,
-      'Risk Altında': dept.at_risk,
-      'Geride': dept.behind,
+      'Hedefi Aşan': dept.exceedingTarget,
+      'Mükemmel': dept.excellent,
+      'İyi': dept.good,
+      'Orta': dept.moderate,
+      'Zayıf': dept.weak,
+      'Çok Zayıf': dept.veryWeak,
     }));
 
-    exportToExcel(exportData, 'Performans_Gosterge_Paneli');
+    exportToExcel(exportData, `Performans_Gosterge_Paneli_${currentYear}_${new Date().toISOString().split('T')[0]}`);
   };
 
-  const handlePDFExport = () => {
-    generatePerformanceDashboardPDF(sortedDepartments, overallProgress);
+  const handleExportPDF = () => {
+    const headers = ['Sıra', 'Birim', 'Gösterge', 'Ort. İlerleme', 'Hedefi Aşan', 'Mükemmel', 'İyi', 'Orta', 'Zayıf', 'Ç.Zayıf'];
+    const rows = sortedDepartments.map((dept, index) => [
+      index + 1,
+      dept.department_name,
+      dept.total_indicators,
+      `${Math.round(dept.avg_progress)}%`,
+      dept.exceedingTarget,
+      dept.excellent,
+      dept.good,
+      dept.moderate,
+      dept.weak,
+      dept.veryWeak
+    ]);
+
+    const content = `
+      <h2>Genel Performans Özeti</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${Math.round(overallProgress)}%</div>
+          <div class="stat-label">Kurum Ortalama İlerleme</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${sortedDepartments.length}</div>
+          <div class="stat-label">Toplam Birim</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #10b981;">
+          <div class="stat-value" style="color: #10b981;">${overallStats.exceedingTarget}</div>
+          <div class="stat-label">Toplam Hedefi Aşan</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #3b82f6;">
+          <div class="stat-value" style="color: #3b82f6;">${overallStats.excellent}</div>
+          <div class="stat-label">Toplam Mükemmel</div>
+        </div>
+      </div>
+
+      <div class="stats-grid" style="margin-top: 10px;">
+        <div class="stat-box" style="border-left: 4px solid #22c55e;">
+          <div class="stat-value" style="color: #22c55e;">${overallStats.good}</div>
+          <div class="stat-label">Toplam İyi</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #eab308;">
+          <div class="stat-value" style="color: #ca8a04;">${overallStats.moderate}</div>
+          <div class="stat-label">Toplam Orta</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #f97316;">
+          <div class="stat-value" style="color: #f97316;">${overallStats.weak}</div>
+          <div class="stat-label">Toplam Zayıf</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626;">
+          <div class="stat-value" style="color: #dc2626;">${overallStats.veryWeak}</div>
+          <div class="stat-label">Toplam Çok Zayıf</div>
+        </div>
+      </div>
+
+      <h2>Birim Bazlı Performans</h2>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF(`Performans Gösterge Paneli - ${currentYear}`, content, `Performans_Gosterge_Paneli_${currentYear}_${new Date().toISOString().split('T')[0]}`);
   };
 
   const loadIndicatorDetails = async (status: IndicatorStatus, dept?: DepartmentPerformance) => {
@@ -427,18 +486,18 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handlePDFExport}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            PDF'e Aktar
-          </button>
-          <button
-            onClick={handleExport}
+            onClick={handleExportExcel}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <Download className="w-4 h-4" />
-            Excel'e Aktar
+            <FileSpreadsheet className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
           </button>
         </div>
       </div>
