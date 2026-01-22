@@ -134,7 +134,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
             const { data: indicators } = await supabase
               .from('indicators')
-              .select('id, calculation_method, goal_id, goal_impact_percentage, target_value, baseline_value')
+              .select('id, calculation_method, goal_id, goal_impact_percentage')
               .eq('organization_id', profile.organization_id)
               .in('goal_id', goalIds);
 
@@ -155,27 +155,47 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
             const indicatorIds = indicators.map(i => i.id);
 
-            const { data: dataEntries } = await supabase
-              .from('indicator_data_entries')
-              .select('indicator_id, value, status')
-              .eq('organization_id', profile.organization_id)
-              .eq('period_year', currentYear)
-              .eq('status', 'approved')
-              .in('indicator_id', indicatorIds);
+            const [dataEntriesResult, targetsResult] = await Promise.all([
+              supabase
+                .from('indicator_data_entries')
+                .select('indicator_id, value, status')
+                .eq('organization_id', profile.organization_id)
+                .eq('period_year', currentYear)
+                .eq('status', 'approved')
+                .in('indicator_id', indicatorIds),
+              supabase
+                .from('indicator_targets')
+                .select('indicator_id, target_value, baseline_value')
+                .eq('year', currentYear)
+                .in('indicator_id', indicatorIds)
+            ]);
+
+            const { data: dataEntries } = dataEntriesResult;
+
+            const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
+            targetsResult.data?.forEach(target => {
+              targetsByIndicator[target.indicator_id] = {
+                target: target.target_value,
+                baseline: target.baseline_value || 0,
+              };
+            });
 
             const stats = createEmptyStats();
             let totalGoalProgress = 0;
             let goalCount = 0;
 
             goals.forEach(goal => {
-              const goalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => ({
-                id: ind.id,
-                goal_id: ind.goal_id,
-                goal_impact_percentage: ind.goal_impact_percentage,
-                target_value: ind.target_value,
-                baseline_value: ind.baseline_value,
-                calculation_method: ind.calculation_method
-              }));
+              const goalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => {
+                const targetData = targetsByIndicator[ind.id];
+                return {
+                  id: ind.id,
+                  goal_id: ind.goal_id,
+                  goal_impact_percentage: ind.goal_impact_percentage,
+                  target_value: targetData?.target || 0,
+                  baseline_value: targetData?.baseline || 0,
+                  calculation_method: ind.calculation_method
+                };
+              }).filter(ind => ind.target_value > 0);
 
               if (goalIndicators.length === 0) return;
 
