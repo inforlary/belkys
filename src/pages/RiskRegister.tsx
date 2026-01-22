@@ -321,13 +321,13 @@ export default function RiskRegister() {
           .from('risks')
           .select(`
             *,
-            category:risk_categories(name, color),
+            category:risk_categories!left(name, color),
             categories:risk_category_mappings(category_id, category:risk_categories(id, name, code, color)),
-            department:departments!owner_department_id(name),
-            coordination_department:departments!coordination_department_id(name),
-            related_goal:goals!related_goal_id(code, title),
-            related_activity:activities!related_activity_id(code, name),
-            related_process:qm_processes!related_process_id(code, name)
+            department:departments!owner_department_id!left(name),
+            coordination_department:departments!coordination_department_id!left(name),
+            related_goal:goals!related_goal_id!left(code, title),
+            related_activity:activities!related_activity_id!left(code, name),
+            related_process:qm_processes!related_process_id!left(code, name)
           `)
           .eq('organization_id', profile?.organization_id)
           .order('code', { ascending: true }),
