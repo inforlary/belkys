@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Plus, Edit, Trash2, Shield, X, CheckSquare } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, X, CheckSquare, Link as LinkIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import ControlExecutionsModal from './ControlExecutionsModal';
 
@@ -23,6 +23,14 @@ interface Control {
   department?: {
     name: string;
   };
+  related_treatments?: Treatment[];
+}
+
+interface Treatment {
+  id: string;
+  title: string;
+  action_type: string;
+  status: string;
 }
 
 interface Department {
@@ -54,6 +62,22 @@ const effectivenessLevels = [
   { value: 4, label: 'Büyük Ölçüde Etkili' },
   { value: 5, label: 'Tam Etkili' }
 ];
+
+const actionTypeLabels: Record<string, string> = {
+  NEW_CONTROL: 'Yeni Kontrol',
+  IMPROVE_CONTROL: 'İyileştirme',
+  AUTOMATE_CONTROL: 'Otomatikleştirme',
+  ENHANCE_CONTROL: 'Güçlendirme',
+  REMOVE_CONTROL: 'Kaldırma',
+  OTHER: 'Diğer'
+};
+
+const statusLabels: Record<string, { label: string; color: string }> = {
+  PLANNED: { label: 'Planlandı', color: 'bg-gray-100 text-gray-800' },
+  IN_PROGRESS: { label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-800' },
+  COMPLETED: { label: 'Tamamlandı', color: 'bg-green-100 text-green-800' },
+  CANCELLED: { label: 'İptal', color: 'bg-red-100 text-red-800' }
+};
 
 export default function RiskControlsTab({ riskId, riskCode }: Props) {
   const { profile } = useAuth();
@@ -89,7 +113,7 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
   async function loadControls() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: controlsData, error: controlsError } = await supabase
         .from('risk_controls')
         .select(`
           *,
@@ -99,8 +123,27 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setControls(data || []);
+      if (controlsError) throw controlsError;
+
+      if (controlsData && controlsData.length > 0) {
+        const { data: treatmentsData, error: treatmentsError } = await supabase
+          .from('risk_treatments')
+          .select('id, title, action_type, status, risk_control_id')
+          .eq('risk_id', riskId)
+          .not('risk_control_id', 'is', null);
+
+        if (!treatmentsError && treatmentsData) {
+          const controlsWithTreatments = controlsData.map(control => ({
+            ...control,
+            related_treatments: treatmentsData.filter(t => t.risk_control_id === control.id)
+          }));
+          setControls(controlsWithTreatments);
+        } else {
+          setControls(controlsData);
+        }
+      } else {
+        setControls([]);
+      }
     } catch (error) {
       console.error('Kontroller yüklenirken hata:', error);
     } finally {
@@ -292,13 +335,20 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
             </thead>
             <tbody>
               {controls.map((control) => (
-                <tr key={control.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{control.name}</div>
-                    {control.description && (
-                      <div className="text-sm text-gray-500 mt-1">{control.description}</div>
-                    )}
-                  </td>
+                <>
+                  <tr key={control.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{control.name}</div>
+                      {control.description && (
+                        <div className="text-sm text-gray-500 mt-1">{control.description}</div>
+                      )}
+                      {control.related_treatments && control.related_treatments.length > 0 && (
+                        <div className="mt-2 flex items-center gap-2 text-xs text-blue-600">
+                          <LinkIcon className="w-3 h-3" />
+                          {control.related_treatments.length} faaliyet bağlı
+                        </div>
+                      )}
+                    </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       control.control_type === 'PREVENTIVE' ? 'bg-green-100 text-green-800' :
@@ -359,6 +409,30 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
                     </div>
                   </td>
                 </tr>
+                {control.related_treatments && control.related_treatments.length > 0 && (
+                  <tr className="bg-blue-50">
+                    <td colSpan={8} className="px-4 py-3">
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold text-blue-900 mb-2">İlgili Faaliyetler:</div>
+                        {control.related_treatments.map((treatment) => (
+                          <div key={treatment.id} className="flex items-center gap-3 text-sm bg-white rounded px-3 py-2">
+                            <LinkIcon className="w-3 h-3 text-blue-600" />
+                            <span className="font-medium text-gray-900">{treatment.title}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[treatment.status]?.color}`}>
+                              {statusLabels[treatment.status]?.label}
+                            </span>
+                            {treatment.action_type && (
+                              <span className="text-xs text-gray-600">
+                                ({actionTypeLabels[treatment.action_type]})
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </>
               ))}
             </tbody>
           </table>

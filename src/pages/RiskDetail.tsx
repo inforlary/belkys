@@ -5,6 +5,9 @@ import { useLocation } from '../hooks/useLocation';
 import { AlertTriangle, ArrowLeft, Save, X, Plus, Trash2, Info, Edit2, Shield, TrendingUp, Activity, Users } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { Card } from '../components/ui/Card';
+import RiskControlsTab from '../components/risk/RiskControlsTab';
+import RiskTreatmentsTab from '../components/risk/RiskTreatmentsTab';
+import RiskIndicatorsTab from '../components/risk/RiskIndicatorsTab';
 
 interface DepartmentImpact {
   id?: string;
@@ -32,6 +35,7 @@ export default function RiskDetail() {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'controls' | 'treatments' | 'indicators'>('controls');
 
   const [categories, setCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -1697,7 +1701,60 @@ export default function RiskDetail() {
           </Card>
 
           {/* Kontroller, Tedbirler, Göstergeler sekmeleri */}
-          {/* Bu kısım mevcut haliyle bırakılabilir veya gerekirse eklenebilir */}
+          <Card className="p-6">
+            <div className="border-b border-slate-200 mb-6">
+              <div className="flex gap-6">
+                <button
+                  onClick={() => setActiveTab('controls')}
+                  className={`pb-3 px-2 font-medium transition-colors border-b-2 ${
+                    activeTab === 'controls'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Kontroller
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100">{controls.length}</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('treatments')}
+                  className={`pb-3 px-2 font-medium transition-colors border-b-2 ${
+                    activeTab === 'treatments'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4" />
+                    Faaliyetler
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100">{treatments.length}</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('indicators')}
+                  className={`pb-3 px-2 font-medium transition-colors border-b-2 ${
+                    activeTab === 'indicators'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Göstergeler
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100">{indicators.length}</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              {activeTab === 'controls' && <RiskControlsTab riskId={riskId!} riskCode={formData.code} />}
+              {activeTab === 'treatments' && <RiskTreatmentsTab riskId={riskId!} riskCode={formData.code} />}
+              {activeTab === 'indicators' && <RiskIndicatorsTab riskId={riskId!} riskCode={formData.code} />}
+            </div>
+          </Card>
         </div>
       )}
 
