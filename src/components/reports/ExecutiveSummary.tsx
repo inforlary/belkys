@@ -397,73 +397,121 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
   const handleExportExcel = () => {
     if (!data) return;
 
-    const exportData = [
+    const sheets: { [key: string]: any[] } = {};
+
+    sheets['Genel Özet'] = [
       { 'Metrik': 'Genel İlerleme', 'Değer': `${Math.round(data.overall_progress)}%` },
       { 'Metrik': 'Toplam Gösterge', 'Değer': data.total_indicators },
-      { 'Metrik': 'Hedefi Aşan', 'Değer': data.exceedingTarget },
-      { 'Metrik': 'Mükemmel', 'Değer': data.excellent },
+      { 'Metrik': '', 'Değer': '' },
+      { 'Metrik': 'Hedef Üstü', 'Değer': data.exceedingTarget },
+      { 'Metrik': 'Çok İyi', 'Değer': data.excellent },
       { 'Metrik': 'İyi', 'Değer': data.good },
       { 'Metrik': 'Orta', 'Değer': data.moderate },
       { 'Metrik': 'Zayıf', 'Değer': data.weak },
       { 'Metrik': 'Çok Zayıf', 'Değer': data.veryWeak },
-      { 'Metrik': 'Gecikmiş Faaliyet', 'Değer': data.overdue_activities },
-      { 'Metrik': 'Bekleyen Onay', 'Değer': data.pending_approvals },
+      { 'Metrik': '', 'Değer': '' },
       { 'Metrik': 'Veri Giriş Oranı', 'Değer': `${Math.round(data.data_completion)}%` },
+      { 'Metrik': 'Bekleyen Onay', 'Değer': data.pending_approvals },
+      { 'Metrik': 'Gecikmiş Faaliyet', 'Değer': data.overdue_activities },
     ];
 
-    exportToExcel(exportData, `Yonetici_Ozeti_${currentYear}_${new Date().toISOString().split('T')[0]}`);
+    if (data.strategic_plans.length > 0) {
+      sheets['Stratejik Planlar'] = data.strategic_plans.map(plan => ({
+        'Stratejik Plan': plan.name,
+        'Başlangıç': plan.start_year,
+        'Bitiş': plan.end_year,
+        'Amaç Sayısı': plan.objectives_count,
+        'Hedef Sayısı': plan.goals_count,
+        'Gösterge Sayısı': plan.indicators_count,
+      }));
+    }
+
+    if (data.top_performers.length > 0) {
+      sheets['Hedef Sapması'] = data.top_performers.map((p, idx) => ({
+        'Sıra': idx + 1,
+        'Gösterge': p.name,
+        'İlerleme': `${Math.round(p.progress)}%`,
+      }));
+    }
+
+    if (data.concerns.length > 0) {
+      sheets['Geride Kalanlar'] = data.concerns.map((c, idx) => ({
+        'Sıra': idx + 1,
+        'Gösterge': c.name,
+        'İlerleme': `${Math.round(c.progress)}%`,
+      }));
+    }
+
+    sheets['Öneriler'] = data.recommendations.map((rec, idx) => ({
+      'Sıra': idx + 1,
+      'Öneri': rec,
+    }));
+
+    exportToExcel(sheets, `Yonetici_Ozeti_${currentYear}_${new Date().toISOString().split('T')[0]}`);
   };
 
   const handleExportPDF = () => {
     if (!data) return;
 
-    const topPerformersHeaders = ['Gösterge', 'İlerleme'];
-    const topPerformersRows = data.top_performers.slice(0, 10).map(p => [
+    const topPerformersHeaders = ['Sıra', 'Gösterge', 'İlerleme'];
+    const topPerformersRows = data.top_performers.map((p, idx) => [
+      (idx + 1).toString(),
       p.name,
       `${Math.round(p.progress)}%`
     ]);
 
-    const concernsHeaders = ['Gösterge', 'İlerleme'];
-    const concernsRows = data.concerns.slice(0, 10).map(c => [
+    const concernsHeaders = ['Sıra', 'Gösterge', 'İlerleme'];
+    const concernsRows = data.concerns.map((c, idx) => [
+      (idx + 1).toString(),
       c.name,
       `${Math.round(c.progress)}%`
     ]);
 
-    const plansHeaders = ['Stratejik Plan', 'Dönem', 'Amaç', 'Hedef', 'Gösterge'];
+    const plansHeaders = ['Stratejik Plan', 'Başlangıç', 'Bitiş', 'Amaç', 'Hedef', 'Gösterge'];
     const plansRows = data.strategic_plans.map(plan => [
       plan.name,
-      `${plan.start_year} - ${plan.end_year}`,
-      plan.objectives_count,
-      plan.goals_count,
-      plan.indicators_count
+      plan.start_year.toString(),
+      plan.end_year.toString(),
+      plan.objectives_count.toString(),
+      plan.goals_count.toString(),
+      plan.indicators_count.toString()
+    ]);
+
+    const recommendationsHeaders = ['Sıra', 'Öneri'];
+    const recommendationsRows = data.recommendations.map((rec, idx) => [
+      (idx + 1).toString(),
+      rec
     ]);
 
     const content = `
-      <h2>Genel Performans Özeti</h2>
+      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 30px; border-radius: 8px; margin-bottom: 25px;">
+        <h1 style="margin: 0 0 10px 0; font-size: 28px;">Yönetici Özet Raporu</h1>
+        <p style="margin: 0; font-size: 16px; opacity: 0.9;">Kurum Genel Durumu - ${currentYear}</p>
+        <div style="margin-top: 20px; font-size: 48px; font-weight: bold;">${Math.round(data.overall_progress)}%</div>
+        <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Genel İlerleme Oranı</p>
+      </div>
+
+      <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Gösterge Durumu</h2>
       <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-value">${Math.round(data.overall_progress)}%</div>
-          <div class="stat-label">Genel İlerleme</div>
-        </div>
         <div class="stat-box">
           <div class="stat-value">${data.total_indicators}</div>
           <div class="stat-label">Toplam Gösterge</div>
         </div>
+        <div class="stat-box" style="border-left: 4px solid #9333ea;">
+          <div class="stat-value" style="color: #9333ea;">${data.exceedingTarget}</div>
+          <div class="stat-label">Hedef Üstü</div>
+        </div>
         <div class="stat-box" style="border-left: 4px solid #10b981;">
-          <div class="stat-value" style="color: #10b981;">${data.exceedingTarget}</div>
-          <div class="stat-label">Hedefi Aşan</div>
+          <div class="stat-value" style="color: #10b981;">${data.excellent}</div>
+          <div class="stat-label">Çok İyi</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #3b82f6;">
-          <div class="stat-value" style="color: #3b82f6;">${data.excellent}</div>
-          <div class="stat-label">Mükemmel</div>
-        </div>
-      </div>
-
-      <div class="stats-grid" style="margin-top: 10px;">
         <div class="stat-box" style="border-left: 4px solid #22c55e;">
           <div class="stat-value" style="color: #22c55e;">${data.good}</div>
           <div class="stat-label">İyi</div>
         </div>
+      </div>
+
+      <div class="stats-grid" style="margin-top: 10px;">
         <div class="stat-box" style="border-left: 4px solid #eab308;">
           <div class="stat-value" style="color: #ca8a04;">${data.moderate}</div>
           <div class="stat-label">Orta</div>
@@ -478,41 +526,50 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         </div>
       </div>
 
-      <h2>Operasyonel Metrikler</h2>
+      <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Operasyonel Metrikler</h2>
       <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-value">${data.overdue_activities}</div>
-          <div class="stat-label">Gecikmiş Faaliyet</div>
+        <div class="stat-box" style="border-left: 4px solid ${data.data_completion >= 75 ? '#10b981' : '#eab308'};">
+          <div class="stat-value" style="color: ${data.data_completion >= 75 ? '#10b981' : '#ca8a04'};">${Math.round(data.data_completion)}%</div>
+          <div class="stat-label">Veri Giriş Oranı</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-value">${data.pending_approvals}</div>
+        <div class="stat-box" style="border-left: 4px solid #eab308;">
+          <div class="stat-value" style="color: #ca8a04;">${data.pending_approvals}</div>
           <div class="stat-label">Bekleyen Onay</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-value">${Math.round(data.data_completion)}%</div>
-          <div class="stat-label">Veri Giriş Oranı</div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626;">
+          <div class="stat-value" style="color: #dc2626;">${data.overdue_activities}</div>
+          <div class="stat-label">Gecikmiş Faaliyet</div>
         </div>
       </div>
 
+      ${data.strategic_plans.length > 0 ? `
+        <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Stratejik Planlar</h2>
+        ${generateTableHTML(plansHeaders, plansRows)}
+      ` : ''}
+
       ${data.top_performers.length > 0 ? `
-        <h2>En İyi Performans Gösteren Göstergeler</h2>
+        <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Hedef Sapması Gösteren Göstergeler</h2>
+        <p style="margin-bottom: 15px; color: #64748b; font-size: 14px;">Hedefin üzerinde performans gösteren göstergeler</p>
         ${generateTableHTML(topPerformersHeaders, topPerformersRows)}
       ` : ''}
 
       ${data.concerns.length > 0 ? `
-        <h2>Dikkat Gerektiren Göstergeler</h2>
+        <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Geride Kalan Göstergeler</h2>
+        <p style="margin-bottom: 15px; color: #64748b; font-size: 14px;">Hedefin gerisinde kalan ve dikkat gerektiren göstergeler</p>
         ${generateTableHTML(concernsHeaders, concernsRows)}
       ` : ''}
 
-      ${data.strategic_plans.length > 0 ? `
-        <h2>Stratejik Planlar</h2>
-        ${generateTableHTML(plansHeaders, plansRows)}
-      ` : ''}
+      <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Öneriler ve Dikkat Noktaları</h2>
+      ${generateTableHTML(recommendationsHeaders, recommendationsRows)}
 
-      <h2>Öneriler</h2>
-      <ul>
-        ${data.recommendations.map(rec => `<li>${rec}</li>`).join('')}
-      </ul>
+      <div style="margin-top: 30px; padding: 20px; background: #f1f5f9; border-radius: 8px; border-left: 4px solid #2563eb;">
+        <p style="margin: 0; color: #475569; font-size: 12px;">
+          <strong>Rapor Tarihi:</strong> ${new Date().toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </p>
+        <p style="margin: 5px 0 0 0; color: #475569; font-size: 12px;">
+          <strong>Rapor Dönemi:</strong> ${currentYear} Yılı
+        </p>
+      </div>
     `;
 
     exportToPDF(`Yönetici Özeti - ${currentYear}`, content, `Yonetici_Ozeti_${currentYear}_${new Date().toISOString().split('T')[0]}`);

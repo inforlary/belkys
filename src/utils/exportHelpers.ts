@@ -32,25 +32,57 @@ export function exportToCSV(data: any[], filename: string) {
   document.body.removeChild(link);
 }
 
-export function exportToExcel(data: any[], filename: string) {
-  if (!data || data.length === 0) {
+export function exportToExcel(data: any[] | { [key: string]: any[] }, filename: string) {
+  if (!data) {
     alert('Dışa aktarılacak veri bulunamadı');
     return;
   }
 
   import('xlsx').then((XLSX) => {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-
-    const columnWidths = Object.keys(data[0]).map(key => ({
-      wch: Math.max(
-        key.length,
-        ...data.map(row => String(row[key] || '').length)
-      ) + 2
-    }));
-    worksheet['!cols'] = columnWidths;
-
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Veri');
+
+    if (Array.isArray(data)) {
+      if (data.length === 0) {
+        alert('Dışa aktarılacak veri bulunamadı');
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+
+      const columnWidths = Object.keys(data[0]).map(key => ({
+        wch: Math.max(
+          key.length,
+          ...data.map(row => String(row[key] || '').length)
+        ) + 2
+      }));
+      worksheet['!cols'] = columnWidths;
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Veri');
+    } else {
+      const sheets = Object.entries(data);
+
+      if (sheets.length === 0 || sheets.every(([_, sheetData]) => sheetData.length === 0)) {
+        alert('Dışa aktarılacak veri bulunamadı');
+        return;
+      }
+
+      sheets.forEach(([sheetName, sheetData]) => {
+        if (sheetData && sheetData.length > 0) {
+          const worksheet = XLSX.utils.json_to_sheet(sheetData);
+
+          const columnWidths = Object.keys(sheetData[0]).map(key => ({
+            wch: Math.max(
+              key.length,
+              ...sheetData.map(row => String(row[key] || '').length)
+            ) + 2
+          }));
+          worksheet['!cols'] = columnWidths;
+
+          const sanitizedSheetName = sheetName.substring(0, 31).replace(/[:\\\/\?\*\[\]]/g, '_');
+          XLSX.utils.book_append_sheet(workbook, worksheet, sanitizedSheetName);
+        }
+      });
+    }
 
     XLSX.writeFile(workbook, `${filename}.xlsx`);
   }).catch(err => {
