@@ -387,6 +387,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
       if (!goals || goals.length === 0) {
         setIndicatorDetails([]);
+        setLoadingIndicators(false);
         return;
       }
 
@@ -411,6 +412,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
       if (!indicators || indicators.length === 0) {
         setIndicatorDetails([]);
+        setLoadingIndicators(false);
         return;
       }
 
@@ -419,7 +421,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
       const [entriesResult, targetsResult] = await Promise.all([
         supabase
           .from('indicator_data_entries')
-          .select('indicator_id, value, period_quarter')
+          .select('indicator_id, value, period_quarter, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
           .eq('status', 'approved')
