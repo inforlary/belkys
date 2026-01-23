@@ -54,19 +54,56 @@ export default function PerformanceKPIDashboard() {
   const { profile } = useAuth();
   const [indicators, setIndicators] = useState<IndicatorData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
 
   useEffect(() => {
     if (profile?.organization_id) {
-      loadData();
+      loadAvailableYears();
     }
   }, [profile?.organization_id]);
+
+  useEffect(() => {
+    if (profile?.organization_id && selectedYear) {
+      loadData();
+    }
+  }, [profile?.organization_id, selectedYear]);
+
+  const loadAvailableYears = async () => {
+    if (!profile?.organization_id) return;
+
+    try {
+      const { data } = await supabase
+        .from('indicator_data_entries')
+        .select('period_year')
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'approved')
+        .order('period_year', { ascending: false });
+
+      if (data && data.length > 0) {
+        const uniqueYears = Array.from(new Set(data.map(d => d.period_year))).sort((a, b) => b - a);
+        setAvailableYears(uniqueYears);
+
+        if (uniqueYears.length > 0) {
+          setSelectedYear(uniqueYears[0]);
+        }
+      } else {
+        const currentYear = new Date().getFullYear();
+        setAvailableYears(Array.from({ length: 5 }, (_, i) => currentYear - i));
+      }
+    } catch (error) {
+      console.error('Yıl verisi yüklenirken hata:', error);
+      const currentYear = new Date().getFullYear();
+      setAvailableYears(Array.from({ length: 5 }, (_, i) => currentYear - i));
+    }
+  };
 
   const loadData = async () => {
     if (!profile) return;
     setLoading(true);
 
     try {
-      const currentYear = new Date().getFullYear();
+      const currentYear = selectedYear;
 
       let goalIds: string[] = [];
       if (profile.role === 'admin' || profile.role === 'super_admin') {
@@ -284,8 +321,26 @@ export default function PerformanceKPIDashboard() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Performans Göstergeleri</h1>
-        <p className="text-gray-600">Hedefe göre gösterge performansı</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Performans Göstergeleri</h1>
+            <p className="text-gray-600">Hedefe göre gösterge performansı</p>
+          </div>
+          {availableYears.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Yıl:</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ÖZET İSTATİSTİKLER */}

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TrendingUp, BarChart3, Award } from 'lucide-react';
 import PerformanceDashboard from '../components/reports/PerformanceDashboard';
 import IndicatorPerformance from '../components/reports/IndicatorPerformance';
 import ExecutiveSummary from '../components/reports/ExecutiveSummary';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 type ReportTab =
   | 'performance-dashboard'
@@ -10,10 +12,47 @@ type ReportTab =
   | 'executive-summary';
 
 export default function Reports() {
+  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<ReportTab>('executive-summary');
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+
+  useEffect(() => {
+    loadAvailableYears();
+  }, [profile?.organization_id]);
+
+  const loadAvailableYears = async () => {
+    if (!profile?.organization_id) return;
+
+    try {
+      // Get years with approved data entries
+      const { data } = await supabase
+        .from('indicator_data_entries')
+        .select('period_year')
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'approved')
+        .order('period_year', { ascending: false });
+
+      if (data && data.length > 0) {
+        const uniqueYears = Array.from(new Set(data.map(d => d.period_year))).sort((a, b) => b - a);
+        setAvailableYears(uniqueYears);
+
+        // Set the latest year with data as default
+        if (uniqueYears.length > 0 && !uniqueYears.includes(selectedYear)) {
+          setSelectedYear(uniqueYears[0]);
+        }
+      } else {
+        // No data entries, use current and previous years
+        setAvailableYears(Array.from({ length: 5 }, (_, i) => currentYear - i));
+      }
+    } catch (error) {
+      console.error('Yıl verisi yüklenirken hata:', error);
+      setAvailableYears(Array.from({ length: 5 }, (_, i) => currentYear - i));
+    }
+  };
+
+  const years = availableYears.length > 0 ? availableYears : Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   const tabs = [
     {
