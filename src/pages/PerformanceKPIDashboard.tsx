@@ -118,45 +118,79 @@ export default function PerformanceKPIDashboard() {
         return;
       }
 
-      const dataEntriesQuery = supabase
-        .from('indicator_data_entries')
-        .select('indicator_id, actual_value, year, period_type, period')
-        .eq('year', currentYear)
-        .eq('status', 'admin_approved');
+      const indicatorIds = (indicatorsData || []).map(i => i.id);
 
-      const { data: dataEntries } = await dataEntriesQuery;
+      const [dataEntries, targetsData] = await Promise.all([
+        supabase
+          .from('indicator_data_entries')
+          .select('indicator_id, value, status')
+          .eq('organization_id', profile.organization_id)
+          .eq('period_year', currentYear)
+          .eq('status', 'approved')
+          .in('indicator_id', indicatorIds),
+        supabase
+          .from('indicator_targets')
+          .select('indicator_id, target_value, baseline_value')
+          .eq('year', currentYear)
+          .in('indicator_id', indicatorIds)
+      ]);
+
+      const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
+      targetsData.data?.forEach(target => {
+        targetsByIndicator[target.indicator_id] = {
+          target: target.target_value,
+          baseline: target.baseline_value || 0,
+        };
+      });
 
       const indicatorsWithProgress = (indicatorsData || []).map(indicator => {
-        const entries = (dataEntries || []).filter(e => e.indicator_id === indicator.id);
+        const targetData = targetsByIndicator[indicator.id];
+        const indicatorEntries = (dataEntries.data || []).filter(
+          e => e.indicator_id === indicator.id && e.status === 'approved'
+        );
 
-        let latestValue = 0;
-        if (entries.length > 0) {
-          const periodicalEntries = entries.filter(e => e.period_type === 'quarterly' || e.period_type === 'monthly');
-          if (periodicalEntries.length > 0) {
-            periodicalEntries.sort((a, b) => {
-              if (a.period_type === b.period_type) {
-                return (b.period || 0) - (a.period || 0);
-              }
-              return a.period_type === 'quarterly' ? -1 : 1;
-            });
-            latestValue = periodicalEntries[0].actual_value || 0;
-          } else {
-            const annualEntry = entries.find(e => e.period_type === 'annual');
-            latestValue = annualEntry?.actual_value || 0;
+        const hasTarget = targetData && targetData.target > 0;
+        const hasData = indicatorEntries.length > 0;
+
+        let progress = 0;
+        let currentValue = 0;
+        let targetValue = targetData?.target || indicator.target_value || 0;
+
+        if (hasTarget && hasData) {
+          const indicatorWithTarget = {
+            id: indicator.id,
+            goal_id: indicator.goal_id,
+            yearly_target: targetData.target,
+            baseline_value: targetData.baseline || indicator.baseline_value || 0,
+            calculation_method: indicator.calculation_method
+          };
+
+          progress = calculateIndicatorProgress(indicatorWithTarget, dataEntries.data || []);
+
+          const sum = indicatorEntries.reduce((acc, e) => acc + (e.value || 0), 0);
+          const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+          const baselineValue = targetData.baseline || indicator.baseline_value || 0;
+
+          if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+            currentValue = baselineValue + sum;
+          } else if (calculationMethod === 'decreasing') {
+            currentValue = baselineValue - sum;
+          } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
+            currentValue = indicatorEntries.length > 0 ? sum / indicatorEntries.length : baselineValue;
           }
+        } else if (hasTarget && !hasData) {
+          currentValue = targetData.baseline || indicator.baseline_value || 0;
+          progress = 0;
+        } else if (!hasTarget && hasData) {
+          const sum = indicatorEntries.reduce((acc, e) => acc + (e.value || 0), 0);
+          currentValue = sum;
         }
-
-        const progressData = calculateIndicatorProgress({
-          latest_value: latestValue,
-          target_value: indicator.target_value,
-          baseline_value: indicator.baseline_value,
-          calculation_method: indicator.calculation_method as any
-        });
 
         return {
           ...indicator,
-          latest_value: latestValue,
-          achievement_rate: progressData.achievement_rate
+          target_value: targetValue,
+          latest_value: currentValue,
+          achievement_rate: progress
         };
       });
 
