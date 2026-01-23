@@ -236,7 +236,6 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       items: [
         { icon: Target, label: 'Hedeflerim', path: 'my-goals', requiresDepartment: true },
         { icon: FileText, label: 'Raporlar', path: 'reports' },
-        { icon: FileBarChart, label: 'Stratejik Plan Raporları', path: 'strategic-plan-reports' },
         { icon: Target, label: 'Stratejik Planlar', path: 'plans', adminOnly: true },
         { icon: Flag, label: 'Amaçlar', path: 'objectives', adminOnly: true },
         { icon: Target, label: 'Hedefler', path: 'goals', adminOnly: true },

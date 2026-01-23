@@ -69,7 +69,6 @@ import DepartmentProgramMappingView from './pages/DepartmentProgramMappingView';
 import PerformanceCards from './pages/PerformanceCards';
 import BudgetPeriodManagement from './pages/BudgetPeriodManagement';
 import StrategicPlanEvaluation from './pages/StrategicPlanEvaluation';
-import StrategicPlanReports from './pages/StrategicPlanReports';
 import IntegratedManagementDashboard from './pages/IntegratedManagementDashboard';
 import RiskManagement from './pages/RiskManagement';
 import RiskDashboard from './pages/RiskDashboard';
@@ -353,8 +352,6 @@ const renderPage = () => {
         return <PerformanceCards />;
       case 'strategic-plan-evaluation':
         return <StrategicPlanEvaluation />;
-      case 'strategic-plan-reports':
-        return <StrategicPlanReports />;
       case 'risks':
         return <RiskManagement />;
       case 'risks/register':
