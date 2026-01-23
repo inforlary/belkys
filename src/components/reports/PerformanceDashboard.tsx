@@ -421,11 +421,15 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
       indicators.forEach(indicator => {
         const targetData = targetsByIndicator[indicator.id];
-        if (targetData && targetData.target > 0) {
-          const periodValues = entriesByIndicator[indicator.id] || [];
+        const periodValues = entriesByIndicator[indicator.id] || [];
+        const hasTarget = targetData && targetData.target > 0;
+        const hasData = periodValues.length > 0;
 
-          if (periodValues.length === 0) return;
+        let progress = 0;
+        let currentValue = 0;
+        let targetValue = 0;
 
+        if (hasTarget && hasData) {
           const indicatorWithTarget = {
             id: indicator.id,
             goal_id: indicator.goal_id,
@@ -434,32 +438,37 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             calculation_method: indicator.calculation_method
           };
 
-          const progress = calculateIndicatorProgress(indicatorWithTarget, entriesResult.data || []);
-          const indicatorStatus = getIndicatorStatus(progress);
+          progress = calculateIndicatorProgress(indicatorWithTarget, entriesResult.data || []);
+          targetValue = targetData.target;
 
-          if (indicatorStatus === status) {
-            const sum = periodValues.reduce((acc, val) => acc + val, 0);
-            const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+          const sum = periodValues.reduce((acc, val) => acc + val, 0);
+          const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
 
-            let currentValue = sum;
-            if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
-              currentValue = (targetData.baseline || indicator.baseline_value || 0) + sum;
-            } else if (calculationMethod === 'decreasing') {
-              currentValue = (targetData.baseline || indicator.baseline_value || 0) - sum;
-            } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
-              currentValue = periodValues.length > 0 ? sum / periodValues.length : sum;
-            }
-
-            details.push({
-              id: indicator.id,
-              name: indicator.name,
-              code: indicator.code || '',
-              current_value: currentValue,
-              target_value: targetData.target,
-              progress: progress,
-              status: indicatorStatus,
-            });
+          if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+            currentValue = (targetData.baseline || indicator.baseline_value || 0) + sum;
+          } else if (calculationMethod === 'decreasing') {
+            currentValue = (targetData.baseline || indicator.baseline_value || 0) - sum;
+          } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
+            currentValue = periodValues.length > 0 ? sum / periodValues.length : sum;
           }
+        } else if (hasTarget && !hasData) {
+          targetValue = targetData.target;
+          currentValue = targetData.baseline || indicator.baseline_value || 0;
+          progress = 0;
+        }
+
+        const indicatorStatus = getIndicatorStatus(progress);
+
+        if (indicatorStatus === status) {
+          details.push({
+            id: indicator.id,
+            name: indicator.name,
+            code: indicator.code || '',
+            current_value: currentValue,
+            target_value: targetValue,
+            progress: progress,
+            status: indicatorStatus,
+          });
         }
       });
 

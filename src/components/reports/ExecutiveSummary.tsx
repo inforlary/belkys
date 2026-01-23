@@ -618,7 +618,7 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         let currentValue = 0;
         let targetValue = 0;
 
-        if (hasTarget) {
+        if (hasTarget && hasData) {
           const indicatorWithTarget = {
             id: indicator.id,
             goal_id: indicator.goal_id,
@@ -640,6 +640,10 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
           } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
             currentValue = periodValues.length > 0 ? sum / periodValues.length : sum;
           }
+        } else if (hasTarget && !hasData) {
+          targetValue = targetData.target;
+          currentValue = targetData.baseline || indicator.baseline_value || 0;
+          progress = 0;
         }
 
         const indicatorStatus = getIndicatorStatus(progress);
