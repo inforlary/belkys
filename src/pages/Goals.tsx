@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { Plus, Edit2, Trash2, Search, Sparkles, TrendingUp, ChevronDown, ChevronRight, Target, AlertTriangle, Shield } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Sparkles, TrendingUp, ChevronDown, ChevronRight, Target, AlertTriangle, Shield, FileSpreadsheet, FileDown } from 'lucide-react';
 import { generateGoalCode } from '../utils/codeGenerator';
 import { calculateGoalProgress, getProgressColor } from '../utils/progressCalculations';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Goal {
   id: string;
@@ -397,6 +398,82 @@ export default function Goals() {
     setExpandedObjectives(newExpanded);
   };
 
+  const handleExportExcel = () => {
+    const exportData: any[] = [];
+
+    filteredGroups.forEach(group => {
+      group.goals.forEach(goal => {
+        const progress = calculateGoalProgress(goal.id, indicators, dataEntries);
+        const riskCount = risks.filter(r => r.goal_id === goal.id).length;
+
+        exportData.push({
+          'Amaç': `${group.objective_code} - ${group.objective_title}`,
+          'Hedef Kodu': goal.code,
+          'Hedef Başlığı': goal.title,
+          'Müdürlük': goal.departments?.name || '-',
+          'Başkan Yardımcısı': goal.vice_president?.full_name || '-',
+          'İlerleme (%)': Math.round(progress),
+          'Risk Sayısı': riskCount,
+          'Açıklama': goal.description || '-',
+        });
+      });
+    });
+
+    exportToExcel(
+      exportData,
+      `Hedefler_${selectedYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['Amaç', 'Hedef Kodu', 'Hedef Başlığı', 'Müdürlük', 'İlerleme', 'Risk'];
+    const rows: any[] = [];
+    let totalGoals = 0;
+
+    filteredGroups.forEach(group => {
+      group.goals.forEach(goal => {
+        const progress = calculateGoalProgress(goal.id, indicators, dataEntries);
+        const riskCount = risks.filter(r => r.goal_id === goal.id).length;
+        totalGoals++;
+
+        rows.push([
+          `${group.objective_code} - ${group.objective_title}`,
+          goal.code,
+          goal.title,
+          goal.departments?.name || '-',
+          `${Math.round(progress)}%`,
+          riskCount.toString(),
+        ]);
+      });
+    });
+
+    const avgProgress = totalGoals > 0
+      ? Math.round(
+          filteredGroups.reduce((sum, group) => {
+            return sum + group.goals.reduce((gSum, goal) => {
+              return gSum + calculateGoalProgress(goal.id, indicators, dataEntries);
+            }, 0);
+          }, 0) / totalGoals
+        )
+      : 0;
+
+    const content = `
+      <h2>Hedefler - ${selectedYear}</h2>
+      <div class="mb-4">
+        <p><strong>Toplam Hedef:</strong> ${totalGoals}</p>
+        <p><strong>Amaç Sayısı:</strong> ${filteredGroups.length}</p>
+        <p><strong>Ortalama İlerleme:</strong> ${avgProgress}%</p>
+      </div>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF(
+      `Hedefler - ${selectedYear}`,
+      content,
+      `Hedefler_${selectedYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -412,10 +489,30 @@ export default function Goals() {
           <h1 className="text-3xl font-bold text-slate-900">Hedefler</h1>
           <p className="text-slate-600 mt-1">Amaçlara bağlı hedefleri yönetin</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} disabled={objectives.length === 0}>
-          <Plus className="w-4 h-4 mr-2" />
-          Yeni Hedef
-        </Button>
+        <div className="flex gap-2">
+          {filteredGroups.some(g => g.goals.length > 0) && (
+            <>
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <FileDown className="w-4 h-4" />
+                PDF
+              </button>
+            </>
+          )}
+          <Button onClick={() => setIsModalOpen(true)} disabled={objectives.length === 0}>
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Hedef
+          </Button>
+        </div>
       </div>
 
       {objectives.length === 0 && (

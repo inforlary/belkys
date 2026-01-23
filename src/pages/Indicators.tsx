@@ -5,8 +5,8 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { IndicatorForm } from '../components/IndicatorForm';
-import { Plus, Edit2, Trash2, Search, TrendingUp, Download, ChevronDown, ChevronRight, Target } from 'lucide-react';
-import { generateIndicatorReport } from '../utils/exportHelpers';
+import { Plus, Edit2, Trash2, Search, TrendingUp, Download, ChevronDown, ChevronRight, Target, FileSpreadsheet, FileDown } from 'lucide-react';
+import { generateIndicatorReport, exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 import { calculateIndicatorProgress, getProgressColor } from '../utils/progressCalculations';
 
 interface Indicator {
@@ -345,6 +345,101 @@ export default function Indicators() {
     setExpandedGoals(newExpanded);
   };
 
+  const handleExportExcel = () => {
+    const exportData: any[] = [];
+
+    filteredGroups.forEach(group => {
+      group.indicators.forEach(indicator => {
+        const progress = calculateIndicatorProgress(
+          indicator.baseline_value,
+          indicator.current_value,
+          indicator.target_value,
+          indicator.calculation_method || 'cumulative'
+        );
+
+        exportData.push({
+          'Amaç': `${group.objective_code} - ${group.objective_title}`,
+          'Hedef': `${group.goal_code} - ${group.goal_title}`,
+          'Gösterge Kodu': indicator.code,
+          'Gösterge Adı': indicator.name,
+          'Birim': indicator.unit,
+          'Başlangıç': indicator.baseline_value,
+          'Güncel Değer': indicator.current_value,
+          'Hedef Değer': indicator.target_value || '-',
+          'İlerleme (%)': Math.round(progress),
+          'Ölçüm Sıklığı': indicator.measurement_frequency,
+          'Hesaplama Yöntemi': indicator.calculation_method || '-',
+        });
+      });
+    });
+
+    exportToExcel(
+      exportData,
+      `Gostergeler_${selectedYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['Hedef', 'Gösterge Kodu', 'Gösterge Adı', 'Birim', 'Başlangıç', 'Güncel', 'Hedef', 'İlerleme'];
+    const rows: any[] = [];
+    let totalIndicators = 0;
+
+    filteredGroups.forEach(group => {
+      group.indicators.forEach(indicator => {
+        const progress = calculateIndicatorProgress(
+          indicator.baseline_value,
+          indicator.current_value,
+          indicator.target_value,
+          indicator.calculation_method || 'cumulative'
+        );
+        totalIndicators++;
+
+        rows.push([
+          `${group.goal_code} - ${group.goal_title}`,
+          indicator.code,
+          indicator.name,
+          indicator.unit,
+          indicator.baseline_value.toString(),
+          indicator.current_value.toString(),
+          indicator.target_value?.toString() || '-',
+          `${Math.round(progress)}%`,
+        ]);
+      });
+    });
+
+    const avgProgress = totalIndicators > 0
+      ? Math.round(
+          filteredGroups.reduce((sum, group) => {
+            return sum + group.indicators.reduce((iSum, ind) => {
+              const progress = calculateIndicatorProgress(
+                ind.baseline_value,
+                ind.current_value,
+                ind.target_value,
+                ind.calculation_method || 'cumulative'
+              );
+              return iSum + progress;
+            }, 0);
+          }, 0) / totalIndicators
+        )
+      : 0;
+
+    const content = `
+      <h2>Göstergeler - ${selectedYear}</h2>
+      <div class="mb-4">
+        <p><strong>Toplam Gösterge:</strong> ${totalIndicators}</p>
+        <p><strong>Hedef Sayısı:</strong> ${filteredGroups.length}</p>
+        <p><strong>Ortalama İlerleme:</strong> ${avgProgress}%</p>
+      </div>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF(
+      `Göstergeler - ${selectedYear}`,
+      content,
+      `Gostergeler_${selectedYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
   const measurementFrequencyLabels = {
     monthly: 'Aylık',
     quarterly: '3 Aylık',
@@ -367,15 +462,25 @@ export default function Indicators() {
           <h1 className="text-3xl font-bold text-gray-900">Performans Göstergeleri</h1>
           <p className="text-gray-600 mt-1">Hedeflere bağlı performans göstergelerini yönetin</p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            onClick={() => generateIndicatorReport(indicators)}
-            variant="outline"
-            disabled={indicators.length === 0}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Excel
-          </Button>
+        <div className="flex gap-2">
+          {filteredGroups.some(g => g.indicators.length > 0) && (
+            <>
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <FileDown className="w-4 h-4" />
+                PDF
+              </button>
+            </>
+          )}
           <Button
             onClick={() => setIsModalOpen(true)}
             disabled={goals.length === 0 || !selectedPlan}

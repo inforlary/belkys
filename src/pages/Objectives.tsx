@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { Plus, Edit2, Trash2, Search, Sparkles, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Sparkles, TrendingUp, FileSpreadsheet, FileDown } from 'lucide-react';
 import { generateObjectiveCode } from '../utils/codeGenerator';
 import { calculateObjectiveProgress, getProgressColor } from '../utils/progressCalculations';
+import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 
 interface Objective {
   id: string;
@@ -247,6 +248,60 @@ export default function Objectives() {
     obj.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleExportExcel = () => {
+    const exportData = filteredObjectives.map((obj, index) => {
+      const progress = calculateObjectiveProgress(obj.id, goals, indicators, dataEntries);
+      return {
+        'Sıra': obj.order_number,
+        'Kod': obj.code,
+        'Amaç Başlığı': obj.title,
+        'Stratejik Plan': obj.plan?.name || '-',
+        'İlerleme (%)': Math.round(progress),
+        'Açıklama': obj.description || '-',
+      };
+    });
+
+    exportToExcel(
+      exportData,
+      `Amaclar_${selectedYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['Sıra', 'Kod', 'Amaç Başlığı', 'Stratejik Plan', 'İlerleme', 'Açıklama'];
+    const rows = filteredObjectives.map(obj => {
+      const progress = calculateObjectiveProgress(obj.id, goals, indicators, dataEntries);
+      return [
+        obj.order_number.toString(),
+        obj.code,
+        obj.title,
+        obj.plan?.name || '-',
+        `${Math.round(progress)}%`,
+        obj.description || '-',
+      ];
+    });
+
+    const content = `
+      <h2>Amaçlar - ${selectedYear}</h2>
+      <div class="mb-4">
+        <p><strong>Toplam Amaç:</strong> ${filteredObjectives.length}</p>
+        <p><strong>Ortalama İlerleme:</strong> ${Math.round(
+          filteredObjectives.reduce((sum, obj) => {
+            const progress = calculateObjectiveProgress(obj.id, goals, indicators, dataEntries);
+            return sum + progress;
+          }, 0) / filteredObjectives.length || 0
+        )}%</p>
+      </div>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF(
+      `Amaçlar - ${selectedYear}`,
+      content,
+      `Amaclar_${selectedYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -262,10 +317,30 @@ export default function Objectives() {
           <h1 className="text-3xl font-bold text-slate-900">Amaçlar</h1>
           <p className="text-slate-600 mt-1">Stratejik planlara bağlı amaçları yönetin</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} disabled={plans.length === 0}>
-          <Plus className="w-4 h-4 mr-2" />
-          Yeni Amaç
-        </Button>
+        <div className="flex gap-2">
+          {filteredObjectives.length > 0 && (
+            <>
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <FileDown className="w-4 h-4" />
+                PDF
+              </button>
+            </>
+          )}
+          <Button onClick={() => setIsModalOpen(true)} disabled={plans.length === 0}>
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Amaç
+          </Button>
+        </div>
       </div>
 
       {plans.length === 0 && (
