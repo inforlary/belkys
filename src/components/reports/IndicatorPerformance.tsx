@@ -366,6 +366,60 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     return `${config.color} ${config.bgColor}`;
   };
 
+  const handleExportIndicatorDetailsExcel = () => {
+    if (indicatorDetails.length === 0) return;
+
+    const exportData = indicatorDetails.map(ind => ({
+      'Gösterge Kodu': ind.code,
+      'Gösterge Adı': ind.name,
+      'Müdürlük': ind.department_name || '-',
+      'Gerçekleşen': ind.current_value.toFixed(2),
+      'Hedef': ind.target_value.toFixed(2),
+      'İlerleme (%)': Math.round(ind.progress),
+      'Durum': getStatusLabel(ind.status),
+      'Hedef Tanımlı': ind.has_target ? 'Evet' : 'Hayır',
+      'Veri Girişi': ind.has_data ? 'Var' : 'Yok',
+    }));
+
+    const statusLabel = selectedStatus ? getStatusLabel(selectedStatus) : 'Tum';
+    exportToExcel(
+      exportData,
+      `${statusLabel}_Gostergeler_${currentYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
+  const handleExportIndicatorDetailsPDF = () => {
+    if (indicatorDetails.length === 0) return;
+
+    const headers = ['Kod', 'Gösterge', 'Müdürlük', 'Gerçekleşen', 'Hedef', 'İlerleme', 'Durum'];
+    const rows = indicatorDetails.map(ind => [
+      ind.code,
+      ind.name,
+      ind.department_name || '-',
+      ind.current_value.toFixed(2),
+      ind.target_value > 0 ? ind.target_value.toFixed(2) : 'Belirtilmemiş',
+      `${Math.round(ind.progress)}%`,
+      getStatusLabel(ind.status),
+    ]);
+
+    const statusLabel = selectedStatus ? getStatusLabel(selectedStatus) : 'Tüm';
+    const content = `
+      <h2>${statusLabel} Göstergeler - ${currentYear}</h2>
+      <div class="mb-4">
+        <p><strong>Toplam Gösterge:</strong> ${indicatorDetails.length}</p>
+        <p><strong>Hedefi Olmayan:</strong> ${indicatorDetails.filter(i => !i.has_target).length}</p>
+        <p><strong>Veri Girişi Olmayan:</strong> ${indicatorDetails.filter(i => !i.has_data).length}</p>
+      </div>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF(
+      `${statusLabel} Göstergeler`,
+      content,
+      `${statusLabel}_Gostergeler_${currentYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
   const calculateCurrentValue = (ind: IndicatorData) => {
     const periodValues: number[] = [];
     if (ind.hasQ1Entry) periodValues.push(ind.q1_value);
@@ -1137,14 +1191,32 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             <div className="space-y-3">
               <div className="mb-4 p-4 bg-slate-50 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-slate-600">
-                    Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
-                  </div>
-                  {selectedStatus && (
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColorClass(selectedStatus)}`}>
-                      {getStatusLabel(selectedStatus)}
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-slate-600">
+                      Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
                     </div>
-                  )}
+                    {selectedStatus && (
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColorClass(selectedStatus)}`}>
+                        {getStatusLabel(selectedStatus)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExportIndicatorDetailsExcel}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Excel
+                    </button>
+                    <button
+                      onClick={handleExportIndicatorDetailsPDF}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <FileDown className="w-4 h-4" />
+                      PDF
+                    </button>
+                  </div>
                 </div>
               </div>
 
