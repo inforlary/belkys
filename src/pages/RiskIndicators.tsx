@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { Plus, CreditCard as Edit, History, Grid3x3, List, TrendingUp, TrendingDown, Minus, X, Filter, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Plus, CreditCard as Edit, History, Grid3x3, List, TrendingUp, TrendingDown, Minus, X, Filter, FileDown, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { exportToExcel, exportToPDF, generateTableHTML } from '../utils/exportHelpers';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
@@ -89,8 +89,10 @@ export default function RiskIndicators() {
 
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingIndicator, setEditingIndicator] = useState<Indicator | null>(null);
   const [selectedIndicator, setSelectedIndicator] = useState<Indicator | null>(null);
+  const [deletingIndicator, setDeletingIndicator] = useState<Indicator | null>(null);
   const [indicatorValues, setIndicatorValues] = useState<IndicatorValue[]>([]);
 
   const [filters, setFilters] = useState({
@@ -355,6 +357,36 @@ export default function RiskIndicators() {
     setShowHistoryModal(false);
     setSelectedIndicator(null);
     setIndicatorValues([]);
+  }
+
+  function openDeleteModal(indicator: Indicator) {
+    setDeletingIndicator(indicator);
+    setShowDeleteModal(true);
+  }
+
+  function closeDeleteModal() {
+    setShowDeleteModal(false);
+    setDeletingIndicator(null);
+  }
+
+  async function handleDelete() {
+    if (!deletingIndicator) return;
+
+    try {
+      const { error } = await supabase
+        .from('risk_indicators')
+        .delete()
+        .eq('id', deletingIndicator.id);
+
+      if (error) throw error;
+
+      alert('Gösterge silindi');
+      closeDeleteModal();
+      loadData();
+    } catch (error: any) {
+      console.error('Error deleting indicator:', error);
+      alert(`Gösterge silinirken hata oluştu: ${error.message}`);
+    }
   }
 
   const filteredIndicators = indicators.filter(ind => {
@@ -720,6 +752,13 @@ export default function RiskIndicators() {
                       <History className="w-3 h-3" />
                       Geçmiş
                     </button>
+                    <button
+                      onClick={() => openDeleteModal(indicator)}
+                      className="flex-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 text-sm flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Sil
+                    </button>
                   </div>
                 </div>
               </Card>
@@ -782,14 +821,23 @@ export default function RiskIndicators() {
                           <button
                             onClick={() => openIndicatorModal(indicator)}
                             className="text-blue-600 hover:text-blue-800"
+                            title="Düzenle"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => openHistoryModal(indicator)}
                             className="text-gray-600 hover:text-gray-800"
+                            title="Geçmiş"
                           >
                             <History className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(indicator)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1222,6 +1270,54 @@ export default function RiskIndicators() {
               Henüz veri girilmemiş
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={closeDeleteModal}
+        title="Gösterge Sil"
+      >
+        <div className="space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-red-900 mb-2">
+                  Bu göstergeyi silmek istediğinizden emin misiniz?
+                </h3>
+                {deletingIndicator && (
+                  <div className="text-sm text-red-700 space-y-1">
+                    <p><strong>Gösterge Kodu:</strong> {deletingIndicator.code}</p>
+                    <p><strong>Gösterge Adı:</strong> {deletingIndicator.name}</p>
+                    <p className="text-red-600 font-medium mt-2">
+                      ⚠️ Bu işlem geri alınamaz ve tüm geçmiş veriler silinecektir!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeDeleteModal}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Sil
+            </button>
+          </div>
         </div>
       </Modal>
     </div>
