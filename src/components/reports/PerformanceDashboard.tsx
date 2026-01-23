@@ -36,6 +36,9 @@ interface IndicatorDetail {
   target_value: number;
   progress: number;
   status: IndicatorStatus;
+  department_name?: string;
+  has_target: boolean;
+  has_data: boolean;
 }
 
 interface PerformanceDashboardProps {
@@ -374,7 +377,18 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
 
       const { data: indicators } = await supabase
         .from('indicators')
-        .select('id, name, code, calculation_method, baseline_value, goal_id')
+        .select(`
+          id,
+          name,
+          code,
+          goal_id,
+          calculation_method,
+          baseline_value,
+          goal:goals!goal_id(
+            department_id,
+            department:departments(name)
+          )
+        `)
         .eq('organization_id', profile.organization_id)
         .in('goal_id', goalIds);
 
@@ -425,36 +439,40 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         const hasTarget = targetData && targetData.target > 0;
         const hasData = periodValues.length > 0;
 
+        const departmentName = indicator.goal?.department?.name || 'Atanmamış';
+
         let progress = 0;
         let currentValue = 0;
         let targetValue = 0;
 
-        if (hasTarget && hasData) {
-          const indicatorWithTarget = {
-            id: indicator.id,
-            goal_id: indicator.goal_id,
-            yearly_target: targetData.target,
-            baseline_value: targetData.baseline || indicator.baseline_value || 0,
-            calculation_method: indicator.calculation_method
-          };
-
-          progress = calculateIndicatorProgress(indicatorWithTarget, entriesResult.data || []);
+        if (hasTarget) {
           targetValue = targetData.target;
 
-          const sum = periodValues.reduce((acc, val) => acc + val, 0);
-          const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+          if (hasData) {
+            const indicatorWithTarget = {
+              id: indicator.id,
+              goal_id: indicator.goal_id,
+              yearly_target: targetData.target,
+              baseline_value: targetData.baseline || indicator.baseline_value || 0,
+              calculation_method: indicator.calculation_method
+            };
 
-          if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
-            currentValue = (targetData.baseline || indicator.baseline_value || 0) + sum;
-          } else if (calculationMethod === 'decreasing') {
-            currentValue = (targetData.baseline || indicator.baseline_value || 0) - sum;
-          } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
-            currentValue = periodValues.length > 0 ? sum / periodValues.length : sum;
+            progress = calculateIndicatorProgress(indicatorWithTarget, entriesResult.data || []);
+
+            const sum = periodValues.reduce((acc, val) => acc + val, 0);
+            const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+
+            if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+              currentValue = (targetData.baseline || indicator.baseline_value || 0) + sum;
+            } else if (calculationMethod === 'decreasing') {
+              currentValue = (targetData.baseline || indicator.baseline_value || 0) - sum;
+            } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
+              currentValue = periodValues.length > 0 ? sum / periodValues.length : (targetData.baseline || indicator.baseline_value || 0);
+            }
+          } else {
+            currentValue = targetData.baseline || indicator.baseline_value || 0;
+            progress = 0;
           }
-        } else if (hasTarget && !hasData) {
-          targetValue = targetData.target;
-          currentValue = targetData.baseline || indicator.baseline_value || 0;
-          progress = 0;
         }
 
         const indicatorStatus = getIndicatorStatus(progress);
@@ -468,6 +486,9 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             target_value: targetValue,
             progress: progress,
             status: indicatorStatus,
+            department_name: departmentName,
+            has_target: hasTarget,
+            has_data: hasData,
           });
         }
       });
@@ -484,6 +505,62 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
   const getStatusColorClass = (status: IndicatorStatus) => {
     const config = getStatusConfig(status);
     return `${config.color} ${config.bgColor}`;
+  };
+
+  const handleExportIndicatorDetailsExcel = () => {
+    if (indicatorDetails.length === 0) return;
+
+    const exportData = indicatorDetails.map(ind => ({
+      'Gösterge Kodu': ind.code,
+      'Gösterge Adı': ind.name,
+      'Müdürlük': ind.department_name || '-',
+      'Gerçekleşen': ind.current_value.toFixed(2),
+      'Hedef': ind.target_value.toFixed(2),
+      'İlerleme (%)': Math.round(ind.progress),
+      'Durum': getStatusLabel(ind.status),
+      'Hedef Tanımlı': ind.has_target ? 'Evet' : 'Hayır',
+      'Veri Girişi': ind.has_data ? 'Var' : 'Yok',
+    }));
+
+    const statusLabel = selectedStatus ? getStatusLabel(selectedStatus) : 'Tum';
+    const deptLabel = selectedDepartment ? `_${selectedDepartment.department_name}` : '_Kurum_Geneli';
+    exportToExcel(
+      exportData,
+      `${statusLabel}_Gostergeler${deptLabel}_${currentYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
+  const handleExportIndicatorDetailsPDF = () => {
+    if (indicatorDetails.length === 0) return;
+
+    const headers = ['Kod', 'Gösterge', 'Müdürlük', 'Gerçekleşen', 'Hedef', 'İlerleme', 'Durum'];
+    const rows = indicatorDetails.map(ind => [
+      ind.code,
+      ind.name,
+      ind.department_name || '-',
+      ind.current_value.toFixed(2),
+      ind.target_value > 0 ? ind.target_value.toFixed(2) : 'Belirtilmemiş',
+      `${Math.round(ind.progress)}%`,
+      getStatusLabel(ind.status),
+    ]);
+
+    const statusLabel = selectedStatus ? getStatusLabel(selectedStatus) : 'Tüm';
+    const deptLabel = selectedDepartment ? ` - ${selectedDepartment.department_name}` : ' - Kurum Geneli';
+    const content = `
+      <h2>${statusLabel} Göstergeler${deptLabel} - ${currentYear}</h2>
+      <div class="mb-4">
+        <p><strong>Toplam Gösterge:</strong> ${indicatorDetails.length}</p>
+        <p><strong>Hedefi Olmayan:</strong> ${indicatorDetails.filter(i => !i.has_target).length}</p>
+        <p><strong>Veri Girişi Olmayan:</strong> ${indicatorDetails.filter(i => !i.has_data).length}</p>
+      </div>
+      ${generateTableHTML(headers, rows)}
+    `;
+
+    exportToPDF(
+      `${statusLabel} Göstergeler${deptLabel}`,
+      content,
+      `${statusLabel}_Gostergeler${selectedDepartment ? `_${selectedDepartment.department_name}` : '_Kurum_Geneli'}_${currentYear}_${new Date().toISOString().split('T')[0]}`
+    );
   };
 
   if (loading) {
@@ -763,14 +840,32 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             <div className="space-y-3">
               <div className="mb-4 p-4 bg-slate-50 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-slate-600">
-                    Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
-                  </div>
-                  {selectedStatus && (
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColorClass(selectedStatus)}`}>
-                      {getStatusLabel(selectedStatus)}
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-slate-600">
+                      Toplam <span className="font-bold text-slate-900">{indicatorDetails.length}</span> gösterge
                     </div>
-                  )}
+                    {selectedStatus && (
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColorClass(selectedStatus)}`}>
+                        {getStatusLabel(selectedStatus)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExportIndicatorDetailsExcel}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Excel
+                    </button>
+                    <button
+                      onClick={handleExportIndicatorDetailsPDF}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <FileDown className="w-4 h-4" />
+                      PDF
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -781,13 +876,28 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded">
                           {indicator.code}
                         </span>
+                        {indicator.department_name && (
+                          <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-1 rounded-full border border-blue-200">
+                            {indicator.department_name}
+                          </span>
+                        )}
                         {selectedStatus && (
                           <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColorClass(selectedStatus)}`}>
                             {getStatusLabel(selectedStatus)}
+                          </span>
+                        )}
+                        {!indicator.has_target && (
+                          <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
+                            Hedef Belirlenmemiş
+                          </span>
+                        )}
+                        {!indicator.has_data && (
+                          <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded-full border border-orange-200">
+                            Veri Girişi Yok
                           </span>
                         )}
                       </div>
@@ -803,7 +913,9 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Hedef</div>
                           <div className="text-lg font-semibold text-slate-700">
-                            {indicator.target_value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                            {indicator.target_value > 0
+                              ? indicator.target_value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })
+                              : 'Belirtilmemiş'}
                           </div>
                         </div>
                         <div>
@@ -814,14 +926,16 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
                         </div>
                       </div>
 
-                      <div className="mt-3">
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full transition-all ${getStatusConfig(indicator.status).progressBarColor}`}
-                            style={{ width: `${Math.min(indicator.progress, 100)}%` }}
-                          />
+                      {indicator.has_target && (
+                        <div className="mt-3">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all ${getStatusConfig(indicator.status).progressBarColor}`}
+                              style={{ width: `${Math.min(indicator.progress, 100)}%` }}
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
