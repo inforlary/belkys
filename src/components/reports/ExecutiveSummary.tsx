@@ -595,6 +595,12 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       const { data: allowedGoals } = await goalsQuery;
       const allowedGoalIds = allowedGoals?.map(g => g.id) || [];
 
+      if (allowedGoalIds.length === 0 && profile.role !== 'admin' && profile.role !== 'manager') {
+        setIndicatorDetails([]);
+        setLoadingIndicators(false);
+        return;
+      }
+
       let indicatorsQuery = supabase
         .from('indicators')
         .select(`
@@ -613,10 +619,6 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
 
       if (allowedGoalIds.length > 0) {
         indicatorsQuery = indicatorsQuery.in('goal_id', allowedGoalIds);
-      } else if (profile.role !== 'admin' && profile.role !== 'manager') {
-        setIndicatorDetails([]);
-        setLoadingIndicators(false);
-        return;
       }
 
       const { data: indicators } = await indicatorsQuery;
@@ -632,26 +634,17 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
       const [entriesResult, targetsResult] = await Promise.all([
         supabase
           .from('indicator_data_entries')
-          .select('indicator_id, value, period_quarter')
+          .select('indicator_id, value, status')
           .eq('organization_id', profile.organization_id)
           .eq('period_year', currentYear)
           .eq('status', 'approved')
-          .in('indicator_id', indicatorIds)
-          .order('period_quarter', { ascending: true }),
+          .in('indicator_id', indicatorIds),
         supabase
           .from('indicator_targets')
           .select('indicator_id, target_value, baseline_value')
           .eq('year', currentYear)
           .in('indicator_id', indicatorIds),
       ]);
-
-      const entriesByIndicator: Record<string, number[]> = {};
-      entriesResult.data?.forEach(entry => {
-        if (!entriesByIndicator[entry.indicator_id]) {
-          entriesByIndicator[entry.indicator_id] = [];
-        }
-        entriesByIndicator[entry.indicator_id].push(entry.value || 0);
-      });
 
       const targetsByIndicator: Record<string, { target: number; baseline: number }> = {};
       targetsResult.data?.forEach(target => {
@@ -665,9 +658,10 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
 
       indicators.forEach(indicator => {
         const targetData = targetsByIndicator[indicator.id];
-        const periodValues = entriesByIndicator[indicator.id] || [];
+        const indicatorEntries = (entriesResult.data || []).filter(e => e.indicator_id === indicator.id && e.status === 'approved');
+
         const hasTarget = targetData && targetData.target > 0;
-        const hasData = periodValues.length > 0;
+        const hasData = indicatorEntries.length > 0;
 
         const departmentName = indicator.goal?.department?.name || 'Atanmamış';
 
@@ -675,32 +669,35 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
         let currentValue = 0;
         let targetValue = 0;
 
-        if (hasTarget && hasData) {
-          const indicatorWithTarget = {
-            id: indicator.id,
-            goal_id: indicator.goal_id,
-            yearly_target: targetData.target,
-            baseline_value: targetData.baseline || indicator.baseline_value || 0,
-            calculation_method: indicator.calculation_method
-          };
-
-          progress = calculateIndicatorProgress(indicatorWithTarget, entriesResult.data || []);
+        if (hasTarget) {
           targetValue = targetData.target;
 
-          const sum = periodValues.reduce((acc, val) => acc + val, 0);
-          const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+          if (hasData) {
+            const indicatorWithTarget = {
+              id: indicator.id,
+              goal_id: indicator.goal_id,
+              yearly_target: targetData.target,
+              baseline_value: targetData.baseline || indicator.baseline_value || 0,
+              calculation_method: indicator.calculation_method
+            };
 
-          if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
-            currentValue = (targetData.baseline || indicator.baseline_value || 0) + sum;
-          } else if (calculationMethod === 'decreasing') {
-            currentValue = (targetData.baseline || indicator.baseline_value || 0) - sum;
-          } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
-            currentValue = periodValues.length > 0 ? sum / periodValues.length : sum;
+            progress = calculateIndicatorProgress(indicatorWithTarget, entriesResult.data || []);
+
+            const sum = indicatorEntries.reduce((acc, e) => acc + (e.value || 0), 0);
+            const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+            const baselineValue = targetData.baseline || indicator.baseline_value || 0;
+
+            if (calculationMethod.includes('cumulative') || calculationMethod === 'increasing') {
+              currentValue = baselineValue + sum;
+            } else if (calculationMethod === 'decreasing') {
+              currentValue = baselineValue - sum;
+            } else if (calculationMethod.includes('maintenance') || calculationMethod.includes('percentage')) {
+              currentValue = indicatorEntries.length > 0 ? sum / indicatorEntries.length : baselineValue;
+            }
+          } else {
+            currentValue = targetData.baseline || indicator.baseline_value || 0;
+            progress = 0;
           }
-        } else if (hasTarget && !hasData) {
-          targetValue = targetData.target;
-          currentValue = targetData.baseline || indicator.baseline_value || 0;
-          progress = 0;
         }
 
         const indicatorStatus = getIndicatorStatus(progress);
