@@ -96,12 +96,34 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
     if (!profile?.organization_id) return;
 
     try {
+      // First get goals to filter indicators by department
+      let goalsQuery = supabase
+        .from('goals')
+        .select('id, department_id')
+        .eq('organization_id', profile.organization_id);
+
+      // Non-admin and non-manager users see only their department's data
+      if (profile.role !== 'admin' && profile.role !== 'manager' && profile.department_id) {
+        goalsQuery = goalsQuery.eq('department_id', profile.department_id);
+      }
+
+      const { data: allowedGoals } = await goalsQuery;
+      const allowedGoalIds = allowedGoals?.map(g => g.id) || [];
+
+      if (allowedGoalIds.length === 0) {
+        setDepartments([]);
+        setOverallProgress(0);
+        setOverallStats(createEmptyStats());
+        setLoading(false);
+        return;
+      }
+
+      // Get all departments
       let deptsQuery = supabase
         .from('departments')
         .select('id, name')
         .eq('organization_id', profile.organization_id);
 
-      // Non-admin and non-manager users see only their own department
       if (profile.role !== 'admin' && profile.role !== 'manager' && profile.department_id) {
         deptsQuery = deptsQuery.eq('id', profile.department_id);
       }
@@ -111,13 +133,10 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
       if (depts) {
         const performanceData = await Promise.all(
           depts.map(async (dept) => {
-            const { data: goals } = await supabase
-              .from('goals')
-              .select('id')
-              .eq('organization_id', profile.organization_id)
-              .eq('department_id', dept.id);
+            const deptGoals = allowedGoals?.filter(g => g.department_id === dept.id) || [];
+            const deptGoalIds = deptGoals.map(g => g.id);
 
-            if (!goals || goals.length === 0) {
+            if (deptGoalIds.length === 0) {
               return {
                 department_id: dept.id,
                 department_name: dept.name,
@@ -132,13 +151,11 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
               };
             }
 
-            const goalIds = goals.map(g => g.id);
-
             const { data: indicators } = await supabase
               .from('indicators')
               .select('id, calculation_method, goal_id, goal_impact_percentage, baseline_value')
               .eq('organization_id', profile.organization_id)
-              .in('goal_id', goalIds);
+              .in('goal_id', deptGoalIds);
 
             if (!indicators || indicators.length === 0) {
               return {
@@ -186,7 +203,7 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
             let totalGoalProgress = 0;
             let goalCount = 0;
 
-            goals.forEach(goal => {
+            deptGoals.forEach(goal => {
               const allGoalIndicators = indicators.filter(ind => ind.goal_id === goal.id).map(ind => {
                 const targetData = targetsByIndicator[ind.id];
                 return {
