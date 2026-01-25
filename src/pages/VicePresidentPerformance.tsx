@@ -460,7 +460,7 @@ export default function VicePresidentPerformance() {
 
           const { data: indicators, error: indicatorsError } = await supabase
             .from('indicators')
-            .select('id, code, name, unit')
+            .select('id, code, name, unit, target_value, calculation_method')
             .eq('goal_id', goal.id);
 
           if (indicatorsError || !indicators || indicators.length === 0) {
@@ -491,10 +491,25 @@ export default function VicePresidentPerformance() {
               .eq('period_year', selectedYear)
               .in('status', ['approved', 'admin_approved']);
 
-            const q1Target = targets?.quarter_1_value || 0;
-            const q2Target = targets?.quarter_2_value || 0;
-            const q3Target = targets?.quarter_3_value || 0;
-            const q4Target = targets?.quarter_4_value || 0;
+            let q1Target = targets?.quarter_1_value || 0;
+            let q2Target = targets?.quarter_2_value || 0;
+            let q3Target = targets?.quarter_3_value || 0;
+            let q4Target = targets?.quarter_4_value || 0;
+
+            if (q1Target === 0 && q2Target === 0 && q3Target === 0 && q4Target === 0 && indicator.target_value) {
+              const yearlyTarget = Number(indicator.target_value) || 0;
+              if (indicator.calculation_method === 'cumulative') {
+                q1Target = yearlyTarget * 0.25;
+                q2Target = yearlyTarget * 0.50;
+                q3Target = yearlyTarget * 0.75;
+                q4Target = yearlyTarget;
+              } else {
+                q1Target = yearlyTarget / 4;
+                q2Target = yearlyTarget / 4;
+                q3Target = yearlyTarget / 4;
+                q4Target = yearlyTarget / 4;
+              }
+            }
 
             const actualsMap = new Map<number, number>();
             if (entries && entries.length > 0) {
@@ -517,9 +532,19 @@ export default function VicePresidentPerformance() {
             const q4Actual = actualsMap.get(4) || 0;
             const q4Rate = q4Target > 0 ? (q4Actual / q4Target) * 100 : 0;
 
-            const yearlyTarget = q1Target + q2Target + q3Target + q4Target;
-            const totalActual = q1Actual + q2Actual + q3Actual + q4Actual;
-            const successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : 0;
+            let yearlyTarget: number;
+            let totalActual: number;
+            let successRate: number;
+
+            if (indicator.calculation_method === 'cumulative') {
+              yearlyTarget = q4Target;
+              totalActual = q4Actual;
+              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : 0;
+            } else {
+              yearlyTarget = q1Target + q2Target + q3Target + q4Target;
+              totalActual = q1Actual + q2Actual + q3Actual + q4Actual;
+              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : 0;
+            }
 
             indicatorsData.push({
               indicator_id: indicator.id,
