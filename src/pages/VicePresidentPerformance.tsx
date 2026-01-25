@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
-import { User, Building2, Target, CheckCircle, Clock, AlertCircle, TrendingUp, Award, BarChart3, Activity } from 'lucide-react';
+import { User, Building2, Target, CheckCircle, Clock, AlertCircle, TrendingUp, Award, BarChart3, Activity, FileText, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import type { Profile, Department } from '../types/database';
+import * as XLSX from 'xlsx';
 
 interface VPWithDepartments {
   id: string;
@@ -36,6 +37,69 @@ interface VPOverallPerformance {
   performance_color: string;
 }
 
+interface IndicatorQuarterlyData {
+  indicator_id: string;
+  indicator_code: string;
+  indicator_name: string;
+  unit: string;
+  yearly_target: number;
+  q1_target: number;
+  q1_actual: number;
+  q1_rate: number;
+  q2_target: number;
+  q2_actual: number;
+  q2_rate: number;
+  q3_target: number;
+  q3_actual: number;
+  q3_rate: number;
+  q4_target: number;
+  q4_actual: number;
+  q4_rate: number;
+  total_actual: number;
+  success_rate: number;
+}
+
+interface GoalDetail {
+  goal_id: string;
+  goal_code: string;
+  goal_name: string;
+  indicators: IndicatorQuarterlyData[];
+  success_rate: number;
+}
+
+interface ObjectiveDetail {
+  objective_id: string;
+  objective_code: string;
+  objective_name: string;
+  goals: GoalDetail[];
+  success_rate: number;
+}
+
+interface StrategicPlanGroup {
+  plan_id: string;
+  plan_name: string;
+  plan_years: string;
+  objectives: ObjectiveDetail[];
+  success_rate: number;
+}
+
+interface DepartmentStrategicData {
+  department_id: string;
+  department_name: string;
+  plans: StrategicPlanGroup[];
+  overall_success_rate: number;
+}
+
+interface VPStrategicPerformance {
+  total_plans: number;
+  total_objectives: number;
+  total_goals: number;
+  total_indicators: number;
+  overall_success_rate: number;
+  performance_grade: string;
+  performance_color: string;
+}
+
 export default function VicePresidentPerformance() {
   const { profile } = useAuth();
   const [vicePresidents, setVicePresidents] = useState<VPWithDepartments[]>([]);
@@ -44,6 +108,13 @@ export default function VicePresidentPerformance() {
   const [overallPerformance, setOverallPerformance] = useState<VPOverallPerformance | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(2025);
+  const [strategicPerformance, setStrategicPerformance] = useState<VPStrategicPerformance | null>(null);
+  const [departmentStrategicData, setDepartmentStrategicData] = useState<DepartmentStrategicData[]>([]);
+  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set());
+  const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
+  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     loadVicePresidents();
@@ -52,6 +123,7 @@ export default function VicePresidentPerformance() {
   useEffect(() => {
     if (selectedVP) {
       loadPerformance();
+      loadStrategicPerformance();
     }
   }, [selectedVP, selectedYear]);
 
@@ -297,6 +369,411 @@ export default function VicePresidentPerformance() {
     }
   }
 
+  async function loadStrategicPerformance() {
+    if (!selectedVP) return;
+
+    try {
+      const vp = vicePresidents.find(v => v.id === selectedVP);
+      if (!vp || vp.departments.length === 0) {
+        setStrategicPerformance(null);
+        setDepartmentStrategicData([]);
+        return;
+      }
+
+      const departmentIds = vp.departments.map(d => d.id);
+      const departmentsData: DepartmentStrategicData[] = [];
+
+      let totalPlans = 0;
+      let totalObjectives = 0;
+      let totalGoals = 0;
+      let totalIndicators = 0;
+      let allSuccessRates: number[] = [];
+
+      for (const dept of vp.departments) {
+        const { data: goals, error: goalsError } = await supabase
+          .from('goals')
+          .select(`
+            id,
+            code,
+            name,
+            objective:objectives(
+              id,
+              code,
+              name,
+              strategic_plan:strategic_plans(
+                id,
+                name,
+                start_year,
+                end_year
+              )
+            )
+          `)
+          .eq('department_id', dept.id)
+          .eq('organization_id', profile?.organization_id);
+
+        if (goalsError) {
+          console.error('Error loading goals:', goalsError);
+          continue;
+        }
+
+        if (!goals || goals.length === 0) {
+          departmentsData.push({
+            department_id: dept.id,
+            department_name: dept.name,
+            plans: [],
+            overall_success_rate: 0,
+          });
+          continue;
+        }
+
+        const planGroups = new Map<string, StrategicPlanGroup>();
+
+        for (const goal of goals) {
+          if (!goal.objective || !goal.objective.strategic_plan) continue;
+
+          const plan = goal.objective.strategic_plan;
+          const objective = goal.objective;
+          const planKey = plan.id;
+
+          if (!planGroups.has(planKey)) {
+            planGroups.set(planKey, {
+              plan_id: plan.id,
+              plan_name: plan.name,
+              plan_years: `${plan.start_year}-${plan.end_year}`,
+              objectives: [],
+              success_rate: 0,
+            });
+          }
+
+          const planGroup = planGroups.get(planKey)!;
+          let objectiveDetail = planGroup.objectives.find(o => o.objective_id === objective.id);
+
+          if (!objectiveDetail) {
+            objectiveDetail = {
+              objective_id: objective.id,
+              objective_code: objective.code,
+              objective_name: objective.name,
+              goals: [],
+              success_rate: 0,
+            };
+            planGroup.objectives.push(objectiveDetail);
+            totalObjectives++;
+          }
+
+          const { data: indicators, error: indicatorsError } = await supabase
+            .from('indicators')
+            .select('id, code, name, unit')
+            .eq('goal_id', goal.id);
+
+          if (indicatorsError || !indicators || indicators.length === 0) {
+            objectiveDetail.goals.push({
+              goal_id: goal.id,
+              goal_code: goal.code,
+              goal_name: goal.name,
+              indicators: [],
+              success_rate: 0,
+            });
+            totalGoals++;
+            continue;
+          }
+
+          const indicatorIds = indicators.map(i => i.id);
+          totalIndicators += indicators.length;
+
+          const indicatorsData: IndicatorQuarterlyData[] = [];
+
+          for (const indicator of indicators) {
+            const { data: targets, error: targetsError } = await supabase
+              .from('indicator_targets')
+              .select('period_quarter, target_value')
+              .eq('indicator_id', indicator.id)
+              .eq('period_year', selectedYear);
+
+            const { data: entries, error: entriesError } = await supabase
+              .from('indicator_data_entries')
+              .select('period_quarter, actual_value, status')
+              .eq('indicator_id', indicator.id)
+              .eq('period_year', selectedYear)
+              .in('status', ['approved', 'admin_approved']);
+
+            const targetsMap = new Map<number, number>();
+            if (targets) {
+              targets.forEach(t => targetsMap.set(t.period_quarter, t.target_value || 0));
+            }
+
+            const actualsMap = new Map<number, number>();
+            if (entries) {
+              entries.forEach(e => actualsMap.set(e.period_quarter, e.actual_value || 0));
+            }
+
+            const q1Target = targetsMap.get(1) || 0;
+            const q1Actual = actualsMap.get(1) || 0;
+            const q1Rate = q1Target > 0 ? (q1Actual / q1Target) * 100 : 0;
+
+            const q2Target = targetsMap.get(2) || 0;
+            const q2Actual = actualsMap.get(2) || 0;
+            const q2Rate = q2Target > 0 ? (q2Actual / q2Target) * 100 : 0;
+
+            const q3Target = targetsMap.get(3) || 0;
+            const q3Actual = actualsMap.get(3) || 0;
+            const q3Rate = q3Target > 0 ? (q3Actual / q3Target) * 100 : 0;
+
+            const q4Target = targetsMap.get(4) || 0;
+            const q4Actual = actualsMap.get(4) || 0;
+            const q4Rate = q4Target > 0 ? (q4Actual / q4Target) * 100 : 0;
+
+            const yearlyTarget = q1Target + q2Target + q3Target + q4Target;
+            const totalActual = q1Actual + q2Actual + q3Actual + q4Actual;
+            const successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : 0;
+
+            indicatorsData.push({
+              indicator_id: indicator.id,
+              indicator_code: indicator.code,
+              indicator_name: indicator.name,
+              unit: indicator.unit || '',
+              yearly_target: yearlyTarget,
+              q1_target: q1Target,
+              q1_actual: q1Actual,
+              q1_rate: q1Rate,
+              q2_target: q2Target,
+              q2_actual: q2Actual,
+              q2_rate: q2Rate,
+              q3_target: q3Target,
+              q3_actual: q3Actual,
+              q3_rate: q3Rate,
+              q4_target: q4Target,
+              q4_actual: q4Actual,
+              q4_rate: q4Rate,
+              total_actual: totalActual,
+              success_rate: successRate,
+            });
+
+            if (successRate > 0) {
+              allSuccessRates.push(successRate);
+            }
+          }
+
+          const goalSuccessRate = indicatorsData.length > 0
+            ? indicatorsData.reduce((sum, ind) => sum + ind.success_rate, 0) / indicatorsData.length
+            : 0;
+
+          objectiveDetail.goals.push({
+            goal_id: goal.id,
+            goal_code: goal.code,
+            goal_name: goal.name,
+            indicators: indicatorsData,
+            success_rate: goalSuccessRate,
+          });
+          totalGoals++;
+        }
+
+        const plans: StrategicPlanGroup[] = Array.from(planGroups.values());
+        plans.forEach(plan => {
+          plan.objectives.forEach(obj => {
+            obj.success_rate = obj.goals.length > 0
+              ? obj.goals.reduce((sum, g) => sum + g.success_rate, 0) / obj.goals.length
+              : 0;
+          });
+          plan.success_rate = plan.objectives.length > 0
+            ? plan.objectives.reduce((sum, o) => sum + o.success_rate, 0) / plan.objectives.length
+            : 0;
+        });
+
+        const deptSuccessRate = plans.length > 0
+          ? plans.reduce((sum, p) => sum + p.success_rate, 0) / plans.length
+          : 0;
+
+        departmentsData.push({
+          department_id: dept.id,
+          department_name: dept.name,
+          plans,
+          overall_success_rate: deptSuccessRate,
+        });
+
+        totalPlans += plans.length;
+      }
+
+      const overallSuccessRate = allSuccessRates.length > 0
+        ? allSuccessRates.reduce((sum, rate) => sum + rate, 0) / allSuccessRates.length
+        : 0;
+
+      let grade = '';
+      let color = '';
+      if (overallSuccessRate >= 90) {
+        grade = 'Mükemmel';
+        color = 'emerald';
+      } else if (overallSuccessRate >= 80) {
+        grade = 'Çok İyi';
+        color = 'green';
+      } else if (overallSuccessRate >= 70) {
+        grade = 'İyi';
+        color = 'blue';
+      } else if (overallSuccessRate >= 60) {
+        grade = 'Orta';
+        color = 'yellow';
+      } else if (overallSuccessRate >= 50) {
+        grade = 'Zayıf';
+        color = 'orange';
+      } else {
+        grade = 'Yetersiz';
+        color = 'red';
+      }
+
+      setStrategicPerformance({
+        total_plans: totalPlans,
+        total_objectives: totalObjectives,
+        total_goals: totalGoals,
+        total_indicators: totalIndicators,
+        overall_success_rate: overallSuccessRate,
+        performance_grade: grade,
+        performance_color: color,
+      });
+
+      setDepartmentStrategicData(departmentsData);
+    } catch (error) {
+      console.error('Error loading strategic performance:', error);
+    }
+  }
+
+  async function exportToExcel() {
+    if (!selectedVP || !overallPerformance) return;
+
+    setExportLoading(true);
+    try {
+      const vp = vicePresidents.find(v => v.id === selectedVP);
+      if (!vp) return;
+
+      const workbook = XLSX.utils.book_new();
+
+      const summaryData = [
+        ['Başkan Yardımcısı Performans Raporu'],
+        [''],
+        ['Başkan Yardımcısı:', vp.full_name],
+        ['E-posta:', vp.email],
+        ['Dönem:', selectedYear],
+        ['Rapor Tarihi:', new Date().toLocaleDateString('tr-TR')],
+        [''],
+        ['VERİ GİRİŞİ PERFORMANSI'],
+        ['Toplam Müdürlük:', overallPerformance.total_departments],
+        ['Toplam Gösterge:', overallPerformance.total_indicators],
+        ['Toplam Veri Girişi:', overallPerformance.total_data_entries],
+        ['Onaylı:', overallPerformance.total_approved],
+        ['Bekleyen:', overallPerformance.total_pending],
+        ['Reddedilen:', overallPerformance.total_rejected],
+        ['Tamamlanma Oranı:', `%${overallPerformance.overall_completion_rate.toFixed(1)}`],
+        ['Performans Notu:', overallPerformance.performance_grade],
+        [''],
+      ];
+
+      if (strategicPerformance) {
+        summaryData.push(
+          ['STRATEJİK PLAN PERFORMANSI'],
+          ['Toplam Plan:', strategicPerformance.total_plans],
+          ['Toplam Amaç:', strategicPerformance.total_objectives],
+          ['Toplam Hedef:', strategicPerformance.total_goals],
+          ['Toplam Gösterge:', strategicPerformance.total_indicators],
+          ['Ortalama Başarı Oranı:', `%${strategicPerformance.overall_success_rate.toFixed(1)}`],
+          ['Performans Notu:', strategicPerformance.performance_grade],
+          ['']
+        );
+      }
+
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      summarySheet['!cols'] = [{ wch: 25 }, { wch: 40 }];
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Özet');
+
+      const deptPerformanceData = [
+        ['Müdürlük Adı', 'Toplam Gösterge', 'Toplam Veri', 'Onaylı', 'Bekleyen', 'Red', 'Tamamlanma Oranı (%)'],
+      ];
+      performance.forEach(dept => {
+        deptPerformanceData.push([
+          dept.department_name,
+          dept.total_indicators,
+          dept.data_entries,
+          dept.approved_entries,
+          dept.pending_approvals,
+          dept.rejected_entries,
+          dept.completion_rate.toFixed(1),
+        ]);
+      });
+      const deptSheet = XLSX.utils.aoa_to_sheet(deptPerformanceData);
+      deptSheet['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(workbook, deptSheet, 'Veri Girişi Performansı');
+
+      for (const deptData of departmentStrategicData) {
+        if (deptData.plans.length === 0) continue;
+
+        const strategicData: any[][] = [
+          ['STRATEJIK PLAN PERFORMANS DETAYI'],
+          ['Müdürlük:', deptData.department_name],
+          ['Genel Başarı Oranı:', `%${deptData.overall_success_rate.toFixed(1)}`],
+          [''],
+        ];
+
+        for (const plan of deptData.plans) {
+          strategicData.push(
+            [`Plan: ${plan.plan_name} (${plan.plan_years}) - %${plan.success_rate.toFixed(1)}`],
+            [''],
+            ['Amaç Kodu', 'Amaç Adı', 'Hedef Kodu', 'Hedef Adı', 'Gösterge Kodu', 'Gösterge Adı', 'Birim', 'Q1 Hedef', 'Q1 Gerçekleşen', 'Q1 Oran (%)', 'Q2 Hedef', 'Q2 Gerçekleşen', 'Q2 Oran (%)', 'Q3 Hedef', 'Q3 Gerçekleşen', 'Q3 Oran (%)', 'Q4 Hedef', 'Q4 Gerçekleşen', 'Q4 Oran (%)', 'Yıllık Hedef', 'Yıllık Gerçekleşen', 'Başarı Oranı (%)']
+          );
+
+          for (const objective of plan.objectives) {
+            for (const goal of objective.goals) {
+              for (const indicator of goal.indicators) {
+                strategicData.push([
+                  objective.objective_code,
+                  objective.objective_name,
+                  goal.goal_code,
+                  goal.goal_name,
+                  indicator.indicator_code,
+                  indicator.indicator_name,
+                  indicator.unit,
+                  indicator.q1_target.toFixed(1),
+                  indicator.q1_actual.toFixed(1),
+                  indicator.q1_rate.toFixed(1),
+                  indicator.q2_target.toFixed(1),
+                  indicator.q2_actual.toFixed(1),
+                  indicator.q2_rate.toFixed(1),
+                  indicator.q3_target.toFixed(1),
+                  indicator.q3_actual.toFixed(1),
+                  indicator.q3_rate.toFixed(1),
+                  indicator.q4_target.toFixed(1),
+                  indicator.q4_actual.toFixed(1),
+                  indicator.q4_rate.toFixed(1),
+                  indicator.yearly_target.toFixed(1),
+                  indicator.total_actual.toFixed(1),
+                  indicator.success_rate.toFixed(1),
+                ]);
+              }
+            }
+          }
+          strategicData.push(['']);
+        }
+
+        const strategicSheet = XLSX.utils.aoa_to_sheet(strategicData);
+        strategicSheet['!cols'] = [
+          { wch: 12 }, { wch: 35 }, { wch: 12 }, { wch: 35 }, { wch: 12 }, { wch: 35 },
+          { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 },
+          { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 },
+          { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 15 }
+        ];
+
+        const sheetName = deptData.department_name.substring(0, 31);
+        XLSX.utils.book_append_sheet(workbook, strategicSheet, sheetName);
+      }
+
+      const fileName = `BaskanYardimcisi_${vp.full_name.replace(/\s+/g, '_')}_${selectedYear}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      alert('Excel dosyası başarıyla indirildi!');
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Excel dosyası oluşturulurken bir hata oluştu.');
+    } finally {
+      setExportLoading(false);
+    }
+  }
+
   const getCompletionColor = (rate: number) => {
     if (rate >= 80) return 'text-green-600 bg-green-50';
     if (rate >= 60) return 'text-blue-600 bg-blue-50';
@@ -377,7 +854,7 @@ export default function VicePresidentPerformance() {
         <p className="mt-2 text-slate-600">Başkan yardımcılarının genel performansını ve sorumlu oldukları müdürlüklerin detaylı analizini görüntüleyin</p>
       </div>
 
-      <div className="flex gap-4 items-center bg-white rounded-lg p-4 border border-slate-200">
+      <div className="flex gap-4 items-end bg-white rounded-lg p-4 border border-slate-200">
         <div className="flex-1">
           <label className="block text-sm font-medium text-slate-700 mb-2">Yıl</label>
           <select
@@ -390,6 +867,25 @@ export default function VicePresidentPerformance() {
             ))}
           </select>
         </div>
+        {selectedVP && overallPerformance && (
+          <button
+            onClick={exportToExcel}
+            disabled={exportLoading}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+          >
+            {exportLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Hazırlanıyor...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Excel İndir</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -517,6 +1013,68 @@ export default function VicePresidentPerformance() {
                     />
                   </div>
                 </div>
+
+                {strategicPerformance && (
+                  <div className="mt-6 pt-6 border-t-2 border-white">
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <FileText className={`w-5 h-5 ${getGradeTextColor(strategicPerformance.performance_color)}`} />
+                        <h3 className={`text-lg font-bold ${getGradeTextColor(strategicPerformance.performance_color)}`}>
+                          Stratejik Plan İlerleme Performansı
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
+                          <div className="flex items-center gap-2 text-slate-600 mb-1">
+                            <FileText className="w-3 h-3" />
+                            <span className="text-xs font-medium">Plan</span>
+                          </div>
+                          <div className="text-xl font-bold text-slate-900">{strategicPerformance.total_plans}</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
+                          <div className="flex items-center gap-2 text-slate-600 mb-1">
+                            <Target className="w-3 h-3" />
+                            <span className="text-xs font-medium">Amaç</span>
+                          </div>
+                          <div className="text-xl font-bold text-slate-900">{strategicPerformance.total_objectives}</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
+                          <div className="flex items-center gap-2 text-slate-600 mb-1">
+                            <Award className="w-3 h-3" />
+                            <span className="text-xs font-medium">Hedef</span>
+                          </div>
+                          <div className="text-xl font-bold text-slate-900">{strategicPerformance.total_goals}</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
+                          <div className="flex items-center gap-2 text-slate-600 mb-1">
+                            <Activity className="w-3 h-3" />
+                            <span className="text-xs font-medium">Gösterge</span>
+                          </div>
+                          <div className="text-xl font-bold text-slate-900">{strategicPerformance.total_indicators}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-sm font-semibold ${getGradeTextColor(strategicPerformance.performance_color)}`}>
+                          Ortalama Başarı Oranı
+                        </span>
+                        <span className={`text-lg font-bold ${getGradeTextColor(strategicPerformance.performance_color)}`}>
+                          %{strategicPerformance.overall_success_rate.toFixed(1)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-white rounded-full h-3 shadow-inner border border-slate-200">
+                        <div
+                          className={`h-3 rounded-full transition-all ${getGradeColor(strategicPerformance.performance_color)}`}
+                          style={{ width: `${Math.min(strategicPerformance.overall_success_rate, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -617,6 +1175,266 @@ export default function VicePresidentPerformance() {
                           />
                         </div>
                       </div>
+
+                      {(() => {
+                        const deptStrategicData = departmentStrategicData.find(d => d.department_id === dept.department_id);
+                        if (!deptStrategicData || deptStrategicData.plans.length === 0) return null;
+
+                        const isDeptExpanded = expandedDepartments.has(dept.department_id);
+
+                        return (
+                          <div className="mt-4 pt-4 border-t border-slate-200">
+                            <button
+                              onClick={() => {
+                                const newExpanded = new Set(expandedDepartments);
+                                if (isDeptExpanded) {
+                                  newExpanded.delete(dept.department_id);
+                                } else {
+                                  newExpanded.add(dept.department_id);
+                                }
+                                setExpandedDepartments(newExpanded);
+                              }}
+                              className="w-full flex items-center justify-between text-left hover:bg-slate-50 rounded-lg p-2 transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-blue-600" />
+                                <span className="font-semibold text-slate-900">Stratejik Plan Detayları</span>
+                                <span className="text-xs text-slate-500">
+                                  ({deptStrategicData.plans.length} Plan, %{deptStrategicData.overall_success_rate.toFixed(1)} Başarı)
+                                </span>
+                              </div>
+                              {isDeptExpanded ? (
+                                <ChevronUp className="w-5 h-5 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="w-5 h-5 text-slate-400" />
+                              )}
+                            </button>
+
+                            {isDeptExpanded && (
+                              <div className="mt-3 space-y-3">
+                                {deptStrategicData.plans.map(plan => {
+                                  const isPlanExpanded = expandedPlans.has(plan.plan_id);
+
+                                  return (
+                                    <div key={plan.plan_id} className="border border-slate-300 rounded-lg overflow-hidden">
+                                      <button
+                                        onClick={() => {
+                                          const newExpanded = new Set(expandedPlans);
+                                          if (isPlanExpanded) {
+                                            newExpanded.delete(plan.plan_id);
+                                          } else {
+                                            newExpanded.add(plan.plan_id);
+                                          }
+                                          setExpandedPlans(newExpanded);
+                                        }}
+                                        className="w-full flex items-center justify-between bg-slate-50 p-3 hover:bg-slate-100 transition-colors"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <FileText className="w-4 h-4 text-slate-700" />
+                                          <div className="text-left">
+                                            <div className="font-semibold text-slate-900">{plan.plan_name}</div>
+                                            <div className="text-xs text-slate-500">{plan.plan_years}</div>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <div className={`px-3 py-1 rounded-lg text-sm font-semibold ${getCompletionColor(plan.success_rate)}`}>
+                                            %{plan.success_rate.toFixed(1)}
+                                          </div>
+                                          {isPlanExpanded ? (
+                                            <ChevronUp className="w-4 h-4 text-slate-400" />
+                                          ) : (
+                                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                                          )}
+                                        </div>
+                                      </button>
+
+                                      {isPlanExpanded && (
+                                        <div className="p-3 space-y-2 bg-white">
+                                          {plan.objectives.map(objective => {
+                                            const isObjExpanded = expandedObjectives.has(objective.objective_id);
+
+                                            return (
+                                              <div key={objective.objective_id} className="border border-orange-200 rounded-lg overflow-hidden">
+                                                <button
+                                                  onClick={() => {
+                                                    const newExpanded = new Set(expandedObjectives);
+                                                    if (isObjExpanded) {
+                                                      newExpanded.delete(objective.objective_id);
+                                                    } else {
+                                                      newExpanded.add(objective.objective_id);
+                                                    }
+                                                    setExpandedObjectives(newExpanded);
+                                                  }}
+                                                  className="w-full flex items-center justify-between bg-orange-50 p-2 hover:bg-orange-100 transition-colors"
+                                                >
+                                                  <div className="flex items-center gap-2">
+                                                    <Target className="w-3 h-3 text-orange-700" />
+                                                    <div className="text-left">
+                                                      <span className="text-xs font-semibold text-orange-900">{objective.objective_code}</span>
+                                                      <span className="text-xs text-orange-700 ml-2">{objective.objective_name}</span>
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-semibold text-orange-700">%{objective.success_rate.toFixed(1)}</span>
+                                                    {isObjExpanded ? (
+                                                      <ChevronUp className="w-3 h-3 text-orange-400" />
+                                                    ) : (
+                                                      <ChevronDown className="w-3 h-3 text-orange-400" />
+                                                    )}
+                                                  </div>
+                                                </button>
+
+                                                {isObjExpanded && (
+                                                  <div className="p-2 space-y-2 bg-white">
+                                                    {objective.goals.map(goal => {
+                                                      const isGoalExpanded = expandedGoals.has(goal.goal_id);
+
+                                                      return (
+                                                        <div key={goal.goal_id} className="border border-blue-200 rounded-lg overflow-hidden">
+                                                          <button
+                                                            onClick={() => {
+                                                              const newExpanded = new Set(expandedGoals);
+                                                              if (isGoalExpanded) {
+                                                                newExpanded.delete(goal.goal_id);
+                                                              } else {
+                                                                newExpanded.add(goal.goal_id);
+                                                              }
+                                                              setExpandedGoals(newExpanded);
+                                                            }}
+                                                            className="w-full flex items-center justify-between bg-blue-50 p-2 hover:bg-blue-100 transition-colors"
+                                                          >
+                                                            <div className="flex items-center gap-2">
+                                                              <Award className="w-3 h-3 text-blue-700" />
+                                                              <div className="text-left">
+                                                                <span className="text-xs font-semibold text-blue-900">{goal.goal_code}</span>
+                                                                <span className="text-xs text-blue-700 ml-2">{goal.goal_name}</span>
+                                                              </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                              <span className="text-xs font-semibold text-blue-700">%{goal.success_rate.toFixed(1)}</span>
+                                                              {isGoalExpanded ? (
+                                                                <ChevronUp className="w-3 h-3 text-blue-400" />
+                                                              ) : (
+                                                                <ChevronDown className="w-3 h-3 text-blue-400" />
+                                                              )}
+                                                            </div>
+                                                          </button>
+
+                                                          {isGoalExpanded && goal.indicators.length > 0 && (
+                                                            <div className="p-2 bg-white">
+                                                              <div className="overflow-x-auto">
+                                                                <table className="w-full text-xs">
+                                                                  <thead className="bg-slate-50 border-b border-slate-200">
+                                                                    <tr>
+                                                                      <th className="p-2 text-left font-semibold text-slate-700">Gösterge</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Birim</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Q1</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Q2</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Q3</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Q4</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Başarı</th>
+                                                                    </tr>
+                                                                  </thead>
+                                                                  <tbody>
+                                                                    {goal.indicators.map(indicator => (
+                                                                      <tr key={indicator.indicator_id} className="border-b border-slate-100 hover:bg-slate-50">
+                                                                        <td className="p-2">
+                                                                          <div className="font-semibold text-slate-900">{indicator.indicator_code}</div>
+                                                                          <div className="text-slate-600">{indicator.indicator_name}</div>
+                                                                        </td>
+                                                                        <td className="p-2 text-center text-slate-600">{indicator.unit}</td>
+                                                                        <td className="p-2">
+                                                                          {indicator.q1_target > 0 ? (
+                                                                            <div className="text-center">
+                                                                              <div className="text-slate-600">{indicator.q1_actual.toFixed(1)} / {indicator.q1_target.toFixed(1)}</div>
+                                                                              <div className={`text-xs font-semibold ${indicator.q1_rate >= 80 ? 'text-green-600' : indicator.q1_rate >= 60 ? 'text-blue-600' : indicator.q1_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                %{indicator.q1_rate.toFixed(0)}
+                                                                              </div>
+                                                                            </div>
+                                                                          ) : (
+                                                                            <div className="text-center text-slate-400">-</div>
+                                                                          )}
+                                                                        </td>
+                                                                        <td className="p-2">
+                                                                          {indicator.q2_target > 0 ? (
+                                                                            <div className="text-center">
+                                                                              <div className="text-slate-600">{indicator.q2_actual.toFixed(1)} / {indicator.q2_target.toFixed(1)}</div>
+                                                                              <div className={`text-xs font-semibold ${indicator.q2_rate >= 80 ? 'text-green-600' : indicator.q2_rate >= 60 ? 'text-blue-600' : indicator.q2_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                %{indicator.q2_rate.toFixed(0)}
+                                                                              </div>
+                                                                            </div>
+                                                                          ) : (
+                                                                            <div className="text-center text-slate-400">-</div>
+                                                                          )}
+                                                                        </td>
+                                                                        <td className="p-2">
+                                                                          {indicator.q3_target > 0 ? (
+                                                                            <div className="text-center">
+                                                                              <div className="text-slate-600">{indicator.q3_actual.toFixed(1)} / {indicator.q3_target.toFixed(1)}</div>
+                                                                              <div className={`text-xs font-semibold ${indicator.q3_rate >= 80 ? 'text-green-600' : indicator.q3_rate >= 60 ? 'text-blue-600' : indicator.q3_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                %{indicator.q3_rate.toFixed(0)}
+                                                                              </div>
+                                                                            </div>
+                                                                          ) : (
+                                                                            <div className="text-center text-slate-400">-</div>
+                                                                          )}
+                                                                        </td>
+                                                                        <td className="p-2">
+                                                                          {indicator.q4_target > 0 ? (
+                                                                            <div className="text-center">
+                                                                              <div className="text-slate-600">{indicator.q4_actual.toFixed(1)} / {indicator.q4_target.toFixed(1)}</div>
+                                                                              <div className={`text-xs font-semibold ${indicator.q4_rate >= 80 ? 'text-green-600' : indicator.q4_rate >= 60 ? 'text-blue-600' : indicator.q4_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                %{indicator.q4_rate.toFixed(0)}
+                                                                              </div>
+                                                                            </div>
+                                                                          ) : (
+                                                                            <div className="text-center text-slate-400">-</div>
+                                                                          )}
+                                                                        </td>
+                                                                        <td className="p-2">
+                                                                          <div className="flex items-center justify-center">
+                                                                            <div className={`px-2 py-1 rounded text-xs font-bold ${
+                                                                              indicator.success_rate >= 100 ? 'bg-emerald-100 text-emerald-700' :
+                                                                              indicator.success_rate >= 80 ? 'bg-green-100 text-green-700' :
+                                                                              indicator.success_rate >= 60 ? 'bg-blue-100 text-blue-700' :
+                                                                              indicator.success_rate >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                                                              indicator.success_rate > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                                                                            }`}>
+                                                                              {indicator.success_rate > 0 ? `%${indicator.success_rate.toFixed(0)}` : '-'}
+                                                                            </div>
+                                                                          </div>
+                                                                        </td>
+                                                                      </tr>
+                                                                    ))}
+                                                                  </tbody>
+                                                                </table>
+                                                              </div>
+                                                            </div>
+                                                          )}
+
+                                                          {isGoalExpanded && goal.indicators.length === 0 && (
+                                                            <div className="p-3 text-center text-slate-400 text-xs">
+                                                              Bu hedef için gösterge tanımlanmamış
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
