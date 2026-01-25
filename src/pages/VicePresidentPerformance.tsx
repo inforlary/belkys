@@ -388,11 +388,11 @@ export default function VicePresidentPerformance() {
           .select(`
             id,
             code,
-            name,
+            title,
             objective:objectives!inner(
               id,
               code,
-              name,
+              title,
               strategic_plan:strategic_plans!inner(
                 id,
                 name,
@@ -451,7 +451,7 @@ export default function VicePresidentPerformance() {
             objectiveDetail = {
               objective_id: objective.id,
               objective_code: objective.code,
-              objective_name: objective.name,
+              objective_name: objective.title,
               goals: [],
               success_rate: 0,
             };
@@ -467,7 +467,7 @@ export default function VicePresidentPerformance() {
             objectiveDetail.goals.push({
               goal_id: goal.id,
               goal_code: goal.code,
-              goal_name: goal.name,
+              goal_name: goal.title,
               indicators: [],
               success_rate: 0,
             });
@@ -551,7 +551,7 @@ export default function VicePresidentPerformance() {
           objectiveDetail.goals.push({
             goal_id: goal.id,
             goal_code: goal.code,
-            goal_name: goal.name,
+            goal_name: goal.title,
             indicators: indicatorsData,
             success_rate: goalSuccessRate,
           });
