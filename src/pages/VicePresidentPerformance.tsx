@@ -443,7 +443,8 @@ export default function VicePresidentPerformance() {
           incrementStatusInStats(deptStats, status);
           incrementStatusInStats(overallStats, status);
 
-          totalProgress += progress;
+          const cappedProgress = Math.min(progress, 200);
+          totalProgress += cappedProgress;
           indicatorCount++;
         });
 
