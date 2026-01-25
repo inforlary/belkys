@@ -539,11 +539,11 @@ export default function VicePresidentPerformance() {
             if (indicator.calculation_method === 'cumulative') {
               yearlyTarget = q4Target;
               totalActual = q4Actual;
-              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : 0;
+              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
             } else {
               yearlyTarget = q1Target + q2Target + q3Target + q4Target;
               totalActual = q1Actual + q2Actual + q3Actual + q4Actual;
-              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : 0;
+              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
             }
 
             indicatorsData.push({
@@ -613,9 +613,7 @@ export default function VicePresidentPerformance() {
       const departmentSuccessRates: number[] = [];
 
       departmentsData.forEach(deptData => {
-        if (deptData.overall_success_rate > 0) {
-          departmentSuccessRates.push(deptData.overall_success_rate);
-        }
+        departmentSuccessRates.push(deptData.overall_success_rate);
         deptData.plans.forEach(plan => {
           totalPlans++;
           plan.objectives.forEach(obj => {
