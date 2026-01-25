@@ -398,329 +398,349 @@ export default function VicePresidentPerformance() {
         return;
       }
 
-      const departmentsData: DepartmentStrategicData[] = [];
+      const departmentIds = vp.departments.map(d => d.id);
 
-      for (const dept of vp.departments) {
-        const { data: goals, error: goalsError } = await supabase
-          .from('goals')
+      const [objectivesRes, entriesRes, targetsRes] = await Promise.all([
+        supabase
+          .from('objectives')
           .select(`
             id,
             code,
             title,
-            objective:objectives!inner(
+            goals (
               id,
               code,
               title,
-              strategic_plan:strategic_plans!inner(
+              department_id,
+              department:departments(name),
+              indicators (
                 id,
+                code,
                 name,
-                start_year,
-                end_year
+                unit,
+                target_value,
+                calculation_method,
+                baseline_value,
+                measurement_frequency,
+                goal_impact_percentage
               )
             )
           `)
-          .eq('department_id', dept.id)
-          .eq('organization_id', profile?.organization_id);
+          .eq('organization_id', profile?.organization_id)
+          .order('code', { ascending: true }),
+        supabase
+          .from('indicator_data_entries')
+          .select('*')
+          .eq('organization_id', profile?.organization_id)
+          .eq('period_year', selectedYear)
+          .eq('status', 'approved'),
+        supabase
+          .from('indicator_targets')
+          .select(`
+            indicator_id,
+            year,
+            target_value,
+            quarter_1_value,
+            quarter_2_value,
+            quarter_3_value,
+            quarter_4_value,
+            indicators!inner(organization_id)
+          `)
+          .in('year', [selectedYear, selectedYear - 1])
+          .eq('indicators.organization_id', profile?.organization_id)
+      ]);
 
-        if (goalsError) {
-          console.error('Error loading goals for dept:', dept.name, goalsError);
-          departmentsData.push({
-            department_id: dept.id,
-            department_name: dept.name,
-            plans: [],
-            overall_success_rate: 0,
-          });
-          continue;
+      if (objectivesRes.error) throw objectivesRes.error;
+      if (entriesRes.error) throw entriesRes.error;
+
+      const targetsByIndicator: Record<string, number> = {};
+      const baselineByIndicator: Record<string, number> = {};
+      const quarterTargetsByIndicator: Record<string, { q1: number; q2: number; q3: number; q4: number }> = {};
+
+      targetsRes.data?.forEach(target => {
+        if (target.year === selectedYear) {
+          targetsByIndicator[target.indicator_id] = target.target_value;
+          quarterTargetsByIndicator[target.indicator_id] = {
+            q1: target.quarter_1_value || 0,
+            q2: target.quarter_2_value || 0,
+            q3: target.quarter_3_value || 0,
+            q4: target.quarter_4_value || 0
+          };
+        } else if (target.year === selectedYear - 1) {
+          baselineByIndicator[target.indicator_id] = target.target_value;
         }
+      });
 
-        if (!goals || goals.length === 0) {
-          departmentsData.push({
-            department_id: dept.id,
-            department_name: dept.name,
-            plans: [],
-            overall_success_rate: 0,
-          });
-          continue;
-        }
-
-        const planGroups = new Map<string, StrategicPlanGroup>();
-
-        for (const goal of goals) {
-          if (!goal.objective || !goal.objective.strategic_plan) continue;
-
-          const plan = goal.objective.strategic_plan;
-          const objective = goal.objective;
-          const planKey = plan.id;
-
-          if (!planGroups.has(planKey)) {
-            planGroups.set(planKey, {
-              plan_id: plan.id,
-              plan_name: plan.name,
-              plan_years: `${plan.start_year}-${plan.end_year}`,
-              objectives: [],
-              success_rate: 0,
-            });
-          }
-
-          const planGroup = planGroups.get(planKey)!;
-          let objectiveDetail = planGroup.objectives.find(o => o.objective_id === objective.id);
-
-          if (!objectiveDetail) {
-            objectiveDetail = {
-              objective_id: objective.id,
-              objective_code: objective.code,
-              objective_name: objective.title,
-              goals: [],
-              success_rate: 0,
-            };
-            planGroup.objectives.push(objectiveDetail);
-          }
-
-          const { data: indicators, error: indicatorsError } = await supabase
-            .from('indicators')
-            .select('id, code, name, unit, target_value, calculation_method, baseline_value, goal_impact_percentage')
-            .eq('goal_id', goal.id);
-
-          if (indicatorsError || !indicators || indicators.length === 0) {
-            objectiveDetail.goals.push({
-              goal_id: goal.id,
-              goal_code: goal.code,
-              goal_name: goal.title,
-              indicators: [],
-              success_rate: 0,
-              progress_percentage: 0,
-              status: 'very_weak' as IndicatorStatus,
-            });
-            continue;
-          }
-
-          const { data: targetsData } = await supabase
-            .from('indicator_targets')
-            .select('indicator_id, year, target_value')
-            .in('indicator_id', indicators.map(i => i.id))
-            .in('year', [selectedYear, selectedYear - 1]);
-
-          const targetsByIndicator: Record<string, number> = {};
-          const baselineByIndicator: Record<string, number> = {};
-
-          targetsData?.forEach(target => {
-            if (target.year === selectedYear) {
-              targetsByIndicator[target.indicator_id] = target.target_value;
-            } else if (target.year === selectedYear - 1) {
-              baselineByIndicator[target.indicator_id] = target.target_value;
-            }
-          });
-
-          const { data: allEntries } = await supabase
-            .from('indicator_data_entries')
-            .select('indicator_id, period_quarter, value, status')
-            .in('indicator_id', indicators.map(i => i.id))
-            .eq('period_year', selectedYear)
-            .eq('status', 'approved');
-
-          const indicatorsData: IndicatorQuarterlyData[] = [];
-
-          for (const indicator of indicators) {
-            const { data: targets } = await supabase
-              .from('indicator_targets')
-              .select('quarter_1_value, quarter_2_value, quarter_3_value, quarter_4_value')
-              .eq('indicator_id', indicator.id)
-              .eq('year', selectedYear)
-              .maybeSingle();
-
-            const entries = allEntries?.filter(e => e.indicator_id === indicator.id) || [];
-
-            let q1Target = targets?.quarter_1_value || 0;
-            let q2Target = targets?.quarter_2_value || 0;
-            let q3Target = targets?.quarter_3_value || 0;
-            let q4Target = targets?.quarter_4_value || 0;
-
-            if (q1Target === 0 && q2Target === 0 && q3Target === 0 && q4Target === 0 && indicator.target_value) {
-              const yearlyTarget = Number(indicator.target_value) || 0;
-              if (indicator.calculation_method === 'cumulative') {
-                q1Target = yearlyTarget * 0.25;
-                q2Target = yearlyTarget * 0.50;
-                q3Target = yearlyTarget * 0.75;
-                q4Target = yearlyTarget;
+      let filteredObjectives = (objectivesRes.data || []).map(obj => ({
+        ...obj,
+        goals: obj.goals
+          .filter(goal => departmentIds.includes(goal.department_id))
+          .map(goal => ({
+            ...goal,
+            indicators: goal.indicators.map(ind => {
+              let baselineValue;
+              if (baselineByIndicator[ind.id] !== undefined && baselineByIndicator[ind.id] !== null) {
+                baselineValue = baselineByIndicator[ind.id];
+              } else if (ind.baseline_value !== undefined && ind.baseline_value !== null) {
+                baselineValue = ind.baseline_value;
               } else {
-                q1Target = yearlyTarget / 4;
-                q2Target = yearlyTarget / 4;
-                q3Target = yearlyTarget / 4;
-                q4Target = yearlyTarget / 4;
+                baselineValue = 0;
               }
+
+              return {
+                ...ind,
+                yearly_target: targetsByIndicator[ind.id] !== undefined ? targetsByIndicator[ind.id] : ind.target_value,
+                yearly_baseline: baselineValue
+              };
+            }).sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }))
+          })).sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }))
+      })).filter(obj => obj.goals.length > 0)
+        .sort((a, b) => a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' }));
+
+      const departmentsData: DepartmentStrategicData[] = [];
+      const entries = entriesRes.data || [];
+
+      for (const dept of vp.departments) {
+        const deptObjectives = filteredObjectives.map(obj => ({
+          ...obj,
+          goals: obj.goals.filter(goal => goal.department_id === dept.id)
+        })).filter(obj => obj.goals.length > 0);
+
+        if (deptObjectives.length === 0) {
+          departmentsData.push({
+            department_id: dept.id,
+            department_name: dept.name,
+            plans: [],
+            overall_success_rate: 0,
+          });
+          continue;
+        }
+
+        const objectiveGroups: ObjectiveDetail[] = [];
+
+        for (const objective of deptObjectives) {
+          const objectiveDetail: ObjectiveDetail = {
+            objective_id: objective.id,
+            objective_code: objective.code,
+            objective_name: objective.title,
+            goals: [],
+            success_rate: 0,
+            progress_percentage: 0,
+            status: 'very_weak' as IndicatorStatus,
+          };
+
+          for (const goal of objective.goals) {
+            if (goal.indicators.length === 0) {
+              objectiveDetail.goals.push({
+                goal_id: goal.id,
+                goal_code: goal.code,
+                goal_name: goal.title,
+                indicators: [],
+                success_rate: 0,
+                progress_percentage: 0,
+                status: 'very_weak' as IndicatorStatus,
+              });
+              continue;
             }
 
-            const actualsMap = new Map<number, number>();
-            if (entries && entries.length > 0) {
-              entries.forEach(e => {
+            const indicatorsData: IndicatorQuarterlyData[] = [];
+
+            for (const indicator of goal.indicators) {
+              const indicatorEntries = entries.filter(e => e.indicator_id === indicator.id);
+
+              const quarterTargets = quarterTargetsByIndicator[indicator.id] || { q1: 0, q2: 0, q3: 0, q4: 0 };
+              let q1Target = quarterTargets.q1;
+              let q2Target = quarterTargets.q2;
+              let q3Target = quarterTargets.q3;
+              let q4Target = quarterTargets.q4;
+
+              const yearlyTarget = indicator.yearly_target || indicator.target_value || 0;
+
+              if (q1Target === 0 && q2Target === 0 && q3Target === 0 && q4Target === 0 && yearlyTarget > 0) {
+                const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+                if (calculationMethod.includes('cumulative')) {
+                  q1Target = yearlyTarget * 0.25;
+                  q2Target = yearlyTarget * 0.50;
+                  q3Target = yearlyTarget * 0.75;
+                  q4Target = yearlyTarget;
+                } else {
+                  q1Target = yearlyTarget / 4;
+                  q2Target = yearlyTarget / 4;
+                  q3Target = yearlyTarget / 4;
+                  q4Target = yearlyTarget / 4;
+                }
+              }
+
+              const actualsMap = new Map<number, number>();
+              indicatorEntries.forEach(e => {
                 if (e.value !== null && e.value !== undefined && e.period_quarter) {
                   actualsMap.set(e.period_quarter, e.value);
                 }
               });
+
+              const q1Actual = actualsMap.get(1) || 0;
+              const q1Rate = q1Target > 0 ? (q1Actual / q1Target) * 100 : 0;
+
+              const q2Actual = actualsMap.get(2) || 0;
+              const q2Rate = q2Target > 0 ? (q2Actual / q2Target) * 100 : 0;
+
+              const q3Actual = actualsMap.get(3) || 0;
+              const q3Rate = q3Target > 0 ? (q3Actual / q3Target) * 100 : 0;
+
+              const q4Actual = actualsMap.get(4) || 0;
+              const q4Rate = q4Target > 0 ? (q4Actual / q4Target) * 100 : 0;
+
+              const baselineValue = indicator.yearly_baseline || 0;
+
+              let totalActual: number;
+              let successRate: number;
+
+              const calculationMethod = indicator.calculation_method || 'cumulative_increasing';
+              if (calculationMethod.includes('cumulative')) {
+                totalActual = q4Actual;
+                successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
+              } else {
+                totalActual = q1Actual + q2Actual + q3Actual + q4Actual;
+                successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
+              }
+
+              const dataEntriesForIndicator = indicatorEntries.map(e => ({
+                indicator_id: e.indicator_id,
+                value: e.value,
+                status: e.status
+              }));
+
+              const progress = calculateIndicatorProgress(
+                {
+                  id: indicator.id,
+                  goal_id: goal.id,
+                  yearly_target: yearlyTarget,
+                  target_value: yearlyTarget,
+                  baseline_value: baselineValue,
+                  calculation_method: calculationMethod,
+                  goal_impact_percentage: indicator.goal_impact_percentage
+                },
+                dataEntriesForIndicator
+              );
+
+              const status = getIndicatorStatus(progress);
+
+              indicatorsData.push({
+                indicator_id: indicator.id,
+                indicator_code: indicator.code,
+                indicator_name: indicator.name,
+                unit: indicator.unit || '',
+                yearly_target: yearlyTarget,
+                baseline_value: baselineValue,
+                calculation_method: calculationMethod,
+                goal_impact_percentage: indicator.goal_impact_percentage,
+                q1_target: q1Target,
+                q1_actual: q1Actual,
+                q1_rate: q1Rate,
+                q2_target: q2Target,
+                q2_actual: q2Actual,
+                q2_rate: q2Rate,
+                q3_target: q3Target,
+                q3_actual: q3Actual,
+                q3_rate: q3Rate,
+                q4_target: q4Target,
+                q4_actual: q4Actual,
+                q4_rate: q4Rate,
+                total_actual: totalActual,
+                success_rate: successRate,
+                progress_percentage: progress,
+                status: status,
+              });
             }
 
-            const q1Actual = actualsMap.get(1) || 0;
-            const q1Rate = q1Target > 0 ? (q1Actual / q1Target) * 100 : 0;
+            const goalSuccessRate = indicatorsData.length > 0
+              ? indicatorsData.reduce((sum, ind) => sum + ind.success_rate, 0) / indicatorsData.length
+              : 0;
 
-            const q2Actual = actualsMap.get(2) || 0;
-            const q2Rate = q2Target > 0 ? (q2Actual / q2Target) * 100 : 0;
-
-            const q3Actual = actualsMap.get(3) || 0;
-            const q3Rate = q3Target > 0 ? (q3Actual / q3Target) * 100 : 0;
-
-            const q4Actual = actualsMap.get(4) || 0;
-            const q4Rate = q4Target > 0 ? (q4Actual / q4Target) * 100 : 0;
-
-            let yearlyTarget = targetsByIndicator[indicator.id] || indicator.target_value || 0;
-            let baselineValue = baselineByIndicator[indicator.id] !== undefined
-              ? baselineByIndicator[indicator.id]
-              : (indicator.baseline_value || 0);
-
-            let totalActual: number;
-            let successRate: number;
-
-            if (indicator.calculation_method === 'cumulative' || indicator.calculation_method === 'cumulative_increasing') {
-              totalActual = q4Actual;
-              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
-            } else {
-              totalActual = q1Actual + q2Actual + q3Actual + q4Actual;
-              successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
-            }
-
-            const dataEntriesForIndicator = entries.map(e => ({
-              indicator_id: e.indicator_id,
-              value: e.value,
-              status: e.status
+            const indicatorsForGoalProgress = indicatorsData.map(ind => ({
+              id: ind.indicator_id,
+              goal_id: goal.id,
+              goal_impact_percentage: ind.goal_impact_percentage,
+              yearly_target: ind.yearly_target,
+              target_value: ind.yearly_target,
+              baseline_value: ind.baseline_value,
+              calculation_method: ind.calculation_method
             }));
 
-            const progress = calculateIndicatorProgress(
-              {
-                id: indicator.id,
-                goal_id: goal.id,
-                yearly_target: yearlyTarget,
-                target_value: yearlyTarget,
-                baseline_value: baselineValue,
-                calculation_method: indicator.calculation_method || 'cumulative_increasing',
-                goal_impact_percentage: indicator.goal_impact_percentage
-              },
-              dataEntriesForIndicator
+            const goalProgress = calculateGoalProgress(
+              goal.id,
+              indicatorsForGoalProgress,
+              entries.map(e => ({ indicator_id: e.indicator_id, value: e.value, status: e.status }))
             );
 
-            const status = getIndicatorStatus(progress);
+            const goalStatus = getIndicatorStatus(goalProgress);
 
-            indicatorsData.push({
-              indicator_id: indicator.id,
-              indicator_code: indicator.code,
-              indicator_name: indicator.name,
-              unit: indicator.unit || '',
-              yearly_target: yearlyTarget,
-              baseline_value: baselineValue,
-              calculation_method: indicator.calculation_method || 'cumulative_increasing',
-              goal_impact_percentage: indicator.goal_impact_percentage,
-              q1_target: q1Target,
-              q1_actual: q1Actual,
-              q1_rate: q1Rate,
-              q2_target: q2Target,
-              q2_actual: q2Actual,
-              q2_rate: q2Rate,
-              q3_target: q3Target,
-              q3_actual: q3Actual,
-              q3_rate: q3Rate,
-              q4_target: q4Target,
-              q4_actual: q4Actual,
-              q4_rate: q4Rate,
-              total_actual: totalActual,
-              success_rate: successRate,
-              progress_percentage: progress,
-              status: status,
+            objectiveDetail.goals.push({
+              goal_id: goal.id,
+              goal_code: goal.code,
+              goal_name: goal.title,
+              indicators: indicatorsData,
+              success_rate: goalSuccessRate,
+              progress_percentage: goalProgress,
+              status: goalStatus,
             });
           }
 
-          const goalSuccessRate = indicatorsData.length > 0
-            ? indicatorsData.reduce((sum, ind) => sum + ind.success_rate, 0) / indicatorsData.length
+          objectiveDetail.success_rate = objectiveDetail.goals.length > 0
+            ? objectiveDetail.goals.reduce((sum, g) => sum + g.success_rate, 0) / objectiveDetail.goals.length
             : 0;
 
-          const indicatorsForGoalProgress = indicatorsData.map(ind => ({
-            id: ind.indicator_id,
-            goal_id: goal.id,
-            goal_impact_percentage: ind.goal_impact_percentage,
-            yearly_target: ind.yearly_target,
-            target_value: ind.yearly_target,
-            baseline_value: ind.baseline_value,
-            calculation_method: ind.calculation_method
-          }));
-
-          const goalProgress = calculateGoalProgress(
-            goal.id,
-            indicatorsForGoalProgress,
-            allEntries?.map(e => ({ indicator_id: e.indicator_id, value: e.value, status: e.status })) || []
+          const allGoals = objectiveDetail.goals.map(g => ({ id: g.goal_id, objective_id: objectiveDetail.objective_id }));
+          const allIndicatorsForObj = objectiveDetail.goals.flatMap(g =>
+            g.indicators.map(ind => ({
+              id: ind.indicator_id,
+              goal_id: g.goal_id,
+              goal_impact_percentage: ind.goal_impact_percentage,
+              yearly_target: ind.yearly_target,
+              target_value: ind.yearly_target,
+              baseline_value: ind.baseline_value,
+              calculation_method: ind.calculation_method
+            }))
           );
 
-          const goalStatus = getIndicatorStatus(goalProgress);
+          const objectiveProgress = calculateObjectiveProgress(
+            objectiveDetail.objective_id,
+            allGoals,
+            allIndicatorsForObj,
+            entries.map(e => ({ indicator_id: e.indicator_id, value: e.value, status: e.status }))
+          );
 
-          objectiveDetail.goals.push({
-            goal_id: goal.id,
-            goal_code: goal.code,
-            goal_name: goal.title,
-            indicators: indicatorsData,
-            success_rate: goalSuccessRate,
-            progress_percentage: goalProgress,
-            status: goalStatus,
-          });
+          objectiveDetail.progress_percentage = objectiveProgress;
+          objectiveDetail.status = getIndicatorStatus(objectiveProgress);
+
+          objectiveGroups.push(objectiveDetail);
         }
 
-        const plans: StrategicPlanGroup[] = Array.from(planGroups.values());
-        plans.forEach(plan => {
-          plan.objectives.forEach(obj => {
-            obj.success_rate = obj.goals.length > 0
-              ? obj.goals.reduce((sum, g) => sum + g.success_rate, 0) / obj.goals.length
-              : 0;
+        const dummyPlan: StrategicPlanGroup = {
+          plan_id: `dept-${dept.id}`,
+          plan_name: 'Stratejik Plan',
+          plan_years: `${selectedYear}`,
+          objectives: objectiveGroups,
+          success_rate: 0,
+          progress_percentage: 0,
+          status: 'very_weak' as IndicatorStatus,
+        };
 
-            const allGoals = obj.goals.map(g => ({ id: g.goal_id, objective_id: obj.objective_id }));
-            const allIndicatorsForObj = obj.goals.flatMap(g =>
-              g.indicators.map(ind => ({
-                id: ind.indicator_id,
-                goal_id: g.goal_id,
-                goal_impact_percentage: ind.goal_impact_percentage,
-                yearly_target: ind.yearly_target,
-                target_value: ind.yearly_target,
-                baseline_value: ind.baseline_value,
-                calculation_method: ind.calculation_method
-              }))
-            );
-            const allEntriesForObj = allEntries?.map(e => ({ indicator_id: e.indicator_id, value: e.value, status: e.status })) || [];
-
-            const objectiveProgress = calculateObjectiveProgress(
-              obj.objective_id,
-              allGoals,
-              allIndicatorsForObj,
-              allEntriesForObj
-            );
-
-            obj.progress_percentage = objectiveProgress;
-            obj.status = getIndicatorStatus(objectiveProgress);
-          });
-
-          plan.success_rate = plan.objectives.length > 0
-            ? plan.objectives.reduce((sum, o) => sum + o.success_rate, 0) / plan.objectives.length
-            : 0;
-
-          plan.progress_percentage = plan.objectives.length > 0
-            ? plan.objectives.reduce((sum, o) => sum + o.progress_percentage, 0) / plan.objectives.length
-            : 0;
-
-          plan.status = getIndicatorStatus(plan.progress_percentage);
-        });
-
-        const deptSuccessRate = plans.length > 0
-          ? plans.reduce((sum, p) => sum + p.success_rate, 0) / plans.length
+        dummyPlan.success_rate = dummyPlan.objectives.length > 0
+          ? dummyPlan.objectives.reduce((sum, o) => sum + o.success_rate, 0) / dummyPlan.objectives.length
           : 0;
+
+        dummyPlan.progress_percentage = dummyPlan.objectives.length > 0
+          ? dummyPlan.objectives.reduce((sum, o) => sum + o.progress_percentage, 0) / dummyPlan.objectives.length
+          : 0;
+
+        dummyPlan.status = getIndicatorStatus(dummyPlan.progress_percentage);
 
         departmentsData.push({
           department_id: dept.id,
           department_name: dept.name,
-          plans,
-          overall_success_rate: deptSuccessRate,
+          plans: [dummyPlan],
+          overall_success_rate: dummyPlan.success_rate,
         });
       }
 
