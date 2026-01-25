@@ -380,14 +380,7 @@ export default function VicePresidentPerformance() {
         return;
       }
 
-      const departmentIds = vp.departments.map(d => d.id);
       const departmentsData: DepartmentStrategicData[] = [];
-
-      let totalPlans = 0;
-      let totalObjectives = 0;
-      let totalGoals = 0;
-      let totalIndicators = 0;
-      let allSuccessRates: number[] = [];
 
       for (const dept of vp.departments) {
         const { data: goals, error: goalsError } = await supabase
@@ -396,11 +389,11 @@ export default function VicePresidentPerformance() {
             id,
             code,
             name,
-            objective:objectives(
+            objective:objectives!inner(
               id,
               code,
               name,
-              strategic_plan:strategic_plans(
+              strategic_plan:strategic_plans!inner(
                 id,
                 name,
                 start_year,
@@ -412,7 +405,13 @@ export default function VicePresidentPerformance() {
           .eq('organization_id', profile?.organization_id);
 
         if (goalsError) {
-          console.error('Error loading goals:', goalsError);
+          console.error('Error loading goals for dept:', dept.name, goalsError);
+          departmentsData.push({
+            department_id: dept.id,
+            department_name: dept.name,
+            plans: [],
+            overall_success_rate: 0,
+          });
           continue;
         }
 
@@ -457,7 +456,6 @@ export default function VicePresidentPerformance() {
               success_rate: 0,
             };
             planGroup.objectives.push(objectiveDetail);
-            totalObjectives++;
           }
 
           const { data: indicators, error: indicatorsError } = await supabase
@@ -473,23 +471,19 @@ export default function VicePresidentPerformance() {
               indicators: [],
               success_rate: 0,
             });
-            totalGoals++;
             continue;
           }
-
-          const indicatorIds = indicators.map(i => i.id);
-          totalIndicators += indicators.length;
 
           const indicatorsData: IndicatorQuarterlyData[] = [];
 
           for (const indicator of indicators) {
-            const { data: targets, error: targetsError } = await supabase
+            const { data: targets } = await supabase
               .from('indicator_targets')
               .select('period_quarter, target_value')
               .eq('indicator_id', indicator.id)
               .eq('period_year', selectedYear);
 
-            const { data: entries, error: entriesError } = await supabase
+            const { data: entries } = await supabase
               .from('indicator_data_entries')
               .select('period_quarter, actual_value, status')
               .eq('indicator_id', indicator.id)
@@ -497,13 +491,21 @@ export default function VicePresidentPerformance() {
               .in('status', ['approved', 'admin_approved']);
 
             const targetsMap = new Map<number, number>();
-            if (targets) {
-              targets.forEach(t => targetsMap.set(t.period_quarter, t.target_value || 0));
+            if (targets && targets.length > 0) {
+              targets.forEach(t => {
+                if (t.target_value !== null && t.target_value !== undefined) {
+                  targetsMap.set(t.period_quarter, t.target_value);
+                }
+              });
             }
 
             const actualsMap = new Map<number, number>();
-            if (entries) {
-              entries.forEach(e => actualsMap.set(e.period_quarter, e.actual_value || 0));
+            if (entries && entries.length > 0) {
+              entries.forEach(e => {
+                if (e.actual_value !== null && e.actual_value !== undefined) {
+                  actualsMap.set(e.period_quarter, e.actual_value);
+                }
+              });
             }
 
             const q1Target = targetsMap.get(1) || 0;
@@ -547,10 +549,6 @@ export default function VicePresidentPerformance() {
               total_actual: totalActual,
               success_rate: successRate,
             });
-
-            if (successRate > 0) {
-              allSuccessRates.push(successRate);
-            }
           }
 
           const goalSuccessRate = indicatorsData.length > 0
@@ -564,7 +562,6 @@ export default function VicePresidentPerformance() {
             indicators: indicatorsData,
             success_rate: goalSuccessRate,
           });
-          totalGoals++;
         }
 
         const plans: StrategicPlanGroup[] = Array.from(planGroups.values());
@@ -589,12 +586,32 @@ export default function VicePresidentPerformance() {
           plans,
           overall_success_rate: deptSuccessRate,
         });
-
-        totalPlans += plans.length;
       }
 
-      const overallSuccessRate = allSuccessRates.length > 0
-        ? allSuccessRates.reduce((sum, rate) => sum + rate, 0) / allSuccessRates.length
+      let totalPlans = 0;
+      let totalObjectives = 0;
+      let totalGoals = 0;
+      let totalIndicators = 0;
+      const departmentSuccessRates: number[] = [];
+
+      departmentsData.forEach(deptData => {
+        if (deptData.overall_success_rate > 0) {
+          departmentSuccessRates.push(deptData.overall_success_rate);
+        }
+        deptData.plans.forEach(plan => {
+          totalPlans++;
+          plan.objectives.forEach(obj => {
+            totalObjectives++;
+            obj.goals.forEach(goal => {
+              totalGoals++;
+              totalIndicators += goal.indicators.length;
+            });
+          });
+        });
+      });
+
+      const overallSuccessRate = departmentSuccessRates.length > 0
+        ? departmentSuccessRates.reduce((sum, rate) => sum + rate, 0) / departmentSuccessRates.length
         : 0;
 
       let grade = '';
