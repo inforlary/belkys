@@ -10,7 +10,10 @@ import {
   getIndicatorStatus,
   getStatusConfig,
   getStatusLabel,
-  IndicatorStatus
+  IndicatorStatus,
+  IndicatorStats,
+  createEmptyStats,
+  incrementStatusInStats
 } from '../utils/indicatorStatus';
 
 interface VPWithDepartments {
@@ -24,22 +27,16 @@ interface DepartmentPerformance {
   department_id: string;
   department_name: string;
   total_indicators: number;
-  active_indicators: number;
-  data_entries: number;
-  pending_approvals: number;
-  approved_entries: number;
-  rejected_entries: number;
-  completion_rate: number;
+  data_entry_progress: number;
+  unit_performance_percentage: number;
+  status_stats: IndicatorStats;
 }
 
 interface VPOverallPerformance {
   total_departments: number;
   total_indicators: number;
-  total_data_entries: number;
-  total_approved: number;
-  total_pending: number;
-  total_rejected: number;
-  overall_completion_rate: number;
+  overall_performance_percentage: number;
+  status_stats: IndicatorStats;
   performance_grade: string;
   performance_color: string;
 }
@@ -221,6 +218,83 @@ export default function VicePresidentPerformance() {
     }
   }
 
+  const getIndicatorTarget = (indicatorId: string, indicator: any) => {
+    if (indicator.yearly_target !== null && indicator.yearly_target !== undefined) {
+      return indicator.yearly_target;
+    }
+    if (indicator.target_value !== null && indicator.target_value !== undefined) {
+      return indicator.target_value;
+    }
+    return 0;
+  };
+
+  const calculateCurrentValue = (indicator: any, entries: any[]) => {
+    const indicatorEntries = entries.filter(
+      e => e.indicator_id === indicator.id && e.status === 'approved'
+    );
+    if (indicatorEntries.length === 0) return null;
+
+    const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
+    const periodCount = indicatorEntries.length;
+    const average = sumOfEntries / periodCount;
+    const baselineValue = indicator.yearly_baseline !== undefined && indicator.yearly_baseline !== null ? indicator.yearly_baseline : (indicator.baseline_value !== undefined && indicator.baseline_value !== null ? indicator.baseline_value : 0);
+    const calculationMethod = indicator.calculation_method || 'cumulative';
+
+    let currentValue = 0;
+
+    switch (calculationMethod) {
+      case 'cumulative':
+      case 'cumulative_increasing':
+      case 'increasing':
+        currentValue = baselineValue + sumOfEntries;
+        break;
+
+      case 'cumulative_decreasing':
+      case 'decreasing':
+        currentValue = baselineValue - sumOfEntries;
+        break;
+
+      case 'percentage':
+      case 'percentage_increasing':
+      case 'percentage_decreasing':
+        currentValue = average;
+        break;
+
+      case 'maintenance':
+      case 'maintenance_increasing':
+      case 'maintenance_decreasing':
+        currentValue = average;
+        break;
+
+      default:
+        currentValue = baselineValue + sumOfEntries;
+        break;
+    }
+
+    return currentValue;
+  };
+
+  const calculateProgress = (indicator: any, currentValue: number | null, targetValue: number | null, entries: any[]) => {
+    if (currentValue === null || targetValue === null) return 0;
+
+    const dataEntriesForIndicator = entries
+      .filter(e => e.indicator_id === indicator.id)
+      .map(e => ({
+        indicator_id: e.indicator_id,
+        value: e.value,
+        status: e.status
+      }));
+
+    return calculateIndicatorProgress(
+      {
+        ...indicator,
+        yearly_target: targetValue,
+        current_value: currentValue
+      },
+      dataEntriesForIndicator
+    );
+  };
+
   async function loadPerformance() {
     if (!selectedVP) return;
 
@@ -236,14 +310,9 @@ export default function VicePresidentPerformance() {
       const performanceData: DepartmentPerformance[] = [];
 
       let totalIndicators = 0;
-      let totalDataEntries = 0;
-      let totalApproved = 0;
-      let totalPending = 0;
-      let totalRejected = 0;
+      const overallStats = createEmptyStats();
 
       for (const dept of vp.departments) {
-        console.log('Loading performance for department:', dept.name, dept.id);
-
         const { data: goals, error: goalsError } = await supabase
           .from('goals')
           .select('id')
@@ -255,8 +324,6 @@ export default function VicePresidentPerformance() {
           throw goalsError;
         }
 
-        console.log('Goals for', dept.name, ':', goals);
-
         const goalIds = goals?.map(g => g.id) || [];
 
         if (goalIds.length === 0) {
@@ -264,27 +331,22 @@ export default function VicePresidentPerformance() {
             department_id: dept.id,
             department_name: dept.name,
             total_indicators: 0,
-            active_indicators: 0,
-            data_entries: 0,
-            pending_approvals: 0,
-            approved_entries: 0,
-            rejected_entries: 0,
-            completion_rate: 0,
+            data_entry_progress: 0,
+            unit_performance_percentage: 0,
+            status_stats: createEmptyStats(),
           });
           continue;
         }
 
         const { data: indicators, error: indicatorsError } = await supabase
           .from('indicators')
-          .select('id')
+          .select('id, code, name, target_value, baseline_value, calculation_method, measurement_frequency')
           .in('goal_id', goalIds);
 
         if (indicatorsError) {
           console.error('Error loading indicators for goals:', goalIds, indicatorsError);
           throw indicatorsError;
         }
-
-        console.log('Indicators for', dept.name, ':', indicators);
 
         const indicatorIds = indicators?.map(i => i.id) || [];
         const deptTotalIndicators = indicatorIds.length;
@@ -295,93 +357,144 @@ export default function VicePresidentPerformance() {
             department_id: dept.id,
             department_name: dept.name,
             total_indicators: 0,
-            active_indicators: 0,
-            data_entries: 0,
-            pending_approvals: 0,
-            approved_entries: 0,
-            rejected_entries: 0,
-            completion_rate: 0,
+            data_entry_progress: 0,
+            unit_performance_percentage: 0,
+            status_stats: createEmptyStats(),
           });
           continue;
         }
 
-        const { data: entries, error: entriesError } = await supabase
-          .from('indicator_data_entries')
-          .select('id, status, period_quarter, period_year')
-          .in('indicator_id', indicatorIds)
-          .eq('period_year', selectedYear);
+        const [entriesRes, targetsRes] = await Promise.all([
+          supabase
+            .from('indicator_data_entries')
+            .select('*')
+            .in('indicator_id', indicatorIds)
+            .eq('period_year', selectedYear),
+          supabase
+            .from('indicator_targets')
+            .select('indicator_id, year, target_value, baseline_value')
+            .in('indicator_id', indicatorIds)
+            .in('year', [selectedYear, selectedYear - 1])
+        ]);
 
-        if (entriesError) {
-          console.error('Error loading entries for indicators:', indicatorIds, entriesError);
-          throw entriesError;
-        }
+        const entries = entriesRes.data || [];
+        const targets = targetsRes.data || [];
 
-        console.log('Entries for', dept.name, ':', entries);
+        const targetsByIndicator: Record<string, number> = {};
+        const baselineByIndicator: Record<string, number> = {};
 
-        const totalEntries = entries?.length || 0;
-        const pendingApprovals = entries?.filter(e => e.status === 'pending' || e.status === 'submitted_to_director' || e.status === 'submitted_to_admin').length || 0;
-        const approvedEntries = entries?.filter(e => e.status === 'approved' || e.status === 'admin_approved').length || 0;
-        const rejectedEntries = entries?.filter(e => e.status === 'rejected').length || 0;
+        targets.forEach(target => {
+          if (target.year === selectedYear) {
+            targetsByIndicator[target.indicator_id] = target.target_value;
+          } else if (target.year === selectedYear - 1) {
+            baselineByIndicator[target.indicator_id] = target.baseline_value || target.target_value;
+          }
+        });
 
-        totalDataEntries += totalEntries;
-        totalApproved += approvedEntries;
-        totalPending += pendingApprovals;
-        totalRejected += rejectedEntries;
+        const enrichedIndicators = indicators?.map(ind => {
+          let baselineValue;
+          if (baselineByIndicator[ind.id] !== undefined && baselineByIndicator[ind.id] !== null) {
+            baselineValue = baselineByIndicator[ind.id];
+          } else if (ind.baseline_value !== undefined && ind.baseline_value !== null) {
+            baselineValue = ind.baseline_value;
+          } else {
+            baselineValue = 0;
+          }
 
+          return {
+            ...ind,
+            yearly_target: targetsByIndicator[ind.id] !== undefined ? targetsByIndicator[ind.id] : ind.target_value,
+            yearly_baseline: baselineValue
+          };
+        });
+
+        const deptStats = createEmptyStats();
+        let totalProgress = 0;
+        let indicatorCount = 0;
+
+        let approvedEntryCount = 0;
         const expectedEntries = deptTotalIndicators * 4;
-        const completionRate = expectedEntries > 0 ? (approvedEntries / expectedEntries) * 100 : 0;
+
+        enrichedIndicators?.forEach(indicator => {
+          const target = getIndicatorTarget(indicator.id, indicator);
+
+          const indicatorEntries = entries.filter(e => e.indicator_id === indicator.id);
+          const approvedCount = indicatorEntries.filter(e => e.status === 'approved').length;
+          approvedEntryCount += approvedCount;
+
+          if (target === 0 || target === null) {
+            incrementStatusInStats(deptStats, 'very_weak');
+            incrementStatusInStats(overallStats, 'very_weak');
+            indicatorCount++;
+            return;
+          }
+
+          const currentValue = calculateCurrentValue(indicator, entries);
+          if (currentValue === null) {
+            incrementStatusInStats(deptStats, 'very_weak');
+            incrementStatusInStats(overallStats, 'very_weak');
+            indicatorCount++;
+            return;
+          }
+
+          const progress = calculateProgress(indicator, currentValue, target, entries);
+          const status = getIndicatorStatus(progress);
+
+          incrementStatusInStats(deptStats, status);
+          incrementStatusInStats(overallStats, status);
+
+          totalProgress += progress;
+          indicatorCount++;
+        });
+
+        const unitPerformance = indicatorCount > 0 ? totalProgress / indicatorCount : 0;
+        const dataEntryProgress = expectedEntries > 0 ? (approvedEntryCount / expectedEntries) * 100 : 0;
 
         performanceData.push({
           department_id: dept.id,
           department_name: dept.name,
           total_indicators: deptTotalIndicators,
-          active_indicators: deptTotalIndicators,
-          data_entries: totalEntries,
-          pending_approvals: pendingApprovals,
-          approved_entries: approvedEntries,
-          rejected_entries: rejectedEntries,
-          completion_rate: completionRate,
+          data_entry_progress: dataEntryProgress,
+          unit_performance_percentage: unitPerformance,
+          status_stats: deptStats,
         });
       }
 
-      const expectedTotalEntries = totalIndicators * 4;
-      const overallCompletionRate = expectedTotalEntries > 0 ? (totalApproved / expectedTotalEntries) * 100 : 0;
+      const totalPerformance = performanceData.reduce((sum, dept) => sum + dept.unit_performance_percentage, 0);
+      const overallPerformancePercentage = performanceData.length > 0 ? totalPerformance / performanceData.length : 0;
 
       let grade = '';
       let color = '';
-      if (overallCompletionRate >= 90) {
-        grade = 'Mükemmel';
-        color = 'emerald';
-      } else if (overallCompletionRate >= 80) {
+      if (overallPerformancePercentage >= 115) {
+        grade = 'Hedef Üstü';
+        color = 'purple';
+      } else if (overallPerformancePercentage >= 85) {
         grade = 'Çok İyi';
         color = 'green';
-      } else if (overallCompletionRate >= 70) {
+      } else if (overallPerformancePercentage >= 70) {
         grade = 'İyi';
-        color = 'blue';
-      } else if (overallCompletionRate >= 60) {
+        color = 'emerald';
+      } else if (overallPerformancePercentage >= 55) {
         grade = 'Orta';
         color = 'yellow';
-      } else if (overallCompletionRate >= 50) {
+      } else if (overallPerformancePercentage >= 45) {
         grade = 'Zayıf';
         color = 'orange';
       } else {
-        grade = 'Yetersiz';
+        grade = 'Çok Zayıf';
         color = 'red';
       }
 
       setOverallPerformance({
         total_departments: vp.departments.length,
         total_indicators: totalIndicators,
-        total_data_entries: totalDataEntries,
-        total_approved: totalApproved,
-        total_pending: totalPending,
-        total_rejected: totalRejected,
-        overall_completion_rate: overallCompletionRate,
+        overall_performance_percentage: overallPerformancePercentage,
+        status_stats: overallStats,
         performance_grade: grade,
         performance_color: color,
       });
 
-      setPerformance(performanceData.sort((a, b) => b.completion_rate - a.completion_rate));
+      setPerformance(performanceData.sort((a, b) => b.unit_performance_percentage - a.unit_performance_percentage));
     } catch (error) {
       console.error('Error loading performance:', error);
     }
@@ -824,15 +937,19 @@ export default function VicePresidentPerformance() {
         ['Dönem:', selectedYear],
         ['Rapor Tarihi:', new Date().toLocaleDateString('tr-TR')],
         [''],
-        ['VERİ GİRİŞİ PERFORMANSI'],
+        ['GENEL PERFORMANS'],
         ['Toplam Müdürlük:', overallPerformance.total_departments],
         ['Toplam Gösterge:', overallPerformance.total_indicators],
-        ['Toplam Veri Girişi:', overallPerformance.total_data_entries],
-        ['Onaylı:', overallPerformance.total_approved],
-        ['Bekleyen:', overallPerformance.total_pending],
-        ['Reddedilen:', overallPerformance.total_rejected],
-        ['Tamamlanma Oranı:', `%${overallPerformance.overall_completion_rate.toFixed(1)}`],
+        ['Genel Performans:', `%${overallPerformance.overall_performance_percentage.toFixed(1)}`],
         ['Performans Notu:', overallPerformance.performance_grade],
+        [''],
+        ['İLERLEME DURUMU'],
+        ['Hedef Üstü:', overallPerformance.status_stats.exceedingTarget],
+        ['Çok İyi:', overallPerformance.status_stats.excellent],
+        ['İyi:', overallPerformance.status_stats.good],
+        ['Orta:', overallPerformance.status_stats.moderate],
+        ['Zayıf:', overallPerformance.status_stats.weak],
+        ['Çok Zayıf:', overallPerformance.status_stats.veryWeak],
         [''],
       ];
 
@@ -854,22 +971,25 @@ export default function VicePresidentPerformance() {
       XLSX.utils.book_append_sheet(workbook, summarySheet, 'Özet');
 
       const deptPerformanceData = [
-        ['Müdürlük Adı', 'Toplam Gösterge', 'Toplam Veri', 'Onaylı', 'Bekleyen', 'Red', 'Tamamlanma Oranı (%)'],
+        ['Müdürlük Adı', 'Toplam Gösterge', 'Birim Performansı (%)', 'Veri Girişi İlerlemesi (%)', 'Hedef Üstü', 'Çok İyi', 'İyi', 'Orta', 'Zayıf', 'Çok Zayıf'],
       ];
       performance.forEach(dept => {
         deptPerformanceData.push([
           dept.department_name,
           dept.total_indicators,
-          dept.data_entries,
-          dept.approved_entries,
-          dept.pending_approvals,
-          dept.rejected_entries,
-          dept.completion_rate.toFixed(1),
+          dept.unit_performance_percentage.toFixed(1),
+          dept.data_entry_progress.toFixed(1),
+          dept.status_stats.exceedingTarget,
+          dept.status_stats.excellent,
+          dept.status_stats.good,
+          dept.status_stats.moderate,
+          dept.status_stats.weak,
+          dept.status_stats.veryWeak,
         ]);
       });
       const deptSheet = XLSX.utils.aoa_to_sheet(deptPerformanceData);
-      deptSheet['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 18 }];
-      XLSX.utils.book_append_sheet(workbook, deptSheet, 'Veri Girişi Performansı');
+      deptSheet['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(workbook, deptSheet, 'Müdürlük Performansları');
 
       for (const deptData of departmentStrategicData) {
         if (deptData.plans.length === 0) continue;
@@ -1123,7 +1243,7 @@ export default function VicePresidentPerformance() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
                     <div className="flex items-center gap-2 text-slate-600 mb-2">
                       <Building2 className="w-4 h-4" />
@@ -1143,33 +1263,47 @@ export default function VicePresidentPerformance() {
                   <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
                     <div className="flex items-center gap-2 text-slate-600 mb-2">
                       <Activity className="w-4 h-4" />
-                      <span className="text-xs font-medium">Toplam Veri</span>
+                      <span className="text-xs font-medium">Genel Performans</span>
                     </div>
-                    <div className="text-2xl font-bold text-slate-900">{overallPerformance.total_data_entries}</div>
+                    <div className="text-2xl font-bold text-slate-900">%{overallPerformance.overall_performance_percentage.toFixed(1)}</div>
                   </div>
 
-                  <div className="bg-green-50 rounded-xl p-4 shadow-sm border border-green-200">
-                    <div className="flex items-center gap-2 text-green-700 mb-2">
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-xs font-medium">Onaylı</span>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                    <div className="flex items-center gap-2 text-slate-600 mb-2">
+                      <Award className="w-4 h-4" />
+                      <span className="text-xs font-medium">Not</span>
                     </div>
-                    <div className="text-2xl font-bold text-green-900">{overallPerformance.total_approved}</div>
+                    <div className={`text-xl font-bold ${getGradeTextColor(overallPerformance.performance_color)}`}>{overallPerformance.performance_grade}</div>
                   </div>
+                </div>
 
-                  <div className="bg-yellow-50 rounded-xl p-4 shadow-sm border border-yellow-200">
-                    <div className="flex items-center gap-2 text-yellow-700 mb-2">
-                      <Clock className="w-4 h-4" />
-                      <span className="text-xs font-medium">Bekleyen</span>
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">İlerleme Durumu</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                      <div className="text-xs text-purple-600 font-medium mb-1">Hedef Üstü</div>
+                      <div className="text-2xl font-bold text-purple-900">{overallPerformance.status_stats.exceedingTarget}</div>
                     </div>
-                    <div className="text-2xl font-bold text-yellow-900">{overallPerformance.total_pending}</div>
-                  </div>
-
-                  <div className="bg-red-50 rounded-xl p-4 shadow-sm border border-red-200">
-                    <div className="flex items-center gap-2 text-red-700 mb-2">
-                      <AlertCircle className="w-4 h-4" />
-                      <span className="text-xs font-medium">Red</span>
+                    <div className="bg-green-100 rounded-lg p-3 border border-green-300">
+                      <div className="text-xs text-green-700 font-medium mb-1">Çok İyi</div>
+                      <div className="text-2xl font-bold text-green-900">{overallPerformance.status_stats.excellent}</div>
                     </div>
-                    <div className="text-2xl font-bold text-red-900">{overallPerformance.total_rejected}</div>
+                    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                      <div className="text-xs text-green-600 font-medium mb-1">İyi</div>
+                      <div className="text-2xl font-bold text-green-800">{overallPerformance.status_stats.good}</div>
+                    </div>
+                    <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                      <div className="text-xs text-yellow-600 font-medium mb-1">Orta</div>
+                      <div className="text-2xl font-bold text-yellow-900">{overallPerformance.status_stats.moderate}</div>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                      <div className="text-xs text-red-600 font-medium mb-1">Zayıf</div>
+                      <div className="text-2xl font-bold text-red-900">{overallPerformance.status_stats.weak}</div>
+                    </div>
+                    <div className="bg-amber-100 rounded-lg p-3 border border-amber-300">
+                      <div className="text-xs text-amber-800 font-medium mb-1">Çok Zayıf</div>
+                      <div className="text-2xl font-bold text-amber-900">{overallPerformance.status_stats.veryWeak}</div>
+                    </div>
                   </div>
                 </div>
 
@@ -1178,17 +1312,17 @@ export default function VicePresidentPerformance() {
                     <div className="flex items-center gap-2">
                       <TrendingUp className={`w-5 h-5 ${getGradeTextColor(overallPerformance.performance_color)}`} />
                       <span className={`font-bold ${getGradeTextColor(overallPerformance.performance_color)}`}>
-                        Genel Tamamlanma Oranı
+                        Başkan Yardımcısı Genel Performans
                       </span>
                     </div>
                     <span className={`text-2xl font-bold ${getGradeTextColor(overallPerformance.performance_color)}`}>
-                      %{overallPerformance.overall_completion_rate.toFixed(1)}
+                      %{overallPerformance.overall_performance_percentage.toFixed(1)}
                     </span>
                   </div>
                   <div className="w-full bg-white rounded-full h-4 shadow-inner border border-slate-200">
                     <div
                       className={`h-4 rounded-full transition-all ${getGradeColor(overallPerformance.performance_color)}`}
-                      style={{ width: `${Math.min(overallPerformance.overall_completion_rate, 100)}%` }}
+                      style={{ width: `${Math.min(overallPerformance.overall_performance_percentage, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -1296,61 +1430,60 @@ export default function VicePresidentPerformance() {
                             </div>
                           </div>
                         </div>
-                        <div className={`px-5 py-3 rounded-xl font-bold text-lg shadow-md ${getCompletionColor(dept.completion_rate)}`}>
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5" />
-                            <span>%{dept.completion_rate.toFixed(1)}</span>
+                        <div className="text-right">
+                          <div className={`px-5 py-3 rounded-xl font-bold text-lg shadow-md ${getCompletionColor(dept.unit_performance_percentage)}`}>
+                            <div className="flex items-center gap-2">
+                              <TrendingUp className="w-5 h-5" />
+                              <span>%{dept.unit_performance_percentage.toFixed(1)}</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">Birim Performansı</p>
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <h4 className="text-sm font-semibold text-slate-700 mb-2">İlerleme Durumu</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                          <div className="bg-purple-50 rounded-lg p-2 border border-purple-200">
+                            <div className="text-xs text-purple-600 font-medium">Hedef Üstü</div>
+                            <div className="text-lg font-bold text-purple-900">{dept.status_stats.exceedingTarget}</div>
+                          </div>
+                          <div className="bg-green-100 rounded-lg p-2 border border-green-300">
+                            <div className="text-xs text-green-700 font-medium">Çok İyi</div>
+                            <div className="text-lg font-bold text-green-900">{dept.status_stats.excellent}</div>
+                          </div>
+                          <div className="bg-green-50 rounded-lg p-2 border border-green-200">
+                            <div className="text-xs text-green-600 font-medium">İyi</div>
+                            <div className="text-lg font-bold text-green-800">{dept.status_stats.good}</div>
+                          </div>
+                          <div className="bg-yellow-50 rounded-lg p-2 border border-yellow-200">
+                            <div className="text-xs text-yellow-600 font-medium">Orta</div>
+                            <div className="text-lg font-bold text-yellow-900">{dept.status_stats.moderate}</div>
+                          </div>
+                          <div className="bg-red-50 rounded-lg p-2 border border-red-200">
+                            <div className="text-xs text-red-600 font-medium">Zayıf</div>
+                            <div className="text-lg font-bold text-red-900">{dept.status_stats.weak}</div>
+                          </div>
+                          <div className="bg-amber-100 rounded-lg p-2 border border-amber-300">
+                            <div className="text-xs text-amber-800 font-medium">Çok Zayıf</div>
+                            <div className="text-lg font-bold text-amber-900">{dept.status_stats.veryWeak}</div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                          <div className="flex items-center gap-2 text-blue-600 mb-1">
-                            <Target className="w-4 h-4" />
-                            <span className="text-xs font-medium">Toplam Veri</span>
-                          </div>
-                          <div className="text-xl font-bold text-blue-900">{dept.data_entries}</div>
+                      <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="text-slate-600 font-medium">Veri Girişi İlerlemesi</span>
+                          <span className="font-bold text-slate-900">%{dept.data_entry_progress.toFixed(1)}</span>
                         </div>
-
-                        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                          <div className="flex items-center gap-2 text-green-600 mb-1">
-                            <CheckCircle className="w-4 h-4" />
-                            <span className="text-xs font-medium">Onaylı</span>
-                          </div>
-                          <div className="text-xl font-bold text-green-900">{dept.approved_entries}</div>
-                        </div>
-
-                        <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
-                          <div className="flex items-center gap-2 text-yellow-600 mb-1">
-                            <Clock className="w-4 h-4" />
-                            <span className="text-xs font-medium">Bekleyen</span>
-                          </div>
-                          <div className="text-xl font-bold text-yellow-900">{dept.pending_approvals}</div>
-                        </div>
-
-                        <div className="bg-red-50 rounded-lg p-3 border border-red-200">
-                          <div className="flex items-center gap-2 text-red-600 mb-1">
-                            <AlertCircle className="w-4 h-4" />
-                            <span className="text-xs font-medium">Red</span>
-                          </div>
-                          <div className="text-xl font-bold text-red-900">{dept.rejected_entries}</div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between text-sm font-medium text-slate-700 mb-2">
-                          <span>İlerleme Durumu</span>
-                          <span>{dept.approved_entries} / {dept.total_indicators * 4}</span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner">
+                        <div className="w-full bg-slate-200 rounded-full h-2 shadow-inner">
                           <div
-                            className={`h-3 rounded-full transition-all ${
-                              dept.completion_rate >= 80 ? 'bg-green-600' :
-                              dept.completion_rate >= 60 ? 'bg-blue-600' :
-                              dept.completion_rate >= 50 ? 'bg-yellow-600' : 'bg-red-600'
+                            className={`h-2 rounded-full transition-all ${
+                              dept.data_entry_progress >= 80 ? 'bg-green-600' :
+                              dept.data_entry_progress >= 60 ? 'bg-blue-600' :
+                              dept.data_entry_progress >= 50 ? 'bg-yellow-600' : 'bg-red-600'
                             }`}
-                            style={{ width: `${Math.min(dept.completion_rate, 100)}%` }}
+                            style={{ width: `${Math.min(dept.data_entry_progress, 100)}%` }}
                           />
                         </div>
                       </div>
