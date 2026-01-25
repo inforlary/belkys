@@ -409,11 +409,10 @@ export default function VicePresidentPerformance() {
         });
 
         const deptStats = createEmptyStats();
-        let totalProgress = 0;
-        let indicatorCount = 0;
-
         let approvedEntryCount = 0;
         const expectedEntries = deptTotalIndicators * 4;
+
+        const goalProgressMap = new Map<string, { totalProgress: number; count: number }>();
 
         enrichedIndicators?.forEach(indicator => {
           const target = getIndicatorTarget(indicator.id, indicator);
@@ -422,33 +421,45 @@ export default function VicePresidentPerformance() {
           const approvedCount = indicatorEntries.filter(e => e.status === 'approved').length;
           approvedEntryCount += approvedCount;
 
+          let progress = 0;
+          let status: IndicatorStatus = 'very_weak';
+
           if (target === 0 || target === null) {
-            incrementStatusInStats(deptStats, 'very_weak');
-            incrementStatusInStats(overallStats, 'very_weak');
-            indicatorCount++;
-            return;
+            status = 'very_weak';
+          } else {
+            const currentValue = calculateCurrentValue(indicator, entries);
+            if (currentValue === null) {
+              status = 'very_weak';
+            } else {
+              progress = calculateProgress(indicator, currentValue, target, entries);
+              status = getIndicatorStatus(progress);
+            }
           }
-
-          const currentValue = calculateCurrentValue(indicator, entries);
-          if (currentValue === null) {
-            incrementStatusInStats(deptStats, 'very_weak');
-            incrementStatusInStats(overallStats, 'very_weak');
-            indicatorCount++;
-            return;
-          }
-
-          const progress = calculateProgress(indicator, currentValue, target, entries);
-          const status = getIndicatorStatus(progress);
 
           incrementStatusInStats(deptStats, status);
           incrementStatusInStats(overallStats, status);
 
-          const cappedProgress = Math.min(progress, 200);
-          totalProgress += cappedProgress;
-          indicatorCount++;
+          const goalId = indicator.goal_id;
+          if (goalId) {
+            if (!goalProgressMap.has(goalId)) {
+              goalProgressMap.set(goalId, { totalProgress: 0, count: 0 });
+            }
+            const goalData = goalProgressMap.get(goalId)!;
+            goalData.totalProgress += progress;
+            goalData.count += 1;
+          }
         });
 
-        const unitPerformance = indicatorCount > 0 ? totalProgress / indicatorCount : 0;
+        let unitPerformance = 0;
+        if (goalProgressMap.size > 0) {
+          let goalAvgSum = 0;
+          goalProgressMap.forEach((data) => {
+            const goalAvg = data.count > 0 ? data.totalProgress / data.count : 0;
+            goalAvgSum += goalAvg;
+          });
+          unitPerformance = goalAvgSum / goalProgressMap.size;
+        }
+
         const dataEntryProgress = expectedEntries > 0 ? (approvedEntryCount / expectedEntries) * 100 : 0;
 
         performanceData.push({
