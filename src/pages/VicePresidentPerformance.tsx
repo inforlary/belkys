@@ -5,6 +5,13 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { User, Building2, Target, CheckCircle, Clock, AlertCircle, TrendingUp, Award, BarChart3, Activity, FileText, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import type { Profile, Department } from '../types/database';
 import * as XLSX from 'xlsx';
+import { calculateIndicatorProgress, calculateGoalProgress, calculateObjectiveProgress, getProgressColor } from '../utils/progressCalculations';
+import {
+  getIndicatorStatus,
+  getStatusConfig,
+  getStatusLabel,
+  IndicatorStatus
+} from '../utils/indicatorStatus';
 
 interface VPWithDepartments {
   id: string;
@@ -43,6 +50,7 @@ interface IndicatorQuarterlyData {
   indicator_name: string;
   unit: string;
   yearly_target: number;
+  baseline_value: number;
   q1_target: number;
   q1_actual: number;
   q1_rate: number;
@@ -57,6 +65,8 @@ interface IndicatorQuarterlyData {
   q4_rate: number;
   total_actual: number;
   success_rate: number;
+  progress_percentage: number;
+  status: IndicatorStatus;
 }
 
 interface GoalDetail {
@@ -65,6 +75,8 @@ interface GoalDetail {
   goal_name: string;
   indicators: IndicatorQuarterlyData[];
   success_rate: number;
+  progress_percentage: number;
+  status: IndicatorStatus;
 }
 
 interface ObjectiveDetail {
@@ -73,6 +85,8 @@ interface ObjectiveDetail {
   objective_name: string;
   goals: GoalDetail[];
   success_rate: number;
+  progress_percentage: number;
+  status: IndicatorStatus;
 }
 
 interface StrategicPlanGroup {
@@ -81,6 +95,8 @@ interface StrategicPlanGroup {
   plan_years: string;
   objectives: ObjectiveDetail[];
   success_rate: number;
+  progress_percentage: number;
+  status: IndicatorStatus;
 }
 
 interface DepartmentStrategicData {
@@ -460,7 +476,7 @@ export default function VicePresidentPerformance() {
 
           const { data: indicators, error: indicatorsError } = await supabase
             .from('indicators')
-            .select('id, code, name, unit, target_value, calculation_method')
+            .select('id, code, name, unit, target_value, calculation_method, baseline_value, goal_impact_percentage')
             .eq('goal_id', goal.id);
 
           if (indicatorsError || !indicators || indicators.length === 0) {
@@ -470,9 +486,35 @@ export default function VicePresidentPerformance() {
               goal_name: goal.title,
               indicators: [],
               success_rate: 0,
+              progress_percentage: 0,
+              status: 'very_weak' as IndicatorStatus,
             });
             continue;
           }
+
+          const { data: targetsData } = await supabase
+            .from('indicator_targets')
+            .select('indicator_id, year, target_value')
+            .in('indicator_id', indicators.map(i => i.id))
+            .in('year', [selectedYear, selectedYear - 1]);
+
+          const targetsByIndicator: Record<string, number> = {};
+          const baselineByIndicator: Record<string, number> = {};
+
+          targetsData?.forEach(target => {
+            if (target.year === selectedYear) {
+              targetsByIndicator[target.indicator_id] = target.target_value;
+            } else if (target.year === selectedYear - 1) {
+              baselineByIndicator[target.indicator_id] = target.target_value;
+            }
+          });
+
+          const { data: allEntries } = await supabase
+            .from('indicator_data_entries')
+            .select('indicator_id, period_quarter, value, status')
+            .in('indicator_id', indicators.map(i => i.id))
+            .eq('period_year', selectedYear)
+            .eq('status', 'approved');
 
           const indicatorsData: IndicatorQuarterlyData[] = [];
 
@@ -484,12 +526,7 @@ export default function VicePresidentPerformance() {
               .eq('year', selectedYear)
               .maybeSingle();
 
-            const { data: entries } = await supabase
-              .from('indicator_data_entries')
-              .select('period_quarter, value, status')
-              .eq('indicator_id', indicator.id)
-              .eq('period_year', selectedYear)
-              .in('status', ['approved', 'admin_approved']);
+            const entries = allEntries?.filter(e => e.indicator_id === indicator.id) || [];
 
             let q1Target = targets?.quarter_1_value || 0;
             let q2Target = targets?.quarter_2_value || 0;
@@ -532,19 +569,42 @@ export default function VicePresidentPerformance() {
             const q4Actual = actualsMap.get(4) || 0;
             const q4Rate = q4Target > 0 ? (q4Actual / q4Target) * 100 : 0;
 
-            let yearlyTarget: number;
+            let yearlyTarget = targetsByIndicator[indicator.id] || indicator.target_value || 0;
+            let baselineValue = baselineByIndicator[indicator.id] !== undefined
+              ? baselineByIndicator[indicator.id]
+              : (indicator.baseline_value || 0);
+
             let totalActual: number;
             let successRate: number;
 
-            if (indicator.calculation_method === 'cumulative') {
-              yearlyTarget = q4Target;
+            if (indicator.calculation_method === 'cumulative' || indicator.calculation_method === 'cumulative_increasing') {
               totalActual = q4Actual;
               successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
             } else {
-              yearlyTarget = q1Target + q2Target + q3Target + q4Target;
               totalActual = q1Actual + q2Actual + q3Actual + q4Actual;
               successRate = yearlyTarget > 0 ? (totalActual / yearlyTarget) * 100 : (totalActual > 0 ? 100 : 0);
             }
+
+            const dataEntriesForIndicator = entries.map(e => ({
+              indicator_id: e.indicator_id,
+              value: e.value,
+              status: e.status
+            }));
+
+            const progress = calculateIndicatorProgress(
+              {
+                id: indicator.id,
+                goal_id: goal.id,
+                yearly_target: yearlyTarget,
+                target_value: yearlyTarget,
+                baseline_value: baselineValue,
+                calculation_method: indicator.calculation_method || 'cumulative_increasing',
+                goal_impact_percentage: indicator.goal_impact_percentage
+              },
+              dataEntriesForIndicator
+            );
+
+            const status = getIndicatorStatus(progress);
 
             indicatorsData.push({
               indicator_id: indicator.id,
@@ -552,6 +612,7 @@ export default function VicePresidentPerformance() {
               indicator_name: indicator.name,
               unit: indicator.unit || '',
               yearly_target: yearlyTarget,
+              baseline_value: baselineValue,
               q1_target: q1Target,
               q1_actual: q1Actual,
               q1_rate: q1Rate,
@@ -566,6 +627,8 @@ export default function VicePresidentPerformance() {
               q4_rate: q4Rate,
               total_actual: totalActual,
               success_rate: successRate,
+              progress_percentage: progress,
+              status: status,
             });
           }
 
@@ -573,12 +636,32 @@ export default function VicePresidentPerformance() {
             ? indicatorsData.reduce((sum, ind) => sum + ind.success_rate, 0) / indicatorsData.length
             : 0;
 
+          const indicatorsForGoalProgress = indicatorsData.map(ind => ({
+            id: ind.indicator_id,
+            goal_id: goal.id,
+            goal_impact_percentage: indicators.find(i => i.id === ind.indicator_id)?.goal_impact_percentage,
+            yearly_target: ind.yearly_target,
+            target_value: ind.yearly_target,
+            baseline_value: ind.baseline_value,
+            calculation_method: indicators.find(i => i.id === ind.indicator_id)?.calculation_method
+          }));
+
+          const goalProgress = calculateGoalProgress(
+            goal.id,
+            indicatorsForGoalProgress,
+            allEntries?.map(e => ({ indicator_id: e.indicator_id, value: e.value, status: e.status })) || []
+          );
+
+          const goalStatus = getIndicatorStatus(goalProgress);
+
           objectiveDetail.goals.push({
             goal_id: goal.id,
             goal_code: goal.code,
             goal_name: goal.title,
             indicators: indicatorsData,
             success_rate: goalSuccessRate,
+            progress_percentage: goalProgress,
+            status: goalStatus,
           });
         }
 
@@ -588,10 +671,41 @@ export default function VicePresidentPerformance() {
             obj.success_rate = obj.goals.length > 0
               ? obj.goals.reduce((sum, g) => sum + g.success_rate, 0) / obj.goals.length
               : 0;
+
+            const allGoals = obj.goals.map(g => ({ id: g.goal_id, objective_id: obj.objective_id }));
+            const allIndicatorsForObj = obj.goals.flatMap(g =>
+              g.indicators.map(ind => ({
+                id: ind.indicator_id,
+                goal_id: g.goal_id,
+                goal_impact_percentage: indicators.find(i => i.id === ind.indicator_id)?.goal_impact_percentage,
+                yearly_target: ind.yearly_target,
+                target_value: ind.yearly_target,
+                baseline_value: ind.baseline_value,
+                calculation_method: indicators.find(i => i.id === ind.indicator_id)?.calculation_method
+              }))
+            );
+            const allEntriesForObj = allEntries?.map(e => ({ indicator_id: e.indicator_id, value: e.value, status: e.status })) || [];
+
+            const objectiveProgress = calculateObjectiveProgress(
+              obj.objective_id,
+              allGoals,
+              allIndicatorsForObj,
+              allEntriesForObj
+            );
+
+            obj.progress_percentage = objectiveProgress;
+            obj.status = getIndicatorStatus(objectiveProgress);
           });
+
           plan.success_rate = plan.objectives.length > 0
             ? plan.objectives.reduce((sum, o) => sum + o.success_rate, 0) / plan.objectives.length
             : 0;
+
+          plan.progress_percentage = plan.objectives.length > 0
+            ? plan.objectives.reduce((sum, o) => sum + o.progress_percentage, 0) / plan.objectives.length
+            : 0;
+
+          plan.status = getIndicatorStatus(plan.progress_percentage);
         });
 
         const deptSuccessRate = plans.length > 0
@@ -745,37 +859,43 @@ export default function VicePresidentPerformance() {
 
         for (const plan of deptData.plans) {
           strategicData.push(
-            [`Plan: ${plan.plan_name} (${plan.plan_years}) - %${plan.success_rate.toFixed(1)}`],
+            [`Plan: ${plan.plan_name} (${plan.plan_years}) - %${plan.progress_percentage.toFixed(1)} İlerleme`],
             [''],
-            ['Amaç Kodu', 'Amaç Adı', 'Hedef Kodu', 'Hedef Adı', 'Gösterge Kodu', 'Gösterge Adı', 'Birim', 'Q1 Hedef', 'Q1 Gerçekleşen', 'Q1 Oran (%)', 'Q2 Hedef', 'Q2 Gerçekleşen', 'Q2 Oran (%)', 'Q3 Hedef', 'Q3 Gerçekleşen', 'Q3 Oran (%)', 'Q4 Hedef', 'Q4 Gerçekleşen', 'Q4 Oran (%)', 'Yıllık Hedef', 'Yıllık Gerçekleşen', 'Başarı Oranı (%)']
+            ['Amaç Kodu', 'Amaç Adı', 'Amaç İlerleme', 'Amaç Durum', 'Hedef Kodu', 'Hedef Adı', 'Hedef İlerleme', 'Hedef Durum', 'Gösterge Kodu', 'Gösterge Adı', 'Birim', 'Yıllık Hedef', 'Başlangıç', 'Q1 Hedef', 'Q1 Gerçekleşen', 'Q2 Hedef', 'Q2 Gerçekleşen', 'Q3 Hedef', 'Q3 Gerçekleşen', 'Q4 Hedef', 'Q4 Gerçekleşen', 'Toplam Gerçekleşen', 'İlerleme (%)', 'Durum']
           );
 
           for (const objective of plan.objectives) {
             for (const goal of objective.goals) {
               for (const indicator of goal.indicators) {
+                const objStatusConfig = getStatusConfig(objective.status);
+                const goalStatusConfig = getStatusConfig(goal.status);
+                const indStatusConfig = getStatusConfig(indicator.status);
+
                 strategicData.push([
                   objective.objective_code,
                   objective.objective_name,
+                  `%${objective.progress_percentage}`,
+                  objStatusConfig.label,
                   goal.goal_code,
                   goal.goal_name,
+                  `%${goal.progress_percentage}`,
+                  goalStatusConfig.label,
                   indicator.indicator_code,
                   indicator.indicator_name,
                   indicator.unit,
+                  indicator.yearly_target.toFixed(1),
+                  indicator.baseline_value.toFixed(1),
                   indicator.q1_target.toFixed(1),
                   indicator.q1_actual.toFixed(1),
-                  indicator.q1_rate.toFixed(1),
                   indicator.q2_target.toFixed(1),
                   indicator.q2_actual.toFixed(1),
-                  indicator.q2_rate.toFixed(1),
                   indicator.q3_target.toFixed(1),
                   indicator.q3_actual.toFixed(1),
-                  indicator.q3_rate.toFixed(1),
                   indicator.q4_target.toFixed(1),
                   indicator.q4_actual.toFixed(1),
-                  indicator.q4_rate.toFixed(1),
-                  indicator.yearly_target.toFixed(1),
                   indicator.total_actual.toFixed(1),
-                  indicator.success_rate.toFixed(1),
+                  indicator.progress_percentage,
+                  indStatusConfig.label,
                 ]);
               }
             }
@@ -785,10 +905,12 @@ export default function VicePresidentPerformance() {
 
         const strategicSheet = XLSX.utils.aoa_to_sheet(strategicData);
         strategicSheet['!cols'] = [
-          { wch: 12 }, { wch: 35 }, { wch: 12 }, { wch: 35 }, { wch: 12 }, { wch: 35 },
-          { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 },
-          { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 },
-          { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 15 }
+          { wch: 12 }, { wch: 35 }, { wch: 12 }, { wch: 15 },
+          { wch: 12 }, { wch: 35 }, { wch: 12 }, { wch: 15 },
+          { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+          { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
+          { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
+          { wch: 15 }, { wch: 12 }, { wch: 15 }
         ];
 
         const sheetName = deptData.department_name.substring(0, 31);
@@ -1270,9 +1392,19 @@ export default function VicePresidentPerformance() {
                                           </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                          <div className={`px-3 py-1 rounded-lg text-sm font-semibold ${getCompletionColor(plan.success_rate)}`}>
-                                            %{plan.success_rate.toFixed(1)}
-                                          </div>
+                                          {(() => {
+                                            const planStatusConfig = getStatusConfig(plan.status);
+                                            return (
+                                              <>
+                                                <div className={`px-2 py-1 rounded text-sm font-semibold ${planStatusConfig.color} ${planStatusConfig.bgColor}`}>
+                                                  %{plan.progress_percentage.toFixed(1)}
+                                                </div>
+                                                <div className={`px-2 py-1 rounded-full text-xs font-semibold ${planStatusConfig.color} ${planStatusConfig.bgColor}`}>
+                                                  {planStatusConfig.label}
+                                                </div>
+                                              </>
+                                            );
+                                          })()}
                                           {isPlanExpanded ? (
                                             <ChevronUp className="w-4 h-4 text-slate-400" />
                                           ) : (
@@ -1308,7 +1440,19 @@ export default function VicePresidentPerformance() {
                                                     </div>
                                                   </div>
                                                   <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-semibold text-orange-700">%{objective.success_rate.toFixed(1)}</span>
+                                                    {(() => {
+                                                      const objStatusConfig = getStatusConfig(objective.status);
+                                                      return (
+                                                        <>
+                                                          <div className={`px-2 py-1 rounded text-xs font-semibold ${objStatusConfig.color} ${objStatusConfig.bgColor}`}>
+                                                            %{objective.progress_percentage}
+                                                          </div>
+                                                          <div className={`px-2 py-1 rounded-full text-xs font-semibold ${objStatusConfig.color} ${objStatusConfig.bgColor}`}>
+                                                            {objStatusConfig.label}
+                                                          </div>
+                                                        </>
+                                                      );
+                                                    })()}
                                                     {isObjExpanded ? (
                                                       <ChevronUp className="w-3 h-3 text-orange-400" />
                                                     ) : (
@@ -1344,7 +1488,19 @@ export default function VicePresidentPerformance() {
                                                               </div>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                              <span className="text-xs font-semibold text-blue-700">%{goal.success_rate.toFixed(1)}</span>
+                                                              {(() => {
+                                                                const goalStatusConfig = getStatusConfig(goal.status);
+                                                                return (
+                                                                  <>
+                                                                    <div className={`px-2 py-1 rounded text-xs font-semibold ${goalStatusConfig.color} ${goalStatusConfig.bgColor}`}>
+                                                                      %{goal.progress_percentage}
+                                                                    </div>
+                                                                    <div className={`px-2 py-1 rounded-full text-xs font-semibold ${goalStatusConfig.color} ${goalStatusConfig.bgColor}`}>
+                                                                      {goalStatusConfig.label}
+                                                                    </div>
+                                                                  </>
+                                                                );
+                                                              })()}
                                                               {isGoalExpanded ? (
                                                                 <ChevronUp className="w-3 h-3 text-blue-400" />
                                                               ) : (
@@ -1361,21 +1517,36 @@ export default function VicePresidentPerformance() {
                                                                     <tr>
                                                                       <th className="p-2 text-left font-semibold text-slate-700">Gösterge</th>
                                                                       <th className="p-2 text-center font-semibold text-slate-700">Birim</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Hedef</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Başlangıç</th>
                                                                       <th className="p-2 text-center font-semibold text-slate-700">Q1</th>
                                                                       <th className="p-2 text-center font-semibold text-slate-700">Q2</th>
                                                                       <th className="p-2 text-center font-semibold text-slate-700">Q3</th>
                                                                       <th className="p-2 text-center font-semibold text-slate-700">Q4</th>
-                                                                      <th className="p-2 text-center font-semibold text-slate-700">Başarı</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">İlerleme</th>
+                                                                      <th className="p-2 text-center font-semibold text-slate-700">Durum</th>
                                                                     </tr>
                                                                   </thead>
                                                                   <tbody>
-                                                                    {goal.indicators.map(indicator => (
+                                                                    {goal.indicators.map(indicator => {
+                                                                      const statusConfig = getStatusConfig(indicator.status);
+                                                                      return (
                                                                       <tr key={indicator.indicator_id} className="border-b border-slate-100 hover:bg-slate-50">
                                                                         <td className="p-2">
                                                                           <div className="font-semibold text-slate-900">{indicator.indicator_code}</div>
                                                                           <div className="text-slate-600">{indicator.indicator_name}</div>
                                                                         </td>
                                                                         <td className="p-2 text-center text-slate-600">{indicator.unit}</td>
+                                                                        <td className="p-2 text-center">
+                                                                          <div className="font-semibold text-slate-900">
+                                                                            {indicator.yearly_target.toFixed(1)}
+                                                                          </div>
+                                                                        </td>
+                                                                        <td className="p-2 text-center">
+                                                                          <div className="text-slate-600">
+                                                                            {indicator.baseline_value.toFixed(1)}
+                                                                          </div>
+                                                                        </td>
                                                                         <td className="p-2">
                                                                           {indicator.q1_actual > 0 || indicator.q1_target > 0 ? (
                                                                             <div className="text-center">
@@ -1445,20 +1616,28 @@ export default function VicePresidentPerformance() {
                                                                           )}
                                                                         </td>
                                                                         <td className="p-2">
+                                                                          <div className="text-center">
+                                                                            <div className={`px-2 py-1 rounded text-xs font-bold ${statusConfig.color} ${statusConfig.bgColor}`}>
+                                                                              %{indicator.progress_percentage}
+                                                                            </div>
+                                                                            <div className="mt-1 w-full bg-slate-200 rounded-full h-1.5">
+                                                                              <div
+                                                                                className={`h-1.5 rounded-full transition-all ${statusConfig.progressBarColor}`}
+                                                                                style={{ width: `${Math.min(indicator.progress_percentage, 100)}%` }}
+                                                                              />
+                                                                            </div>
+                                                                          </div>
+                                                                        </td>
+                                                                        <td className="p-2">
                                                                           <div className="flex items-center justify-center">
-                                                                            <div className={`px-2 py-1 rounded text-xs font-bold ${
-                                                                              indicator.success_rate >= 100 ? 'bg-emerald-100 text-emerald-700' :
-                                                                              indicator.success_rate >= 80 ? 'bg-green-100 text-green-700' :
-                                                                              indicator.success_rate >= 60 ? 'bg-blue-100 text-blue-700' :
-                                                                              indicator.success_rate >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                                                                              indicator.success_rate > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                                                                            }`}>
-                                                                              {indicator.success_rate > 0 ? `%${indicator.success_rate.toFixed(0)}` : '-'}
+                                                                            <div className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${statusConfig.color} ${statusConfig.bgColor}`}>
+                                                                              {statusConfig.label}
                                                                             </div>
                                                                           </div>
                                                                         </td>
                                                                       </tr>
-                                                                    ))}
+                                                                    );
+                                                                    })}
                                                                   </tbody>
                                                                 </table>
                                                               </div>
