@@ -51,6 +51,8 @@ interface IndicatorQuarterlyData {
   unit: string;
   yearly_target: number;
   baseline_value: number;
+  calculation_method: string;
+  goal_impact_percentage: number | null;
   q1_target: number;
   q1_actual: number;
   q1_rate: number;
@@ -613,6 +615,8 @@ export default function VicePresidentPerformance() {
               unit: indicator.unit || '',
               yearly_target: yearlyTarget,
               baseline_value: baselineValue,
+              calculation_method: indicator.calculation_method || 'cumulative_increasing',
+              goal_impact_percentage: indicator.goal_impact_percentage,
               q1_target: q1Target,
               q1_actual: q1Actual,
               q1_rate: q1Rate,
@@ -639,11 +643,11 @@ export default function VicePresidentPerformance() {
           const indicatorsForGoalProgress = indicatorsData.map(ind => ({
             id: ind.indicator_id,
             goal_id: goal.id,
-            goal_impact_percentage: indicators.find(i => i.id === ind.indicator_id)?.goal_impact_percentage,
+            goal_impact_percentage: ind.goal_impact_percentage,
             yearly_target: ind.yearly_target,
             target_value: ind.yearly_target,
             baseline_value: ind.baseline_value,
-            calculation_method: indicators.find(i => i.id === ind.indicator_id)?.calculation_method
+            calculation_method: ind.calculation_method
           }));
 
           const goalProgress = calculateGoalProgress(
@@ -677,11 +681,11 @@ export default function VicePresidentPerformance() {
               g.indicators.map(ind => ({
                 id: ind.indicator_id,
                 goal_id: g.goal_id,
-                goal_impact_percentage: indicators.find(i => i.id === ind.indicator_id)?.goal_impact_percentage,
+                goal_impact_percentage: ind.goal_impact_percentage,
                 yearly_target: ind.yearly_target,
                 target_value: ind.yearly_target,
                 baseline_value: ind.baseline_value,
-                calculation_method: indicators.find(i => i.id === ind.indicator_id)?.calculation_method
+                calculation_method: ind.calculation_method
               }))
             );
             const allEntriesForObj = allEntries?.map(e => ({ indicator_id: e.indicator_id, value: e.value, status: e.status })) || [];
