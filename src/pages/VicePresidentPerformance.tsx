@@ -340,7 +340,7 @@ export default function VicePresidentPerformance() {
 
         const { data: indicators, error: indicatorsError } = await supabase
           .from('indicators')
-          .select('id, code, name, target_value, baseline_value, calculation_method, measurement_frequency')
+          .select('id, code, name, goal_id, target_value, baseline_value, calculation_method, measurement_frequency')
           .in('goal_id', goalIds);
 
         if (indicatorsError) {
