@@ -479,48 +479,41 @@ export default function VicePresidentPerformance() {
           for (const indicator of indicators) {
             const { data: targets } = await supabase
               .from('indicator_targets')
-              .select('period_quarter, target_value')
+              .select('quarter_1_value, quarter_2_value, quarter_3_value, quarter_4_value')
               .eq('indicator_id', indicator.id)
-              .eq('period_year', selectedYear);
+              .eq('year', selectedYear)
+              .maybeSingle();
 
             const { data: entries } = await supabase
               .from('indicator_data_entries')
-              .select('period_quarter, actual_value, status')
+              .select('period_quarter, value, status')
               .eq('indicator_id', indicator.id)
               .eq('period_year', selectedYear)
               .in('status', ['approved', 'admin_approved']);
 
-            const targetsMap = new Map<number, number>();
-            if (targets && targets.length > 0) {
-              targets.forEach(t => {
-                if (t.target_value !== null && t.target_value !== undefined) {
-                  targetsMap.set(t.period_quarter, t.target_value);
-                }
-              });
-            }
+            const q1Target = targets?.quarter_1_value || 0;
+            const q2Target = targets?.quarter_2_value || 0;
+            const q3Target = targets?.quarter_3_value || 0;
+            const q4Target = targets?.quarter_4_value || 0;
 
             const actualsMap = new Map<number, number>();
             if (entries && entries.length > 0) {
               entries.forEach(e => {
-                if (e.actual_value !== null && e.actual_value !== undefined) {
-                  actualsMap.set(e.period_quarter, e.actual_value);
+                if (e.value !== null && e.value !== undefined && e.period_quarter) {
+                  actualsMap.set(e.period_quarter, e.value);
                 }
               });
             }
 
-            const q1Target = targetsMap.get(1) || 0;
             const q1Actual = actualsMap.get(1) || 0;
             const q1Rate = q1Target > 0 ? (q1Actual / q1Target) * 100 : 0;
 
-            const q2Target = targetsMap.get(2) || 0;
             const q2Actual = actualsMap.get(2) || 0;
             const q2Rate = q2Target > 0 ? (q2Actual / q2Target) * 100 : 0;
 
-            const q3Target = targetsMap.get(3) || 0;
             const q3Actual = actualsMap.get(3) || 0;
             const q3Rate = q3Target > 0 ? (q3Actual / q3Target) * 100 : 0;
 
-            const q4Target = targetsMap.get(4) || 0;
             const q4Actual = actualsMap.get(4) || 0;
             const q4Rate = q4Target > 0 ? (q4Actual / q4Target) * 100 : 0;
 
