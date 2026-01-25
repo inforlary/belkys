@@ -1377,48 +1377,68 @@ export default function VicePresidentPerformance() {
                                                                         </td>
                                                                         <td className="p-2 text-center text-slate-600">{indicator.unit}</td>
                                                                         <td className="p-2">
-                                                                          {indicator.q1_target > 0 ? (
+                                                                          {indicator.q1_actual > 0 || indicator.q1_target > 0 ? (
                                                                             <div className="text-center">
-                                                                              <div className="text-slate-600">{indicator.q1_actual.toFixed(1)} / {indicator.q1_target.toFixed(1)}</div>
-                                                                              <div className={`text-xs font-semibold ${indicator.q1_rate >= 80 ? 'text-green-600' : indicator.q1_rate >= 60 ? 'text-blue-600' : indicator.q1_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                                                                %{indicator.q1_rate.toFixed(0)}
+                                                                              <div className="text-slate-600">
+                                                                                {indicator.q1_actual.toFixed(1)}
+                                                                                {indicator.q1_target > 0 && ` / ${indicator.q1_target.toFixed(1)}`}
                                                                               </div>
+                                                                              {indicator.q1_target > 0 && (
+                                                                                <div className={`text-xs font-semibold ${indicator.q1_rate >= 80 ? 'text-green-600' : indicator.q1_rate >= 60 ? 'text-blue-600' : indicator.q1_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                  %{indicator.q1_rate.toFixed(0)}
+                                                                                </div>
+                                                                              )}
                                                                             </div>
                                                                           ) : (
                                                                             <div className="text-center text-slate-400">-</div>
                                                                           )}
                                                                         </td>
                                                                         <td className="p-2">
-                                                                          {indicator.q2_target > 0 ? (
+                                                                          {indicator.q2_actual > 0 || indicator.q2_target > 0 ? (
                                                                             <div className="text-center">
-                                                                              <div className="text-slate-600">{indicator.q2_actual.toFixed(1)} / {indicator.q2_target.toFixed(1)}</div>
-                                                                              <div className={`text-xs font-semibold ${indicator.q2_rate >= 80 ? 'text-green-600' : indicator.q2_rate >= 60 ? 'text-blue-600' : indicator.q2_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                                                                %{indicator.q2_rate.toFixed(0)}
+                                                                              <div className="text-slate-600">
+                                                                                {indicator.q2_actual.toFixed(1)}
+                                                                                {indicator.q2_target > 0 && ` / ${indicator.q2_target.toFixed(1)}`}
                                                                               </div>
+                                                                              {indicator.q2_target > 0 && (
+                                                                                <div className={`text-xs font-semibold ${indicator.q2_rate >= 80 ? 'text-green-600' : indicator.q2_rate >= 60 ? 'text-blue-600' : indicator.q2_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                  %{indicator.q2_rate.toFixed(0)}
+                                                                                </div>
+                                                                              )}
                                                                             </div>
                                                                           ) : (
                                                                             <div className="text-center text-slate-400">-</div>
                                                                           )}
                                                                         </td>
                                                                         <td className="p-2">
-                                                                          {indicator.q3_target > 0 ? (
+                                                                          {indicator.q3_actual > 0 || indicator.q3_target > 0 ? (
                                                                             <div className="text-center">
-                                                                              <div className="text-slate-600">{indicator.q3_actual.toFixed(1)} / {indicator.q3_target.toFixed(1)}</div>
-                                                                              <div className={`text-xs font-semibold ${indicator.q3_rate >= 80 ? 'text-green-600' : indicator.q3_rate >= 60 ? 'text-blue-600' : indicator.q3_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                                                                %{indicator.q3_rate.toFixed(0)}
+                                                                              <div className="text-slate-600">
+                                                                                {indicator.q3_actual.toFixed(1)}
+                                                                                {indicator.q3_target > 0 && ` / ${indicator.q3_target.toFixed(1)}`}
                                                                               </div>
+                                                                              {indicator.q3_target > 0 && (
+                                                                                <div className={`text-xs font-semibold ${indicator.q3_rate >= 80 ? 'text-green-600' : indicator.q3_rate >= 60 ? 'text-blue-600' : indicator.q3_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                  %{indicator.q3_rate.toFixed(0)}
+                                                                                </div>
+                                                                              )}
                                                                             </div>
                                                                           ) : (
                                                                             <div className="text-center text-slate-400">-</div>
                                                                           )}
                                                                         </td>
                                                                         <td className="p-2">
-                                                                          {indicator.q4_target > 0 ? (
+                                                                          {indicator.q4_actual > 0 || indicator.q4_target > 0 ? (
                                                                             <div className="text-center">
-                                                                              <div className="text-slate-600">{indicator.q4_actual.toFixed(1)} / {indicator.q4_target.toFixed(1)}</div>
-                                                                              <div className={`text-xs font-semibold ${indicator.q4_rate >= 80 ? 'text-green-600' : indicator.q4_rate >= 60 ? 'text-blue-600' : indicator.q4_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                                                                %{indicator.q4_rate.toFixed(0)}
+                                                                              <div className="text-slate-600">
+                                                                                {indicator.q4_actual.toFixed(1)}
+                                                                                {indicator.q4_target > 0 && ` / ${indicator.q4_target.toFixed(1)}`}
                                                                               </div>
+                                                                              {indicator.q4_target > 0 && (
+                                                                                <div className={`text-xs font-semibold ${indicator.q4_rate >= 80 ? 'text-green-600' : indicator.q4_rate >= 60 ? 'text-blue-600' : indicator.q4_rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                                  %{indicator.q4_rate.toFixed(0)}
+                                                                                </div>
+                                                                              )}
                                                                             </div>
                                                                           ) : (
                                                                             <div className="text-center text-slate-400">-</div>
