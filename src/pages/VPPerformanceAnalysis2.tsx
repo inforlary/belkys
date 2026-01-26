@@ -417,15 +417,22 @@ export default function VPPerformanceAnalysis2() {
   };
 
   const exportToPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4');
+    const doc = new jsPDF({
+      orientation: 'l',
+      unit: 'mm',
+      format: 'a4',
+      compress: false
+    });
     let yPos = 20;
 
-    doc.setFontSize(18);
-    doc.text('BAŞKAN YARDIMCILARI PERFORMANS ANALİZİ', 148, yPos, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('BASKAN YARDIMCILARI PERFORMANS ANALIZI', 148, yPos, { align: 'center' });
 
     yPos += 10;
-    doc.setFontSize(12);
-    doc.text(`Rapor Yılı: ${selectedYear}`, 148, yPos, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(13);
+    doc.text(`Rapor Yili: ${selectedYear}`, 148, yPos, { align: 'center' });
     doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 148, yPos + 7, { align: 'center' });
 
     vpPerformances.forEach((vp, vpIndex) => {
@@ -435,23 +442,24 @@ export default function VPPerformanceAnalysis2() {
       yPos = 40;
 
       doc.setFillColor(59, 130, 246);
-      doc.rect(10, yPos, 277, 12, 'F');
+      doc.rect(10, yPos, 277, 14, 'F');
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
-      doc.text(vp.vp_name, 15, yPos + 8);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text(vp.vp_name, 15, yPos + 9);
       doc.setTextColor(0, 0, 0);
 
-      yPos += 15;
-      doc.setFontSize(11);
+      yPos += 17;
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${vp.vp_name} - ${vp.total_departments} Müdürlük - ${vp.total_indicators} Gösterge - %${vp.overall_performance} Performans`, 15, yPos);
+      doc.text(`${vp.vp_name} - ${vp.total_departments} Mudurluk - ${vp.total_indicators} Gosterge - %${vp.overall_performance} Performans`, 15, yPos);
       doc.setFont('helvetica', 'normal');
 
-      yPos += 8;
-      doc.setFontSize(10);
+      yPos += 9;
+      doc.setFontSize(11);
       doc.text(`Genel Performans: %${vp.overall_performance}`, 15, yPos);
-      doc.text(`Toplam Müdürlük: ${vp.total_departments}`, 80, yPos);
-      doc.text(`Toplam Gösterge: ${vp.total_indicators}`, 150, yPos);
+      doc.text(`Toplam Mudurluk: ${vp.total_departments}`, 85, yPos);
+      doc.text(`Toplam Gosterge: ${vp.total_indicators}`, 155, yPos);
 
       yPos += 10;
 
@@ -462,11 +470,13 @@ export default function VPPerformanceAnalysis2() {
         }
 
         doc.setFillColor(229, 231, 235);
-        doc.rect(10, yPos, 277, 8, 'F');
-        doc.setFontSize(11);
-        doc.text(`${dept.department_name} - Performans: %${dept.performance_percentage}`, 15, yPos + 5);
+        doc.rect(10, yPos, 277, 9, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(`${dept.department_name} - Performans: %${dept.performance_percentage}`, 15, yPos + 6);
+        doc.setFont('helvetica', 'normal');
 
-        yPos += 12;
+        yPos += 13;
 
         dept.goals.forEach(goal => {
           if (yPos > 165) {
@@ -474,11 +484,13 @@ export default function VPPerformanceAnalysis2() {
             yPos = 20;
           }
 
-          doc.setFontSize(10);
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
           const goalText = `Hedef: ${goal.code} - ${goal.title}`;
           const splitGoalText = doc.splitTextToSize(goalText, 195);
           doc.text(splitGoalText, 15, yPos);
-          doc.text(`İlerleme: %${goal.progress}`, 220, yPos);
+          doc.text(`Ilerleme: %${goal.progress}`, 220, yPos);
+          doc.setFont('helvetica', 'normal');
 
           const textHeight = splitGoalText.length * 5;
           yPos += textHeight + 2;
@@ -495,30 +507,35 @@ export default function VPPerformanceAnalysis2() {
 
             autoTable(doc, {
               startY: yPos,
-              head: [['Kod', 'Gösterge', 'Başlangıç', 'Hedef', 'Gerçekleşme', 'İlerleme']],
+              head: [['Kod', 'Gosterge', 'Baslangic', 'Hedef', 'Gerceklesme', 'Ilerleme']],
               body: tableData,
               theme: 'grid',
               styles: {
-                fontSize: 8,
-                cellPadding: 2,
+                fontSize: 9,
+                cellPadding: 2.5,
                 overflow: 'linebreak',
-                cellWidth: 'wrap'
+                cellWidth: 'wrap',
+                font: 'helvetica',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1
               },
               headStyles: {
                 fillColor: [59, 130, 246],
-                textColor: 255,
-                fontStyle: 'bold'
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                fontSize: 10,
+                halign: 'center'
               },
               alternateRowStyles: {
                 fillColor: [249, 250, 251]
               },
               columnStyles: {
-                0: { cellWidth: 25 },
+                0: { cellWidth: 25, halign: 'center' },
                 1: { cellWidth: 110, overflow: 'linebreak' },
                 2: { cellWidth: 28, halign: 'right' },
                 3: { cellWidth: 28, halign: 'right' },
                 4: { cellWidth: 32, halign: 'right' },
-                5: { cellWidth: 22, halign: 'center' }
+                5: { cellWidth: 22, halign: 'center', fontStyle: 'bold' }
               },
               margin: { left: 15, right: 15 }
             });
@@ -536,8 +553,9 @@ export default function VPPerformanceAnalysis2() {
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(128);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
       doc.text(
         `Sayfa ${i} / ${pageCount}`,
         148,
