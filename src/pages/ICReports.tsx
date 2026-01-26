@@ -445,6 +445,15 @@ export default function ICReports() {
       >
         {renderReportContent()}
       </Modal>
+
+      <Modal
+        isOpen={showQualityReportModal}
+        onClose={handleCloseQualityModal}
+        title={qualityReportCards.find(r => r.id === selectedQualityReportType)?.title || ''}
+        maxWidth="6xl"
+      >
+        {renderQualityReportContent()}
+      </Modal>
     </div>
   );
 }
