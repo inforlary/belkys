@@ -325,6 +325,7 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
           <table className="w-full border-collapse bg-white rounded-lg shadow-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kod</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kontrol Adı</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tip</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Yapı</th>
@@ -339,6 +340,9 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
               {controls.map((control) => (
                 <>
                   <tr key={control.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <span className="text-sm font-mono text-gray-600">{control.code || '-'}</span>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{control.name}</div>
                       {control.description && (
@@ -413,7 +417,7 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
                 </tr>
                 {control.related_treatments && control.related_treatments.length > 0 && (
                   <tr className="bg-blue-50">
-                    <td colSpan={8} className="px-4 py-3">
+                    <td colSpan={9} className="px-4 py-3">
                       <div className="space-y-2">
                         <div className="text-xs font-semibold text-blue-900 mb-2">İlgili Faaliyetler:</div>
                         {control.related_treatments.map((treatment) => (

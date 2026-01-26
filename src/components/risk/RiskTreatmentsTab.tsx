@@ -113,12 +113,12 @@ export default function RiskTreatmentsTab({ riskId, riskCode }: Props) {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('risk_improvement_actions')
+        .from('risk_treatments')
         .select(`
           *,
           department:departments!responsible_department_id(name),
-          responsible:profiles!responsible_person(full_name),
-          control:risk_controls!target_control_id(id, name)
+          responsible:profiles!responsible_person_id(full_name),
+          control:risk_controls!risk_control_id(id, name)
         `)
         .eq('risk_id', riskId)
         .order('created_at', { ascending: false });
