@@ -302,19 +302,64 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
   };
 
   const handleExportPDF = () => {
-    const headers = ['Sıra', 'Birim', 'Gösterge', 'Ort. İlerleme', 'Hedefi Aşan', 'Mükemmel', 'İyi', 'Orta', 'Zayıf', 'Ç.Zayıf'];
-    const rows = sortedDepartments.map((dept, index) => [
-      index + 1,
-      dept.department_name,
-      dept.total_indicators,
-      `${Math.round(dept.avg_progress)}%`,
-      dept.exceedingTarget,
-      dept.excellent,
-      dept.good,
-      dept.moderate,
-      dept.weak,
-      dept.veryWeak
-    ]);
+    const departmentCards = sortedDepartments.map((dept, index) => `
+      <div class="department-card" style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #ffffff;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="background: #f1f5f9; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">
+              ${index + 1}
+            </div>
+            <div>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${dept.department_name}</h3>
+              <p style="margin: 0; font-size: 12px; color: #64748b;">${dept.total_indicators} gösterge</p>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${Math.round(dept.avg_progress)}%</div>
+            <div style="font-size: 11px; color: #64748b;">Ortalama İlerleme</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div style="width: 100%; background-color: #e5e7eb; border-radius: 9999px; height: 8px; overflow: hidden;">
+            <div style="height: 8px; background-color: ${
+              dept.avg_progress >= 115 ? '#a855f7' :
+              dept.avg_progress >= 85 ? '#10b981' :
+              dept.avg_progress >= 70 ? '#22c55e' :
+              dept.avg_progress >= 55 ? '#eab308' :
+              dept.avg_progress >= 45 ? '#f97316' : '#dc2626'
+            }; width: ${Math.min(dept.avg_progress, 100)}%;"></div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;">
+          <div style="background: #faf5ff; border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: bold; color: #a855f7;">${dept.exceedingTarget}</div>
+            <div style="font-size: 10px; color: #64748b;">Hedef Üstü</div>
+          </div>
+          <div style="background: #dcfce7; border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: bold; color: #15803d;">${dept.excellent}</div>
+            <div style="font-size: 10px; color: #64748b;">Çok İyi</div>
+          </div>
+          <div style="background: #f0fdf4; border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: bold; color: #16a34a;">${dept.good}</div>
+            <div style="font-size: 10px; color: #64748b;">İyi</div>
+          </div>
+          <div style="background: #fef9c3; border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: bold; color: #ca8a04;">${dept.moderate}</div>
+            <div style="font-size: 10px; color: #64748b;">Orta</div>
+          </div>
+          <div style="background: #fee2e2; border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: bold; color: #dc2626;">${dept.weak}</div>
+            <div style="font-size: 10px; color: #64748b;">Zayıf</div>
+          </div>
+          <div style="background: #fef3c7; border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: bold; color: #92400e;">${dept.veryWeak}</div>
+            <div style="font-size: 10px; color: #64748b;">Ç. Zayıf</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
 
     const content = `
       <h2>Genel Performans Özeti</h2>
@@ -352,8 +397,8 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         </div>
       </div>
 
-      <h2>Birim Bazlı Performans</h2>
-      ${generateTableHTML(headers, rows)}
+      <h2 style="margin-top: 25px; margin-bottom: 15px;">Birim Bazlı Performans</h2>
+      ${departmentCards}
     `;
 
     exportToPDF(`Performans Gösterge Paneli - ${currentYear}`, content, `Performans_Gosterge_Paneli_${currentYear}_${new Date().toISOString().split('T')[0]}`);
