@@ -217,23 +217,23 @@ export default function RiskMatrix() {
         <h2>Risk Seviye Dağılımı</h2>
         <div class="stats-grid">
           <div class="stat-box" style="border-left: 4px solid #dc2626;">
-            <div class="stat-value" style="color: #dc2626;">${riskDistribution.veryHigh}</div>
+            <div class="stat-value" style="color: #dc2626;">${statistics.veryHigh}</div>
             <div class="stat-label">Çok Yüksek Risk</div>
           </div>
           <div class="stat-box" style="border-left: 4px solid #f97316;">
-            <div class="stat-value" style="color: #f97316;">${riskDistribution.high}</div>
+            <div class="stat-value" style="color: #f97316;">${statistics.high}</div>
             <div class="stat-label">Yüksek Risk</div>
           </div>
           <div class="stat-box" style="border-left: 4px solid #facc15;">
-            <div class="stat-value" style="color: #ca8a04;">${riskDistribution.medium}</div>
+            <div class="stat-value" style="color: #ca8a04;">${statistics.medium}</div>
             <div class="stat-label">Orta Risk</div>
           </div>
           <div class="stat-box" style="border-left: 4px solid #84cc16;">
-            <div class="stat-value" style="color: #65a30d;">${riskDistribution.lowMedium}</div>
+            <div class="stat-value" style="color: #65a30d;">${statistics.lowMedium}</div>
             <div class="stat-label">Düşük-Orta Risk</div>
           </div>
           <div class="stat-box" style="border-left: 4px solid #16a34a;">
-            <div class="stat-value" style="color: #16a34a;">${riskDistribution.low}</div>
+            <div class="stat-value" style="color: #16a34a;">${statistics.low}</div>
             <div class="stat-label">Düşük Risk</div>
           </div>
         </div>
