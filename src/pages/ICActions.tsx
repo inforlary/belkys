@@ -680,6 +680,25 @@ export default function ICActions() {
     return codeA.localeCompare(codeB, 'tr');
   }, []);
 
+  const compareStandardCodes = useCallback((codeA: string, codeB: string): number => {
+    const cleanA = codeA.trim();
+    const cleanB = codeB.trim();
+
+    const matchA = cleanA.match(/^([A-ZÇĞİÖŞÜ]+)\s*(\d+)$/i);
+    const matchB = cleanB.match(/^([A-ZÇĞİÖŞÜ]+)\s*(\d+)$/i);
+
+    if (matchA && matchB) {
+      const prefixCompare = matchA[1].toUpperCase().localeCompare(matchB[1].toUpperCase(), 'tr');
+      if (prefixCompare !== 0) return prefixCompare;
+
+      const numA = parseInt(matchA[2], 10);
+      const numB = parseInt(matchB[2], 10);
+      return numA - numB;
+    }
+
+    return cleanA.localeCompare(cleanB, 'tr', { numeric: true, sensitivity: 'base' });
+  }, []);
+
   const sortedActions = useMemo(() => {
     const sorted = [...filteredActions];
 
@@ -687,7 +706,7 @@ export default function ICActions() {
       const componentCompare = compareComponentCodes(a.component_code || '', b.component_code || '');
       if (componentCompare !== 0) return componentCompare;
 
-      const standardCompare = (a.standard_code || '').localeCompare(b.standard_code || '', undefined, { numeric: true, sensitivity: 'base' });
+      const standardCompare = compareStandardCodes(a.standard_code || '', b.standard_code || '');
       if (standardCompare !== 0) return standardCompare;
 
       const conditionCompare = (a.condition_code || '').localeCompare(b.condition_code || '', undefined, { numeric: true, sensitivity: 'base' });
@@ -717,8 +736,8 @@ export default function ICActions() {
         const aStd = a.standard_code || '';
         const bStd = b.standard_code || '';
         return sortDirection === 'asc'
-          ? aStd.localeCompare(bStd, undefined, { numeric: true, sensitivity: 'base' })
-          : bStd.localeCompare(aStd, undefined, { numeric: true, sensitivity: 'base' });
+          ? compareStandardCodes(aStd, bStd)
+          : compareStandardCodes(bStd, aStd);
       }
 
       if (sortColumn === 'target_date') {
@@ -739,7 +758,7 @@ export default function ICActions() {
     });
 
     return sorted;
-  }, [filteredActions, sortColumn, sortDirection]);
+  }, [filteredActions, sortColumn, sortDirection, compareComponentCodes, compareStandardCodes]);
 
   const hierarchicalData = useMemo(() => {
     const componentMap = new Map<string, {
@@ -1276,7 +1295,7 @@ export default function ICActions() {
       rows.push([componentData.component.name.toUpperCase(), '', '', '', '', '', '', '', '', '']);
 
       Array.from(componentData.standards.values())
-        .sort((a, b) => a.standard.code.localeCompare(b.standard.code, undefined, { numeric: true }))
+        .sort((a, b) => compareStandardCodes(a.standard.code, b.standard.code))
         .forEach(standardData => {
           rows.push([`${standardData.standard.code} - ${standardData.standard.name}`, '', '', '', '', '', '', '', '', '']);
 
@@ -1379,7 +1398,7 @@ export default function ICActions() {
       });
 
       Array.from(componentData.standards.values())
-        .sort((a, b) => a.standard.code.localeCompare(b.standard.code, undefined, { numeric: true }))
+        .sort((a, b) => compareStandardCodes(a.standard.code, b.standard.code))
         .forEach(standardData => {
           tableData.push({
             content: `${standardData.standard.code} - ${standardData.standard.name}`,
@@ -1988,7 +2007,7 @@ export default function ICActions() {
                     </td>
                   </tr>
                   {Array.from(componentData.standards.values())
-                    .sort((a, b) => a.standard.code.localeCompare(b.standard.code, undefined, { numeric: true, sensitivity: 'base' }))
+                    .sort((a, b) => compareStandardCodes(a.standard.code, b.standard.code))
                     .map(standardData => (
                     <>
                       <tr key={`std-${standardData.standard.code}`}>
