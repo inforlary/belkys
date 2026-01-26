@@ -169,6 +169,45 @@ export default function VPPerformanceAnalysis2() {
   };
 
   const loadDepartmentPerformance = async (dept: Department): Promise<DepartmentPerformance> => {
+    const allPlansRes = await supabase
+      .from('strategic_plans')
+      .select('id, start_year, end_year')
+      .eq('organization_id', profile?.organization_id);
+
+    const relevantPlans = allPlansRes.data?.filter(plan =>
+      selectedYear >= plan.start_year && selectedYear <= plan.end_year
+    ) || [];
+
+    if (relevantPlans.length === 0) {
+      return {
+        department_id: dept.id,
+        department_name: dept.name,
+        total_indicators: 0,
+        total_goals: 0,
+        performance_percentage: 0,
+        goals: []
+      };
+    }
+
+    const relevantObjectivesRes = await supabase
+      .from('objectives')
+      .select('id')
+      .eq('organization_id', profile?.organization_id)
+      .in('strategic_plan_id', relevantPlans.map(p => p.id));
+
+    const relevantObjectiveIds = relevantObjectivesRes.data?.map(o => o.id) || [];
+
+    if (relevantObjectiveIds.length === 0) {
+      return {
+        department_id: dept.id,
+        department_name: dept.name,
+        total_indicators: 0,
+        total_goals: 0,
+        performance_percentage: 0,
+        goals: []
+      };
+    }
+
     const { data: goals, error: goalsError } = await supabase
       .from('goals')
       .select(`
@@ -181,7 +220,8 @@ export default function VPPerformanceAnalysis2() {
         )
       `)
       .eq('organization_id', profile?.organization_id)
-      .eq('department_id', dept.id);
+      .eq('department_id', dept.id)
+      .in('objective_id', relevantObjectiveIds);
 
     if (goalsError) throw goalsError;
 
@@ -200,7 +240,7 @@ export default function VPPerformanceAnalysis2() {
 
     const { data: indicators, error: indicatorsError } = await supabase
       .from('indicators')
-      .select('id, code, name, unit, goal_id, target_value, baseline_value, calculation_method, measurement_frequency')
+      .select('id, code, name, unit, goal_id, target_value, baseline_value, calculation_method, measurement_frequency, goal_impact_percentage')
       .in('goal_id', goalIds);
 
     if (indicatorsError) throw indicatorsError;
@@ -229,13 +269,13 @@ export default function VPPerformanceAnalysis2() {
     const [entriesRes, targetsRes] = await Promise.all([
       supabase
         .from('indicator_data_entries')
-        .select('*')
+        .select('indicator_id, value, status')
         .in('indicator_id', indicatorIds)
         .eq('period_year', selectedYear)
         .eq('status', 'approved'),
       supabase
         .from('indicator_targets')
-        .select('indicator_id, year, target_value, baseline_value')
+        .select('indicator_id, year, target_value')
         .in('indicator_id', indicatorIds)
         .eq('year', selectedYear)
     ]);
@@ -248,26 +288,20 @@ export default function VPPerformanceAnalysis2() {
       targetsByIndicator[target.indicator_id] = target.target_value;
     });
 
+    const indicatorsWithYearlyTargets = indicators.map(ind => ({
+      ...ind,
+      yearly_target: targetsByIndicator[ind.id] || ind.target_value
+    }));
+
     let totalGoalProgress = 0;
     const enrichedGoals: GoalDetail[] = [];
 
     for (const goal of goals) {
-      const goalIndicators = indicators.filter(i => i.goal_id === goal.id);
-
-      const goalIndicatorsWithTargets = goalIndicators.map(ind => {
-        const yearlyTarget = targetsByIndicator[ind.id] ?? ind.target_value;
-        const baselineValue = ind.baseline_value ?? 0;
-
-        return {
-          ...ind,
-          yearly_target: yearlyTarget,
-          yearly_baseline: baselineValue
-        };
-      });
+      const goalIndicators = indicatorsWithYearlyTargets.filter(i => i.goal_id === goal.id);
 
       const goalProgress = calculateGoalProgress(
         goal.id,
-        goalIndicatorsWithTargets,
+        goalIndicators,
         entries
       );
 
@@ -275,11 +309,12 @@ export default function VPPerformanceAnalysis2() {
 
       const enrichedIndicators: IndicatorDetail[] = [];
 
-      for (const ind of goalIndicatorsWithTargets) {
+      for (const ind of goalIndicators) {
         const progress = calculateIndicatorProgress(ind, entries);
         const indicatorEntries = entries.filter(e => e.indicator_id === ind.id);
         const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
-        const currentValue = ind.yearly_baseline + sumOfEntries;
+        const baselineValue = ind.baseline_value ?? 0;
+        const currentValue = baselineValue + sumOfEntries;
 
         enrichedIndicators.push({
           id: ind.id,
@@ -296,7 +331,7 @@ export default function VPPerformanceAnalysis2() {
           objective_code: (goal as any).objectives?.code || '',
           objective_title: (goal as any).objectives?.title || '',
           yearly_target: ind.yearly_target,
-          yearly_baseline: ind.yearly_baseline,
+          yearly_baseline: baselineValue,
           progress,
           current_value: currentValue
         });
