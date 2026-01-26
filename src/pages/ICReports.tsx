@@ -185,6 +185,8 @@ export default function ICReports() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [qualityStats, setQualityStats] = useState<QualityStats | null>(null);
+  const [showQualityReportModal, setShowQualityReportModal] = useState(false);
+  const [selectedQualityReportType, setSelectedQualityReportType] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile?.organization_id) {
@@ -264,13 +266,27 @@ export default function ICReports() {
     setShowReportModal(true);
   };
 
-  const handleQualityReportClick = (reportTitle: string) => {
-    alert(`${reportTitle} oluşturuluyor...`);
+  const handleQualityReportClick = (reportId: string) => {
+    setSelectedQualityReportType(reportId);
+    setShowQualityReportModal(true);
   };
 
   const handleCloseModal = () => {
     setShowReportModal(false);
     setSelectedReportType(null);
+  };
+
+  const handleCloseQualityModal = () => {
+    setShowQualityReportModal(false);
+    setSelectedQualityReportType(null);
+  };
+
+  const renderQualityReportContent = () => {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-600">Bu rapor yakında hazır olacak.</p>
+      </div>
+    );
   };
 
   const renderReportContent = () => {
@@ -417,14 +433,14 @@ export default function ICReports() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleQualityReportClick(report.title)}
+                    onClick={() => handleQualityReportClick(report.id)}
                     className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs"
                   >
                     <Download className="w-3 h-3" />
                     Excel
                   </button>
                   <button
-                    onClick={() => handleQualityReportClick(report.title)}
+                    onClick={() => handleQualityReportClick(report.id)}
                     className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-xs"
                   >
                     <FileText className="w-3 h-3" />
