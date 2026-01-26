@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import type { Profile, Department } from '../types/database';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   calculateIndicatorProgress,
   calculateGoalProgress,
@@ -412,6 +414,128 @@ export default function VPPerformanceAnalysis2() {
     XLSX.writeFile(workbook, `VP_Performans_Analizi_${selectedYear}.xlsx`);
   };
 
+  const exportToPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    let yPos = 20;
+
+    doc.setFontSize(18);
+    doc.text('BASKAN YARDIMCILARI PERFORMANS ANALIZI', 148, yPos, { align: 'center' });
+
+    yPos += 10;
+    doc.setFontSize(12);
+    doc.text(`Rapor Yili: ${selectedYear}`, 148, yPos, { align: 'center' });
+    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 148, yPos + 7, { align: 'center' });
+
+    vpPerformances.forEach((vp, vpIndex) => {
+      if (vpIndex > 0) {
+        doc.addPage();
+      }
+      yPos = 40;
+
+      doc.setFillColor(59, 130, 246);
+      doc.rect(10, yPos, 277, 12, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.text(vp.vp_name, 15, yPos + 8);
+      doc.setTextColor(0, 0, 0);
+
+      yPos += 15;
+      doc.setFontSize(10);
+      doc.text(`Genel Performans: %${vp.overall_performance}`, 15, yPos);
+      doc.text(`Toplam Mudurluk: ${vp.total_departments}`, 80, yPos);
+      doc.text(`Toplam Gosterge: ${vp.total_indicators}`, 150, yPos);
+
+      yPos += 10;
+
+      vp.departments.forEach(dept => {
+        if (yPos > 180) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.setFillColor(229, 231, 235);
+        doc.rect(10, yPos, 277, 8, 'F');
+        doc.setFontSize(11);
+        doc.text(`${dept.department_name} - Performans: %${dept.performance_percentage}`, 15, yPos + 5);
+
+        yPos += 12;
+
+        dept.goals.forEach(goal => {
+          if (yPos > 170) {
+            doc.addPage();
+            yPos = 20;
+          }
+
+          doc.setFontSize(10);
+          doc.text(`Hedef: ${goal.code} - ${goal.title.substring(0, 60)}`, 15, yPos);
+          doc.text(`Ilerleme: %${goal.progress}`, 220, yPos);
+
+          yPos += 5;
+
+          if (goal.indicators.length > 0) {
+            const tableData = goal.indicators.map(ind => [
+              ind.code,
+              ind.name.substring(0, 40),
+              `${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}`,
+              ind.yearly_target ? `${ind.yearly_target.toLocaleString('tr-TR')}` : '-',
+              `${ind.current_value.toLocaleString('tr-TR')}`,
+              `%${ind.progress}`
+            ]);
+
+            autoTable(doc, {
+              startY: yPos,
+              head: [['Kod', 'Gosterge', 'Baslangic', 'Hedef', 'Gerceklesme', 'Ilerleme']],
+              body: tableData,
+              theme: 'grid',
+              styles: {
+                fontSize: 8,
+                cellPadding: 2
+              },
+              headStyles: {
+                fillColor: [59, 130, 246],
+                textColor: 255,
+                fontStyle: 'bold'
+              },
+              alternateRowStyles: {
+                fillColor: [249, 250, 251]
+              },
+              columnStyles: {
+                0: { cellWidth: 25 },
+                1: { cellWidth: 80 },
+                2: { cellWidth: 30, halign: 'right' },
+                3: { cellWidth: 30, halign: 'right' },
+                4: { cellWidth: 35, halign: 'right' },
+                5: { cellWidth: 25, halign: 'center' }
+              },
+              margin: { left: 15, right: 15 }
+            });
+
+            yPos = (doc as any).lastAutoTable.finalY + 8;
+          } else {
+            yPos += 5;
+          }
+        });
+
+        yPos += 5;
+      });
+    });
+
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128);
+      doc.text(
+        `Sayfa ${i} / ${pageCount}`,
+        148,
+        200,
+        { align: 'center' }
+      );
+    }
+
+    doc.save(`VP_Performans_Analizi_${selectedYear}.pdf`);
+  };
+
   const getPerformanceGrade = (percentage: number) => {
     if (percentage >= 90) return { grade: 'Mükemmel', color: 'text-green-600', bgColor: 'bg-green-100' };
     if (percentage >= 75) return { grade: 'Çok İyi', color: 'text-blue-600', bgColor: 'bg-blue-100' };
@@ -439,6 +563,14 @@ export default function VPPerformanceAnalysis2() {
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
+          <button
+            onClick={exportToPDF}
+            disabled={vpPerformances.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            PDF İndir
+          </button>
           <button
             onClick={exportToExcel}
             disabled={vpPerformances.length === 0}
