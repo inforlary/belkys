@@ -671,22 +671,6 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
         </select>
       </div>
 
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-blue-100 text-sm">Kurum Genel İlerleme</p>
-            <p className="text-4xl font-bold mt-2">{Math.round(overallProgress)}%</p>
-          </div>
-          {overallProgress >= 70 ? (
-            <TrendingUp className="w-16 h-16 text-blue-200" />
-          ) : overallProgress >= 50 ? (
-            <Minus className="w-16 h-16 text-blue-200" />
-          ) : (
-            <TrendingDown className="w-16 h-16 text-blue-200" />
-          )}
-        </div>
-      </div>
-
       <div className="grid grid-cols-7 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
           <div className="text-3xl font-bold text-slate-900">{overallStats.total}</div>
