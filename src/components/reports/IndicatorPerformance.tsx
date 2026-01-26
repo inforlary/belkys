@@ -706,29 +706,37 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
       return acc;
     }, {} as Record<string, any>);
 
+    // Stratejik plan istatistiklerini hesapla
+    const totalObjectives = new Set();
+    const totalGoals = new Set();
+    const totalIndicators = filteredIndicators.length;
+
+    filteredIndicators.forEach(ind => {
+      if (ind.objective_id) totalObjectives.add(ind.objective_id);
+      if (ind.goal_id) totalGoals.add(ind.goal_id);
+    });
+
     let contentHTML = `
       <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px;">
         <h1 style="margin: 0 0 10px 0; font-size: 28px;">Gösterge Performans Raporu</h1>
         <h2 style="margin: 0; font-size: 20px; font-weight: normal; opacity: 0.9;">${currentYear} Yılı</h2>
       </div>
 
-      ${organization ? `
-        <div style="margin-bottom: 25px; padding: 20px; background-color: #f8fafc; border-left: 5px solid #3b82f6; border-radius: 5px;">
-          <h3 style="margin: 0 0 15px 0; color: #1e40af; font-size: 18px;">Kurum Bilgileri</h3>
-          <p style="margin: 5px 0;"><strong>Kurum Adı:</strong> ${organization.name}</p>
-          ${organization.vision ? `<p style="margin: 5px 0;"><strong>Vizyon:</strong> ${organization.vision}</p>` : ''}
-          ${organization.mission ? `<p style="margin: 5px 0;"><strong>Misyon:</strong> ${organization.mission}</p>` : ''}
-          <p style="margin: 5px 0;"><strong>Rapor Tarihi:</strong> ${new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-        </div>
-      ` : ''}
-
-      <div style="margin-bottom: 25px; padding: 20px; background-color: #fef3c7; border-left: 5px solid #f59e0b; border-radius: 5px;">
-        <h3 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px;">Rapor Kapsamı</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-          <p style="margin: 5px 0;"><strong>Raporlama Dönemi:</strong> ${currentYear} Yılı</p>
-          <p style="margin: 5px 0;"><strong>Seçili Çeyrekler:</strong> ${selectedQuarters.map(q => `Ç${q}`).join(', ')}</p>
-          <p style="margin: 5px 0;"><strong>Toplam Gösterge:</strong> ${filteredIndicators.length}</p>
-          <p style="margin: 5px 0;"><strong>Stratejik Plan Sayısı:</strong> ${Object.keys(groupedByPlan).length}</p>
+      <div style="margin-bottom: 25px; padding: 20px; background-color: #ede9fe; border-left: 5px solid #8b5cf6; border-radius: 5px;">
+        <h3 style="margin: 0 0 15px 0; color: #5b21b6; font-size: 18px;">Stratejik Plan İstatistikleri</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #6d28d9; margin-bottom: 5px;">${totalObjectives.size}</div>
+            <div style="font-size: 13px; color: #6b7280;">Toplam Amaç</div>
+          </div>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${totalGoals.size}</div>
+            <div style="font-size: 13px; color: #6b7280;">Toplam Hedef</div>
+          </div>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #8b5cf6; margin-bottom: 5px;">${totalIndicators}</div>
+            <div style="font-size: 13px; color: #6b7280;">Toplam Gösterge</div>
+          </div>
         </div>
       </div>
 
@@ -760,31 +768,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             <div style="font-size: 13px; color: #6b7280;">Çok Zayıf</div>
           </div>
         </div>
-        <div style="margin-top: 15px; padding: 12px; background-color: #dbeafe; border-radius: 5px;">
-          <p style="margin: 0; font-size: 14px; color: #1e40af;">
-            <strong>Genel Başarı Oranı:</strong>
-            ${filteredIndicators.length > 0 ? Math.round((stats.exceedingTarget + stats.excellent + stats.good) / stats.total * 100) : 0}%
-            (${stats.exceedingTarget + stats.excellent + stats.good} / ${stats.total} gösterge)
-          </p>
-        </div>
       </div>
-
-      ${strategicPlans.length > 0 ? `
-        <div style="margin-bottom: 30px; padding: 20px; background-color: #ede9fe; border-left: 5px solid #8b5cf6; border-radius: 5px;">
-          <h3 style="margin: 0 0 15px 0; color: #5b21b6; font-size: 18px;">Stratejik Plan Bilgileri</h3>
-          ${strategicPlans.map(plan => `
-            <div style="margin-bottom: 15px; padding: 12px; background-color: white; border-radius: 5px;">
-              <p style="margin: 0 0 8px 0; font-weight: bold; color: #6d28d9;">${plan.name}</p>
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">
-                <p style="margin: 0;"><strong>Plan Dönemi:</strong> ${plan.start_year} - ${plan.end_year}</p>
-                <p style="margin: 0;"><strong>Oluşturulma:</strong> ${new Date(plan.created_at).toLocaleDateString('tr-TR')}</p>
-              </div>
-              ${plan.vision ? `<p style="margin: 8px 0 0 0; font-size: 13px;"><strong>Vizyon:</strong> ${plan.vision}</p>` : ''}
-              ${plan.mission ? `<p style="margin: 8px 0 0 0; font-size: 13px;"><strong>Misyon:</strong> ${plan.mission}</p>` : ''}
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
 
       <div style="page-break-before: always;"></div>
       <h2 style="margin-top: 0; color: #1e293b; font-size: 22px; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">Detaylı Gösterge Analizi</h2>
