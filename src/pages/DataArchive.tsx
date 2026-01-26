@@ -8,7 +8,7 @@ import {
   IndicatorStatus,
   getIndicatorStatus,
   getStatusConfig,
-  getStatusLabel,
+  getStatusLabel as getIndicatorStatusLabel,
   createEmptyStats,
   incrementStatusInStats,
   IndicatorStats as StatusStats
@@ -678,7 +678,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
     }
   };
 
-  const getStatusLabel = (status: string): string => {
+  const getEntryStatusLabel = (status: string): string => {
     const labels: Record<string, string> = {
       draft: 'Taslak',
       pending_director: 'Müdür Onayı Bekliyor',
@@ -1279,7 +1279,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                                               İlerleme: %{progress}
                                             </span>
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusConfig(getIndicatorStatus(progress)).bgColor} ${getStatusConfig(getIndicatorStatus(progress)).color}`}>
-                                              {getStatusLabel(getIndicatorStatus(progress))}
+                                              {getIndicatorStatusLabel(getIndicatorStatus(progress))}
                                             </span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -1417,7 +1417,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
       <Modal
         isOpen={showIndicatorModal}
         onClose={() => setShowIndicatorModal(false)}
-        title={`${selectedStatus ? getStatusLabel(selectedStatus) : ''} Göstergeler`}
+        title={`${selectedStatus ? getIndicatorStatusLabel(selectedStatus) : ''} Göstergeler`}
         size="large"
       >
         <div className="space-y-4">
@@ -1434,7 +1434,7 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
                   </div>
                   {selectedStatus && (
                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusConfig(selectedStatus).color} ${getStatusConfig(selectedStatus).bgColor}`}>
-                      {getStatusLabel(selectedStatus)}
+                      {getIndicatorStatusLabel(selectedStatus)}
                     </div>
                   )}
                 </div>
