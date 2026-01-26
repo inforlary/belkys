@@ -80,6 +80,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetail[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
   const [dataEntries, setDataEntries] = useState<any[]>([]);
+  const [strategicPlans, setStrategicPlans] = useState<any[]>([]);
+  const [organization, setOrganization] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -147,7 +149,7 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
         indicatorsQuery = indicatorsQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
 
-      const [depsData, plansData, indicatorsData] = await Promise.all([
+      const [depsData, plansData, indicatorsData, orgData, detailedPlansData] = await Promise.all([
         supabase
           .from('departments')
           .select('id, name')
@@ -159,10 +161,22 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           .eq('organization_id', profile.organization_id)
           .order('name'),
         indicatorsQuery,
+        supabase
+          .from('organizations')
+          .select('id, name, mission, vision')
+          .eq('id', profile.organization_id)
+          .single(),
+        supabase
+          .from('strategic_plans')
+          .select('id, name, start_year, end_year, vision, mission, created_at')
+          .eq('organization_id', profile.organization_id)
+          .order('start_year', { ascending: false }),
       ]);
 
       setDepartments(depsData.data || []);
       setPlans(plansData.data || []);
+      setOrganization(orgData.data);
+      setStrategicPlans(detailedPlansData.data || []);
 
       if (indicatorsData.data && indicatorsData.data.length > 0) {
         const indicatorIds = indicatorsData.data.map(i => i.id);
@@ -660,6 +674,8 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   };
 
   const handleExportPDF = () => {
+    const stats = getIndicatorStats();
+
     const groupedByPlan = filteredIndicators.reduce((acc, ind) => {
       const planKey = ind.strategic_plan_id || 'no-plan';
       if (!acc[planKey]) {
@@ -691,17 +707,115 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     }, {} as Record<string, any>);
 
     let contentHTML = `
-      <h2>Gösterge Performans Raporu - ${currentYear}</h2>
-      <p><strong>Seçili Çeyrekler:</strong> ${selectedQuarters.map(q => `Ç${q}`).join(', ')}</p>
-      <p><strong>Toplam Gösterge:</strong> ${filteredIndicators.length}</p>
+      <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px;">
+        <h1 style="margin: 0 0 10px 0; font-size: 28px;">Gösterge Performans Raporu</h1>
+        <h2 style="margin: 0; font-size: 20px; font-weight: normal; opacity: 0.9;">${currentYear} Yılı</h2>
+      </div>
+
+      ${organization ? `
+        <div style="margin-bottom: 25px; padding: 20px; background-color: #f8fafc; border-left: 5px solid #3b82f6; border-radius: 5px;">
+          <h3 style="margin: 0 0 15px 0; color: #1e40af; font-size: 18px;">Kurum Bilgileri</h3>
+          <p style="margin: 5px 0;"><strong>Kurum Adı:</strong> ${organization.name}</p>
+          ${organization.vision ? `<p style="margin: 5px 0;"><strong>Vizyon:</strong> ${organization.vision}</p>` : ''}
+          ${organization.mission ? `<p style="margin: 5px 0;"><strong>Misyon:</strong> ${organization.mission}</p>` : ''}
+          <p style="margin: 5px 0;"><strong>Rapor Tarihi:</strong> ${new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        </div>
+      ` : ''}
+
+      <div style="margin-bottom: 25px; padding: 20px; background-color: #fef3c7; border-left: 5px solid #f59e0b; border-radius: 5px;">
+        <h3 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px;">Rapor Kapsamı</h3>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <p style="margin: 5px 0;"><strong>Raporlama Dönemi:</strong> ${currentYear} Yılı</p>
+          <p style="margin: 5px 0;"><strong>Seçili Çeyrekler:</strong> ${selectedQuarters.map(q => `Ç${q}`).join(', ')}</p>
+          <p style="margin: 5px 0;"><strong>Toplam Gösterge:</strong> ${filteredIndicators.length}</p>
+          <p style="margin: 5px 0;"><strong>Stratejik Plan Sayısı:</strong> ${Object.keys(groupedByPlan).length}</p>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 30px; padding: 20px; background-color: #f0fdf4; border-left: 5px solid #10b981; border-radius: 5px;">
+        <h3 style="margin: 0 0 15px 0; color: #065f46; font-size: 18px;">Performans Özeti</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #a855f7; margin-bottom: 5px;">${stats.exceedingTarget}</div>
+            <div style="font-size: 13px; color: #6b7280;">Hedef Üstü</div>
+          </div>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #10b981; margin-bottom: 5px;">${stats.excellent}</div>
+            <div style="font-size: 13px; color: #6b7280;">Çok İyi</div>
+          </div>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #22c55e; margin-bottom: 5px;">${stats.good}</div>
+            <div style="font-size: 13px; color: #6b7280;">İyi</div>
+          </div>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #eab308; margin-bottom: 5px;">${stats.moderate}</div>
+            <div style="font-size: 13px; color: #6b7280;">Orta</div>
+          </div>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #ef4444; margin-bottom: 5px;">${stats.weak}</div>
+            <div style="font-size: 13px; color: #6b7280;">Zayıf</div>
+          </div>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; font-weight: bold; color: #f59e0b; margin-bottom: 5px;">${stats.veryWeak}</div>
+            <div style="font-size: 13px; color: #6b7280;">Çok Zayıf</div>
+          </div>
+        </div>
+        <div style="margin-top: 15px; padding: 12px; background-color: #dbeafe; border-radius: 5px;">
+          <p style="margin: 0; font-size: 14px; color: #1e40af;">
+            <strong>Genel Başarı Oranı:</strong>
+            ${filteredIndicators.length > 0 ? Math.round((stats.exceedingTarget + stats.excellent + stats.good) / stats.total * 100) : 0}%
+            (${stats.exceedingTarget + stats.excellent + stats.good} / ${stats.total} gösterge)
+          </p>
+        </div>
+      </div>
+
+      ${strategicPlans.length > 0 ? `
+        <div style="margin-bottom: 30px; padding: 20px; background-color: #ede9fe; border-left: 5px solid #8b5cf6; border-radius: 5px;">
+          <h3 style="margin: 0 0 15px 0; color: #5b21b6; font-size: 18px;">Stratejik Plan Bilgileri</h3>
+          ${strategicPlans.map(plan => `
+            <div style="margin-bottom: 15px; padding: 12px; background-color: white; border-radius: 5px;">
+              <p style="margin: 0 0 8px 0; font-weight: bold; color: #6d28d9;">${plan.name}</p>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">
+                <p style="margin: 0;"><strong>Plan Dönemi:</strong> ${plan.start_year} - ${plan.end_year}</p>
+                <p style="margin: 0;"><strong>Oluşturulma:</strong> ${new Date(plan.created_at).toLocaleDateString('tr-TR')}</p>
+              </div>
+              ${plan.vision ? `<p style="margin: 8px 0 0 0; font-size: 13px;"><strong>Vizyon:</strong> ${plan.vision}</p>` : ''}
+              ${plan.mission ? `<p style="margin: 8px 0 0 0; font-size: 13px;"><strong>Misyon:</strong> ${plan.mission}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <div style="page-break-before: always;"></div>
+      <h2 style="margin-top: 0; color: #1e293b; font-size: 22px; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">Detaylı Gösterge Analizi</h2>
     `;
 
     Object.entries(groupedByPlan).forEach(([planId, planData]) => {
+      const planIndicators = filteredIndicators.filter(i => (i.strategic_plan_id || 'no-plan') === planId);
+      const planStats = createEmptyStats();
+      planIndicators.forEach(ind => {
+        const progress = calculateSelectedProgress(ind);
+        const status = getIndicatorStatus(progress);
+        incrementStatusInStats(planStats, status);
+      });
+
+      const planSuccessRate = planStats.total > 0
+        ? Math.round((planStats.exceedingTarget + planStats.excellent + planStats.good) / planStats.total * 100)
+        : 0;
+
       contentHTML += `
         <div style="margin-top: 25px; page-break-inside: avoid;">
           <h2 style="color: #7c3aed; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding: 10px; background-color: #f5f3ff; border-left: 5px solid #7c3aed;">
             ${planData.name}
           </h2>
+          <div style="margin-bottom: 15px; padding: 12px; background-color: #f0f9ff; border-radius: 5px;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 12px;">
+              <div><strong>Toplam Gösterge:</strong> ${planStats.total}</div>
+              <div><strong>Başarılı:</strong> <span style="color: #10b981;">${planStats.exceedingTarget + planStats.excellent + planStats.good}</span></div>
+              <div><strong>İyileştirilmeli:</strong> <span style="color: #f59e0b;">${planStats.moderate}</span></div>
+              <div><strong>Başarı Oranı:</strong> <span style="color: #3b82f6; font-weight: bold;">${planSuccessRate}%</span></div>
+            </div>
+          </div>
         </div>
       `;
 
@@ -736,10 +850,13 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           goalData.indicators.forEach((ind: IndicatorData) => {
             const currentValue = calculateCurrentValue(ind);
             const isAverage = ['maintenance', 'maintenance_increasing', 'maintenance_decreasing', 'percentage', 'percentage_increasing', 'percentage_decreasing'].includes(ind.calculation_method || 'cumulative');
+            const progressValue = calculateSelectedProgress(ind);
+            const statusLabel = getStatusLabel(getIndicatorStatus(progressValue));
+            const statusConfig = getStatusConfig(getIndicatorStatus(progressValue));
 
             const row: any[] = [
               ind.code,
-              ind.name,
+              `${ind.name}<br/><span style="font-size: 10px; color: #6b7280;">${isAverage ? '(Ortalama)' : '(Toplam)'}</span>`,
             ];
 
             if (selectedQuarters.includes(1)) row.push(ind.q1_value);
@@ -747,15 +864,41 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
             if (selectedQuarters.includes(3)) row.push(ind.q3_value);
             if (selectedQuarters.includes(4)) row.push(ind.q4_value);
 
-            const progressValue = calculateSelectedProgress(ind);
-            const statusLabel = getStatusLabel(getIndicatorStatus(progressValue));
+            const colorMap: Record<string, string> = {
+              'text-purple-600': '#9333ea',
+              'text-green-700': '#15803d',
+              'text-green-600': '#16a34a',
+              'text-yellow-600': '#ca8a04',
+              'text-red-600': '#dc2626',
+              'text-amber-800': '#92400e',
+              'bg-purple-600': '#9333ea',
+              'bg-green-700': '#15803d',
+              'bg-green-600': '#16a34a',
+              'bg-yellow-500': '#eab308',
+              'bg-red-600': '#dc2626',
+              'bg-amber-600': '#d97706',
+              'bg-purple-100': '#f3e8ff',
+              'bg-green-100': '#dcfce7',
+              'bg-yellow-100': '#fef9c3',
+              'bg-red-100': '#fee2e2',
+              'bg-amber-100': '#fef3c7'
+            };
+
+            const textColor = colorMap[statusConfig.color] || '#374151';
+            const barColor = colorMap[statusConfig.progressBarColor] || '#3b82f6';
+            const bgColor = colorMap[statusConfig.bgColor] || '#f3f4f6';
 
             row.push(
-              `${currentValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${ind.unit}`,
-              ind.baseline_value,
-              ind.target_value,
-              `${Math.round(progressValue)}%`,
-              statusLabel
+              `<strong>${currentValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</strong> ${ind.unit}`,
+              `${ind.baseline_value} ${ind.unit}`,
+              `${ind.target_value} ${ind.unit}`,
+              `<div style="text-align: center;">
+                <div style="font-weight: bold; color: ${textColor}; margin-bottom: 3px;">${Math.round(progressValue)}%</div>
+                <div style="background-color: #e5e7eb; border-radius: 10px; height: 6px; overflow: hidden;">
+                  <div style="height: 100%; background-color: ${barColor}; width: ${Math.min(100, progressValue)}%;"></div>
+                </div>
+              </div>`,
+              `<span style="padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background-color: ${bgColor}; color: ${textColor};">${statusLabel}</span>`
             );
 
             rows.push(row);
