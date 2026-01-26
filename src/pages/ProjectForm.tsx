@@ -26,6 +26,8 @@ interface FormData {
   contractor: string;
   description: string;
   strategic_plan_id?: string;
+  objective_id?: string;
+  goal_id?: string;
 }
 
 const SOURCE_OPTIONS = [
@@ -56,6 +58,8 @@ export default function ProjectForm() {
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
   const [strategicPlans, setStrategicPlans] = useState<any[]>([]);
+  const [objectives, setObjectives] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<FormData>({
     project_no: 'AUTO',
@@ -78,7 +82,9 @@ export default function ProjectForm() {
     tender_type: '',
     contractor: '',
     description: '',
-    strategic_plan_id: undefined
+    strategic_plan_id: undefined,
+    objective_id: undefined,
+    goal_id: undefined
   });
 
   useEffect(() => {
@@ -121,6 +127,38 @@ export default function ProjectForm() {
     }
   };
 
+  const loadObjectives = async (strategicPlanId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('objectives')
+        .select('id, title')
+        .eq('strategic_plan_id', strategicPlanId)
+        .order('title');
+
+      if (error) throw error;
+      setObjectives(data || []);
+    } catch (error) {
+      console.error('Amaçlar yüklenirken hata:', error);
+      setObjectives([]);
+    }
+  };
+
+  const loadGoals = async (objectiveId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('id, title')
+        .eq('objective_id', objectiveId)
+        .order('title');
+
+      if (error) throw error;
+      setGoals(data || []);
+    } catch (error) {
+      console.error('Hedefler yüklenirken hata:', error);
+      setGoals([]);
+    }
+  };
+
   const loadProject = async () => {
     try {
       setLoading(true);
@@ -134,6 +172,13 @@ export default function ProjectForm() {
       if (error) throw error;
       if (data) {
         setFormData(data);
+
+        if (data.strategic_plan_id) {
+          await loadObjectives(data.strategic_plan_id);
+        }
+        if (data.objective_id) {
+          await loadGoals(data.objective_id);
+        }
       }
     } catch (error) {
       console.error('Proje yüklenirken hata:', error);
@@ -191,6 +236,21 @@ export default function ProjectForm() {
 
   const handleChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+
+    if (field === 'strategic_plan_id') {
+      setFormData(prev => ({ ...prev, objective_id: undefined, goal_id: undefined }));
+      setObjectives([]);
+      setGoals([]);
+      if (value) {
+        loadObjectives(value);
+      }
+    } else if (field === 'objective_id') {
+      setFormData(prev => ({ ...prev, goal_id: undefined }));
+      setGoals([]);
+      if (value) {
+        loadGoals(value);
+      }
+    }
   };
 
   if (loading) {
@@ -501,7 +561,7 @@ export default function ProjectForm() {
               </select>
             </div>
 
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Stratejik Plan
               </label>
@@ -517,9 +577,64 @@ export default function ProjectForm() {
                   </option>
                 ))}
               </select>
+              {strategicPlans.length === 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Henüz stratejik plan tanımlanmamış
+                </p>
+              )}
             </div>
 
-            <div className="md:col-span-2">
+            {formData.strategic_plan_id && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amaç
+                </label>
+                <select
+                  value={formData.objective_id || ''}
+                  onChange={(e) => handleChange('objective_id', e.target.value || undefined)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Seçiniz</option>
+                  {objectives.map(obj => (
+                    <option key={obj.id} value={obj.id}>
+                      {obj.title}
+                    </option>
+                  ))}
+                </select>
+                {objectives.length === 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bu planda amaç tanımlanmamış
+                  </p>
+                )}
+              </div>
+            )}
+
+            {formData.objective_id && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hedef
+                </label>
+                <select
+                  value={formData.goal_id || ''}
+                  onChange={(e) => handleChange('goal_id', e.target.value || undefined)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Seçiniz</option>
+                  {goals.map(goal => (
+                    <option key={goal.id} value={goal.id}>
+                      {goal.title}
+                    </option>
+                  ))}
+                </select>
+                {goals.length === 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bu amaçta hedef tanımlanmamış
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className={formData.strategic_plan_id ? "md:col-span-2" : "md:col-span-2"}>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Açıklama
               </label>
