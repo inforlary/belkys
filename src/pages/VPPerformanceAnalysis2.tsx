@@ -135,7 +135,7 @@ export default function VPPerformanceAnalysis2() {
 
       for (const vp of vps || []) {
         const { data: assignments, error: assignmentsError } = await supabase
-          .from('vp_department_assignments')
+          .from('vice_president_departments')
           .select(`
             department_id,
             departments (
@@ -144,7 +144,7 @@ export default function VPPerformanceAnalysis2() {
               code
             )
           `)
-          .eq('vp_id', vp.id);
+          .eq('vice_president_id', vp.id);
 
         if (assignmentsError) throw assignmentsError;
 
