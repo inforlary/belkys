@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Building2, X, Save, Layers } from 'lucide-react';
+import { Building2, X, Save, Layers, Crown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
+
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
 
 interface EditOrganizationModalProps {
   organization: {
@@ -34,6 +41,39 @@ export default function EditOrganizationModal({ organization, onClose, onSuccess
   const [moduleInternalControl, setModuleInternalControl] = useState(organization.module_internal_control ?? true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedPresidentId, setSelectedPresidentId] = useState<string>('');
+  const [currentPresidentId, setCurrentPresidentId] = useState<string>('');
+
+  useEffect(() => {
+    loadOrganizationUsers();
+  }, [organization.id]);
+
+  const loadOrganizationUsers = async () => {
+    try {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('president_id')
+        .eq('id', organization.id)
+        .single();
+
+      if (orgData?.president_id) {
+        setCurrentPresidentId(orgData.president_id);
+        setSelectedPresidentId(orgData.president_id);
+      }
+
+      const { data: usersData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .eq('organization_id', organization.id)
+        .neq('role', 'president')
+        .order('full_name');
+
+      setUsers(usersData || []);
+    } catch (error) {
+      console.error('Error loading users:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +81,30 @@ export default function EditOrganizationModal({ organization, onClose, onSuccess
     setLoading(true);
 
     try {
+      if (selectedPresidentId !== currentPresidentId) {
+        if (currentPresidentId) {
+          const { data: oldPresident } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', currentPresidentId)
+            .single();
+
+          if (oldPresident?.role === 'president') {
+            await supabase
+              .from('profiles')
+              .update({ role: 'user' })
+              .eq('id', currentPresidentId);
+          }
+        }
+
+        if (selectedPresidentId) {
+          await supabase
+            .from('profiles')
+            .update({ role: 'president' })
+            .eq('id', selectedPresidentId);
+        }
+      }
+
       const { error: updateError } = await supabase
         .from('organizations')
         .update({
@@ -49,6 +113,7 @@ export default function EditOrganizationModal({ organization, onClose, onSuccess
           contact_email: contactEmail,
           contact_phone: contactPhone || null,
           max_users: maxUsers,
+          president_id: selectedPresidentId || null,
           module_strategic_planning: moduleStrategicPlanning,
           module_activity_reports: moduleActivityReports,
           module_budget_performance: moduleBudgetPerformance,
@@ -164,6 +229,28 @@ export default function EditOrganizationModal({ organization, onClose, onSuccess
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+            <Crown className="w-4 h-4 mr-2 text-amber-600" />
+            Başkan (President)
+          </label>
+          <select
+            value={selectedPresidentId}
+            onChange={(e) => setSelectedPresidentId(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+          >
+            <option value="">Başkan Seçilmedi</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name} ({user.email}) - {user.role}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Başkan organizasyonun tüm verilerini görüntüleyebilir ancak değişiklik yapamaz.
+          </p>
         </div>
 
         <div className="border-t pt-4">

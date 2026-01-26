@@ -200,6 +200,26 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     { icon: FolderOpen, label: 'Dokümanlar', path: 'document-library' },
   ];
 
+  const presidentMenuItems: MenuItem[] = [
+    { icon: LayoutDashboard, label: 'Başkan Dashboard', path: 'president-dashboard' },
+  ];
+
+  const presidentReportSections: MenuSection[] = [
+    {
+      label: 'Raporlar',
+      icon: FileText,
+      items: [
+        { icon: FileText, label: 'Stratejik Plan Raporları', path: 'reports' },
+        { icon: FileText, label: 'Risk Raporları', path: 'risk-management/reports' },
+        { icon: FileText, label: 'İç Kontrol Raporları', path: 'internal-control/reports' },
+        { icon: FileText, label: 'Kalite Raporları', path: 'quality-management/reports' },
+        { icon: FileText, label: 'Proje Raporları', path: 'project-management/reports' },
+        { icon: FileText, label: 'Stratejik Analiz Raporu', path: 'strategic-analysis-report' },
+        { icon: FileText, label: 'Yıl Sonu Değerlendirme', path: 'strategic-plan-evaluation' },
+      ],
+    },
+  ];
+
   const getModuleAccess = () => {
     if (profile?.is_super_admin) {
       return {
@@ -429,7 +449,30 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         </div>
 
         <nav className="p-4 space-y-0.5 flex-1 overflow-y-auto">
-          {!profile?.is_super_admin && topMenuItems.map((item) => {
+          {profile?.role === 'president' && (
+            <>
+              {presidentMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPath === item.path;
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-amber-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {!profile?.is_super_admin && profile?.role !== 'president' && topMenuItems.map((item) => {
             if (!shouldShowMenuItem(item)) return null;
             const Icon = item.icon;
             const isActive = currentPath === item.path;
@@ -449,7 +492,64 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
             );
           })}
 
-          {!profile?.is_super_admin && (
+          {profile?.role === 'president' && (
+            <div className="pt-2">
+              {presidentReportSections.map((section) => {
+                const sectionKey = section.label.toLowerCase().replace(/\s+/g, '-');
+                const isExpanded = expandedSections.includes(sectionKey);
+                const SectionIcon = section.icon;
+                const hasActiveItem = section.items.some(item => item.path === currentPath);
+
+                return (
+                  <div key={sectionKey} className="mb-0.5">
+                    <button
+                      onClick={() => toggleSection(sectionKey)}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-colors ${
+                        hasActiveItem
+                          ? 'bg-slate-800 text-white'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <SectionIcon className="w-5 h-5" />
+                        <span className="font-medium">{section.label}</span>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-0.5 ml-4 space-y-0.5">
+                        {section.items.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = currentPath === item.path;
+                          return (
+                            <button
+                              key={item.path}
+                              onClick={() => navigate(item.path)}
+                              className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors text-sm ${
+                                isActive
+                                  ? 'bg-amber-600 text-white'
+                                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                              <span className="flex-1 text-left">{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!profile?.is_super_admin && profile?.role !== 'president' && (
             <div className="pt-2">
               {menuSections.map((section) => {
                 if (!shouldShowSection(section)) return null;
@@ -581,6 +681,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
             {bottomMenuItems.map((item) => {
               if (!shouldShowMenuItem(item)) return null;
               if (profile?.is_super_admin && item.path !== 'user-profile' && item.path !== 'notification-center') return null;
+              if (profile?.role === 'president' && item.path !== 'user-profile' && item.path !== 'notification-center') return null;
               const Icon = item.icon;
               const isActive = currentPath === item.path;
               return (
@@ -589,7 +690,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
                   onClick={() => navigate(item.path)}
                   className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
                     isActive
-                      ? 'bg-blue-600 text-white'
+                      ? (profile?.role === 'president' ? 'bg-amber-600 text-white' : 'bg-blue-600 text-white')
                       : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`}
                 >

@@ -131,6 +131,7 @@ import LoginAttemptsLog from './pages/LoginAttemptsLog';
 import ActiveSessions from './pages/ActiveSessions';
 import SystemHealth from './pages/SystemHealth';
 import SystemUpdates from './pages/SystemUpdates';
+import PresidentDashboard from './pages/PresidentDashboard';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -150,6 +151,10 @@ function AppContent() {
 
   if (profile?.is_super_admin && currentPath !== 'super-admin' && currentPath !== 'user-profile' && currentPath !== 'notification-center') {
     navigate('super-admin');
+  }
+
+  if (profile?.role === 'president' && currentPath === 'dashboard') {
+    navigate('president-dashboard');
   }
 
 const renderPage = () => {
@@ -222,6 +227,8 @@ const renderPage = () => {
     switch (currentPath) {
       case 'dashboard':
         return <Dashboard />;
+      case 'president-dashboard':
+        return <PresidentDashboard />;
       case 'integrated-management':
         return <IntegratedManagementDashboard />;
       case 'reports':
