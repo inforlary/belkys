@@ -233,30 +233,30 @@ export default function VPPerformanceAnalysis2() {
     for (const goal of goals) {
       const goalIndicators = indicators.filter(i => i.goal_id === goal.id);
 
-      const goalProgress = calculateGoalProgress(
-        goal.id,
-        goalIndicators,
-        entries,
-        targets,
-        selectedYear
-      );
-
-      totalGoalProgress += goalProgress;
-
-      for (const ind of goalIndicators) {
+      const goalIndicatorsWithTargets = goalIndicators.map(ind => {
         const yearlyTarget = targetsByIndicator[ind.id] ?? ind.target_value;
         const baselineValue = ind.baseline_value ?? 0;
 
-        const indicatorWithTarget = {
+        return {
           ...ind,
           yearly_target: yearlyTarget,
           yearly_baseline: baselineValue
         };
+      });
 
-        const progress = calculateIndicatorProgress(indicatorWithTarget, entries);
+      const goalProgress = calculateGoalProgress(
+        goal.id,
+        goalIndicatorsWithTargets,
+        entries
+      );
+
+      totalGoalProgress += goalProgress;
+
+      for (const ind of goalIndicatorsWithTargets) {
+        const progress = calculateIndicatorProgress(ind, entries);
         const indicatorEntries = entries.filter(e => e.indicator_id === ind.id);
         const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
-        const currentValue = baselineValue + sumOfEntries;
+        const currentValue = ind.yearly_baseline + sumOfEntries;
 
         enrichedIndicators.push({
           id: ind.id,
@@ -272,8 +272,8 @@ export default function VPPerformanceAnalysis2() {
           goal_title: goal.title,
           objective_code: (goal as any).objectives?.code || '',
           objective_title: (goal as any).objectives?.title || '',
-          yearly_target: yearlyTarget,
-          yearly_baseline: baselineValue,
+          yearly_target: ind.yearly_target,
+          yearly_baseline: ind.yearly_baseline,
           progress,
           current_value: currentValue
         });
