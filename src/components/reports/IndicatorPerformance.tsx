@@ -794,14 +794,6 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           <h2 style="color: #7c3aed; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding: 10px; background-color: #f5f3ff; border-left: 5px solid #7c3aed;">
             ${planData.name}
           </h2>
-          <div style="margin-bottom: 15px; padding: 12px; background-color: #f0f9ff; border-radius: 5px;">
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 12px;">
-              <div><strong>Toplam Gösterge:</strong> ${planStats.total}</div>
-              <div><strong>Başarılı:</strong> <span style="color: #10b981;">${planStats.exceedingTarget + planStats.excellent + planStats.good}</span></div>
-              <div><strong>İyileştirilmeli:</strong> <span style="color: #f59e0b;">${planStats.moderate}</span></div>
-              <div><strong>Başarı Oranı:</strong> <span style="color: #3b82f6; font-weight: bold;">${planSuccessRate}%</span></div>
-            </div>
-          </div>
         </div>
       `;
 
