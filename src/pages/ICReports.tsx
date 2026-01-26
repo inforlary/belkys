@@ -18,10 +18,8 @@ import ComplianceReport from '../components/ic-reports/ComplianceReport';
 import ActionPlanReport from '../components/ic-reports/ActionPlanReport';
 import ComponentAnalysisReport from '../components/ic-reports/ComponentAnalysisReport';
 import DepartmentReport from '../components/ic-reports/DepartmentReport';
-import MeetingReport from '../components/ic-reports/MeetingReport';
-import AssuranceReport from '../components/ic-reports/AssuranceReport';
 
-type ReportType = 'compliance' | 'action_plan' | 'component' | 'department' | 'meeting' | 'assurance';
+type ReportType = 'compliance' | 'action_plan' | 'component' | 'department';
 
 interface ActionPlan {
   id: string;
@@ -60,22 +58,6 @@ const reportCards = [
     icon: Building2,
     description: 'Birim bazında eylem durumu, sorumluluklar ve ilerleme, geciken eylemler',
     color: 'orange',
-    category: 'ic'
-  },
-  {
-    id: 'meeting' as ReportType,
-    title: 'İKİYK TOPLANTI RAPORU',
-    icon: Users,
-    description: 'İKİYK toplantı özetleri, alınan kararlar ve takip durumları',
-    color: 'cyan',
-    category: 'ic'
-  },
-  {
-    id: 'assurance' as ReportType,
-    title: 'GÜVENCE BEYANI RAPORU',
-    icon: Shield,
-    description: 'Birim ve üst yönetici güvence beyanları durumu, yıllık konsolidasyon',
-    color: 'teal',
     category: 'ic'
   }
 ];
@@ -303,10 +285,6 @@ export default function ICReports() {
         return <ComponentAnalysisReport planId={selectedPlanId} onClose={handleCloseModal} />;
       case 'department':
         return <DepartmentReport planId={selectedPlanId} onClose={handleCloseModal} />;
-      case 'meeting':
-        return <MeetingReport onClose={handleCloseModal} />;
-      case 'assurance':
-        return <AssuranceReport onClose={handleCloseModal} />;
       default:
         return null;
     }

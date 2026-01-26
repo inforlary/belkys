@@ -113,9 +113,6 @@ import ICActionPlans from './pages/ICActionPlans';
 import ICActions from './pages/ICActions';
 import ICActionPlanDetail from './pages/ICActionPlanDetail';
 import ICActionDetail from './pages/ICActionDetail';
-import ICAssessments from './pages/ICAssessments';
-import ICMeetings from './pages/ICMeetings';
-import ICAssuranceStatements from './pages/ICAssuranceStatements';
 import ICReports from './pages/ICReports';
 import Settings from './pages/Settings';
 import GeneralSettings from './pages/GeneralSettings';
@@ -437,12 +434,6 @@ const renderPage = () => {
         return <ICActionPlans />;
       case 'internal-control/actions':
         return <ICActions />;
-      case 'internal-control/assessments':
-        return <ICAssessments />;
-      case 'internal-control/ikyk':
-        return <ICMeetings />;
-      case 'internal-control/assurance':
-        return <ICAssuranceStatements />;
       case 'internal-control/processes':
         return <QualityProcesses />;
       case 'internal-control/process-kpis':
