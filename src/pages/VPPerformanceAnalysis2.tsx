@@ -331,7 +331,7 @@ export default function VPPerformanceAnalysis2() {
         sheetData.push([`Müdürlük: ${dept.department_name}`, `Performans: %${dept.performance_percentage}`]);
         sheetData.push([]);
 
-        sheetData.push(['Amaç Kodu', 'Hedef Kodu', 'Gösterge Kodu', 'Gösterge Adı', 'Hedef', 'Gerçekleşme', 'İlerleme %']);
+        sheetData.push(['Amaç Kodu', 'Hedef Kodu', 'Gösterge Kodu', 'Gösterge Adı', 'Başlangıç', 'Hedef', 'Gerçekleşme', 'İlerleme %']);
 
         dept.indicators.forEach(ind => {
           sheetData.push([
@@ -339,6 +339,7 @@ export default function VPPerformanceAnalysis2() {
             ind.goal_code,
             ind.code,
             ind.name,
+            ind.yearly_baseline || 0,
             ind.yearly_target || '-',
             ind.current_value,
             ind.progress
@@ -530,6 +531,7 @@ export default function VPPerformanceAnalysis2() {
                                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Hedef</th>
                                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Kodu</th>
                                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Adı</th>
+                                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Başlangıç</th>
                                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Hedef Değer</th>
                                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Gerçekleşme</th>
                                           <th className="px-3 py-2 text-center text-xs font-medium text-gray-700">İlerleme</th>
@@ -542,6 +544,9 @@ export default function VPPerformanceAnalysis2() {
                                             <td className="px-3 py-2 text-sm text-gray-600">{ind.goal_code}</td>
                                             <td className="px-3 py-2 text-sm font-medium text-gray-900">{ind.code}</td>
                                             <td className="px-3 py-2 text-sm text-gray-900">{ind.name}</td>
+                                            <td className="px-3 py-2 text-sm text-right text-gray-600">
+                                              {ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}
+                                            </td>
                                             <td className="px-3 py-2 text-sm text-right text-gray-700">
                                               {ind.yearly_target?.toLocaleString('tr-TR') || '-'}
                                             </td>
