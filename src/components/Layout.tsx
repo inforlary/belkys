@@ -622,11 +622,11 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       </aside>
 
       <div
-        className={`transition-all duration-300 ${
+        className={`transition-all duration-300 flex flex-col h-screen ${
           sidebarOpen ? 'ml-64' : 'ml-0'
         }`}
       >
-        <header className="bg-white border-b border-slate-200 px-6 py-4">
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -668,7 +668,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
           </div>
         </header>
 
-        <main className="p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );
