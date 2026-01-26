@@ -14,7 +14,7 @@ export interface Profile {
   organization_id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'manager' | 'user' | 'vice_president';
+  role: 'admin' | 'director' | 'user' | 'vice_president' | 'president';
   is_super_admin?: boolean;
   department_id: string | null;
   created_at: string;

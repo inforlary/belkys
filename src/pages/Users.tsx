@@ -11,7 +11,7 @@ interface UserFormData {
   email: string;
   password: string;
   full_name: string;
-  role: 'admin' | 'director' | 'user' | 'vice_president';
+  role: 'admin' | 'director' | 'user' | 'vice_president' | 'president';
   department_id: string;
   vice_president_department_ids: string[];
 }
@@ -84,11 +84,40 @@ export function Users() {
           .update({
             full_name: formData.full_name,
             role: formData.role,
-            department_id: formData.role !== 'vice_president' ? (formData.department_id || null) : null,
+            department_id: (formData.role !== 'vice_president' && formData.role !== 'president') ? (formData.department_id || null) : null,
           })
           .eq('id', editingUser.id);
 
         if (error) throw error;
+
+        if (formData.role === 'president' && editingUser.role !== 'president') {
+          const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('organization_id')
+            .eq('id', user?.id)
+            .single();
+
+          const { error: orgError } = await supabase
+            .from('organizations')
+            .update({ president_id: editingUser.id })
+            .eq('id', currentProfile?.organization_id);
+
+          if (orgError) throw orgError;
+        } else if (formData.role !== 'president' && editingUser.role === 'president') {
+          const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('organization_id')
+            .eq('id', user?.id)
+            .single();
+
+          const { error: orgError } = await supabase
+            .from('organizations')
+            .update({ president_id: null })
+            .eq('id', currentProfile?.organization_id)
+            .eq('president_id', editingUser.id);
+
+          if (orgError) throw orgError;
+        }
 
         if (formData.role === 'vice_president') {
           const { data: currentProfile } = await supabase
@@ -132,7 +161,7 @@ export function Users() {
               full_name: formData.full_name,
               role: formData.role,
               organization_id: currentProfile?.organization_id,
-              department_id: formData.role !== 'vice_president' ? (formData.department_id || null) : null,
+              department_id: (formData.role !== 'vice_president' && formData.role !== 'president') ? (formData.department_id || null) : null,
             }
           }
         });
@@ -153,12 +182,21 @@ export function Users() {
             email: formData.email,
             full_name: formData.full_name,
             role: formData.role,
-            department_id: formData.role !== 'vice_president' ? (formData.department_id || null) : null,
+            department_id: (formData.role !== 'vice_president' && formData.role !== 'president') ? (formData.department_id || null) : null,
           }, {
             onConflict: 'id'
           });
 
         if (profileError) throw profileError;
+
+        if (formData.role === 'president') {
+          const { error: orgError } = await supabase
+            .from('organizations')
+            .update({ president_id: authData.user.id })
+            .eq('id', currentProfile?.organization_id);
+
+          if (orgError) throw orgError;
+        }
 
         if (formData.role === 'vice_president' && formData.vice_president_department_ids.length > 0) {
           const vpDeptInserts = formData.vice_president_department_ids.map(deptId => ({
@@ -280,6 +318,7 @@ export function Users() {
     director: 'Müdür',
     user: 'Kullanıcı',
     vice_president: 'Başkan Yardımcısı',
+    president: 'Başkan',
   };
 
   const roleColors: Record<string, string> = {
@@ -287,6 +326,7 @@ export function Users() {
     director: 'bg-blue-100 text-blue-800',
     user: 'bg-gray-100 text-gray-800',
     vice_president: 'bg-orange-100 text-orange-800',
+    president: 'bg-emerald-100 text-emerald-800',
   };
 
   if (loading) {
@@ -451,6 +491,7 @@ export function Users() {
               <option value="user">Kullanıcı</option>
               <option value="director">Müdür</option>
               <option value="vice_president">Başkan Yardımcısı</option>
+              <option value="president">Başkan</option>
               <option value="admin">Yönetici</option>
             </select>
           </div>
@@ -477,7 +518,7 @@ export function Users() {
                 {formData.vice_president_department_ids.length} müdürlük seçildi
               </p>
             </div>
-          ) : (
+          ) : formData.role !== 'president' ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Müdürlük
@@ -494,6 +535,12 @@ export function Users() {
                   </option>
                 ))}
               </select>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                Başkan rolü tüm müdürlükleri gözetler, müdürlük seçimi gerekmez.
+              </p>
             </div>
           )}
 
