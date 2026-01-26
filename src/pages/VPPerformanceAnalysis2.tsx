@@ -6,19 +6,10 @@ import {
   User,
   Building2,
   Target,
-  CheckCircle,
-  Clock,
   AlertCircle,
-  TrendingUp,
-  Award,
-  BarChart3,
-  Activity,
-  FileText,
   ChevronDown,
   ChevronUp,
-  Download,
-  Shield,
-  DollarSign
+  Download
 } from 'lucide-react';
 import type { Profile, Department } from '../types/database';
 import * as XLSX from 'xlsx';
@@ -56,37 +47,12 @@ interface IndicatorDetail {
   current_value: number;
 }
 
-interface BudgetPPSummary {
-  total_forms: number;
-  approved: number;
-  pending: number;
-  draft: number;
-}
-
-interface RiskSummary {
-  total_risks: number;
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-}
-
-interface ICSummary {
-  total_actions: number;
-  total_controls: number;
-  completed_actions: number;
-  in_progress_actions: number;
-}
-
 interface DepartmentPerformance {
   department_id: string;
   department_name: string;
   total_indicators: number;
   performance_percentage: number;
   indicators: IndicatorDetail[];
-  budget_pp: BudgetPPSummary;
-  risks: RiskSummary;
-  internal_control: ICSummary;
 }
 
 interface VPPerformance {
@@ -106,7 +72,6 @@ export default function VPPerformanceAnalysis2() {
   const [vpPerformances, setVPPerformances] = useState<VPPerformance[]>([]);
   const [expandedVPs, setExpandedVPs] = useState<Set<string>>(new Set());
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
-  const [expandedTabs, setExpandedTabs] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     loadData();
@@ -217,10 +182,7 @@ export default function VPPerformanceAnalysis2() {
         department_name: dept.name,
         total_indicators: 0,
         performance_percentage: 0,
-        indicators: [],
-        budget_pp: { total_forms: 0, approved: 0, pending: 0, draft: 0 },
-        risks: { total_risks: 0, critical: 0, high: 0, medium: 0, low: 0 },
-        internal_control: { total_actions: 0, total_controls: 0, completed_actions: 0, in_progress_actions: 0 }
+        indicators: []
       };
     }
 
@@ -318,12 +280,6 @@ export default function VPPerformanceAnalysis2() {
       ? Math.round(totalProgress / enrichedIndicators.length)
       : 0;
 
-    const [budgetPP, risks, ic] = await Promise.all([
-      loadBudgetPPSummary(dept.id),
-      loadRiskSummary(dept.id),
-      loadICSummary(dept.id)
-    ]);
-
     return {
       department_id: dept.id,
       department_name: dept.name,
@@ -331,78 +287,7 @@ export default function VPPerformanceAnalysis2() {
       performance_percentage: performancePercentage,
       indicators: enrichedIndicators.sort((a, b) =>
         a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
-      ),
-      budget_pp: budgetPP,
-      risks,
-      internal_control: ic
-    };
-  };
-
-  const loadBudgetPPSummary = async (departmentId: string): Promise<BudgetPPSummary> => {
-    const { data, error } = await supabase
-      .from('budget_performance_forms')
-      .select('approval_status')
-      .eq('department_id', departmentId)
-      .eq('fiscal_year', selectedYear);
-
-    if (error || !data) {
-      return { total_forms: 0, approved: 0, pending: 0, draft: 0 };
-    }
-
-    return {
-      total_forms: data.length,
-      approved: data.filter(f => f.approval_status === 'approved').length,
-      pending: data.filter(f => f.approval_status === 'pending').length,
-      draft: data.filter(f => f.approval_status === 'draft').length
-    };
-  };
-
-  const loadRiskSummary = async (departmentId: string): Promise<RiskSummary> => {
-    const { data, error } = await supabase
-      .from('risks')
-      .select('residual_risk_level')
-      .eq('department_id', departmentId)
-      .eq('approval_status', 'approved');
-
-    if (error || !data) {
-      return { total_risks: 0, critical: 0, high: 0, medium: 0, low: 0 };
-    }
-
-    return {
-      total_risks: data.length,
-      critical: data.filter(r => r.residual_risk_level === 'critical').length,
-      high: data.filter(r => r.residual_risk_level === 'high').length,
-      medium: data.filter(r => r.residual_risk_level === 'medium').length,
-      low: data.filter(r => r.residual_risk_level === 'low').length
-    };
-  };
-
-  const loadICSummary = async (departmentId: string): Promise<ICSummary> => {
-    const { data: actions, error } = await supabase
-      .from('ic_actions')
-      .select('status')
-      .contains('responsible_department_ids', [departmentId]);
-
-    if (error) {
-      console.error('Error loading IC actions:', error);
-      return {
-        total_actions: 0,
-        total_controls: 0,
-        completed_actions: 0,
-        in_progress_actions: 0
-      };
-    }
-
-    const { data: controls } = await supabase
-      .from('risk_controls')
-      .select('id')
-      .eq('responsible_department_id', departmentId);
-
-    return {
-      total_actions: actions?.length || 0,
-      total_controls: controls?.length || 0,
-      completed_actions: actions?.filter(a => a.status === 'COMPLETED').length || 0,
-      in_progress_actions: actions?.filter(a => a.status === 'IN_PROGRESS').length || 0
+      )
     };
   };
 
@@ -424,13 +309,6 @@ export default function VPPerformanceAnalysis2() {
       newExpanded.add(deptId);
     }
     setExpandedDepartments(newExpanded);
-  };
-
-  const toggleTab = (deptId: string, tabName: string) => {
-    setExpandedTabs(prev => ({
-      ...prev,
-      [deptId]: prev[deptId] === tabName ? '' : tabName
-    }));
   };
 
   const exportToExcel = () => {
@@ -590,7 +468,6 @@ export default function VPPerformanceAnalysis2() {
                     <div className="mt-6 space-y-3">
                       {vp.departments.map(dept => {
                         const isDeptExpanded = expandedDepartments.has(dept.department_id);
-                        const activeTab = expandedTabs[dept.department_id] || '';
                         const deptGrade = getPerformanceGrade(dept.performance_percentage);
 
                         return (
@@ -635,191 +512,57 @@ export default function VPPerformanceAnalysis2() {
                             </div>
 
                             {isDeptExpanded && (
-                              <div className="mt-4 space-y-3">
-                                <div className="grid grid-cols-4 gap-3">
-                                  <button
-                                    onClick={() => toggleTab(dept.department_id, 'indicators')}
-                                    className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                                      activeTab === 'indicators'
-                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                                  >
-                                    <Target className="w-5 h-5" />
-                                    <span className="font-medium">Gösterge İlerleme</span>
-                                  </button>
-                                  <button
-                                    onClick={() => toggleTab(dept.department_id, 'budget')}
-                                    className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                                      activeTab === 'budget'
-                                        ? 'border-green-500 bg-green-50 text-green-700'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                                  >
-                                    <DollarSign className="w-5 h-5" />
-                                    <span className="font-medium">Bütçe PP</span>
-                                  </button>
-                                  <button
-                                    onClick={() => toggleTab(dept.department_id, 'risk')}
-                                    className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                                      activeTab === 'risk'
-                                        ? 'border-orange-500 bg-orange-50 text-orange-700'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                                  >
-                                    <AlertCircle className="w-5 h-5" />
-                                    <span className="font-medium">Risk Yönetimi</span>
-                                  </button>
-                                  <button
-                                    onClick={() => toggleTab(dept.department_id, 'ic')}
-                                    className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                                      activeTab === 'ic'
-                                        ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                                  >
-                                    <Shield className="w-5 h-5" />
-                                    <span className="font-medium">İç Kontrol</span>
-                                  </button>
-                                </div>
-
-                                {activeTab === 'indicators' && (
-                                  <div className="bg-white rounded-lg p-4">
-                                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                      <Target className="w-5 h-5 text-blue-600" />
-                                      Gösterge İlerleme Tablosu
-                                    </h4>
-                                    <div className="overflow-x-auto">
-                                      <table className="min-w-full">
-                                        <thead>
-                                          <tr className="bg-gray-100">
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Amaç</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Hedef</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Kod</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Adı</th>
-                                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Hedef</th>
-                                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Gerçekleşme</th>
-                                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-700">İlerleme</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {dept.indicators.map(ind => (
-                                            <tr key={ind.id} className="border-t">
-                                              <td className="px-3 py-2 text-sm text-gray-600">{ind.objective_code}</td>
-                                              <td className="px-3 py-2 text-sm text-gray-600">{ind.goal_code}</td>
-                                              <td className="px-3 py-2 text-sm font-medium text-gray-900">{ind.code}</td>
-                                              <td className="px-3 py-2 text-sm text-gray-900">{ind.name}</td>
-                                              <td className="px-3 py-2 text-sm text-right text-gray-700">
-                                                {ind.yearly_target?.toLocaleString('tr-TR') || '-'}
-                                              </td>
-                                              <td className="px-3 py-2 text-sm text-right text-gray-700">
-                                                {ind.current_value.toLocaleString('tr-TR')}
-                                              </td>
-                                              <td className="px-3 py-2">
-                                                <div className="flex items-center gap-2">
-                                                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                                    <div
-                                                      className={`h-2 rounded-full ${getProgressColor(ind.progress)}`}
-                                                      style={{ width: `${Math.min(100, ind.progress)}%` }}
-                                                    ></div>
-                                                  </div>
-                                                  <span className={`text-sm font-medium ${getProgressTextColor(ind.progress)}`}>
-                                                    %{ind.progress}
-                                                  </span>
+                              <div className="mt-4">
+                                <div className="bg-white rounded-lg p-4 border-2 border-blue-200">
+                                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                    <Target className="w-5 h-5 text-blue-600" />
+                                    Amaç ve Hedef Bazında Gösterge İlerlemesi
+                                  </h4>
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full">
+                                      <thead>
+                                        <tr className="bg-gray-100">
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Amaç</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Hedef</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Kodu</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Adı</th>
+                                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Hedef Değer</th>
+                                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Gerçekleşme</th>
+                                          <th className="px-3 py-2 text-center text-xs font-medium text-gray-700">İlerleme</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {dept.indicators.map(ind => (
+                                          <tr key={ind.id} className="border-t hover:bg-gray-50">
+                                            <td className="px-3 py-2 text-sm text-gray-600">{ind.objective_code}</td>
+                                            <td className="px-3 py-2 text-sm text-gray-600">{ind.goal_code}</td>
+                                            <td className="px-3 py-2 text-sm font-medium text-gray-900">{ind.code}</td>
+                                            <td className="px-3 py-2 text-sm text-gray-900">{ind.name}</td>
+                                            <td className="px-3 py-2 text-sm text-right text-gray-700">
+                                              {ind.yearly_target?.toLocaleString('tr-TR') || '-'}
+                                            </td>
+                                            <td className="px-3 py-2 text-sm text-right text-gray-700">
+                                              {ind.current_value.toLocaleString('tr-TR')}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <div className="flex items-center gap-2">
+                                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                  <div
+                                                    className={`h-2 rounded-full ${getProgressColor(ind.progress)}`}
+                                                    style={{ width: `${Math.min(100, ind.progress)}%` }}
+                                                  ></div>
                                                 </div>
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
+                                                <span className={`text-sm font-medium ${getProgressTextColor(ind.progress)}`}>
+                                                  %{ind.progress}
+                                                </span>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
                                   </div>
-                                )}
-
-                                {activeTab === 'budget' && (
-                                  <div className="bg-white rounded-lg p-4">
-                                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                      <DollarSign className="w-5 h-5 text-green-600" />
-                                      Bütçe Performans Programı
-                                    </h4>
-                                    <div className="grid grid-cols-4 gap-4">
-                                      <div className="bg-blue-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Toplam Form</p>
-                                        <p className="text-2xl font-bold text-blue-600">{dept.budget_pp.total_forms}</p>
-                                      </div>
-                                      <div className="bg-green-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Onaylı</p>
-                                        <p className="text-2xl font-bold text-green-600">{dept.budget_pp.approved}</p>
-                                      </div>
-                                      <div className="bg-yellow-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Bekleyen</p>
-                                        <p className="text-2xl font-bold text-yellow-600">{dept.budget_pp.pending}</p>
-                                      </div>
-                                      <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Taslak</p>
-                                        <p className="text-2xl font-bold text-gray-600">{dept.budget_pp.draft}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {activeTab === 'risk' && (
-                                  <div className="bg-white rounded-lg p-4">
-                                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                      <AlertCircle className="w-5 h-5 text-orange-600" />
-                                      Risk Yönetimi
-                                    </h4>
-                                    <div className="grid grid-cols-5 gap-4">
-                                      <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Toplam Risk</p>
-                                        <p className="text-2xl font-bold text-gray-900">{dept.risks.total_risks}</p>
-                                      </div>
-                                      <div className="bg-red-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Kritik</p>
-                                        <p className="text-2xl font-bold text-red-600">{dept.risks.critical}</p>
-                                      </div>
-                                      <div className="bg-orange-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Yüksek</p>
-                                        <p className="text-2xl font-bold text-orange-600">{dept.risks.high}</p>
-                                      </div>
-                                      <div className="bg-yellow-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Orta</p>
-                                        <p className="text-2xl font-bold text-yellow-600">{dept.risks.medium}</p>
-                                      </div>
-                                      <div className="bg-green-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Düşük</p>
-                                        <p className="text-2xl font-bold text-green-600">{dept.risks.low}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {activeTab === 'ic' && (
-                                  <div className="bg-white rounded-lg p-4">
-                                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                      <Shield className="w-5 h-5 text-purple-600" />
-                                      İç Kontrol Sistemi
-                                    </h4>
-                                    <div className="grid grid-cols-4 gap-4">
-                                      <div className="bg-purple-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Toplam Aksiyon</p>
-                                        <p className="text-2xl font-bold text-purple-600">{dept.internal_control.total_actions}</p>
-                                      </div>
-                                      <div className="bg-blue-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Toplam Kontrol</p>
-                                        <p className="text-2xl font-bold text-blue-600">{dept.internal_control.total_controls}</p>
-                                      </div>
-                                      <div className="bg-green-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Tamamlanan</p>
-                                        <p className="text-2xl font-bold text-green-600">{dept.internal_control.completed_actions}</p>
-                                      </div>
-                                      <div className="bg-yellow-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Devam Eden</p>
-                                        <p className="text-2xl font-bold text-yellow-600">{dept.internal_control.in_progress_actions}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
+                                </div>
                               </div>
                             )}
                           </div>
