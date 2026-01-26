@@ -378,25 +378,31 @@ export default function VPPerformanceAnalysis2() {
   };
 
   const loadICSummary = async (departmentId: string): Promise<ICSummary> => {
-    const [actionsRes, controlsRes] = await Promise.all([
-      supabase
-        .from('ic_actions')
-        .select('status')
-        .contains('responsible_departments', [departmentId]),
-      supabase
-        .from('ic_controls')
-        .select('id')
-        .eq('department_id', departmentId)
-    ]);
+    const { data: actions, error } = await supabase
+      .from('ic_actions')
+      .select('status')
+      .contains('responsible_department_ids', [departmentId]);
 
-    const actions = actionsRes.data || [];
-    const controls = controlsRes.data || [];
+    if (error) {
+      console.error('Error loading IC actions:', error);
+      return {
+        total_actions: 0,
+        total_controls: 0,
+        completed_actions: 0,
+        in_progress_actions: 0
+      };
+    }
+
+    const { data: controls } = await supabase
+      .from('risk_controls')
+      .select('id')
+      .eq('responsible_department_id', departmentId);
 
     return {
-      total_actions: actions.length,
-      total_controls: controls.length,
-      completed_actions: actions.filter(a => a.status === 'completed').length,
-      in_progress_actions: actions.filter(a => a.status === 'in_progress').length
+      total_actions: actions?.length || 0,
+      total_controls: controls?.length || 0,
+      completed_actions: actions?.filter(a => a.status === 'COMPLETED').length || 0,
+      in_progress_actions: actions?.filter(a => a.status === 'IN_PROGRESS').length || 0
     };
   };
 
