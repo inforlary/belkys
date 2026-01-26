@@ -276,3 +276,113 @@ export interface RevenueBudgetProposal {
   created_at: string;
   updated_at: string;
 }
+
+export type RiskEventType =
+  | 'CREATED' | 'UPDATED' | 'DELETED'
+  | 'SUBMITTED_FOR_APPROVAL' | 'APPROVED' | 'REJECTED'
+  | 'STATUS_CHANGED' | 'SCORE_CHANGED' | 'OWNER_CHANGED'
+  | 'CONTROL_ADDED' | 'CONTROL_UPDATED' | 'CONTROL_REMOVED'
+  | 'TREATMENT_ADDED' | 'TREATMENT_UPDATED' | 'TREATMENT_COMPLETED'
+  | 'INDICATOR_ADDED' | 'INDICATOR_THRESHOLD_BREACH'
+  | 'REVIEW_COMPLETED' | 'COMMENT_ADDED'
+  | 'APPETITE_BREACH' | 'ESCALATED' | 'CLOSED' | 'REOPENED';
+
+export type RiskEventSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+export type RiskApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SKIPPED' | 'CANCELLED';
+
+export type RiskCommentType = 'GENERAL' | 'ASSESSMENT' | 'CONTROL' | 'TREATMENT' | 'APPROVAL' | 'REVIEW' | 'ESCALATION';
+
+export interface RiskVersion {
+  id: string;
+  risk_id: string;
+  version_number: number;
+  risk_data: Record<string, any>;
+  change_summary: string | null;
+  changed_fields: string[] | null;
+  changed_by_id: string | null;
+  changed_at: string;
+  change_reason: string | null;
+  previous_version_id: string | null;
+  created_at: string;
+  changed_by?: {
+    full_name: string;
+  };
+}
+
+export interface RiskEvent {
+  id: string;
+  risk_id: string;
+  event_type: RiskEventType;
+  event_title: string;
+  event_description: string | null;
+  event_data: Record<string, any> | null;
+  old_value: string | null;
+  new_value: string | null;
+  triggered_by_id: string | null;
+  triggered_at: string;
+  is_system_generated: boolean;
+  severity: RiskEventSeverity;
+  created_at: string;
+  triggered_by?: {
+    full_name: string;
+  };
+}
+
+export interface RiskApprovalChain {
+  id: string;
+  risk_id: string;
+  approval_step: number;
+  step_name: string;
+  approver_id: string | null;
+  approver_role: string | null;
+  approver_department_id: string | null;
+  status: RiskApprovalStatus;
+  decision_date: string | null;
+  decision_comments: string | null;
+  delegated_from_id: string | null;
+  delegation_reason: string | null;
+  is_required: boolean;
+  can_be_parallel: boolean;
+  requires_all_if_parallel: boolean;
+  due_date: string | null;
+  is_overdue: boolean;
+  created_at: string;
+  updated_at: string;
+  approver?: {
+    full_name: string;
+    email: string;
+  };
+  department?: {
+    name: string;
+  };
+  delegated_from?: {
+    full_name: string;
+  };
+}
+
+export interface RiskComment {
+  id: string;
+  risk_id: string;
+  comment_text: string;
+  comment_type: RiskCommentType;
+  parent_comment_id: string | null;
+  thread_level: number;
+  author_id: string;
+  mentioned_user_ids: string[] | null;
+  tags: string[] | null;
+  attachment_urls: string[] | null;
+  is_edited: boolean;
+  edited_at: string | null;
+  is_deleted: boolean;
+  deleted_at: string | null;
+  is_pinned: boolean;
+  is_important: boolean;
+  created_at: string;
+  updated_at: string;
+  author?: {
+    full_name: string;
+    email: string;
+  };
+  replies?: RiskComment[];
+}
