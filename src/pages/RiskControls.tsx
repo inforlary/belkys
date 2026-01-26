@@ -43,10 +43,16 @@ interface Control {
 }
 
 const controlTypeLabels: Record<string, { label: string; color: string }> = {
-  'Önleyici': { label: 'Önleyici', color: 'bg-green-100 text-green-800' },
-  'Tespit Edici': { label: 'Tespit Edici', color: 'bg-blue-100 text-blue-800' },
-  'Düzeltici': { label: 'Düzeltici', color: 'bg-orange-100 text-orange-800' }
+  'PREVENTIVE': { label: 'Önleyici', color: 'bg-green-100 text-green-800' },
+  'DETECTIVE': { label: 'Tespit Edici', color: 'bg-blue-100 text-blue-800' },
+  'CORRECTIVE': { label: 'Düzeltici', color: 'bg-orange-100 text-orange-800' }
 };
+
+const controlTypeOptions = [
+  { value: 'PREVENTIVE', label: 'Önleyici' },
+  { value: 'DETECTIVE', label: 'Tespit Edici' },
+  { value: 'CORRECTIVE', label: 'Düzeltici' }
+];
 
 const frequencyOptions = ['Her işlem', 'Günlük', 'Haftalık', 'Aylık'];
 const effectivenessOptions = ['Etkili', 'Kısmen Etkili', 'Etkisiz'];
@@ -78,7 +84,7 @@ export default function RiskControls() {
     risk_id: '',
     name: '',
     description: '',
-    control_type: 'Önleyici',
+    control_type: 'PREVENTIVE',
     frequency: 'Aylık',
     responsible_department_id: '',
     responsible_person_id: '',
@@ -160,7 +166,7 @@ export default function RiskControls() {
         risk_id: control.risk_id,
         name: control.name,
         description: control.description || '',
-        control_type: control.control_type || 'Önleyici',
+        control_type: control.control_type || 'PREVENTIVE',
         frequency: control.frequency || 'Aylık',
         responsible_department_id: control.responsible_department_id || '',
         responsible_person_id: control.responsible_person_id || '',
@@ -177,7 +183,7 @@ export default function RiskControls() {
         risk_id: '',
         name: '',
         description: '',
-        control_type: 'Önleyici',
+        control_type: 'PREVENTIVE',
         frequency: 'Aylık',
         responsible_department_id: '',
         responsible_person_id: '',
@@ -304,9 +310,9 @@ export default function RiskControls() {
 
   const stats = {
     total: filteredControls.length,
-    preventive: filteredControls.filter(c => c && c.control_type === 'Önleyici').length,
-    detective: filteredControls.filter(c => c && c.control_type === 'Tespit Edici').length,
-    corrective: filteredControls.filter(c => c && c.control_type === 'Düzeltici').length,
+    preventive: filteredControls.filter(c => c && c.control_type === 'PREVENTIVE').length,
+    detective: filteredControls.filter(c => c && c.control_type === 'DETECTIVE').length,
+    corrective: filteredControls.filter(c => c && c.control_type === 'CORRECTIVE').length,
     effective: filteredControls.filter(c => c && c.effectiveness_status === 'Etkili').length
   };
 
@@ -327,7 +333,7 @@ export default function RiskControls() {
       'Risk Adı': control.risk?.name || '-',
       'Kontrol Adı': control.name,
       'Açıklama': control.description || '-',
-      'Kontrol Tipi': control.control_type,
+      'Kontrol Tipi': controlTypeLabels[control.control_type]?.label || control.control_type,
       'Uygulama Sıklığı': control.frequency,
       'Sorumlu Birim': control.department?.name || '-',
       'Sorumlu Kişi': control.responsible_person?.full_name || '-',
@@ -342,7 +348,7 @@ export default function RiskControls() {
       control.code || '-',
       control.risk?.code || '-',
       control.name,
-      control.control_type,
+      controlTypeLabels[control.control_type]?.label || control.control_type,
       control.frequency,
       control.department?.name || '-',
       control.effectiveness_status
@@ -428,21 +434,21 @@ export default function RiskControls() {
           </div>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'Önleyici' })}>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'PREVENTIVE' })}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-green-600">{stats.preventive}</div>
             <div className="text-sm text-gray-600 mt-1">Önleyici</div>
           </div>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'Tespit Edici' })}>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'DETECTIVE' })}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-blue-600">{stats.detective}</div>
             <div className="text-sm text-gray-600 mt-1">Tespit Edici</div>
           </div>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'Düzeltici' })}>
+        <Card className="cursor-pointer hover:shadow-md transition" onClick={() => setFilters({ ...filters, control_type: 'CORRECTIVE' })}>
           <div className="p-6 text-center">
             <div className="text-3xl font-bold text-orange-600">{stats.corrective}</div>
             <div className="text-sm text-gray-600 mt-1">Düzeltici</div>
@@ -585,7 +591,7 @@ export default function RiskControls() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${controlTypeLabels[control.control_type]?.color || 'bg-gray-100 text-gray-800'}`}>
-                        {control.control_type}
+                        {controlTypeLabels[control.control_type]?.label || control.control_type}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">{control.frequency}</td>
@@ -738,9 +744,9 @@ export default function RiskControls() {
                 onChange={(e) => setFormData({ ...formData, control_type: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="Önleyici">Önleyici</option>
-                <option value="Tespit Edici">Tespit Edici</option>
-                <option value="Düzeltici">Düzeltici</option>
+                {controlTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
 
