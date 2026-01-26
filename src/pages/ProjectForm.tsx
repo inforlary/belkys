@@ -58,7 +58,7 @@ export default function ProjectForm() {
   const [strategicPlans, setStrategicPlans] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<FormData>({
-    project_no: '',
+    project_no: 'AUTO',
     project_name: '',
     source: 'genel',
     responsible_unit: '',
@@ -147,8 +147,8 @@ export default function ProjectForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.project_no || !formData.project_name) {
-      alert('Proje No ve Proje Adı zorunludur');
+    if (!formData.project_name) {
+      alert('Proje Adı zorunludur');
       return;
     }
 
@@ -157,6 +157,7 @@ export default function ProjectForm() {
 
       const projectData = {
         ...formData,
+        project_no: isEditMode ? formData.project_no : 'AUTO',
         organization_id: profile?.organization_id,
         last_update_date: new Date().toISOString()
       };
@@ -229,15 +230,27 @@ export default function ProjectForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Proje No <span className="text-red-500">*</span>
+                Proje No
               </label>
-              <input
-                type="text"
-                value={formData.project_no}
-                onChange={(e) => handleChange('project_no', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={isEditMode ? formData.project_no : 'Otomatik Oluşturulacak'}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                  placeholder="Otomatik oluşturulacak"
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    Otomatik
+                  </span>
+                </div>
+              </div>
+              {!isEditMode && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Proje numarası otomatik olarak oluşturulacaktır (Format: PRJ-{formData.year}-####)
+                </p>
+              )}
             </div>
 
             <div>
@@ -272,12 +285,21 @@ export default function ProjectForm() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Sorumlu Birim
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.responsible_unit}
                 onChange={(e) => handleChange('responsible_unit', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              >
+                <option value="">Seçiniz</option>
+                {departments.map(dept => (
+                  <option key={dept.id} value={dept.name}>{dept.name}</option>
+                ))}
+              </select>
+              {departments.length === 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Henüz birim tanımlanmamış
+                </p>
+              )}
             </div>
 
             <div>
