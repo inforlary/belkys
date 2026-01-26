@@ -386,3 +386,187 @@ export interface RiskComment {
   };
   replies?: RiskComment[];
 }
+
+export type NotificationType =
+  | 'RISK_CREATED' | 'RISK_UPDATED' | 'RISK_HIGH_SCORE'
+  | 'REVIEW_DUE' | 'REVIEW_OVERDUE' | 'APPROVAL_REQUIRED'
+  | 'APPROVAL_APPROVED' | 'APPROVAL_REJECTED'
+  | 'TREATMENT_DUE' | 'TREATMENT_OVERDUE' | 'TREATMENT_COMPLETED'
+  | 'CONTROL_FAILURE' | 'INDICATOR_BREACH'
+  | 'ESCALATION' | 'SLA_WARNING' | 'SLA_BREACH'
+  | 'COMMENT_MENTION' | 'COMMENT_REPLY'
+  | 'RECOMMENDATION' | 'SYSTEM_ALERT';
+
+export type NotificationPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL';
+
+export type NotificationStatus = 'UNREAD' | 'READ' | 'ARCHIVED' | 'ACTIONED';
+
+export interface RiskNotification {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  risk_id: string | null;
+  notification_type: NotificationType;
+  title: string;
+  message: string;
+  priority: NotificationPriority;
+  requires_action: boolean;
+  action_url: string | null;
+  action_label: string | null;
+  status: NotificationStatus;
+  read_at: string | null;
+  actioned_at: string | null;
+  email_sent: boolean;
+  email_sent_at: string | null;
+  metadata: Record<string, any> | null;
+  batch_id: string | null;
+  related_notification_id: string | null;
+  created_at: string;
+  updated_at: string;
+  risk?: {
+    name: string;
+    code: string;
+  };
+}
+
+export type EscalationTriggerCondition =
+  | 'HIGH_RISK_SCORE' | 'REVIEW_OVERDUE' | 'TREATMENT_OVERDUE'
+  | 'NO_PROGRESS' | 'REPEATED_FAILURE' | 'SLA_BREACH'
+  | 'INDICATOR_THRESHOLD' | 'CONTROL_FAILURE' | 'CUSTOM';
+
+export type EscalationType =
+  | 'NOTIFY_MANAGER' | 'NOTIFY_ADMIN' | 'NOTIFY_DIRECTOR'
+  | 'CHANGE_OWNER' | 'INCREASE_PRIORITY' | 'REQUIRE_APPROVAL'
+  | 'CREATE_TASK' | 'SEND_EMAIL' | 'CUSTOM';
+
+export interface RiskEscalationRule {
+  id: string;
+  organization_id: string;
+  rule_name: string;
+  description: string | null;
+  trigger_condition: EscalationTriggerCondition;
+  threshold_value: number | null;
+  threshold_unit: string | null;
+  threshold_days: number | null;
+  applies_to_risk_levels: string[] | null;
+  applies_to_categories: string[] | null;
+  applies_to_departments: string[] | null;
+  escalation_type: EscalationType;
+  escalate_to_role: string | null;
+  escalate_to_users: string[] | null;
+  escalate_to_department_id: string | null;
+  delay_days: number;
+  repeat_enabled: boolean;
+  repeat_interval_days: number | null;
+  max_repetitions: number | null;
+  is_active: boolean;
+  times_triggered: number;
+  last_triggered_at: string | null;
+  created_by_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SLAType = 'FIRST_RESPONSE' | 'ASSESSMENT' | 'TREATMENT_PLAN' | 'REVIEW' | 'APPROVAL' | 'RESOLUTION' | 'CLOSURE';
+
+export type SLAStatus = 'IN_PROGRESS' | 'WARNING' | 'BREACHED' | 'COMPLETED' | 'CANCELLED' | 'PAUSED';
+
+export interface RiskSLATracking {
+  id: string;
+  risk_id: string;
+  sla_type: SLAType;
+  target_hours: number;
+  warning_threshold_hours: number | null;
+  started_at: string;
+  target_date: string;
+  warning_date: string | null;
+  completed_at: string | null;
+  status: SLAStatus;
+  paused_at: string | null;
+  pause_reason: string | null;
+  total_paused_hours: number;
+  actual_hours: number | null;
+  is_within_sla: boolean | null;
+  breach_hours: number | null;
+  warning_notification_sent: boolean;
+  breach_notification_sent: boolean;
+  completion_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  risk?: {
+    name: string;
+    code: string;
+  };
+}
+
+export type RecommendationType =
+  | 'TREATMENT_SUGGESTION' | 'CONTROL_SUGGESTION' | 'REVIEW_FREQUENCY'
+  | 'RISK_RESPONSE_CHANGE' | 'CATEGORY_CHANGE' | 'OWNER_CHANGE'
+  | 'SIMILAR_RISKS' | 'BEST_PRACTICE' | 'REGULATORY_COMPLIANCE'
+  | 'RESOURCE_ALLOCATION' | 'PRIORITY_CHANGE' | 'AUTOMATION';
+
+export type RecommendationStatus = 'PENDING' | 'REVIEWED' | 'ACCEPTED' | 'REJECTED' | 'IMPLEMENTED' | 'DISMISSED';
+
+export type ImplementationEffort = 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+
+export interface RiskRecommendation {
+  id: string;
+  risk_id: string;
+  recommendation_type: RecommendationType;
+  title: string;
+  description: string;
+  rationale: string | null;
+  suggested_action: string | null;
+  expected_benefit: string | null;
+  implementation_effort: ImplementationEffort | null;
+  priority: NotificationPriority;
+  confidence_score: number | null;
+  related_risks: string[] | null;
+  related_controls: string[] | null;
+  related_treatments: string[] | null;
+  status: RecommendationStatus;
+  reviewed_by_id: string | null;
+  reviewed_at: string | null;
+  review_comments: string | null;
+  implemented_at: string | null;
+  metadata: Record<string, any> | null;
+  is_system_generated: boolean;
+  generated_at: string;
+  expires_at: string | null;
+  is_expired: boolean;
+  created_at: string;
+  updated_at: string;
+  risk?: {
+    name: string;
+    code: string;
+  };
+  reviewed_by?: {
+    full_name: string;
+  };
+}
+
+export type EmailFrequency = 'IMMEDIATE' | 'HOURLY' | 'DAILY' | 'WEEKLY' | 'NEVER';
+
+export interface RiskNotificationPreferences {
+  id: string;
+  user_id: string;
+  email_enabled: boolean;
+  email_frequency: EmailFrequency;
+  email_digest_time: string;
+  notify_risk_created: boolean;
+  notify_risk_updated: boolean;
+  notify_high_risk: boolean;
+  notify_review_due: boolean;
+  notify_approval_required: boolean;
+  notify_treatment_due: boolean;
+  notify_escalation: boolean;
+  notify_sla_warning: boolean;
+  notify_mentions: boolean;
+  notify_recommendations: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string | null;
+  quiet_hours_end: string | null;
+  weekend_notifications_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
