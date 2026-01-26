@@ -717,55 +717,57 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
     });
 
     let contentHTML = `
-      <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px;">
-        <h1 style="margin: 0 0 10px 0; font-size: 28px;">Gösterge Performans Raporu</h1>
-        <h2 style="margin: 0; font-size: 20px; font-weight: normal; opacity: 0.9;">${currentYear} Yılı</h2>
-      </div>
+      <div style="page-break-inside: avoid;">
+        <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Gösterge Performans Raporu</h1>
+          <h2 style="margin: 0; font-size: 20px; font-weight: normal; opacity: 0.9;">${currentYear} Yılı</h2>
+        </div>
 
-      <div style="margin-bottom: 25px; padding: 20px; background-color: #ede9fe; border-left: 5px solid #8b5cf6; border-radius: 5px;">
-        <h3 style="margin: 0 0 15px 0; color: #5b21b6; font-size: 18px;">Stratejik Plan İstatistikleri</h3>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #6d28d9; margin-bottom: 5px;">${totalObjectives.size}</div>
-            <div style="font-size: 13px; color: #6b7280;">Toplam Amaç</div>
-          </div>
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${totalGoals.size}</div>
-            <div style="font-size: 13px; color: #6b7280;">Toplam Hedef</div>
-          </div>
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #8b5cf6; margin-bottom: 5px;">${totalIndicators}</div>
-            <div style="font-size: 13px; color: #6b7280;">Toplam Gösterge</div>
+        <div style="margin-bottom: 20px; padding: 20px; background-color: #ede9fe; border-left: 5px solid #8b5cf6; border-radius: 5px;">
+          <h3 style="margin: 0 0 15px 0; color: #5b21b6; font-size: 18px;">Stratejik Plan İstatistikleri</h3>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #6d28d9; margin-bottom: 5px;">${totalObjectives.size}</div>
+              <div style="font-size: 13px; color: #6b7280;">Toplam Amaç</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${totalGoals.size}</div>
+              <div style="font-size: 13px; color: #6b7280;">Toplam Hedef</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #8b5cf6; margin-bottom: 5px;">${totalIndicators}</div>
+              <div style="font-size: 13px; color: #6b7280;">Toplam Gösterge</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div style="margin-bottom: 30px; padding: 20px; background-color: #f0fdf4; border-left: 5px solid #10b981; border-radius: 5px;">
-        <h3 style="margin: 0 0 15px 0; color: #065f46; font-size: 18px;">Performans Özeti</h3>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #a855f7; margin-bottom: 5px;">${stats.exceedingTarget}</div>
-            <div style="font-size: 13px; color: #6b7280;">Hedef Üstü</div>
-          </div>
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #10b981; margin-bottom: 5px;">${stats.excellent}</div>
-            <div style="font-size: 13px; color: #6b7280;">Çok İyi</div>
-          </div>
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #22c55e; margin-bottom: 5px;">${stats.good}</div>
-            <div style="font-size: 13px; color: #6b7280;">İyi</div>
-          </div>
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #eab308; margin-bottom: 5px;">${stats.moderate}</div>
-            <div style="font-size: 13px; color: #6b7280;">Orta</div>
-          </div>
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #ef4444; margin-bottom: 5px;">${stats.weak}</div>
-            <div style="font-size: 13px; color: #6b7280;">Zayıf</div>
-          </div>
-          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="font-size: 32px; font-weight: bold; color: #f59e0b; margin-bottom: 5px;">${stats.veryWeak}</div>
-            <div style="font-size: 13px; color: #6b7280;">Çok Zayıf</div>
+        <div style="margin-bottom: 20px; padding: 20px; background-color: #f0fdf4; border-left: 5px solid #10b981; border-radius: 5px;">
+          <h3 style="margin: 0 0 15px 0; color: #065f46; font-size: 18px;">Performans Özeti</h3>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #a855f7; margin-bottom: 5px;">${stats.exceedingTarget}</div>
+              <div style="font-size: 13px; color: #6b7280;">Hedef Üstü</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #10b981; margin-bottom: 5px;">${stats.excellent}</div>
+              <div style="font-size: 13px; color: #6b7280;">Çok İyi</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #22c55e; margin-bottom: 5px;">${stats.good}</div>
+              <div style="font-size: 13px; color: #6b7280;">İyi</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #eab308; margin-bottom: 5px;">${stats.moderate}</div>
+              <div style="font-size: 13px; color: #6b7280;">Orta</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #ef4444; margin-bottom: 5px;">${stats.weak}</div>
+              <div style="font-size: 13px; color: #6b7280;">Zayıf</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 32px; font-weight: bold; color: #f59e0b; margin-bottom: 5px;">${stats.veryWeak}</div>
+              <div style="font-size: 13px; color: #6b7280;">Çok Zayıf</div>
+            </div>
           </div>
         </div>
       </div>
@@ -812,9 +814,12 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
           </div>
         `;
 
-        Object.entries(objData.goals).forEach(([goalId, goalData]: [string, any]) => {
+        Object.entries(objData.goals).forEach(([goalId, goalData]: [string, any], goalIndex: number) => {
+          const isFirstGoal = goalIndex === 0;
+          const pageBreakBefore = isFirstGoal ? '' : 'page-break-before: always;';
+
           contentHTML += `
-            <div style="margin-top: 12px; margin-left: 20px; page-break-inside: avoid;">
+            <div style="margin-top: 12px; margin-left: 20px; ${pageBreakBefore}">
               <h4 style="color: #059669; font-size: 14px; font-weight: 600; margin: 0 0 8px 0; padding: 6px; background-color: #f0fdf4; border-left: 3px solid #059669; display: flex; justify-content: space-between; align-items: center;">
                 <span>HEDEF: ${goalData.title}</span>
                 <span style="font-size: 11px; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px;">[${goalData.department}]</span>
