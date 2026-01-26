@@ -312,10 +312,16 @@ export default function ICActions() {
       const standardIds = new Set<string>();
       const componentIds = new Set<string>();
       const allDeptIds = new Set<string>();
+      const missingConditionIds = new Set<string>();
 
       (actionsData || []).forEach(action => {
         const standardId = action.ic_general_conditions?.standard_id;
-        if (standardId) standardIds.add(standardId);
+        if (standardId) {
+          standardIds.add(standardId);
+        } else if (action.condition_id) {
+          console.warn(`Eylem ${action.code} için ic_general_conditions bilgisi bulunamadı. condition_id: ${action.condition_id}`);
+          missingConditionIds.add(action.condition_id);
+        }
 
         [
           ...(action.related_department_ids || []),
@@ -323,6 +329,25 @@ export default function ICActions() {
           ...(action.collaborating_departments_ids || [])
         ].forEach(id => allDeptIds.add(id));
       });
+
+      let missingConditionsData: any[] = [];
+      if (missingConditionIds.size > 0) {
+        const { data: condData, error: condError } = await supabase
+          .from('ic_general_conditions')
+          .select('id, code, description, standard_id, provides_reasonable_assurance')
+          .in('id', Array.from(missingConditionIds));
+
+        if (!condError && condData) {
+          missingConditionsData = condData;
+          condData.forEach(cond => {
+            if (cond.standard_id) standardIds.add(cond.standard_id);
+          });
+        }
+      }
+
+      const missingConditionsMap = new Map(
+        missingConditionsData.map(c => [c.id, c])
+      );
 
       const [standardsData, deptsData] = await Promise.all([
         standardIds.size > 0
@@ -363,7 +388,12 @@ export default function ICActions() {
       );
 
       const enrichedActions = (actionsData || []).map((action) => {
-        const condition = action.ic_general_conditions;
+        let condition = action.ic_general_conditions;
+
+        if (!condition && action.condition_id) {
+          condition = missingConditionsMap.get(action.condition_id);
+        }
+
         const standardId = condition?.standard_id;
         const standard = standardId ? standardsMap.get(standardId) : null;
         const component = standard?.component_id ? componentsMap.get(standard.component_id) : null;
@@ -427,6 +457,39 @@ export default function ICActions() {
           .from('ic_general_conditions')
           .select('id, code, description, standard_id, provides_reasonable_assurance')
           .in('id', conditionsWithoutActions);
+
+        const newStandardIds = new Set<string>();
+        conditionsData?.forEach(cond => {
+          if (cond.standard_id && !standardsMap.has(cond.standard_id)) {
+            newStandardIds.add(cond.standard_id);
+          }
+        });
+
+        if (newStandardIds.size > 0) {
+          const { data: newStandardsData } = await supabase
+            .from('ic_standards')
+            .select('id, code, name, component_id')
+            .in('id', Array.from(newStandardIds));
+
+          newStandardsData?.forEach(std => {
+            standardsMap.set(std.id, std);
+            if (std.component_id && !componentsMap.has(std.component_id)) {
+              componentIds.add(std.component_id);
+            }
+          });
+
+          const newComponentIds = Array.from(componentIds).filter(id => !componentsMap.has(id));
+          if (newComponentIds.length > 0) {
+            const { data: newComponentsData } = await supabase
+              .from('ic_components')
+              .select('id, code, name')
+              .in('id', newComponentIds);
+
+            newComponentsData?.forEach(comp => {
+              componentsMap.set(comp.id, comp);
+            });
+          }
+        }
 
         conditionsData?.forEach(conditionData => {
           const standard = conditionData.standard_id ? standardsMap.get(conditionData.standard_id) : null;
