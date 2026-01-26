@@ -414,17 +414,29 @@ export default function VPPerformanceAnalysis2() {
     XLSX.writeFile(workbook, `VP_Performans_Analizi_${selectedYear}.xlsx`);
   };
 
+  const turkishToAscii = (text: string) => {
+    const charMap: Record<string, string> = {
+      'ç': 'c', 'Ç': 'C',
+      'ğ': 'g', 'Ğ': 'G',
+      'ı': 'i', 'İ': 'I',
+      'ö': 'o', 'Ö': 'O',
+      'ş': 's', 'Ş': 'S',
+      'ü': 'u', 'Ü': 'U'
+    };
+    return text.replace(/[çÇğĞıİöÖşŞüÜ]/g, match => charMap[match] || match);
+  };
+
   const exportToPDF = () => {
     const doc = new jsPDF('l', 'mm', 'a4');
     let yPos = 20;
 
     doc.setFontSize(18);
-    doc.text('BASKAN YARDIMCILARI PERFORMANS ANALIZI', 148, yPos, { align: 'center' });
+    doc.text(turkishToAscii('BAŞKAN YARDIMCILARI PERFORMANS ANALIZI'), 148, yPos, { align: 'center' });
 
     yPos += 10;
     doc.setFontSize(12);
-    doc.text(`Rapor Yili: ${selectedYear}`, 148, yPos, { align: 'center' });
-    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 148, yPos + 7, { align: 'center' });
+    doc.text(turkishToAscii(`Rapor Yili: ${selectedYear}`), 148, yPos, { align: 'center' });
+    doc.text(turkishToAscii(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`), 148, yPos + 7, { align: 'center' });
 
     vpPerformances.forEach((vp, vpIndex) => {
       if (vpIndex > 0) {
@@ -436,14 +448,14 @@ export default function VPPerformanceAnalysis2() {
       doc.rect(10, yPos, 277, 12, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(14);
-      doc.text(vp.vp_name, 15, yPos + 8);
+      doc.text(turkishToAscii(vp.vp_name), 15, yPos + 8);
       doc.setTextColor(0, 0, 0);
 
       yPos += 15;
       doc.setFontSize(10);
-      doc.text(`Genel Performans: %${vp.overall_performance}`, 15, yPos);
-      doc.text(`Toplam Mudurluk: ${vp.total_departments}`, 80, yPos);
-      doc.text(`Toplam Gosterge: ${vp.total_indicators}`, 150, yPos);
+      doc.text(turkishToAscii(`Genel Performans: %${vp.overall_performance}`), 15, yPos);
+      doc.text(turkishToAscii(`Toplam Mudurluk: ${vp.total_departments}`), 80, yPos);
+      doc.text(turkishToAscii(`Toplam Gosterge: ${vp.total_indicators}`), 150, yPos);
 
       yPos += 10;
 
@@ -456,7 +468,7 @@ export default function VPPerformanceAnalysis2() {
         doc.setFillColor(229, 231, 235);
         doc.rect(10, yPos, 277, 8, 'F');
         doc.setFontSize(11);
-        doc.text(`${dept.department_name} - Performans: %${dept.performance_percentage}`, 15, yPos + 5);
+        doc.text(turkishToAscii(`${dept.department_name} - Performans: %${dept.performance_percentage}`), 15, yPos + 5);
 
         yPos += 12;
 
@@ -467,29 +479,31 @@ export default function VPPerformanceAnalysis2() {
           }
 
           doc.setFontSize(10);
-          doc.text(`Hedef: ${goal.code} - ${goal.title.substring(0, 60)}`, 15, yPos);
-          doc.text(`Ilerleme: %${goal.progress}`, 220, yPos);
+          doc.text(turkishToAscii(`Hedef: ${goal.code} - ${goal.title.substring(0, 60)}`), 15, yPos);
+          doc.text(turkishToAscii(`Ilerleme: %${goal.progress}`), 220, yPos);
 
           yPos += 5;
 
           if (goal.indicators.length > 0) {
             const tableData = goal.indicators.map(ind => [
-              ind.code,
-              ind.name.substring(0, 40),
-              `${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}`,
-              ind.yearly_target ? `${ind.yearly_target.toLocaleString('tr-TR')}` : '-',
-              `${ind.current_value.toLocaleString('tr-TR')}`,
+              turkishToAscii(ind.code),
+              turkishToAscii(ind.name),
+              turkishToAscii(`${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}`),
+              ind.yearly_target ? turkishToAscii(`${ind.yearly_target.toLocaleString('tr-TR')}`) : '-',
+              turkishToAscii(`${ind.current_value.toLocaleString('tr-TR')}`),
               `%${ind.progress}`
             ]);
 
             autoTable(doc, {
               startY: yPos,
-              head: [['Kod', 'Gosterge', 'Baslangic', 'Hedef', 'Gerceklesme', 'Ilerleme']],
+              head: [[turkishToAscii('Kod'), turkishToAscii('Gosterge'), turkishToAscii('Baslangic'), turkishToAscii('Hedef'), turkishToAscii('Gerceklesme'), turkishToAscii('Ilerleme')]],
               body: tableData,
               theme: 'grid',
               styles: {
                 fontSize: 8,
-                cellPadding: 2
+                cellPadding: 2,
+                overflow: 'linebreak',
+                cellWidth: 'wrap'
               },
               headStyles: {
                 fillColor: [59, 130, 246],
@@ -501,11 +515,11 @@ export default function VPPerformanceAnalysis2() {
               },
               columnStyles: {
                 0: { cellWidth: 25 },
-                1: { cellWidth: 80 },
-                2: { cellWidth: 30, halign: 'right' },
-                3: { cellWidth: 30, halign: 'right' },
-                4: { cellWidth: 35, halign: 'right' },
-                5: { cellWidth: 25, halign: 'center' }
+                1: { cellWidth: 110, overflow: 'linebreak' },
+                2: { cellWidth: 28, halign: 'right' },
+                3: { cellWidth: 28, halign: 'right' },
+                4: { cellWidth: 32, halign: 'right' },
+                5: { cellWidth: 22, halign: 'center' }
               },
               margin: { left: 15, right: 15 }
             });
