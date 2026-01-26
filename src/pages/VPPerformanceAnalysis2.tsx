@@ -47,12 +47,23 @@ interface IndicatorDetail {
   current_value: number;
 }
 
+interface GoalDetail {
+  id: string;
+  code: string;
+  title: string;
+  objective_code: string;
+  objective_title: string;
+  progress: number;
+  indicators: IndicatorDetail[];
+}
+
 interface DepartmentPerformance {
   department_id: string;
   department_name: string;
   total_indicators: number;
+  total_goals: number;
   performance_percentage: number;
-  indicators: IndicatorDetail[];
+  goals: GoalDetail[];
 }
 
 interface VPPerformance {
@@ -179,8 +190,9 @@ export default function VPPerformanceAnalysis2() {
         department_id: dept.id,
         department_name: dept.name,
         total_indicators: 0,
+        total_goals: 0,
         performance_percentage: 0,
-        indicators: []
+        goals: []
       };
     }
 
@@ -198,8 +210,17 @@ export default function VPPerformanceAnalysis2() {
         department_id: dept.id,
         department_name: dept.name,
         total_indicators: 0,
+        total_goals: goals.length,
         performance_percentage: 0,
-        indicators: []
+        goals: goals.map(goal => ({
+          id: goal.id,
+          code: goal.code,
+          title: goal.title,
+          objective_code: (goal as any).objectives?.code || '',
+          objective_title: (goal as any).objectives?.title || '',
+          progress: 0,
+          indicators: []
+        }))
       };
     }
 
@@ -228,7 +249,7 @@ export default function VPPerformanceAnalysis2() {
     });
 
     let totalGoalProgress = 0;
-    const enrichedIndicators: IndicatorDetail[] = [];
+    const enrichedGoals: GoalDetail[] = [];
 
     for (const goal of goals) {
       const goalIndicators = indicators.filter(i => i.goal_id === goal.id);
@@ -251,6 +272,8 @@ export default function VPPerformanceAnalysis2() {
       );
 
       totalGoalProgress += goalProgress;
+
+      const enrichedIndicators: IndicatorDetail[] = [];
 
       for (const ind of goalIndicatorsWithTargets) {
         const progress = calculateIndicatorProgress(ind, entries);
@@ -278,6 +301,18 @@ export default function VPPerformanceAnalysis2() {
           current_value: currentValue
         });
       }
+
+      enrichedGoals.push({
+        id: goal.id,
+        code: goal.code,
+        title: goal.title,
+        objective_code: (goal as any).objectives?.code || '',
+        objective_title: (goal as any).objectives?.title || '',
+        progress: goalProgress,
+        indicators: enrichedIndicators.sort((a, b) =>
+          a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
+        )
+      });
     }
 
     const performancePercentage = goals.length > 0
@@ -287,9 +322,10 @@ export default function VPPerformanceAnalysis2() {
     return {
       department_id: dept.id,
       department_name: dept.name,
-      total_indicators: enrichedIndicators.length,
+      total_indicators: indicators.length,
+      total_goals: goals.length,
       performance_percentage: performancePercentage,
-      indicators: enrichedIndicators.sort((a, b) =>
+      goals: enrichedGoals.sort((a, b) =>
         a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
       )
     };
@@ -328,22 +364,27 @@ export default function VPPerformanceAnalysis2() {
       sheetData.push([]);
 
       vp.departments.forEach(dept => {
-        sheetData.push([`Müdürlük: ${dept.department_name}`, `Performans: %${dept.performance_percentage}`]);
+        sheetData.push([`Müdürlük: ${dept.department_name}`, `Performans: %${dept.performance_percentage}`, `Toplam Hedef: ${dept.total_goals}`]);
         sheetData.push([]);
 
-        sheetData.push(['Amaç Kodu', 'Hedef Kodu', 'Gösterge Kodu', 'Gösterge Adı', 'Başlangıç', 'Hedef', 'Gerçekleşme', 'İlerleme %']);
+        dept.goals.forEach(goal => {
+          sheetData.push([`Hedef: ${goal.code} - ${goal.title}`, `Hedef İlerleme: %${goal.progress}`]);
+          sheetData.push(['Amaç Kodu', 'Hedef Kodu', 'Gösterge Kodu', 'Gösterge Adı', 'Başlangıç', 'Hedef', 'Gerçekleşme', 'İlerleme %']);
 
-        dept.indicators.forEach(ind => {
-          sheetData.push([
-            ind.objective_code,
-            ind.goal_code,
-            ind.code,
-            ind.name,
-            ind.yearly_baseline || 0,
-            ind.yearly_target || '-',
-            ind.current_value,
-            ind.progress
-          ]);
+          goal.indicators.forEach(ind => {
+            sheetData.push([
+              ind.objective_code,
+              ind.goal_code,
+              ind.code,
+              ind.name,
+              ind.yearly_baseline || 0,
+              ind.yearly_target || '-',
+              ind.current_value,
+              ind.progress
+            ]);
+          });
+
+          sheetData.push([]);
         });
 
         sheetData.push([]);
@@ -486,7 +527,9 @@ export default function VPPerformanceAnalysis2() {
                                   <Building2 className="w-5 h-5 text-gray-600" />
                                   <div>
                                     <h3 className="font-semibold text-gray-900">{dept.department_name}</h3>
-                                    <p className="text-sm text-gray-600">{dept.total_indicators} gösterge</p>
+                                    <p className="text-sm text-gray-600">
+                                      {dept.total_goals} hedef • {dept.total_indicators} gösterge
+                                    </p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-4">
@@ -517,61 +560,106 @@ export default function VPPerformanceAnalysis2() {
                             </div>
 
                             {isDeptExpanded && (
-                              <div className="mt-4">
-                                <div className="bg-white rounded-lg p-4 border-2 border-blue-200">
-                                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                    <Target className="w-5 h-5 text-blue-600" />
-                                    Amaç ve Hedef Bazında Gösterge İlerlemesi
-                                  </h4>
-                                  <div className="overflow-x-auto">
-                                    <table className="min-w-full">
-                                      <thead>
-                                        <tr className="bg-gray-100">
-                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Amaç</th>
-                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Hedef</th>
-                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Kodu</th>
-                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Adı</th>
-                                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Başlangıç</th>
-                                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Hedef Değer</th>
-                                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Gerçekleşme</th>
-                                          <th className="px-3 py-2 text-center text-xs font-medium text-gray-700">İlerleme</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {dept.indicators.map(ind => (
-                                          <tr key={ind.id} className="border-t hover:bg-gray-50">
-                                            <td className="px-3 py-2 text-sm text-gray-600">{ind.objective_code}</td>
-                                            <td className="px-3 py-2 text-sm text-gray-600">{ind.goal_code}</td>
-                                            <td className="px-3 py-2 text-sm font-medium text-gray-900">{ind.code}</td>
-                                            <td className="px-3 py-2 text-sm text-gray-900">{ind.name}</td>
-                                            <td className="px-3 py-2 text-sm text-right text-gray-600">
-                                              {ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}
-                                            </td>
-                                            <td className="px-3 py-2 text-sm text-right text-gray-700">
-                                              {ind.yearly_target?.toLocaleString('tr-TR') || '-'}
-                                            </td>
-                                            <td className="px-3 py-2 text-sm text-right text-gray-700">
-                                              {ind.current_value.toLocaleString('tr-TR')}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                              <div className="flex items-center gap-2">
-                                                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                                  <div
-                                                    className={`h-2 rounded-full ${getProgressColor(ind.progress)}`}
-                                                    style={{ width: `${Math.min(100, ind.progress)}%` }}
-                                                  ></div>
-                                                </div>
-                                                <span className={`text-sm font-medium ${getProgressTextColor(ind.progress)}`}>
-                                                  %{ind.progress}
-                                                </span>
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
+                              <div className="mt-4 space-y-3">
+                                {dept.goals.map(goal => {
+                                  const goalGrade = getPerformanceGrade(goal.progress);
+
+                                  return (
+                                    <div key={goal.id} className="bg-white rounded-lg p-4 border-2 border-blue-200">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                          <Target className="w-5 h-5 text-blue-600" />
+                                          <div>
+                                            <h4 className="font-semibold text-gray-900">
+                                              {goal.code} - {goal.title}
+                                            </h4>
+                                            <p className="text-xs text-gray-600">
+                                              Amaç: {goal.objective_code} - {goal.objective_title}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className={`text-xl font-bold ${goalGrade.color}`}>
+                                            %{goal.progress}
+                                          </p>
+                                          <span className={`text-xs px-2 py-1 rounded-full ${goalGrade.bgColor} ${goalGrade.color}`}>
+                                            {goalGrade.grade}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="mb-2">
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                          <div
+                                            className={`h-2 rounded-full ${getProgressColor(goal.progress)}`}
+                                            style={{ width: `${Math.min(100, goal.progress)}%` }}
+                                          ></div>
+                                        </div>
+                                      </div>
+
+                                      {goal.indicators.length > 0 && (
+                                        <div className="overflow-x-auto mt-3">
+                                          <table className="min-w-full">
+                                            <thead>
+                                              <tr className="bg-gray-100">
+                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Kodu</th>
+                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Gösterge Adı</th>
+                                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Başlangıç</th>
+                                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Hedef Değer</th>
+                                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Gerçekleşme</th>
+                                                <th className="px-3 py-2 text-center text-xs font-medium text-gray-700">İlerleme</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {goal.indicators.map(ind => (
+                                                <tr key={ind.id} className="border-t hover:bg-gray-50">
+                                                  <td className="px-3 py-2 text-sm font-medium text-gray-900">{ind.code}</td>
+                                                  <td className="px-3 py-2 text-sm text-gray-900">{ind.name}</td>
+                                                  <td className="px-3 py-2 text-sm text-right text-gray-600">
+                                                    {ind.yearly_baseline?.toLocaleString('tr-TR') || '0'} {ind.unit}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-sm text-right text-gray-700">
+                                                    {ind.yearly_target?.toLocaleString('tr-TR') || '-'} {ind.unit}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-sm text-right text-gray-700">
+                                                    {ind.current_value.toLocaleString('tr-TR')} {ind.unit}
+                                                  </td>
+                                                  <td className="px-3 py-2">
+                                                    <div className="flex items-center gap-2">
+                                                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                        <div
+                                                          className={`h-2 rounded-full ${getProgressColor(ind.progress)}`}
+                                                          style={{ width: `${Math.min(100, ind.progress)}%` }}
+                                                        ></div>
+                                                      </div>
+                                                      <span className={`text-sm font-medium ${getProgressTextColor(ind.progress)}`}>
+                                                        %{ind.progress}
+                                                      </span>
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+
+                                      {goal.indicators.length === 0 && (
+                                        <div className="text-center py-4 text-sm text-gray-500">
+                                          Bu hedef için gösterge tanımlanmamış
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+
+                                {dept.goals.length === 0 && (
+                                  <div className="bg-white rounded-lg p-4 border-2 border-gray-200">
+                                    <div className="text-center py-4 text-sm text-gray-500">
+                                      Bu müdürlük için hedef tanımlanmamış
+                                    </div>
                                   </div>
-                                </div>
+                                )}
                               </div>
                             )}
                           </div>
