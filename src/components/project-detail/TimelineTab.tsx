@@ -15,8 +15,8 @@ interface Project {
 interface ProgressRecord {
   id: string;
   record_date: string;
-  physical_progress: number;
-  financial_progress: number;
+  new_physical: number;
+  new_financial: number;
   expense_amount: number;
   description: string;
   photo_count?: number;
@@ -100,7 +100,7 @@ export default function TimelineTab({ project }: { project: Project }) {
     },
     ...progressRecords.map(record => ({
       date: record.record_date,
-      title: record.description || `İlerleme Kaydı ${record.physical_progress}%`,
+      title: record.description || `İlerleme Kaydı ${record.new_physical}%`,
       completed: true,
       progressRecord: record
     })),
@@ -117,8 +117,8 @@ export default function TimelineTab({ project }: { project: Project }) {
 
   const chartData = progressRecords.map(record => ({
     date: formatDate(record.record_date),
-    fiziki: record.physical_progress,
-    nakdi: record.financial_progress
+    fiziki: record.new_physical,
+    nakdi: record.new_financial
   }));
 
   function formatDate(dateStr: string) {
@@ -369,11 +369,11 @@ export default function TimelineTab({ project }: { project: Project }) {
                       <div className="flex items-center gap-4 text-gray-600">
                         <div>
                           <span className="text-xs text-gray-500">Fiziki:</span>
-                          <span className="ml-1 font-semibold">%{milestone.progressRecord.physical_progress}</span>
+                          <span className="ml-1 font-semibold">%{milestone.progressRecord.new_physical}</span>
                         </div>
                         <div>
                           <span className="text-xs text-gray-500">Nakdi:</span>
-                          <span className="ml-1 font-semibold">%{milestone.progressRecord.financial_progress}</span>
+                          <span className="ml-1 font-semibold">%{milestone.progressRecord.new_financial}</span>
                         </div>
                       </div>
                     </div>

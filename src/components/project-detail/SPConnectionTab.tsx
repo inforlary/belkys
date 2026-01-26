@@ -296,7 +296,6 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
 
       {showModal && (
         <Modal
-          isOpen={showModal}
           onClose={() => setShowModal(false)}
           title="Stratejik Plan Bağlantısı"
         >
