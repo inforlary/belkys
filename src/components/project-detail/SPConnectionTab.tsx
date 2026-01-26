@@ -14,13 +14,13 @@ interface Project {
 interface Objective {
   id: string;
   code: string;
-  name: string;
+  title: string;
 }
 
 interface Goal {
   id: string;
   code: string;
-  name: string;
+  title: string;
   objective_id: string;
 }
 
@@ -77,7 +77,7 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
     try {
       const { data, error } = await supabase
         .from('objectives')
-        .select('id, code, name')
+        .select('id, code, title')
         .eq('organization_id', profile?.organization_id)
         .order('code');
 
@@ -92,7 +92,7 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
     try {
       const { data, error } = await supabase
         .from('goals')
-        .select('id, code, name, objective_id')
+        .select('id, code, title, objective_id')
         .eq('objective_id', objectiveId)
         .order('code');
 
@@ -127,8 +127,8 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
           related_objective_id,
           related_goal_id,
           related_indicator_id,
-          objective:objectives!related_objective_id(id, code, name),
-          goal:goals!related_goal_id(id, code, name),
+          objective:objectives!related_objective_id(id, code, title),
+          goal:goals!related_goal_id(id, code, title),
           indicator:indicators!related_indicator_id(id, code, name)
         `)
         .eq('id', project.id)
@@ -238,7 +238,7 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
                     <div className="text-sm">
                       <span className="font-medium text-gray-700">Amaç:</span>
                       <span className="ml-2 text-gray-900">
-                        {currentConnection.objective.code} - {currentConnection.objective.name}
+                        {currentConnection.objective.code} - {currentConnection.objective.title}
                       </span>
                     </div>
                   )}
@@ -246,7 +246,7 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
                     <div className="text-sm">
                       <span className="font-medium text-gray-700">Hedef:</span>
                       <span className="ml-2 text-gray-900">
-                        {currentConnection.goal.code} - {currentConnection.goal.name}
+                        {currentConnection.goal.code} - {currentConnection.goal.title}
                       </span>
                     </div>
                   )}
@@ -312,7 +312,7 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
                 <option value="">Amaç seçin...</option>
                 {objectives.map((obj) => (
                   <option key={obj.id} value={obj.id}>
-                    {obj.code} - {obj.name}
+                    {obj.code} - {obj.title}
                   </option>
                 ))}
               </select>
@@ -331,7 +331,7 @@ export default function SPConnectionTab({ project, onUpdate }: SPConnectionTabPr
                 <option value="">Hedef seçin...</option>
                 {goals.map((goal) => (
                   <option key={goal.id} value={goal.id}>
-                    {goal.code} - {goal.name}
+                    {goal.code} - {goal.title}
                   </option>
                 ))}
               </select>
