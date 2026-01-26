@@ -29,7 +29,7 @@ interface Treatment {
   organization_id: string;
   code: string;
   risk_id: string;
-  name: string;
+  title: string;
   description: string;
   resources_required: string;
   actual_cost: number;
@@ -80,7 +80,7 @@ export default function RiskTreatments() {
   const [formData, setFormData] = useState({
     code: '',
     risk_id: '',
-    name: '',
+    title: '',
     description: '',
     resources_required: 'Bütçe',
     actual_cost: 0,
@@ -166,7 +166,7 @@ export default function RiskTreatments() {
       setFormData({
         code: treatment.code || '',
         risk_id: treatment.risk_id,
-        name: treatment.name,
+        title: treatment.title,
         description: treatment.description || '',
         resources_required: treatment.resources_required || 'Bütçe',
         actual_cost: treatment.actual_cost || 0,
@@ -187,7 +187,7 @@ export default function RiskTreatments() {
       setFormData({
         code: '',
         risk_id: '',
-        name: '',
+        title: '',
         description: '',
         resources_required: 'Bütçe',
         actual_cost: 0,
@@ -239,7 +239,7 @@ export default function RiskTreatments() {
       return;
     }
 
-    if (!formData.name?.trim()) {
+    if (!formData.title?.trim()) {
       alert('Lütfen eylem adını girin');
       return;
     }
@@ -258,7 +258,7 @@ export default function RiskTreatments() {
       const treatmentData = {
         organization_id: profile?.organization_id,
         risk_id: formData.risk_id,
-        name: formData.name.trim(),
+        title: formData.title.trim(),
         description: formData.description?.trim() || null,
         resources_required: formData.resources_required,
         actual_cost: formData.actual_cost || 0,
@@ -296,7 +296,7 @@ export default function RiskTreatments() {
   }
 
   async function handleDelete(treatment: Treatment) {
-    if (!confirm(`${treatment.name} eylemini silmek istediğinize emin misiniz?`)) return;
+    if (!confirm(`${treatment.title} eylemini silmek istediğinize emin misiniz?`)) return;
 
     try {
       const { error } = await supabase
@@ -326,7 +326,7 @@ export default function RiskTreatments() {
     if (filters.department_id && t.responsible_department_id !== filters.department_id) return false;
     if (filters.search) {
       const search = filters.search.toLowerCase();
-      return t.name?.toLowerCase().includes(search) ||
+      return t.title?.toLowerCase().includes(search) ||
              t.description?.toLowerCase().includes(search) ||
              t.code?.toLowerCase().includes(search);
     }
@@ -355,7 +355,7 @@ export default function RiskTreatments() {
       'Eylem Numarası': treatment.code || '-',
       'Risk Kodu': treatment.risk?.code || '-',
       'Risk Adı': treatment.risk?.name || '-',
-      'Eylem Adı': treatment.name,
+      'Eylem Adı': treatment.title,
       'Açıklama': treatment.description || '-',
       'Gerekli Kaynak': treatment.resources_required,
       'Tahmini Maliyet': treatment.actual_cost,
@@ -374,7 +374,7 @@ export default function RiskTreatments() {
     const rows = filteredTreatments.map(treatment => [
       treatment.code || '-',
       treatment.risk?.code || '-',
-      treatment.name,
+      treatment.title,
       treatment.resources_required,
       treatment.status,
       `${treatment.progress_percentage}%`,
@@ -600,7 +600,7 @@ export default function RiskTreatments() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{treatment.name}</div>
+                        <div className="font-medium text-gray-900">{treatment.title}</div>
                         {treatment.description && (
                           <div className="text-xs text-gray-500 mt-1 line-clamp-1">{treatment.description}</div>
                         )}
@@ -754,8 +754,8 @@ export default function RiskTreatments() {
             </label>
             <input
               type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             />
