@@ -320,10 +320,6 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
       <h2>Genel Performans Özeti</h2>
       <div class="stats-grid">
         <div class="stat-box">
-          <div class="stat-value">${Math.round(overallProgress)}%</div>
-          <div class="stat-label">Kurum Ortalama İlerleme</div>
-        </div>
-        <div class="stat-box">
           <div class="stat-value">${sortedDepartments.length}</div>
           <div class="stat-label">Toplam Birim</div>
         </div>
@@ -335,13 +331,13 @@ export default function PerformanceDashboard({ selectedYear }: PerformanceDashbo
           <div class="stat-value" style="color: #3b82f6;">${overallStats.excellent}</div>
           <div class="stat-label">Toplam Mükemmel</div>
         </div>
-      </div>
-
-      <div class="stats-grid" style="margin-top: 10px;">
         <div class="stat-box" style="border-left: 4px solid #22c55e;">
           <div class="stat-value" style="color: #22c55e;">${overallStats.good}</div>
           <div class="stat-label">Toplam İyi</div>
         </div>
+      </div>
+
+      <div class="stats-grid" style="margin-top: 10px;">
         <div class="stat-box" style="border-left: 4px solid #eab308;">
           <div class="stat-value" style="color: #ca8a04;">${overallStats.moderate}</div>
           <div class="stat-label">Toplam Orta</div>
