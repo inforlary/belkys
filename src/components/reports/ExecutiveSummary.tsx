@@ -484,89 +484,89 @@ export default function ExecutiveSummary({ selectedYear }: ExecutiveSummaryProps
     ]);
 
     const content = `
-      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 30px; border-radius: 8px; margin-bottom: 25px;">
-        <h1 style="margin: 0 0 10px 0; font-size: 28px;">Yönetici Özet Raporu</h1>
-        <p style="margin: 0; font-size: 16px; opacity: 0.9;">Kurum Genel Durumu - ${currentYear}</p>
-        <div style="margin-top: 20px; font-size: 48px; font-weight: bold;">${Math.round(data.overall_progress)}%</div>
-        <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Genel İlerleme Oranı</p>
+      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 18px 24px; border-radius: 6px; margin-bottom: 15px;">
+        <h1 style="margin: 0 0 6px 0; font-size: 22px; font-weight: 700;">Yönetici Özet Raporu</h1>
+        <p style="margin: 0; font-size: 13px; opacity: 0.9;">Kurum Genel Durumu - ${currentYear}</p>
+        <div style="margin-top: 12px; font-size: 38px; font-weight: bold; line-height: 1;">${Math.round(data.overall_progress)}%</div>
+        <p style="margin: 3px 0 0 0; font-size: 12px; opacity: 0.9;">Genel İlerleme Oranı</p>
       </div>
 
-      <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Gösterge Durumu</h2>
+      <h2 style="color: #1e40af; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin: 15px 0 10px 0; font-size: 16px;">Gösterge Durumu</h2>
       <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-value">${data.total_indicators}</div>
-          <div class="stat-label">Toplam Gösterge</div>
+        <div class="stat-box" style="padding: 12px;">
+          <div class="stat-value" style="font-size: 26px;">${data.total_indicators}</div>
+          <div class="stat-label" style="font-size: 11px;">Toplam Gösterge</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #9333ea;">
-          <div class="stat-value" style="color: #9333ea;">${data.exceedingTarget}</div>
-          <div class="stat-label">Hedef Üstü</div>
+        <div class="stat-box" style="border-left: 4px solid #9333ea; padding: 12px;">
+          <div class="stat-value" style="color: #9333ea; font-size: 26px;">${data.exceedingTarget}</div>
+          <div class="stat-label" style="font-size: 11px;">Hedef Üstü</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #10b981;">
-          <div class="stat-value" style="color: #10b981;">${data.excellent}</div>
-          <div class="stat-label">Çok İyi</div>
+        <div class="stat-box" style="border-left: 4px solid #10b981; padding: 12px;">
+          <div class="stat-value" style="color: #10b981; font-size: 26px;">${data.excellent}</div>
+          <div class="stat-label" style="font-size: 11px;">Çok İyi</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #22c55e;">
-          <div class="stat-value" style="color: #22c55e;">${data.good}</div>
-          <div class="stat-label">İyi</div>
-        </div>
-      </div>
-
-      <div class="stats-grid" style="margin-top: 10px;">
-        <div class="stat-box" style="border-left: 4px solid #eab308;">
-          <div class="stat-value" style="color: #ca8a04;">${data.moderate}</div>
-          <div class="stat-label">Orta</div>
-        </div>
-        <div class="stat-box" style="border-left: 4px solid #f97316;">
-          <div class="stat-value" style="color: #f97316;">${data.weak}</div>
-          <div class="stat-label">Zayıf</div>
-        </div>
-        <div class="stat-box" style="border-left: 4px solid #dc2626;">
-          <div class="stat-value" style="color: #dc2626;">${data.veryWeak}</div>
-          <div class="stat-label">Çok Zayıf</div>
+        <div class="stat-box" style="border-left: 4px solid #22c55e; padding: 12px;">
+          <div class="stat-value" style="color: #22c55e; font-size: 26px;">${data.good}</div>
+          <div class="stat-label" style="font-size: 11px;">İyi</div>
         </div>
       </div>
 
-      <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Operasyonel Metrikler</h2>
+      <div class="stats-grid" style="margin-top: 8px;">
+        <div class="stat-box" style="border-left: 4px solid #eab308; padding: 12px;">
+          <div class="stat-value" style="color: #ca8a04; font-size: 26px;">${data.moderate}</div>
+          <div class="stat-label" style="font-size: 11px;">Orta</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #f97316; padding: 12px;">
+          <div class="stat-value" style="color: #f97316; font-size: 26px;">${data.weak}</div>
+          <div class="stat-label" style="font-size: 11px;">Zayıf</div>
+        </div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626; padding: 12px;">
+          <div class="stat-value" style="color: #dc2626; font-size: 26px;">${data.veryWeak}</div>
+          <div class="stat-label" style="font-size: 11px;">Çok Zayıf</div>
+        </div>
+      </div>
+
+      <h2 style="color: #1e40af; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin: 15px 0 10px 0; font-size: 16px;">Operasyonel Metrikler</h2>
       <div class="stats-grid">
-        <div class="stat-box" style="border-left: 4px solid ${data.data_completion >= 75 ? '#10b981' : '#eab308'};">
-          <div class="stat-value" style="color: ${data.data_completion >= 75 ? '#10b981' : '#ca8a04'};">${Math.round(data.data_completion)}%</div>
-          <div class="stat-label">Veri Giriş Oranı</div>
+        <div class="stat-box" style="border-left: 4px solid ${data.data_completion >= 75 ? '#10b981' : '#eab308'}; padding: 12px;">
+          <div class="stat-value" style="color: ${data.data_completion >= 75 ? '#10b981' : '#ca8a04'}; font-size: 26px;">${Math.round(data.data_completion)}%</div>
+          <div class="stat-label" style="font-size: 11px;">Veri Giriş Oranı</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #eab308;">
-          <div class="stat-value" style="color: #ca8a04;">${data.pending_approvals}</div>
-          <div class="stat-label">Bekleyen Onay</div>
+        <div class="stat-box" style="border-left: 4px solid #eab308; padding: 12px;">
+          <div class="stat-value" style="color: #ca8a04; font-size: 26px;">${data.pending_approvals}</div>
+          <div class="stat-label" style="font-size: 11px;">Bekleyen Onay</div>
         </div>
-        <div class="stat-box" style="border-left: 4px solid #dc2626;">
-          <div class="stat-value" style="color: #dc2626;">${data.overdue_activities}</div>
-          <div class="stat-label">Gecikmiş Faaliyet</div>
+        <div class="stat-box" style="border-left: 4px solid #dc2626; padding: 12px;">
+          <div class="stat-value" style="color: #dc2626; font-size: 26px;">${data.overdue_activities}</div>
+          <div class="stat-label" style="font-size: 11px;">Gecikmiş Faaliyet</div>
         </div>
       </div>
 
       ${data.strategic_plans.length > 0 ? `
-        <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Stratejik Planlar</h2>
+        <h2 style="color: #1e40af; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin: 18px 0 10px 0; font-size: 16px;">Stratejik Planlar</h2>
         ${generateTableHTML(plansHeaders, plansRows)}
       ` : ''}
 
       ${data.top_performers.length > 0 ? `
-        <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Hedef Sapması Gösteren Göstergeler</h2>
-        <p style="margin-bottom: 15px; color: #64748b; font-size: 14px;">Hedefin üzerinde performans gösteren göstergeler</p>
+        <h2 style="color: #1e40af; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin: 18px 0 8px 0; font-size: 16px;">Hedef Sapması Gösteren Göstergeler</h2>
+        <p style="margin-bottom: 10px; color: #64748b; font-size: 12px;">Hedefin üzerinde performans gösteren göstergeler</p>
         ${generateTableHTML(topPerformersHeaders, topPerformersRows)}
       ` : ''}
 
       ${data.concerns.length > 0 ? `
-        <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Geride Kalan Göstergeler</h2>
-        <p style="margin-bottom: 15px; color: #64748b; font-size: 14px;">Hedefin gerisinde kalan ve dikkat gerektiren göstergeler</p>
+        <h2 style="color: #1e40af; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin: 18px 0 8px 0; font-size: 16px;">Geride Kalan Göstergeler</h2>
+        <p style="margin-bottom: 10px; color: #64748b; font-size: 12px;">Hedefin gerisinde kalan ve dikkat gerektiren göstergeler</p>
         ${generateTableHTML(concernsHeaders, concernsRows)}
       ` : ''}
 
-      <h2 style="color: #1e40af; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-top: 25px;">Öneriler ve Dikkat Noktaları</h2>
+      <h2 style="color: #1e40af; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin: 18px 0 10px 0; font-size: 16px;">Öneriler ve Dikkat Noktaları</h2>
       ${generateTableHTML(recommendationsHeaders, recommendationsRows)}
 
-      <div style="margin-top: 30px; padding: 20px; background: #f1f5f9; border-radius: 8px; border-left: 4px solid #2563eb;">
-        <p style="margin: 0; color: #475569; font-size: 12px;">
+      <div style="margin-top: 18px; padding: 12px 16px; background: #f1f5f9; border-radius: 6px; border-left: 3px solid #2563eb;">
+        <p style="margin: 0; color: #475569; font-size: 11px;">
           <strong>Rapor Tarihi:</strong> ${new Date().toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
         </p>
-        <p style="margin: 5px 0 0 0; color: #475569; font-size: 12px;">
+        <p style="margin: 4px 0 0 0; color: #475569; font-size: 11px;">
           <strong>Rapor Dönemi:</strong> ${currentYear} Yılı
         </p>
       </div>

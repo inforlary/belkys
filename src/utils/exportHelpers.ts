@@ -108,15 +108,15 @@ export function exportToPDF(title: string, content: string, filename?: string) {
       <style>
         @page {
           size: A4 landscape;
-          margin: 1.5cm;
+          margin: 1cm;
         }
         body {
           font-family: 'Arial', sans-serif;
           font-size: 10pt;
-          line-height: 1.4;
+          line-height: 1.35;
           color: #333;
           margin: 0;
-          padding: 20px;
+          padding: 15px;
         }
         h1 {
           color: #2563eb;
@@ -127,25 +127,25 @@ export function exportToPDF(title: string, content: string, filename?: string) {
         }
         h2 {
           color: #1e40af;
-          margin-top: 20px;
-          margin-bottom: 10px;
-          font-size: 14pt;
+          margin-top: 15px;
+          margin-bottom: 8px;
+          font-size: 13pt;
         }
         h3 {
           color: #475569;
-          margin-top: 15px;
-          margin-bottom: 8px;
-          font-size: 12pt;
+          margin-top: 12px;
+          margin-bottom: 6px;
+          font-size: 11pt;
         }
         table {
           width: 100%;
           border-collapse: collapse;
-          margin: 15px 0;
-          font-size: 9pt;
+          margin: 10px 0;
+          font-size: 8.5pt;
         }
         th, td {
           border: 1px solid #cbd5e1;
-          padding: 6px 8px;
+          padding: 5px 7px;
           text-align: left;
         }
         th {
@@ -160,25 +160,25 @@ export function exportToPDF(title: string, content: string, filename?: string) {
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-          margin: 15px 0;
+          gap: 8px;
+          margin: 10px 0;
         }
         .stat-box {
           border: 1px solid #e2e8f0;
           border-radius: 6px;
-          padding: 10px;
+          padding: 12px;
           text-align: center;
           background: #f8fafc;
         }
         .stat-value {
-          font-size: 18pt;
+          font-size: 20pt;
           font-weight: bold;
           color: #1e40af;
         }
         .stat-label {
-          font-size: 9pt;
+          font-size: 8.5pt;
           color: #64748b;
-          margin-top: 5px;
+          margin-top: 4px;
         }
         .footer {
           margin-top: 30px;
