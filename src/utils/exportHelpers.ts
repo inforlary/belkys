@@ -108,51 +108,51 @@ export function exportToPDF(title: string, content: string, filename?: string) {
       <style>
         @page {
           size: A4 landscape;
-          margin: 1cm;
+          margin: 0.8cm;
         }
         body {
           font-family: 'Arial', sans-serif;
-          font-size: 10pt;
-          line-height: 1.35;
+          font-size: 8.5pt;
+          line-height: 1.25;
           color: #333;
           margin: 0;
-          padding: 15px;
+          padding: 12px;
         }
         h1 {
           color: #2563eb;
-          border-bottom: 3px solid #2563eb;
-          padding-bottom: 10px;
-          margin-bottom: 20px;
-          font-size: 20pt;
+          border-bottom: 2px solid #2563eb;
+          padding-bottom: 8px;
+          margin-bottom: 15px;
+          font-size: 18pt;
         }
         h2 {
           color: #1e40af;
-          margin-top: 15px;
-          margin-bottom: 8px;
-          font-size: 13pt;
-        }
-        h3 {
-          color: #475569;
           margin-top: 12px;
           margin-bottom: 6px;
           font-size: 11pt;
         }
+        h3 {
+          color: #475569;
+          margin-top: 10px;
+          margin-bottom: 5px;
+          font-size: 9.5pt;
+        }
         table {
           width: 100%;
           border-collapse: collapse;
-          margin: 10px 0;
-          font-size: 8.5pt;
+          margin: 8px 0;
+          font-size: 7.5pt;
         }
         th, td {
           border: 1px solid #cbd5e1;
-          padding: 5px 7px;
+          padding: 4px 6px;
           text-align: left;
         }
         th {
           background-color: #2563eb;
           color: white;
           font-weight: bold;
-          font-size: 9pt;
+          font-size: 8pt;
         }
         tr:nth-child(even) {
           background-color: #f8fafc;
@@ -160,25 +160,25 @@ export function exportToPDF(title: string, content: string, filename?: string) {
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 8px;
-          margin: 10px 0;
+          gap: 6px;
+          margin: 8px 0;
         }
         .stat-box {
           border: 1px solid #e2e8f0;
-          border-radius: 6px;
-          padding: 12px;
+          border-radius: 4px;
+          padding: 10px;
           text-align: center;
           background: #f8fafc;
         }
         .stat-value {
-          font-size: 20pt;
+          font-size: 18pt;
           font-weight: bold;
           color: #1e40af;
         }
         .stat-label {
-          font-size: 8.5pt;
+          font-size: 7.5pt;
           color: #64748b;
-          margin-top: 4px;
+          margin-top: 3px;
         }
         .footer {
           margin-top: 30px;
