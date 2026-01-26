@@ -416,6 +416,22 @@ export default function VPPerformanceAnalysis2() {
     XLSX.writeFile(workbook, `VP_Performans_Analizi_${selectedYear}.xlsx`);
   };
 
+  const getProgressColorRGB = (progress: number): [number, number, number] => {
+    if (progress >= 90) return [34, 197, 94];
+    if (progress >= 75) return [59, 130, 246];
+    if (progress >= 60) return [234, 179, 8];
+    if (progress >= 40) return [249, 115, 22];
+    return [239, 68, 68];
+  };
+
+  const getProgressTextColorRGB = (progress: number): [number, number, number] => {
+    if (progress >= 90) return [22, 163, 74];
+    if (progress >= 75) return [37, 99, 235];
+    if (progress >= 60) return [161, 98, 7];
+    if (progress >= 40) return [234, 88, 12];
+    return [220, 38, 38];
+  };
+
   const exportToPDF = () => {
     const doc = new jsPDF({
       orientation: 'l',
@@ -427,11 +443,13 @@ export default function VPPerformanceAnalysis2() {
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
+    doc.setTextColor(30, 41, 59);
     doc.text('BASKAN YARDIMCILARI PERFORMANS ANALIZI', 148, yPos, { align: 'center' });
 
     yPos += 10;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(13);
+    doc.setTextColor(71, 85, 105);
     doc.text(`Rapor Yili: ${selectedYear}`, 148, yPos, { align: 'center' });
     doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 148, yPos + 7, { align: 'center' });
 
@@ -441,23 +459,35 @@ export default function VPPerformanceAnalysis2() {
       }
       yPos = 40;
 
-      doc.setFillColor(59, 130, 246);
+      const vpColor = getProgressColorRGB(vp.overall_performance);
+      doc.setFillColor(vpColor[0], vpColor[1], vpColor[2]);
       doc.rect(10, yPos, 277, 14, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
       doc.text(vp.vp_name, 15, yPos + 9);
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(30, 41, 59);
 
       yPos += 17;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${vp.vp_name} - ${vp.total_departments} Mudurluk - ${vp.total_indicators} Gosterge - %${vp.overall_performance} Performans`, 15, yPos);
+      doc.text(`${vp.vp_name} - ${vp.total_departments} Mudurluk - ${vp.total_indicators} Gosterge`, 15, yPos);
+
+      const vpTextColor = getProgressTextColorRGB(vp.overall_performance);
+      doc.setTextColor(vpTextColor[0], vpTextColor[1], vpTextColor[2]);
+      doc.text(`%${vp.overall_performance} Performans`, 185, yPos);
+      doc.setTextColor(30, 41, 59);
       doc.setFont('helvetica', 'normal');
 
       yPos += 9;
       doc.setFontSize(11);
-      doc.text(`Genel Performans: %${vp.overall_performance}`, 15, yPos);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Genel Performans:`, 15, yPos);
+      doc.setTextColor(vpTextColor[0], vpTextColor[1], vpTextColor[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`%${vp.overall_performance}`, 55, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
       doc.text(`Toplam Mudurluk: ${vp.total_departments}`, 85, yPos);
       doc.text(`Toplam Gosterge: ${vp.total_indicators}`, 155, yPos);
 
@@ -469,12 +499,23 @@ export default function VPPerformanceAnalysis2() {
           yPos = 20;
         }
 
-        doc.setFillColor(229, 231, 235);
+        const deptColor = getProgressColorRGB(dept.performance_percentage);
+        const deptBgColor: [number, number, number] = [
+          Math.min(255, deptColor[0] + 200),
+          Math.min(255, deptColor[1] + 200),
+          Math.min(255, deptColor[2] + 200)
+        ];
+        doc.setFillColor(deptBgColor[0], deptBgColor[1], deptBgColor[2]);
         doc.rect(10, yPos, 277, 9, 'F');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(12);
-        doc.text(`${dept.department_name} - Performans: %${dept.performance_percentage}`, 15, yPos + 6);
+        doc.setTextColor(30, 41, 59);
+        doc.text(`${dept.department_name} - Performans:`, 15, yPos + 6);
+        const deptTextColor = getProgressTextColorRGB(dept.performance_percentage);
+        doc.setTextColor(deptTextColor[0], deptTextColor[1], deptTextColor[2]);
+        doc.text(`%${dept.performance_percentage}`, 100, yPos + 6);
         doc.setFont('helvetica', 'normal');
+        doc.setTextColor(30, 41, 59);
 
         yPos += 13;
 
@@ -486,11 +527,16 @@ export default function VPPerformanceAnalysis2() {
 
           doc.setFontSize(11);
           doc.setFont('helvetica', 'bold');
+          doc.setTextColor(71, 85, 105);
           const goalText = `Hedef: ${goal.code} - ${goal.title}`;
           const splitGoalText = doc.splitTextToSize(goalText, 195);
           doc.text(splitGoalText, 15, yPos);
+
+          const goalTextColor = getProgressTextColorRGB(goal.progress);
+          doc.setTextColor(goalTextColor[0], goalTextColor[1], goalTextColor[2]);
           doc.text(`Ilerleme: %${goal.progress}`, 220, yPos);
           doc.setFont('helvetica', 'normal');
+          doc.setTextColor(30, 41, 59);
 
           const textHeight = splitGoalText.length * 5;
           yPos += textHeight + 2;
@@ -517,7 +563,8 @@ export default function VPPerformanceAnalysis2() {
                 cellWidth: 'wrap',
                 font: 'helvetica',
                 lineColor: [200, 200, 200],
-                lineWidth: 0.1
+                lineWidth: 0.1,
+                textColor: [30, 41, 59]
               },
               headStyles: {
                 fillColor: [59, 130, 246],
@@ -537,7 +584,23 @@ export default function VPPerformanceAnalysis2() {
                 4: { cellWidth: 32, halign: 'right' },
                 5: { cellWidth: 22, halign: 'center', fontStyle: 'bold' }
               },
-              margin: { left: 15, right: 15 }
+              margin: { left: 15, right: 15 },
+              didParseCell: function(data) {
+                if (data.section === 'body' && data.column.index === 5) {
+                  const progressText = data.cell.raw as string;
+                  const progress = parseInt(progressText.replace('%', ''));
+                  const color = getProgressTextColorRGB(progress);
+                  data.cell.styles.textColor = color;
+
+                  const bgColor = getProgressColorRGB(progress);
+                  const lightBgColor: [number, number, number] = [
+                    Math.min(255, bgColor[0] + 200),
+                    Math.min(255, bgColor[1] + 200),
+                    Math.min(255, bgColor[2] + 200)
+                  ];
+                  data.cell.styles.fillColor = lightBgColor;
+                }
+              }
             });
 
             yPos = (doc as any).lastAutoTable.finalY + 8;
@@ -555,7 +618,7 @@ export default function VPPerformanceAnalysis2() {
       doc.setPage(i);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(148, 163, 184);
       doc.text(
         `Sayfa ${i} / ${pageCount}`,
         148,
