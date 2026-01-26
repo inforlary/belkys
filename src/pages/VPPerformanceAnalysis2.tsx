@@ -94,37 +94,133 @@ export default function VPPerformanceAnalysis2() {
     try {
       setLoading(true);
 
-      const { data: vps, error: vpsError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          full_name,
-          email
-        `)
-        .eq('organization_id', profile.organization_id)
-        .eq('role', 'vice_president')
-        .order('full_name');
-
-      if (vpsError) throw vpsError;
-
-      const vpPerformanceData: VPPerformance[] = [];
-
-      for (const vp of vps || []) {
-        const { data: assignments, error: assignmentsError } = await supabase
+      const [plansRes, vpsRes, assignmentsRes, goalsRes, indicatorsRes, entriesRes, targetsRes] = await Promise.all([
+        supabase
+          .from('strategic_plans')
+          .select('id, start_year, end_year')
+          .eq('organization_id', profile.organization_id),
+        supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .eq('organization_id', profile.organization_id)
+          .eq('role', 'vice_president')
+          .order('full_name'),
+        supabase
           .from('vice_president_departments')
           .select(`
+            vice_president_id,
             department_id,
-            departments (
+            departments!inner(
               id,
               name,
               code
             )
+          `),
+        supabase
+          .from('goals')
+          .select(`
+            id,
+            code,
+            title,
+            department_id,
+            objective_id,
+            objectives!inner(
+              id,
+              code,
+              title,
+              strategic_plan_id
+            )
           `)
-          .eq('vice_president_id', vp.id);
+          .eq('organization_id', profile.organization_id),
+        supabase
+          .from('indicators')
+          .select('id, code, name, unit, goal_id, target_value, baseline_value, calculation_method, measurement_frequency, goal_impact_percentage'),
+        supabase
+          .from('indicator_data_entries')
+          .select('indicator_id, value, status, period_year')
+          .eq('period_year', selectedYear)
+          .eq('status', 'approved'),
+        supabase
+          .from('indicator_targets')
+          .select('indicator_id, year, target_value')
+          .eq('year', selectedYear)
+      ]);
 
-        if (assignmentsError) throw assignmentsError;
+      if (plansRes.error) throw plansRes.error;
+      if (vpsRes.error) throw vpsRes.error;
+      if (assignmentsRes.error) throw assignmentsRes.error;
+      if (goalsRes.error) throw goalsRes.error;
+      if (indicatorsRes.error) throw indicatorsRes.error;
 
-        const departments = assignments?.map(a => a.departments).filter(Boolean) as Department[] || [];
+      const plans = plansRes.data || [];
+      const vps = vpsRes.data || [];
+      const assignments = assignmentsRes.data || [];
+      const allGoals = goalsRes.data || [];
+      const allIndicators = indicatorsRes.data || [];
+      const allEntries = entriesRes.data || [];
+      const allTargets = targetsRes.data || [];
+
+      const relevantPlans = plans.filter(plan =>
+        selectedYear >= plan.start_year && selectedYear <= plan.end_year
+      );
+
+      if (relevantPlans.length === 0) {
+        setVPPerformances([]);
+        return;
+      }
+
+      const relevantPlanIds = new Set(relevantPlans.map(p => p.id));
+
+      const filteredGoals = allGoals.filter(g =>
+        g.objectives && relevantPlanIds.has((g.objectives as any).strategic_plan_id)
+      );
+
+      const goalIds = new Set(filteredGoals.map(g => g.id));
+      const filteredIndicators = allIndicators.filter(i => goalIds.has(i.goal_id));
+
+      const targetsByIndicator: Record<string, number> = {};
+      allTargets.forEach(target => {
+        targetsByIndicator[target.indicator_id] = target.target_value;
+      });
+
+      const indicatorsWithYearlyTargets = filteredIndicators.map(ind => ({
+        ...ind,
+        yearly_target: targetsByIndicator[ind.id] || ind.target_value
+      }));
+
+      const indicatorsByGoal: Record<string, any[]> = {};
+      indicatorsWithYearlyTargets.forEach(ind => {
+        if (!indicatorsByGoal[ind.goal_id]) {
+          indicatorsByGoal[ind.goal_id] = [];
+        }
+        indicatorsByGoal[ind.goal_id].push(ind);
+      });
+
+      const goalsByDepartment: Record<string, any[]> = {};
+      filteredGoals.forEach(goal => {
+        if (goal.department_id) {
+          if (!goalsByDepartment[goal.department_id]) {
+            goalsByDepartment[goal.department_id] = [];
+          }
+          goalsByDepartment[goal.department_id].push(goal);
+        }
+      });
+
+      const assignmentsByVP: Record<string, any[]> = {};
+      assignments.forEach(assignment => {
+        if (!assignmentsByVP[assignment.vice_president_id]) {
+          assignmentsByVP[assignment.vice_president_id] = [];
+        }
+        assignmentsByVP[assignment.vice_president_id].push(assignment);
+      });
+
+      const vpPerformanceData: VPPerformance[] = [];
+
+      for (const vp of vps) {
+        const vpAssignments = assignmentsByVP[vp.id] || [];
+        const departments = vpAssignments
+          .map(a => a.departments)
+          .filter(Boolean);
 
         const departmentPerformances: DepartmentPerformance[] = [];
         let totalIndicatorsForVP = 0;
@@ -132,12 +228,93 @@ export default function VPPerformanceAnalysis2() {
         let departmentsWithIndicators = 0;
 
         for (const dept of departments) {
-          const deptPerf = await loadDepartmentPerformance(dept);
-          departmentPerformances.push(deptPerf);
+          const deptGoals = goalsByDepartment[dept.id] || [];
 
-          if (deptPerf.total_indicators > 0) {
-            totalIndicatorsForVP += deptPerf.total_indicators;
-            totalPerformanceSum += deptPerf.performance_percentage;
+          if (deptGoals.length === 0) {
+            departmentPerformances.push({
+              department_id: dept.id,
+              department_name: dept.name,
+              total_indicators: 0,
+              total_goals: 0,
+              performance_percentage: 0,
+              goals: []
+            });
+            continue;
+          }
+
+          const enrichedGoals: GoalDetail[] = [];
+          let totalGoalProgress = 0;
+          let totalIndicatorsForDept = 0;
+
+          for (const goal of deptGoals) {
+            const goalIndicators = indicatorsByGoal[goal.id] || [];
+            totalIndicatorsForDept += goalIndicators.length;
+
+            const goalProgress = goalIndicators.length > 0
+              ? calculateGoalProgress(goal.id, goalIndicators, allEntries)
+              : 0;
+
+            totalGoalProgress += goalProgress;
+
+            const enrichedIndicators: IndicatorDetail[] = goalIndicators.map(ind => {
+              const progress = calculateIndicatorProgress(ind, allEntries);
+              const indicatorEntries = allEntries.filter(e => e.indicator_id === ind.id);
+              const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
+              const baselineValue = ind.baseline_value ?? 0;
+              const currentValue = baselineValue + sumOfEntries;
+
+              return {
+                id: ind.id,
+                code: ind.code,
+                name: ind.name,
+                unit: ind.unit,
+                target_value: ind.target_value,
+                baseline_value: ind.baseline_value,
+                calculation_method: ind.calculation_method,
+                measurement_frequency: ind.measurement_frequency,
+                goal_id: ind.goal_id,
+                goal_code: goal.code,
+                goal_title: goal.title,
+                objective_code: (goal.objectives as any)?.code || '',
+                objective_title: (goal.objectives as any)?.title || '',
+                yearly_target: ind.yearly_target,
+                yearly_baseline: baselineValue,
+                progress,
+                current_value: currentValue
+              };
+            }).sort((a, b) =>
+              a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
+            );
+
+            enrichedGoals.push({
+              id: goal.id,
+              code: goal.code,
+              title: goal.title,
+              objective_code: (goal.objectives as any)?.code || '',
+              objective_title: (goal.objectives as any)?.title || '',
+              progress: goalProgress,
+              indicators: enrichedIndicators
+            });
+          }
+
+          const performancePercentage = deptGoals.length > 0
+            ? Math.round(totalGoalProgress / deptGoals.length)
+            : 0;
+
+          departmentPerformances.push({
+            department_id: dept.id,
+            department_name: dept.name,
+            total_indicators: totalIndicatorsForDept,
+            total_goals: deptGoals.length,
+            performance_percentage: performancePercentage,
+            goals: enrichedGoals.sort((a, b) =>
+              a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
+            )
+          });
+
+          if (totalIndicatorsForDept > 0) {
+            totalIndicatorsForVP += totalIndicatorsForDept;
+            totalPerformanceSum += performancePercentage;
             departmentsWithIndicators++;
           }
         }
@@ -166,204 +343,6 @@ export default function VPPerformanceAnalysis2() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadDepartmentPerformance = async (dept: Department): Promise<DepartmentPerformance> => {
-    const allPlansRes = await supabase
-      .from('strategic_plans')
-      .select('id, start_year, end_year')
-      .eq('organization_id', profile?.organization_id);
-
-    const relevantPlans = allPlansRes.data?.filter(plan =>
-      selectedYear >= plan.start_year && selectedYear <= plan.end_year
-    ) || [];
-
-    if (relevantPlans.length === 0) {
-      return {
-        department_id: dept.id,
-        department_name: dept.name,
-        total_indicators: 0,
-        total_goals: 0,
-        performance_percentage: 0,
-        goals: []
-      };
-    }
-
-    const relevantObjectivesRes = await supabase
-      .from('objectives')
-      .select('id')
-      .eq('organization_id', profile?.organization_id)
-      .in('strategic_plan_id', relevantPlans.map(p => p.id));
-
-    const relevantObjectiveIds = relevantObjectivesRes.data?.map(o => o.id) || [];
-
-    if (relevantObjectiveIds.length === 0) {
-      return {
-        department_id: dept.id,
-        department_name: dept.name,
-        total_indicators: 0,
-        total_goals: 0,
-        performance_percentage: 0,
-        goals: []
-      };
-    }
-
-    const { data: goals, error: goalsError } = await supabase
-      .from('goals')
-      .select(`
-        id,
-        code,
-        title,
-        objectives!inner(
-          code,
-          title
-        )
-      `)
-      .eq('organization_id', profile?.organization_id)
-      .eq('department_id', dept.id)
-      .in('objective_id', relevantObjectiveIds);
-
-    if (goalsError) throw goalsError;
-
-    if (!goals || goals.length === 0) {
-      return {
-        department_id: dept.id,
-        department_name: dept.name,
-        total_indicators: 0,
-        total_goals: 0,
-        performance_percentage: 0,
-        goals: []
-      };
-    }
-
-    const goalIds = goals.map(g => g.id);
-
-    const { data: indicators, error: indicatorsError } = await supabase
-      .from('indicators')
-      .select('id, code, name, unit, goal_id, target_value, baseline_value, calculation_method, measurement_frequency, goal_impact_percentage')
-      .in('goal_id', goalIds);
-
-    if (indicatorsError) throw indicatorsError;
-
-    if (!indicators || indicators.length === 0) {
-      return {
-        department_id: dept.id,
-        department_name: dept.name,
-        total_indicators: 0,
-        total_goals: goals.length,
-        performance_percentage: 0,
-        goals: goals.map(goal => ({
-          id: goal.id,
-          code: goal.code,
-          title: goal.title,
-          objective_code: (goal as any).objectives?.code || '',
-          objective_title: (goal as any).objectives?.title || '',
-          progress: 0,
-          indicators: []
-        }))
-      };
-    }
-
-    const indicatorIds = indicators.map(i => i.id);
-
-    const [entriesRes, targetsRes] = await Promise.all([
-      supabase
-        .from('indicator_data_entries')
-        .select('indicator_id, value, status')
-        .in('indicator_id', indicatorIds)
-        .eq('period_year', selectedYear)
-        .eq('status', 'approved'),
-      supabase
-        .from('indicator_targets')
-        .select('indicator_id, year, target_value')
-        .in('indicator_id', indicatorIds)
-        .eq('year', selectedYear)
-    ]);
-
-    const entries = entriesRes.data || [];
-    const targets = targetsRes.data || [];
-
-    const targetsByIndicator: Record<string, number> = {};
-    targets.forEach(target => {
-      targetsByIndicator[target.indicator_id] = target.target_value;
-    });
-
-    const indicatorsWithYearlyTargets = indicators.map(ind => ({
-      ...ind,
-      yearly_target: targetsByIndicator[ind.id] || ind.target_value
-    }));
-
-    let totalGoalProgress = 0;
-    const enrichedGoals: GoalDetail[] = [];
-
-    for (const goal of goals) {
-      const goalIndicators = indicatorsWithYearlyTargets.filter(i => i.goal_id === goal.id);
-
-      const goalProgress = calculateGoalProgress(
-        goal.id,
-        goalIndicators,
-        entries
-      );
-
-      totalGoalProgress += goalProgress;
-
-      const enrichedIndicators: IndicatorDetail[] = [];
-
-      for (const ind of goalIndicators) {
-        const progress = calculateIndicatorProgress(ind, entries);
-        const indicatorEntries = entries.filter(e => e.indicator_id === ind.id);
-        const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
-        const baselineValue = ind.baseline_value ?? 0;
-        const currentValue = baselineValue + sumOfEntries;
-
-        enrichedIndicators.push({
-          id: ind.id,
-          code: ind.code,
-          name: ind.name,
-          unit: ind.unit,
-          target_value: ind.target_value,
-          baseline_value: ind.baseline_value,
-          calculation_method: ind.calculation_method,
-          measurement_frequency: ind.measurement_frequency,
-          goal_id: ind.goal_id,
-          goal_code: goal.code,
-          goal_title: goal.title,
-          objective_code: (goal as any).objectives?.code || '',
-          objective_title: (goal as any).objectives?.title || '',
-          yearly_target: ind.yearly_target,
-          yearly_baseline: baselineValue,
-          progress,
-          current_value: currentValue
-        });
-      }
-
-      enrichedGoals.push({
-        id: goal.id,
-        code: goal.code,
-        title: goal.title,
-        objective_code: (goal as any).objectives?.code || '',
-        objective_title: (goal as any).objectives?.title || '',
-        progress: goalProgress,
-        indicators: enrichedIndicators.sort((a, b) =>
-          a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
-        )
-      });
-    }
-
-    const performancePercentage = goals.length > 0
-      ? Math.round(totalGoalProgress / goals.length)
-      : 0;
-
-    return {
-      department_id: dept.id,
-      department_name: dept.name,
-      total_indicators: indicators.length,
-      total_goals: goals.length,
-      performance_percentage: performancePercentage,
-      goals: enrichedGoals.sort((a, b) =>
-        a.code.localeCompare(b.code, 'tr', { numeric: true, sensitivity: 'base' })
-      )
-    };
   };
 
   const toggleVP = (vpId: string) => {
@@ -462,7 +441,8 @@ export default function VPPerformanceAnalysis2() {
           </select>
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            disabled={vpPerformances.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" />
             Excel İndir
