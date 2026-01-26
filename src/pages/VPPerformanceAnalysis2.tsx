@@ -174,9 +174,7 @@ export default function VPPerformanceAnalysis2() {
 
     if (goalsError) throw goalsError;
 
-    const goalIds = goals?.map(g => g.id) || [];
-
-    if (goalIds.length === 0) {
+    if (!goals || goals.length === 0) {
       return {
         department_id: dept.id,
         department_name: dept.name,
@@ -186,6 +184,8 @@ export default function VPPerformanceAnalysis2() {
       };
     }
 
+    const goalIds = goals.map(g => g.id);
+
     const { data: indicators, error: indicatorsError } = await supabase
       .from('indicators')
       .select('id, code, name, unit, goal_id, target_value, baseline_value, calculation_method, measurement_frequency')
@@ -193,7 +193,17 @@ export default function VPPerformanceAnalysis2() {
 
     if (indicatorsError) throw indicatorsError;
 
-    const indicatorIds = indicators?.map(i => i.id) || [];
+    if (!indicators || indicators.length === 0) {
+      return {
+        department_id: dept.id,
+        department_name: dept.name,
+        total_indicators: 0,
+        performance_percentage: 0,
+        indicators: []
+      };
+    }
+
+    const indicatorIds = indicators.map(i => i.id);
 
     const [entriesRes, targetsRes] = await Promise.all([
       supabase
@@ -206,78 +216,72 @@ export default function VPPerformanceAnalysis2() {
         .from('indicator_targets')
         .select('indicator_id, year, target_value, baseline_value')
         .in('indicator_id', indicatorIds)
-        .in('year', [selectedYear, selectedYear - 1])
+        .eq('year', selectedYear)
     ]);
 
     const entries = entriesRes.data || [];
     const targets = targetsRes.data || [];
 
     const targetsByIndicator: Record<string, number> = {};
-    const baselineByIndicator: Record<string, number> = {};
-
     targets.forEach(target => {
-      if (target.year === selectedYear) {
-        targetsByIndicator[target.indicator_id] = target.target_value;
-      } else if (target.year === selectedYear - 1) {
-        baselineByIndicator[target.indicator_id] = target.baseline_value || target.target_value;
-      }
+      targetsByIndicator[target.indicator_id] = target.target_value;
     });
 
+    let totalGoalProgress = 0;
     const enrichedIndicators: IndicatorDetail[] = [];
-    let totalProgress = 0;
 
-    for (const ind of indicators || []) {
-      const goal = goals?.find(g => g.id === ind.goal_id);
+    for (const goal of goals) {
+      const goalIndicators = indicators.filter(i => i.goal_id === goal.id);
 
-      let baselineValue;
-      if (baselineByIndicator[ind.id] !== undefined && baselineByIndicator[ind.id] !== null) {
-        baselineValue = baselineByIndicator[ind.id];
-      } else if (ind.baseline_value !== undefined && ind.baseline_value !== null) {
-        baselineValue = ind.baseline_value;
-      } else {
-        baselineValue = 0;
+      const goalProgress = calculateGoalProgress(
+        goal.id,
+        goalIndicators,
+        entries,
+        targets,
+        selectedYear
+      );
+
+      totalGoalProgress += goalProgress;
+
+      for (const ind of goalIndicators) {
+        const yearlyTarget = targetsByIndicator[ind.id] ?? ind.target_value;
+        const baselineValue = ind.baseline_value ?? 0;
+
+        const indicatorWithTarget = {
+          ...ind,
+          yearly_target: yearlyTarget,
+          yearly_baseline: baselineValue
+        };
+
+        const progress = calculateIndicatorProgress(indicatorWithTarget, entries);
+        const indicatorEntries = entries.filter(e => e.indicator_id === ind.id);
+        const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
+        const currentValue = baselineValue + sumOfEntries;
+
+        enrichedIndicators.push({
+          id: ind.id,
+          code: ind.code,
+          name: ind.name,
+          unit: ind.unit,
+          target_value: ind.target_value,
+          baseline_value: ind.baseline_value,
+          calculation_method: ind.calculation_method,
+          measurement_frequency: ind.measurement_frequency,
+          goal_id: ind.goal_id,
+          goal_code: goal.code,
+          goal_title: goal.title,
+          objective_code: (goal as any).objectives?.code || '',
+          objective_title: (goal as any).objectives?.title || '',
+          yearly_target: yearlyTarget,
+          yearly_baseline: baselineValue,
+          progress,
+          current_value: currentValue
+        });
       }
-
-      const yearlyTarget = targetsByIndicator[ind.id] !== undefined
-        ? targetsByIndicator[ind.id]
-        : ind.target_value;
-
-      const indicatorWithTarget = {
-        ...ind,
-        yearly_target: yearlyTarget,
-        yearly_baseline: baselineValue
-      };
-
-      const progress = calculateIndicatorProgress(indicatorWithTarget, entries);
-      totalProgress += progress;
-
-      const indicatorEntries = entries.filter(e => e.indicator_id === ind.id);
-      const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
-      const currentValue = baselineValue + sumOfEntries;
-
-      enrichedIndicators.push({
-        id: ind.id,
-        code: ind.code,
-        name: ind.name,
-        unit: ind.unit,
-        target_value: ind.target_value,
-        baseline_value: ind.baseline_value,
-        calculation_method: ind.calculation_method,
-        measurement_frequency: ind.measurement_frequency,
-        goal_id: ind.goal_id,
-        goal_code: goal?.code || '',
-        goal_title: goal?.title || '',
-        objective_code: (goal as any)?.objectives?.code || '',
-        objective_title: (goal as any)?.objectives?.title || '',
-        yearly_target: yearlyTarget,
-        yearly_baseline: baselineValue,
-        progress,
-        current_value: currentValue
-      });
     }
 
-    const performancePercentage = enrichedIndicators.length > 0
-      ? Math.round(totalProgress / enrichedIndicators.length)
+    const performancePercentage = goals.length > 0
+      ? Math.round(totalGoalProgress / goals.length)
       : 0;
 
     return {
