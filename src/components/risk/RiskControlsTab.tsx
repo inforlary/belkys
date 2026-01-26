@@ -217,12 +217,14 @@ export default function RiskControlsTab({ riskId, riskCode }: Props) {
     try {
       const controlData = {
         risk_id: riskId,
+        organization_id: profile?.organization_id,
         name: formData.name,
         description: formData.description,
         control_type: formData.control_type,
         control_nature: formData.control_nature,
         responsible_department_id: formData.responsible_department_id,
         design_effectiveness: formData.design_effectiveness,
+        operating_effectiveness: formData.operating_effectiveness,
         evidence: formData.evidence,
         frequency: formData.frequency,
         last_test_date: formData.last_test_date || null,
