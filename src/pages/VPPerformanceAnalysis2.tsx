@@ -15,6 +15,7 @@ import type { Profile, Department } from '../types/database';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import {
   calculateIndicatorProgress,
   calculateGoalProgress,
@@ -432,203 +433,243 @@ export default function VPPerformanceAnalysis2() {
     return [220, 38, 38];
   };
 
-  const exportToPDF = () => {
-    const doc = new jsPDF({
-      orientation: 'l',
-      unit: 'mm',
-      format: 'a4',
-      compress: false,
-      putOnlyUsedFonts: true
-    });
-    let yPos = 20;
+  const tailwindToHex = (className: string): string => {
+    const colorMap: { [key: string]: string } = {
+      'bg-green-500': '#22c55e',
+      'bg-green-600': '#16a34a',
+      'bg-green-100': '#dcfce7',
+      'bg-blue-500': '#3b82f6',
+      'bg-blue-600': '#2563eb',
+      'bg-blue-100': '#dbeafe',
+      'bg-yellow-500': '#eab308',
+      'bg-yellow-600': '#ca8a04',
+      'bg-yellow-100': '#fef3c7',
+      'bg-orange-500': '#f97316',
+      'bg-orange-600': '#ea580c',
+      'bg-orange-100': '#ffedd5',
+      'bg-red-500': '#ef4444',
+      'bg-red-600': '#dc2626',
+      'bg-red-100': '#fee2e2',
+      'text-green-600': '#16a34a',
+      'text-blue-600': '#2563eb',
+      'text-yellow-600': '#ca8a04',
+      'text-orange-600': '#ea580c',
+      'text-red-600': '#dc2626'
+    };
+    return colorMap[className] || '#000000';
+  };
 
-    doc.setFont('times', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(30, 41, 59);
-    doc.text('BAŞKAN YARDIMCILARI PERFORMANS ANALİZİ', 148, yPos, { align: 'center' });
+  const exportToPDF = async () => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
 
-    yPos += 10;
-    doc.setFont('times', 'normal');
-    doc.setFontSize(13);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Rapor Yılı: ${selectedYear}`, 148, yPos, { align: 'center' });
-    doc.text(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 148, yPos + 7, { align: 'center' });
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const pdfHeight = doc.internal.pageSize.getHeight();
+      let isFirstPage = true;
 
-    vpPerformances.forEach((vp, vpIndex) => {
-      if (vpIndex > 0) {
-        doc.addPage();
-      }
-      yPos = 40;
+      const header = document.createElement('div');
+      header.style.padding = '20px';
+      header.style.backgroundColor = 'white';
+      header.style.fontFamily = 'Arial, sans-serif';
+      header.innerHTML = `
+        <h1 style="text-align: center; color: #1e293b; font-size: 24px; margin-bottom: 10px;">
+          BAŞKAN YARDIMCILARI PERFORMANS ANALİZİ
+        </h1>
+        <p style="text-align: center; color: #475569; font-size: 14px;">
+          Rapor Yılı: ${selectedYear} | Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}
+        </p>
+      `;
+      document.body.appendChild(header);
 
-      const vpColor = getProgressColorRGB(vp.overall_performance);
-      doc.setFillColor(vpColor[0], vpColor[1], vpColor[2]);
-      doc.rect(10, yPos, 277, 14, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('times', 'bold');
-      doc.setFontSize(16);
-      doc.text(vp.vp_name, 15, yPos + 9);
-      doc.setTextColor(30, 41, 59);
+      const headerCanvas = await html2canvas(header, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
 
-      yPos += 17;
-      doc.setFontSize(12);
-      doc.setFont('times', 'bold');
-      doc.text(`${vp.vp_name} - ${vp.total_departments} Müdürlük - ${vp.total_indicators} Gösterge`, 15, yPos);
+      const headerImgData = headerCanvas.toDataURL('image/png');
+      const headerImgHeight = (headerCanvas.height * pdfWidth) / headerCanvas.width;
+      doc.addImage(headerImgData, 'PNG', 0, 0, pdfWidth, headerImgHeight);
+      document.body.removeChild(header);
 
-      const vpTextColor = getProgressTextColorRGB(vp.overall_performance);
-      doc.setTextColor(vpTextColor[0], vpTextColor[1], vpTextColor[2]);
-      doc.text(`%${vp.overall_performance} Performans`, 185, yPos);
-      doc.setTextColor(30, 41, 59);
-      doc.setFont('times', 'normal');
+      for (let vpIndex = 0; vpIndex < vpPerformances.length; vpIndex++) {
+        const vp = vpPerformances[vpIndex];
 
-      yPos += 9;
-      doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Genel Performans:`, 15, yPos);
-      doc.setTextColor(vpTextColor[0], vpTextColor[1], vpTextColor[2]);
-      doc.setFont('times', 'bold');
-      doc.text(`%${vp.overall_performance}`, 55, yPos);
-      doc.setFont('times', 'normal');
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Toplam Müdürlük: ${vp.total_departments}`, 85, yPos);
-      doc.text(`Toplam Gösterge: ${vp.total_indicators}`, 155, yPos);
-
-      yPos += 10;
-
-      vp.departments.forEach(dept => {
-        if (yPos > 180) {
+        if (!isFirstPage) {
           doc.addPage();
-          yPos = 20;
+        }
+        isFirstPage = false;
+
+        const vpCard = document.createElement('div');
+        vpCard.style.padding = '20px';
+        vpCard.style.backgroundColor = 'white';
+        vpCard.style.fontFamily = 'Arial, sans-serif';
+        vpCard.style.width = '800px';
+
+        const performanceGrade = getPerformanceGrade(vp.overall_performance);
+        const progressColor = tailwindToHex(getProgressColor(vp.overall_performance));
+
+        let departmentsHTML = '';
+        for (const dept of vp.departments) {
+          const deptGrade = getPerformanceGrade(dept.performance_percentage);
+          const deptProgressColor = tailwindToHex(getProgressColor(dept.performance_percentage));
+
+          let goalsHTML = '';
+          for (const goal of dept.goals) {
+            const goalGrade = getPerformanceGrade(goal.progress);
+            const goalProgressColor = tailwindToHex(getProgressColor(goal.progress));
+
+            let indicatorsHTML = '';
+            if (goal.indicators.length > 0) {
+              indicatorsHTML = `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px;">
+                  <thead>
+                    <tr style="background-color: #3b82f6; color: white;">
+                      <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Kod</th>
+                      <th style="border: 1px solid #ddd; padding: 8px;">Gösterge</th>
+                      <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Başlangıç</th>
+                      <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Hedef</th>
+                      <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Gerçekleşme</th>
+                      <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">İlerleme</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${goal.indicators.map(ind => `
+                      <tr>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${ind.code}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px;">${ind.name}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${ind.yearly_target ? ind.yearly_target.toLocaleString('tr-TR') : '-'}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${ind.current_value.toLocaleString('tr-TR')}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold; color: ${tailwindToHex(getProgressTextColor(ind.progress))};">%${ind.progress}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              `;
+            }
+
+            goalsHTML += `
+              <div style="background-color: white; border: 2px solid #bfdbfe; border-radius: 8px; padding: 15px; margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                  <div>
+                    <div style="font-weight: 600; color: #1e293b;">${goal.code} - ${goal.title}</div>
+                    <div style="font-size: 12px; color: #64748b;">Amaç: ${goal.objective_code} - ${goal.objective_title}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 18px; font-weight: bold; color: ${tailwindToHex(goalGrade.color)};">%${goal.progress}</div>
+                    <span style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background-color: ${tailwindToHex(goalGrade.bgColor)}; color: ${tailwindToHex(goalGrade.color)};">
+                      ${goalGrade.grade}
+                    </span>
+                  </div>
+                </div>
+                <div style="width: 100%; background-color: #e5e7eb; border-radius: 4px; height: 8px;">
+                  <div style="background-color: ${goalProgressColor}; height: 100%; border-radius: 4px; width: ${Math.min(100, goal.progress)}%;"></div>
+                </div>
+                ${indicatorsHTML}
+              </div>
+            `;
+          }
+
+          departmentsHTML += `
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb; margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <div>
+                  <div style="font-weight: 600; color: #1e293b;">${dept.department_name}</div>
+                  <div style="font-size: 13px; color: #64748b;">${dept.total_goals} hedef • ${dept.total_indicators} gösterge</div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 20px; font-weight: bold; color: ${tailwindToHex(deptGrade.color)};">%${dept.performance_percentage}</div>
+                  <span style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background-color: ${tailwindToHex(deptGrade.bgColor)}; color: ${tailwindToHex(deptGrade.color)};">
+                    ${deptGrade.grade}
+                  </span>
+                </div>
+              </div>
+              <div style="width: 100%; background-color: #d1d5db; border-radius: 4px; height: 8px;">
+                <div style="background-color: ${deptProgressColor}; height: 100%; border-radius: 4px; width: ${Math.min(100, dept.performance_percentage)}%;"></div>
+              </div>
+              ${goalsHTML}
+            </div>
+          `;
         }
 
-        const deptColor = getProgressColorRGB(dept.performance_percentage);
-        const deptBgColor: [number, number, number] = [
-          Math.min(255, deptColor[0] + 200),
-          Math.min(255, deptColor[1] + 200),
-          Math.min(255, deptColor[2] + 200)
-        ];
-        doc.setFillColor(deptBgColor[0], deptBgColor[1], deptBgColor[2]);
-        doc.rect(10, yPos, 277, 9, 'F');
-        doc.setFont('times', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(30, 41, 59);
-        doc.text(`${dept.department_name} - Performans:`, 15, yPos + 6);
-        const deptTextColor = getProgressTextColorRGB(dept.performance_percentage);
-        doc.setTextColor(deptTextColor[0], deptTextColor[1], deptTextColor[2]);
-        doc.text(`%${dept.performance_percentage}`, 100, yPos + 6);
-        doc.setFont('times', 'normal');
-        doc.setTextColor(30, 41, 59);
+        vpCard.innerHTML = `
+          <div style="background-color: #3b82f6; color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <h2 style="font-size: 20px; margin: 0;">${vp.vp_name}</h2>
+            <p style="font-size: 14px; margin: 5px 0 0 0;">${vp.vp_email}</p>
+          </div>
+          <div style="display: flex; justify-content: space-around; background-color: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="text-align: center;">
+              <div style="font-size: 13px; color: #64748b;">Müdürlük</div>
+              <div style="font-size: 24px; font-weight: bold; color: #1e293b;">${vp.total_departments}</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 13px; color: #64748b;">Gösterge</div>
+              <div style="font-size: 24px; font-weight: bold; color: #1e293b;">${vp.total_indicators}</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 13px; color: #64748b;">Genel Performans</div>
+              <div style="font-size: 28px; font-weight: bold; color: ${tailwindToHex(performanceGrade.color)};">%${vp.overall_performance}</div>
+              <span style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background-color: ${tailwindToHex(performanceGrade.bgColor)}; color: ${tailwindToHex(performanceGrade.color)};">
+                ${performanceGrade.grade}
+              </span>
+            </div>
+          </div>
+          <div style="width: 100%; background-color: #e5e7eb; border-radius: 4px; height: 12px; margin-bottom: 20px;">
+            <div style="background-color: ${progressColor}; height: 100%; border-radius: 4px; width: ${Math.min(100, vp.overall_performance)}%;"></div>
+          </div>
+          ${departmentsHTML}
+        `;
 
-        yPos += 13;
+        document.body.appendChild(vpCard);
 
-        dept.goals.forEach(goal => {
-          if (yPos > 165) {
-            doc.addPage();
-            yPos = 20;
-          }
-
-          doc.setFontSize(11);
-          doc.setFont('times', 'bold');
-          doc.setTextColor(71, 85, 105);
-          const goalText = `Hedef: ${goal.code} - ${goal.title}`;
-          const splitGoalText = doc.splitTextToSize(goalText, 195);
-          doc.text(splitGoalText, 15, yPos);
-
-          const goalTextColor = getProgressTextColorRGB(goal.progress);
-          doc.setTextColor(goalTextColor[0], goalTextColor[1], goalTextColor[2]);
-          doc.text(`İlerleme: %${goal.progress}`, 220, yPos);
-          doc.setFont('times', 'normal');
-          doc.setTextColor(30, 41, 59);
-
-          const textHeight = splitGoalText.length * 5;
-          yPos += textHeight + 2;
-
-          if (goal.indicators.length > 0) {
-            const tableData = goal.indicators.map(ind => [
-              ind.code,
-              ind.name,
-              `${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}`,
-              ind.yearly_target ? `${ind.yearly_target.toLocaleString('tr-TR')}` : '-',
-              `${ind.current_value.toLocaleString('tr-TR')}`,
-              `%${ind.progress}`
-            ]);
-
-            autoTable(doc, {
-              startY: yPos,
-              head: [['Kod', 'Gösterge', 'Başlangıç', 'Hedef', 'Gerçekleşme', 'İlerleme']],
-              body: tableData,
-              theme: 'grid',
-              styles: {
-                fontSize: 9,
-                cellPadding: 2.5,
-                overflow: 'linebreak',
-                cellWidth: 'wrap',
-                font: 'times',
-                lineColor: [200, 200, 200],
-                lineWidth: 0.1,
-                textColor: [30, 41, 59]
-              },
-              headStyles: {
-                fillColor: [59, 130, 246],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                fontSize: 10,
-                halign: 'center'
-              },
-              alternateRowStyles: {
-                fillColor: [249, 250, 251]
-              },
-              columnStyles: {
-                0: { cellWidth: 25, halign: 'center' },
-                1: { cellWidth: 110, overflow: 'linebreak' },
-                2: { cellWidth: 28, halign: 'right' },
-                3: { cellWidth: 28, halign: 'right' },
-                4: { cellWidth: 32, halign: 'right' },
-                5: { cellWidth: 22, halign: 'center', fontStyle: 'bold' }
-              },
-              margin: { left: 15, right: 15 },
-              didParseCell: function(data) {
-                if (data.section === 'body' && data.column.index === 5) {
-                  const progressText = data.cell.raw as string;
-                  const progress = parseInt(progressText.replace('%', ''));
-                  const color = getProgressTextColorRGB(progress);
-                  data.cell.styles.textColor = color;
-
-                  const bgColor = getProgressColorRGB(progress);
-                  const lightBgColor: [number, number, number] = [
-                    Math.min(255, bgColor[0] + 200),
-                    Math.min(255, bgColor[1] + 200),
-                    Math.min(255, bgColor[2] + 200)
-                  ];
-                  data.cell.styles.fillColor = lightBgColor;
-                }
-              }
-            });
-
-            yPos = (doc as any).lastAutoTable.finalY + 8;
-          } else {
-            yPos += 5;
-          }
+        const canvas = await html2canvas(vpCard, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
         });
 
-        yPos += 5;
-      });
-    });
+        document.body.removeChild(vpCard);
 
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFont('times', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(148, 163, 184);
-      doc.text(
-        `Sayfa ${i} / ${pageCount}`,
-        148,
-        200,
-        { align: 'center' }
-      );
+        const imgData = canvas.toDataURL('image/png');
+        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = headerImgHeight + 10;
+
+        if (position + heightLeft > pdfHeight) {
+          doc.addPage();
+          position = 10;
+        }
+
+        doc.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      }
+
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(10);
+        doc.setTextColor(148, 163, 184);
+        doc.text(
+          `Sayfa ${i} / ${pageCount}`,
+          pdfWidth / 2,
+          pdfHeight - 10,
+          { align: 'center' }
+        );
+      }
+
+      doc.save(`VP_Performans_Analizi_${selectedYear}.pdf`);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      alert('PDF oluşturulurken bir hata oluştu!');
     }
-
-    doc.save(`VP_Performans_Analizi_${selectedYear}.pdf`);
   };
 
   const getPerformanceGrade = (percentage: number) => {
