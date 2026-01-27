@@ -380,24 +380,45 @@ export default function VPPerformanceAnalysis2() {
 
     vpPerformances.forEach(vp => {
       const sheetData: any[] = [];
+      const vpStatusConfig = getStatusConfigByPercentage(vp.overall_performance);
 
-      sheetData.push([`${vp.vp_name} - ${vp.total_departments} Müdürlük - ${vp.total_indicators} Gösterge - %${vp.overall_performance} Performans`]);
+      sheetData.push([`${vp.vp_name} - ${vp.total_departments} Müdürlük - ${vp.total_indicators} Gösterge - %${vp.overall_performance} (${vpStatusConfig.label})`]);
       sheetData.push([]);
       sheetData.push([`Başkan Yardımcısı: ${vp.vp_name}`]);
-      sheetData.push([`Genel Performans: %${vp.overall_performance}`]);
+      sheetData.push([`Genel Performans: %${vp.overall_performance} - ${vpStatusConfig.label}`]);
       sheetData.push([`Toplam Müdürlük: ${vp.total_departments}`]);
       sheetData.push([`Toplam Gösterge: ${vp.total_indicators}`]);
       sheetData.push([]);
 
       vp.departments.forEach(dept => {
-        sheetData.push([`Müdürlük: ${dept.department_name}`, `Performans: %${dept.performance_percentage}`, `Toplam Hedef: ${dept.total_goals}`]);
+        const deptStatusConfig = getStatusConfigByPercentage(dept.performance_percentage);
+        sheetData.push([
+          `Müdürlük: ${dept.department_name}`,
+          `Performans: %${dept.performance_percentage} - ${deptStatusConfig.label}`,
+          `Toplam Hedef: ${dept.total_goals}`
+        ]);
         sheetData.push([]);
 
         dept.goals.forEach(goal => {
-          sheetData.push([`Hedef: ${goal.code} - ${goal.title}`, `Hedef İlerleme: %${goal.progress}`]);
-          sheetData.push(['Amaç Kodu', 'Hedef Kodu', 'Gösterge Kodu', 'Gösterge Adı', 'Başlangıç', 'Hedef', 'Gerçekleşme', 'İlerleme %']);
+          const goalStatusConfig = getStatusConfigByPercentage(goal.progress);
+          sheetData.push([
+            `Hedef: ${goal.code} - ${goal.title}`,
+            `Hedef İlerleme: %${goal.progress} - ${goalStatusConfig.label}`
+          ]);
+          sheetData.push([
+            'Amaç Kodu',
+            'Hedef Kodu',
+            'Gösterge Kodu',
+            'Gösterge Adı',
+            'Başlangıç',
+            'Hedef',
+            'Gerçekleşme',
+            'İlerleme %',
+            'Durum'
+          ]);
 
           goal.indicators.forEach(ind => {
+            const indStatusConfig = getStatusConfigByPercentage(ind.progress);
             sheetData.push([
               ind.objective_code,
               ind.goal_code,
@@ -406,7 +427,8 @@ export default function VPPerformanceAnalysis2() {
               ind.yearly_baseline || 0,
               ind.yearly_target || '-',
               ind.current_value,
-              ind.progress
+              ind.progress,
+              indStatusConfig.label
             ]);
           });
 
