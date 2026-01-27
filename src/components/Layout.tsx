@@ -231,6 +231,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         quality_management: true,
         project_management: true,
         workflow_management: true,
+        process_management: true,
         settings: true,
         administration: true,
       };
@@ -244,6 +245,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       quality_management: profile?.organization?.module_quality_management ?? true,
       project_management: profile?.organization?.module_project_management ?? true,
       workflow_management: profile?.organization?.module_workflow_management ?? true,
+      process_management: profile?.organization?.module_process_management ?? true,
       settings: profile?.organization?.module_settings ?? true,
       administration: profile?.organization?.module_administration ?? true,
     };
@@ -335,6 +337,16 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: BarChart3, label: 'Süreç KPI Takip', path: 'internal-control/process-kpis' },
         { icon: AlertCircle, label: 'DÖF Yönetimi', path: 'internal-control/dof' },
         { icon: FileText, label: 'Raporlar', path: 'internal-control/reports' },
+      ],
+    },
+    {
+      label: 'Süreç Yönetimi',
+      icon: GitBranch,
+      items: [
+        { icon: LayoutDashboard, label: 'Dashboard', path: 'process-management/dashboard' },
+        { icon: GitBranch, label: 'Süreç Listesi', path: 'process-management/list' },
+        { icon: CheckCircle, label: 'Onay İşlemleri', path: 'process-management/approvals', adminOnly: true },
+        { icon: Settings, label: 'Kategori Yönetimi', path: 'process-management/categories', adminOnly: true },
       ],
     },
     {
@@ -435,6 +447,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     if (section.label === 'Risk Yönetimi') return moduleAccess.risk_management;
     if (section.label === 'Kalite Yönetimi') return moduleAccess.quality_management;
     if (section.label === 'Proje Yönetimi') return moduleAccess.project_management;
+    if (section.label === 'Süreç Yönetimi') return moduleAccess.process_management;
     if (section.label === 'İş Akışı Yönetimi') return moduleAccess.workflow_management;
     if (section.label === 'Ayarlar') return moduleAccess.settings;
     if (section.label === 'Yönetim') return moduleAccess.administration;
