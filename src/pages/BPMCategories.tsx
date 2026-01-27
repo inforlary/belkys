@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, ChevronUp, ChevronDown, Save, X, Palette } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronUp, ChevronDown, Save, X, Palette, Package } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import * as Icons from 'lucide-react';
@@ -38,6 +38,9 @@ export default function BPMCategories() {
   });
 
   useEffect(() => {
+    console.log('BPMCategories mounted. User:', user?.id, 'Profile:', profile);
+    console.log('User role:', profile?.role);
+    console.log('Organization ID:', profile?.organization_id);
     if (profile?.organization_id) {
       fetchCategories();
     }
@@ -45,16 +48,20 @@ export default function BPMCategories() {
 
   const fetchCategories = async () => {
     try {
+      console.log('Fetching categories for organization:', profile?.organization_id);
       const { data, error } = await supabase
         .from('bpm_categories')
         .select('*')
         .eq('organization_id', profile?.organization_id)
         .order('sort_order', { ascending: true });
 
+      console.log('Fetch categories result:', { data, error });
+
       if (error) throw error;
       setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      alert(`Kategoriler yüklenirken hata: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -74,18 +81,34 @@ export default function BPMCategories() {
           })
           .eq('id', editingCategory.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
       } else {
-        const { error } = await supabase
+        console.log('Inserting category with data:', {
+          ...formData,
+          code: formData.code.toUpperCase(),
+          organization_id: profile?.organization_id,
+          created_by: user?.id
+        });
+
+        const { data, error } = await supabase
           .from('bpm_categories')
           .insert({
             ...formData,
             code: formData.code.toUpperCase(),
             organization_id: profile?.organization_id,
             created_by: user?.id
-          });
+          })
+          .select();
 
-        if (error) throw error;
+        console.log('Insert result:', { data, error });
+
+        if (error) {
+          console.error('Insert error:', error);
+          throw error;
+        }
       }
 
       setShowModal(false);
@@ -94,7 +117,7 @@ export default function BPMCategories() {
       fetchCategories();
     } catch (error: any) {
       console.error('Error saving category:', error);
-      alert(error.message);
+      alert(`Kategori kaydedilirken hata oluştu: ${error.message || 'Bilinmeyen hata'}\n\nDetay: ${JSON.stringify(error, null, 2)}`);
     }
   };
 
@@ -193,7 +216,8 @@ export default function BPMCategories() {
   };
 
   const getIconComponent = (iconName: string) => {
-    const IconComponent = Icons[iconName as keyof typeof Icons] || Icons.Folder;
+    const capitalizedIconName = iconName.charAt(0).toUpperCase() + iconName.slice(1);
+    const IconComponent = Icons[capitalizedIconName as keyof typeof Icons] || Icons.Folder;
     return IconComponent;
   };
 
