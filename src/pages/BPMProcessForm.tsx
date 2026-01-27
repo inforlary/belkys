@@ -90,8 +90,22 @@ export default function BPMProcessForm() {
   useEffect(() => {
     if (formData.owner_department_id) {
       fetchDepartmentUsers(formData.owner_department_id);
+      fetchDepartmentGoals(formData.owner_department_id);
+      fetchDepartmentRisks(formData.owner_department_id);
+    } else {
+      setUsers([]);
+      setGoals([]);
+      setRisks([]);
     }
   }, [formData.owner_department_id]);
+
+  useEffect(() => {
+    if (formData.category_id) {
+      fetchParentProcesses(formData.category_id);
+    } else {
+      setParentProcesses([]);
+    }
+  }, [formData.category_id]);
 
   useEffect(() => {
     if (formData.category_id && !isEdit) {
@@ -100,18 +114,14 @@ export default function BPMProcessForm() {
   }, [formData.category_id, formData.parent_id]);
 
   const fetchOptions = async () => {
-    const [cats, depts, goalsData, risksData, workflowsData] = await Promise.all([
+    const [cats, depts, workflowsData] = await Promise.all([
       supabase.from('bpm_categories').select('*').eq('organization_id', profile?.organization_id).order('sort_order'),
       supabase.from('departments').select('id, name').eq('organization_id', profile?.organization_id).order('name'),
-      supabase.from('goals').select('id, code, name').eq('organization_id', profile?.organization_id).order('code'),
-      supabase.from('risks').select('id, code, name, current_level').eq('organization_id', profile?.organization_id).order('code'),
       supabase.from('workflow_processes').select('id, code, name').eq('organization_id', profile?.organization_id).order('code')
     ]);
 
     if (cats.data) setCategories(cats.data);
     if (depts.data) setDepartments(depts.data);
-    if (goalsData.data) setGoals(goalsData.data);
-    if (risksData.data) setRisks(risksData.data);
     if (workflowsData.data) setWorkflows(workflowsData.data);
   };
 
@@ -124,6 +134,39 @@ export default function BPMProcessForm() {
       .order('full_name');
 
     if (data) setUsers(data);
+  };
+
+  const fetchDepartmentGoals = async (deptId: string) => {
+    const { data } = await supabase
+      .from('goals')
+      .select('id, code, name, department_id')
+      .eq('organization_id', profile?.organization_id)
+      .eq('department_id', deptId)
+      .order('code');
+
+    if (data) setGoals(data);
+  };
+
+  const fetchDepartmentRisks = async (deptId: string) => {
+    const { data } = await supabase
+      .from('risks')
+      .select('id, code, name, current_level, department_id')
+      .eq('organization_id', profile?.organization_id)
+      .eq('department_id', deptId)
+      .order('code');
+
+    if (data) setRisks(data);
+  };
+
+  const fetchParentProcesses = async (categoryId: string) => {
+    const { data } = await supabase
+      .from('bpm_processes')
+      .select('id, code, name, level')
+      .eq('organization_id', profile?.organization_id)
+      .eq('category_id', categoryId)
+      .order('code');
+
+    if (data) setParentProcesses(data);
   };
 
   const fetchProcess = async () => {
@@ -167,6 +210,15 @@ export default function BPMProcessForm() {
           strategic_goal_id: data.strategic_goal_id || '',
           workflow_process_id: data.workflow_process_id || ''
         });
+
+        if (data.category_id) {
+          fetchParentProcesses(data.category_id);
+        }
+        if (data.owner_department_id) {
+          fetchDepartmentUsers(data.owner_department_id);
+          fetchDepartmentGoals(data.owner_department_id);
+          fetchDepartmentRisks(data.owner_department_id);
+        }
       }
     } catch (error) {
       console.error('Error fetching process:', error);
@@ -411,7 +463,17 @@ export default function BPMProcessForm() {
                   disabled={!formData.category_id}
                 >
                   <option value="">Yok (Ana Seviye)</option>
+                  {parentProcesses.filter(p => p.level < 4 && p.id !== id).map(process => (
+                    <option key={process.id} value={process.id}>
+                      {process.code} - {process.name}
+                    </option>
+                  ))}
                 </select>
+                {formData.category_id && parentProcesses.length === 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bu kategoride henüz süreç bulunmuyor.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -716,27 +778,44 @@ export default function BPMProcessForm() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               İlişkili Riskler
             </label>
-            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
-              {risks.map(risk => (
-                <label key={risk.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
-                  <input
-                    type="checkbox"
-                    checked={formData.risk_ids.includes(risk.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setFormData(prev => ({ ...prev, risk_ids: [...prev.risk_ids, risk.id] }));
-                      } else {
-                        setFormData(prev => ({ ...prev, risk_ids: prev.risk_ids.filter(id => id !== risk.id) }));
-                      }
-                    }}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm font-mono text-gray-600">{risk.code}</span>
-                  <span className="text-sm flex-1">{risk.name}</span>
-                  <span className="text-xs px-2 py-1 bg-gray-100 rounded">{risk.current_level}</span>
-                </label>
-              ))}
-            </div>
+            {!formData.owner_department_id ? (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm">
+                  Riskleri görmek için önce <span className="font-semibold">Sorumlu Birim</span> seçiniz.
+                </p>
+              </div>
+            ) : risks.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm">
+                  Seçilen birim için henüz risk tanımlanmamış.
+                </p>
+                <p className="text-xs mt-1">
+                  Risk Yönetimi modülünden risk ekleyebilirsiniz.
+                </p>
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
+                {risks.map(risk => (
+                  <label key={risk.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
+                    <input
+                      type="checkbox"
+                      checked={formData.risk_ids.includes(risk.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData(prev => ({ ...prev, risk_ids: [...prev.risk_ids, risk.id] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, risk_ids: prev.risk_ids.filter(id => id !== risk.id) }));
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm font-mono text-gray-600">{risk.code}</span>
+                    <span className="text-sm flex-1">{risk.name}</span>
+                    <span className="text-xs px-2 py-1 bg-gray-100 rounded">{risk.current_level}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         ))}
 
@@ -749,12 +828,22 @@ export default function BPMProcessForm() {
               value={formData.strategic_goal_id}
               onChange={(e) => setFormData({ ...formData, strategic_goal_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              disabled={!formData.owner_department_id}
             >
               <option value="">Seçiniz</option>
               {goals.map(goal => (
                 <option key={goal.id} value={goal.id}>{goal.code} - {goal.name}</option>
               ))}
             </select>
+            {!formData.owner_department_id ? (
+              <p className="mt-2 text-sm text-gray-500">
+                Hedefleri görmek için önce <span className="font-semibold">Sorumlu Birim</span> seçiniz.
+              </p>
+            ) : goals.length === 0 ? (
+              <p className="mt-2 text-sm text-gray-500">
+                Seçilen birim için henüz stratejik hedef tanımlanmamış.
+              </p>
+            ) : null}
           </div>
         ))}
 
