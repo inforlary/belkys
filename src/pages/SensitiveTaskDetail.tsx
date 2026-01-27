@@ -674,10 +674,10 @@ export default function SensitiveTaskDetail() {
                 disabled={saving}
               >
                 <option value="">Seçiniz...</option>
+                <option value="monthly">Aylık</option>
                 <option value="quarterly">3 Aylık</option>
-                <option value="semi-annual">6 Aylık</option>
+                <option value="semi_annual">6 Aylık</option>
                 <option value="annual">Yıllık</option>
-                <option value="biennial">2 Yıllık</option>
               </select>
             </div>
 
