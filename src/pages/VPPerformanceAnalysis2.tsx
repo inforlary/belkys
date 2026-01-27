@@ -21,6 +21,7 @@ import {
   getProgressColor,
   getProgressTextColor
 } from '../utils/progressCalculations';
+import { calculateCurrentValueFromEntries } from '../utils/indicatorCalculations';
 import { exportToPDF } from '../utils/exportHelpers';
 
 interface VPWithDepartments {
@@ -261,10 +262,17 @@ export default function VPPerformanceAnalysis2() {
 
             const enrichedIndicators: IndicatorDetail[] = goalIndicators.map(ind => {
               const progress = calculateIndicatorProgress(ind, allEntries);
-              const indicatorEntries = allEntries.filter(e => e.indicator_id === ind.id);
-              const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
               const baselineValue = ind.baseline_value ?? 0;
-              const currentValue = baselineValue + sumOfEntries;
+              const currentValue = calculateCurrentValueFromEntries(
+                ind.id,
+                baselineValue,
+                ind.calculation_method || 'cumulative',
+                allEntries.map(e => ({
+                  indicator_id: e.indicator_id,
+                  value: e.value,
+                  status: e.status
+                }))
+              ) ?? baselineValue;
 
               return {
                 id: ind.id,

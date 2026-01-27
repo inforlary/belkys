@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Search, ChevronDown, ChevronRight, CreditCard as Edit2, Trash2, Plus, CheckCircle, Clock, XCircle, Send, X, FileSpreadsheet, FileText, TrendingUp } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { calculateIndicatorProgress, calculateGoalProgress, calculateObjectiveProgress, getProgressColor } from '../utils/progressCalculations';
+import { calculateCurrentValueFromEntries } from '../utils/indicatorCalculations';
 import {
   IndicatorStatus,
   getIndicatorStatus,
@@ -281,49 +282,22 @@ const getIndicatorTarget = (indicatorId: string, indicator: any) => {
     return 0;
   };
  const calculateCurrentValue = (indicator: Indicator) => {
-    const indicatorEntries = entries.filter(
-      e => e.indicator_id === indicator.id && e.status === 'approved'
-    );
-    if (indicatorEntries.length === 0) return null;
+    const baselineValue = indicator.yearly_baseline !== undefined && indicator.yearly_baseline !== null
+      ? indicator.yearly_baseline
+      : (indicator.baseline_value !== undefined && indicator.baseline_value !== null ? indicator.baseline_value : 0);
 
-    const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
-    const periodCount = indicatorEntries.length;
-    const average = sumOfEntries / periodCount;
-    const baselineValue = indicator.yearly_baseline !== undefined && indicator.yearly_baseline !== null ? indicator.yearly_baseline : (indicator.baseline_value !== undefined && indicator.baseline_value !== null ? indicator.baseline_value : 0);
     const calculationMethod = indicator.calculation_method || 'cumulative';
 
-    let currentValue = 0;
-
-    switch (calculationMethod) {
-      case 'cumulative':
-      case 'cumulative_increasing':
-      case 'increasing':
-        currentValue = baselineValue + sumOfEntries;
-        break;
-        
-      case 'cumulative_decreasing':
-      case 'decreasing':
-        currentValue = baselineValue - sumOfEntries;
-        break;
-        
-      case 'percentage':
-      case 'percentage_increasing':
-      case 'percentage_decreasing':
-        currentValue = average;
-        break;
-        
-      case 'maintenance':
-      case 'maintenance_increasing':
-      case 'maintenance_decreasing':
-        currentValue = average;
-        break;
-        
-      default:
-        currentValue = baselineValue + sumOfEntries;
-        break;
-    }
-    
-    return currentValue;
+    return calculateCurrentValueFromEntries(
+      indicator.id,
+      baselineValue,
+      calculationMethod,
+      entries.map(e => ({
+        indicator_id: e.indicator_id,
+        value: e.value,
+        status: e.status
+      }))
+    );
 };
   const getEnteredPeriods = (indicatorId: string, indicator: Indicator) => {
     const indicatorEntries = entries

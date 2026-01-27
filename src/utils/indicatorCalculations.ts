@@ -148,3 +148,51 @@ export async function getIndicatorPeriodValues(
 
   return data?.map(d => d.value || 0) || [];
 }
+
+interface IndicatorEntry {
+  indicator_id: string;
+  value: number;
+  status: string;
+}
+
+export function calculateCurrentValueFromEntries(
+  indicatorId: string,
+  baselineValue: number,
+  calculationMethod: string,
+  entries: IndicatorEntry[]
+): number | null {
+  const indicatorEntries = entries.filter(
+    e => e.indicator_id === indicatorId && e.status === 'approved'
+  );
+
+  if (indicatorEntries.length === 0) return null;
+
+  const sumOfEntries = indicatorEntries.reduce((sum, entry) => sum + entry.value, 0);
+  const periodCount = indicatorEntries.length;
+  const average = sumOfEntries / periodCount;
+  const method = (calculationMethod || 'cumulative') as CalculationMethod;
+
+  switch (method) {
+    case 'cumulative':
+    case 'cumulative_increasing':
+    case 'increasing':
+      return baselineValue + sumOfEntries;
+
+    case 'cumulative_decreasing':
+    case 'decreasing':
+      return baselineValue - sumOfEntries;
+
+    case 'percentage':
+    case 'percentage_increasing':
+    case 'percentage_decreasing':
+      return average;
+
+    case 'maintenance':
+    case 'maintenance_increasing':
+    case 'maintenance_decreasing':
+      return average;
+
+    default:
+      return baselineValue + sumOfEntries;
+  }
+}
