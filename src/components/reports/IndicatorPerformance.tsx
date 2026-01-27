@@ -676,6 +676,13 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const handleExportPDF = () => {
     const stats = getIndicatorStats();
 
+    const totalProgress = filteredIndicators.length > 0
+      ? Math.round(
+          filteredIndicators.reduce((sum, ind) => sum + calculateSelectedProgress(ind), 0) /
+          filteredIndicators.length
+        )
+      : 0;
+
     const groupedByPlan = filteredIndicators.reduce((acc, ind) => {
       const planKey = ind.strategic_plan_id || 'no-plan';
       if (!acc[planKey]) {
@@ -716,11 +723,17 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
       if (ind.goal_id) totalGoals.add(ind.goal_id);
     });
 
+    const organizationName = organization?.name || 'Kurum';
+
     let contentHTML = `
       <div style="page-break-inside: avoid;">
         <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px;">
-          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Gösterge Performans Raporu</h1>
-          <h2 style="margin: 0; font-size: 20px; font-weight: normal; opacity: 0.9;">${currentYear} Yılı</h2>
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Kurum Genel Durumu - ${currentYear}</h1>
+          <h2 style="margin: 0 0 15px 0; font-size: 20px; font-weight: normal; opacity: 0.9;">${organizationName}</h2>
+          <div style="margin-top: 20px; padding: 15px; background-color: rgba(255, 255, 255, 0.2); border-radius: 8px; display: inline-block;">
+            <div style="font-size: 48px; font-weight: bold; margin-bottom: 5px;">${totalProgress}%</div>
+            <div style="font-size: 16px; opacity: 0.95;">Genel İlerleme Oranı</div>
+          </div>
         </div>
 
         <div style="margin-bottom: 20px; padding: 20px; background-color: #ede9fe; border-left: 5px solid #8b5cf6; border-radius: 5px;">
