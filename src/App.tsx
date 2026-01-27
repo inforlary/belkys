@@ -136,6 +136,10 @@ import WorkflowList from './pages/WorkflowList';
 import WorkflowTemplateSelection from './pages/WorkflowTemplateSelection';
 import WorkflowForm from './pages/WorkflowForm';
 import WorkflowDetail from './pages/WorkflowDetail';
+import SensitiveTasksDashboard from './pages/SensitiveTasksDashboard';
+import SensitiveTasksList from './pages/SensitiveTasksList';
+import SensitiveTaskDetail from './pages/SensitiveTaskDetail';
+import SensitiveTasksReports from './pages/SensitiveTasksReports';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -164,6 +168,9 @@ function AppContent() {
 const renderPage = () => {
     console.log('[App.tsx] renderPage called with currentPath:', currentPath);
 
+    if (currentPath.startsWith('sensitive-tasks/') && currentPath !== 'sensitive-tasks/list' && currentPath !== 'sensitive-tasks/reports') {
+      return <SensitiveTaskDetail />;
+    }
     if (currentPath === 'workflows/create/blank' || currentPath.startsWith('workflows/create/')) {
       return <WorkflowForm />;
     }
@@ -376,6 +383,12 @@ const renderPage = () => {
         return <WorkflowList />;
       case 'workflows/new':
         return <WorkflowTemplateSelection />;
+      case 'sensitive-tasks':
+        return <SensitiveTasksDashboard />;
+      case 'sensitive-tasks/list':
+        return <SensitiveTasksList />;
+      case 'sensitive-tasks/reports':
+        return <SensitiveTasksReports />;
       case 'risks':
         return <RiskManagement />;
       case 'risks/register':

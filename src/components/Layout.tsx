@@ -343,6 +343,8 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       items: [
         { icon: GitBranch, label: 'İş Akış Şemaları', path: 'workflows' },
         { icon: FileText, label: 'Şablon Seçimi', path: 'workflows/new' },
+        { icon: AlertTriangle, label: 'Hassas Görevler', path: 'sensitive-tasks' },
+        { icon: FileText, label: 'Hassas Görev Raporları', path: 'sensitive-tasks/reports' },
       ],
     },
     {
