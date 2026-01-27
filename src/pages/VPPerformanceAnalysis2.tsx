@@ -464,6 +464,163 @@ export default function VPPerformanceAnalysis2() {
     return colorMap[tailwindClass] || '#000000';
   };
 
+  const generateVPContent = (vp: VPPerformance) => {
+    const vpStatusConfig = getStatusConfigByPercentage(vp.overall_performance);
+    const vpColor = getColorFromTailwind(vpStatusConfig.color);
+
+    let content = `
+      <div style="background: ${vpColor}; color: white; padding: 14px 20px; border-radius: 6px; margin: 16px 0 12px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 700;">${vp.vp_name}</h2>
+          <span style="font-size: 18px; font-weight: 700;">%${vp.overall_performance}</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
+        <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; text-align: center;">
+          <div style="font-size: 9px; color: #64748b; margin-bottom: 4px;">E-posta</div>
+          <div style="font-size: 10px; font-weight: 600; color: #1e293b;">${vp.vp_email}</div>
+        </div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; text-align: center;">
+          <div style="font-size: 9px; color: #64748b; margin-bottom: 4px;">Toplam Müdürlük</div>
+          <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${vp.total_departments}</div>
+        </div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; text-align: center;">
+          <div style="font-size: 9px; color: #64748b; margin-bottom: 4px;">Toplam Gösterge</div>
+          <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${vp.total_indicators}</div>
+        </div>
+      </div>
+    `;
+
+    vp.departments.forEach((dept) => {
+      const deptStatusConfig = getStatusConfigByPercentage(dept.performance_percentage);
+      const deptBgColor = getColorFromTailwind(deptStatusConfig.bgColor);
+      const deptColor = getColorFromTailwind(deptStatusConfig.color);
+
+      content += `
+        <div style="background: ${deptBgColor}; border-left: 4px solid ${deptColor}; padding: 10px 14px; margin: 12px 0; border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #1e293b;">${dept.department_name}</h3>
+            <div style="text-align: right;">
+              <span style="font-size: 16px; font-weight: 700; color: ${deptColor};">%${dept.performance_percentage}</span>
+              <span style="font-size: 9px; color: #64748b; margin-left: 6px;">${deptStatusConfig.label}</span>
+            </div>
+          </div>
+          <div style="margin-top: 4px; font-size: 9px; color: #64748b;">
+            ${dept.total_goals} hedef • ${dept.total_indicators} gösterge
+          </div>
+        </div>
+      `;
+
+      dept.goals.forEach((goal) => {
+        const goalStatusConfig = getStatusConfigByPercentage(goal.progress);
+        const goalColor = getColorFromTailwind(goalStatusConfig.color);
+
+        content += `
+          <div style="margin: 10px 0 10px 20px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <div style="flex: 1;">
+                <span style="font-size: 10px; font-weight: 600; color: #1e40af;">${goal.code}</span>
+                <span style="font-size: 10px; color: #475569; margin-left: 6px;">${goal.title}</span>
+              </div>
+              <div style="text-align: right; margin-left: 10px;">
+                <span style="font-size: 12px; font-weight: 700; color: ${goalColor};">%${goal.progress}</span>
+              </div>
+            </div>
+            <div style="font-size: 8px; color: #64748b; margin-bottom: 6px;">
+              Amaç: ${goal.objective_code} - ${goal.objective_title}
+            </div>
+        `;
+
+        if (goal.indicators.length > 0) {
+          content += `
+            <table style="width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 7.5pt;">
+              <thead>
+                <tr>
+                  <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Kod</th>
+                  <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Gösterge</th>
+                  <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Başlangıç</th>
+                  <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Hedef</th>
+                  <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Gerçekleşme</th>
+                  <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">İlerleme</th>
+                  <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          goal.indicators.forEach((ind, idx) => {
+            const statusConfig = getStatusConfigByPercentage(ind.progress);
+            const progressColor = getColorFromTailwind(statusConfig.color);
+            const gradeBgColor = getColorFromTailwind(statusConfig.bgColor);
+            const bgColor = idx % 2 === 1 ? '#f8fafc' : '#ffffff';
+
+            content += `
+              <tr style="background-color: ${bgColor};">
+                <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.code}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.name}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.yearly_target ? ind.yearly_target.toLocaleString('tr-TR') : '-'}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.current_value.toLocaleString('tr-TR')}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px 6px; font-weight: 700; color: ${progressColor};">${ind.progress}%</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">
+                  <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; background-color: ${gradeBgColor}; color: ${progressColor};">${statusConfig.label}</span>
+                </td>
+              </tr>
+            `;
+          });
+
+          content += `
+              </tbody>
+            </table>
+          `;
+        } else {
+          content += '<p style="font-size: 9px; color: #64748b; text-align: center; margin: 8px 0;">Bu hedef için gösterge tanımlanmamış</p>';
+        }
+
+        content += '</div>';
+      });
+
+      if (dept.goals.length === 0) {
+        content += '<p style="font-size: 9px; color: #64748b; text-align: center; margin: 12px 20px;">Bu müdürlük için hedef tanımlanmamış</p>';
+      }
+    });
+
+    return content;
+  };
+
+  const handleExportSingleVPPDF = (vp: VPPerformance) => {
+    let content = `
+      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 18px 24px; border-radius: 6px; margin-bottom: 20px;">
+        <h1 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 700;">${vp.vp_name} - Performans Raporu</h1>
+        <p style="margin: 0; font-size: 12px; opacity: 0.9;">Müdürlük ve Gösterge Bazlı Detaylı Performans Raporu - ${selectedYear}</p>
+      </div>
+    `;
+
+    content += generateVPContent(vp);
+
+    content += `
+      <div style="margin-top: 20px; padding: 12px 16px; background: #f1f5f9; border-radius: 4px; border-left: 3px solid #2563eb;">
+        <p style="margin: 0; color: #475569; font-size: 9px;">
+          <strong>Rapor Tarihi:</strong> ${new Date().toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </p>
+        <p style="margin: 4px 0 0 0; color: #475569; font-size: 9px;">
+          <strong>Rapor Dönemi:</strong> ${selectedYear} Yılı
+        </p>
+        <p style="margin: 4px 0 0 0; color: #475569; font-size: 9px;">
+          <strong>Başkan Yardımcısı:</strong> ${vp.vp_name}
+        </p>
+      </div>
+    `;
+
+    const sanitizedName = vp.vp_name.replace(/[^a-zA-Z0-9]/g, '_');
+    exportToPDF(
+      `${vp.vp_name} - Performans Raporu - ${selectedYear}`,
+      content,
+      `${sanitizedName}_Performans_${selectedYear}_${new Date().toISOString().split('T')[0]}`
+    );
+  };
+
   const handleExportPDF = () => {
     if (vpPerformances.length === 0) return;
 
@@ -475,130 +632,10 @@ export default function VPPerformanceAnalysis2() {
     `;
 
     vpPerformances.forEach((vp, vpIndex) => {
-      const vpStatusConfig = getStatusConfigByPercentage(vp.overall_performance);
-      const vpColor = getColorFromTailwind(vpStatusConfig.color);
-
       if (vpIndex > 0) {
         content += '<div style="page-break-before: always;"></div>';
       }
-
-      content += `
-        <div style="background: ${vpColor}; color: white; padding: 14px 20px; border-radius: 6px; margin: 16px 0 12px 0;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0; font-size: 16px; font-weight: 700;">${vp.vp_name}</h2>
-            <span style="font-size: 18px; font-weight: 700;">%${vp.overall_performance}</span>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
-          <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; text-align: center;">
-            <div style="font-size: 9px; color: #64748b; margin-bottom: 4px;">E-posta</div>
-            <div style="font-size: 10px; font-weight: 600; color: #1e293b;">${vp.vp_email}</div>
-          </div>
-          <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; text-align: center;">
-            <div style="font-size: 9px; color: #64748b; margin-bottom: 4px;">Toplam Müdürlük</div>
-            <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${vp.total_departments}</div>
-          </div>
-          <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; text-align: center;">
-            <div style="font-size: 9px; color: #64748b; margin-bottom: 4px;">Toplam Gösterge</div>
-            <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${vp.total_indicators}</div>
-          </div>
-        </div>
-      `;
-
-      vp.departments.forEach((dept) => {
-        const deptStatusConfig = getStatusConfigByPercentage(dept.performance_percentage);
-        const deptBgColor = getColorFromTailwind(deptStatusConfig.bgColor);
-        const deptColor = getColorFromTailwind(deptStatusConfig.color);
-
-        content += `
-          <div style="background: ${deptBgColor}; border-left: 4px solid ${deptColor}; padding: 10px 14px; margin: 12px 0; border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #1e293b;">${dept.department_name}</h3>
-              <div style="text-align: right;">
-                <span style="font-size: 16px; font-weight: 700; color: ${deptColor};">%${dept.performance_percentage}</span>
-                <span style="font-size: 9px; color: #64748b; margin-left: 6px;">${deptStatusConfig.label}</span>
-              </div>
-            </div>
-            <div style="margin-top: 4px; font-size: 9px; color: #64748b;">
-              ${dept.total_goals} hedef • ${dept.total_indicators} gösterge
-            </div>
-          </div>
-        `;
-
-        dept.goals.forEach((goal) => {
-          const goalStatusConfig = getStatusConfigByPercentage(goal.progress);
-          const goalColor = getColorFromTailwind(goalStatusConfig.color);
-
-          content += `
-            <div style="margin: 10px 0 10px 20px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                <div style="flex: 1;">
-                  <span style="font-size: 10px; font-weight: 600; color: #1e40af;">${goal.code}</span>
-                  <span style="font-size: 10px; color: #475569; margin-left: 6px;">${goal.title}</span>
-                </div>
-                <div style="text-align: right; margin-left: 10px;">
-                  <span style="font-size: 12px; font-weight: 700; color: ${goalColor};">%${goal.progress}</span>
-                </div>
-              </div>
-              <div style="font-size: 8px; color: #64748b; margin-bottom: 6px;">
-                Amaç: ${goal.objective_code} - ${goal.objective_title}
-              </div>
-          `;
-
-          if (goal.indicators.length > 0) {
-            content += `
-              <table style="width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 7.5pt;">
-                <thead>
-                  <tr>
-                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Kod</th>
-                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Gösterge</th>
-                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Başlangıç</th>
-                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Hedef</th>
-                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Gerçekleşme</th>
-                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">İlerleme</th>
-                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Durum</th>
-                  </tr>
-                </thead>
-                <tbody>
-            `;
-
-            goal.indicators.forEach((ind, idx) => {
-              const statusConfig = getStatusConfigByPercentage(ind.progress);
-              const progressColor = getColorFromTailwind(statusConfig.color);
-              const gradeBgColor = getColorFromTailwind(statusConfig.bgColor);
-              const bgColor = idx % 2 === 1 ? '#f8fafc' : '#ffffff';
-
-              content += `
-                <tr style="background-color: ${bgColor};">
-                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.code}</td>
-                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.name}</td>
-                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}</td>
-                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.yearly_target ? ind.yearly_target.toLocaleString('tr-TR') : '-'}</td>
-                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.current_value.toLocaleString('tr-TR')}</td>
-                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px; font-weight: 700; color: ${progressColor};">${ind.progress}%</td>
-                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">
-                    <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; background-color: ${gradeBgColor}; color: ${progressColor};">${statusConfig.label}</span>
-                  </td>
-                </tr>
-              `;
-            });
-
-            content += `
-                </tbody>
-              </table>
-            `;
-          } else {
-            content += '<p style="font-size: 9px; color: #64748b; text-align: center; margin: 8px 0;">Bu hedef için gösterge tanımlanmamış</p>';
-          }
-
-          content += '</div>';
-        });
-
-        if (dept.goals.length === 0) {
-          content += '<p style="font-size: 9px; color: #64748b; text-align: center; margin: 12px 20px;">Bu müdürlük için hedef tanımlanmamış</p>';
-        }
-      });
+      content += generateVPContent(vp);
     });
 
     content += `
@@ -685,20 +722,32 @@ export default function VPPerformanceAnalysis2() {
             return (
               <Card key={vp.vp_id}>
                 <CardBody>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <User className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-900">{vp.vp_name}</h2>
+                        <p className="text-xs text-gray-600">{vp.vp_email}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportSingleVPPDF(vp);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      PDF İndir
+                    </button>
+                  </div>
                   <div
                     onClick={() => toggleVP(vp.vp_id)}
                     className="cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 rounded-lg">
-                          <User className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <h2 className="text-xl font-bold text-gray-900">{vp.vp_name}</h2>
-                          <p className="text-sm text-gray-600">{vp.vp_email}</p>
-                        </div>
-                      </div>
                       <div className="flex items-center gap-6">
                         <div className="text-center">
                           <p className="text-sm text-gray-600">Müdürlük</p>
@@ -717,6 +766,8 @@ export default function VPPerformanceAnalysis2() {
                             {vpStatusConfig.label}
                           </span>
                         </div>
+                      </div>
+                      <div>
                         {isVPExpanded ? (
                           <ChevronUp className="w-6 h-6 text-gray-400" />
                         ) : (
