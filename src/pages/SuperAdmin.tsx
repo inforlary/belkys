@@ -33,6 +33,9 @@ interface Organization {
   module_internal_control: boolean;
   module_risk_management: boolean;
   module_quality_management: boolean;
+  module_project_management: boolean;
+  module_workflow_management: boolean;
+  module_process_management: boolean;
   module_settings: boolean;
   module_administration: boolean;
 }

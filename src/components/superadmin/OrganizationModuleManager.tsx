@@ -12,7 +12,10 @@ import {
   Save,
   Search,
   CheckCircle,
-  XCircle
+  XCircle,
+  FolderOpen,
+  GitBranch,
+  Workflow
 } from 'lucide-react';
 
 interface Organization {
@@ -26,6 +29,9 @@ interface Organization {
   module_risk_management: boolean;
   module_internal_control: boolean;
   module_quality_management: boolean;
+  module_project_management: boolean;
+  module_workflow_management: boolean;
+  module_process_management: boolean;
   module_settings: boolean;
   module_administration: boolean;
 }
@@ -38,6 +44,9 @@ interface Module {
     'module_risk_management' |
     'module_internal_control' |
     'module_quality_management' |
+    'module_project_management' |
+    'module_workflow_management' |
+    'module_process_management' |
     'module_settings' |
     'module_administration'
   >;
@@ -89,6 +98,27 @@ const MODULES: Module[] = [
     description: 'Kalite yönetim sistemi',
     icon: <Award className="w-5 h-5" />,
     color: 'indigo'
+  },
+  {
+    key: 'module_project_management',
+    name: 'Proje Yönetimi',
+    description: 'Proje takibi ve yönetimi',
+    icon: <FolderOpen className="w-5 h-5" />,
+    color: 'teal'
+  },
+  {
+    key: 'module_workflow_management',
+    name: 'İş Akış Şemaları',
+    description: 'İş akışları ve süreç şemaları',
+    icon: <Workflow className="w-5 h-5" />,
+    color: 'pink'
+  },
+  {
+    key: 'module_process_management',
+    name: 'Süreç Yönetimi',
+    description: 'Kurumsal süreç yönetimi',
+    icon: <GitBranch className="w-5 h-5" />,
+    color: 'emerald'
   },
   {
     key: 'module_settings',
