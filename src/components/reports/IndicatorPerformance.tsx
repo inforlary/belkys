@@ -676,12 +676,25 @@ export default function IndicatorPerformance({ selectedYear }: IndicatorPerforma
   const handleExportPDF = () => {
     const stats = getIndicatorStats();
 
-    const totalProgress = filteredIndicators.length > 0
-      ? Math.round(
-          filteredIndicators.reduce((sum, ind) => sum + calculateSelectedProgress(ind), 0) /
-          filteredIndicators.length
-        )
-      : 0;
+    let totalGoalProgress = 0;
+    let goalCount = 0;
+    const processedGoals = new Set<string>();
+
+    filteredIndicators.forEach(ind => {
+      if (!processedGoals.has(ind.goal_id)) {
+        processedGoals.add(ind.goal_id);
+        const goalIndicators = filteredIndicators.filter(i => i.goal_id === ind.goal_id);
+        const goalIndicatorsWithTarget = goalIndicators.filter(i => i.target_value > 0);
+
+        if (goalIndicatorsWithTarget.length > 0) {
+          const goalProgress = calculateGoalProgress(ind.goal_id, goalIndicatorsWithTarget, dataEntries);
+          totalGoalProgress += goalProgress;
+          goalCount++;
+        }
+      }
+    });
+
+    const totalProgress = goalCount > 0 ? Math.round(totalGoalProgress / goalCount) : 0;
 
     const groupedByPlan = filteredIndicators.reduce((acc, ind) => {
       const planKey = ind.strategic_plan_id || 'no-plan';
