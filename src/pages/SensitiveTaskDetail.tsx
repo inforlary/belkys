@@ -200,7 +200,7 @@ export default function SensitiveTaskDetail() {
         .insert({
           sensitive_task_id: id!,
           organization_id: profile!.organization_id,
-          action_type: isInitialAssignment ? 'initial_assignment' : 'assignment',
+          action_type: isInitialAssignment ? 'initial_assignment' : 'rotation',
           action_date: now,
           previous_primary_id: task?.assigned_primary_id || null,
           new_primary_id: assignForm.primary_id,
