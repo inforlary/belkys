@@ -61,9 +61,14 @@ export default function SensitiveTaskDetail() {
   useEffect(() => {
     if (id && profile?.organization_id) {
       loadData();
-      loadUsers();
     }
   }, [id, profile?.organization_id]);
+
+  useEffect(() => {
+    if (task) {
+      loadUsers();
+    }
+  }, [task]);
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -121,13 +126,14 @@ export default function SensitiveTaskDetail() {
 
   const loadUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, role, department_id, departments(name)')
-        .eq('organization_id', profile!.organization_id)
-        .order('full_name');
+      const { data, error } = await supabase.rpc('get_users_for_sensitive_task', {
+        p_organization_id: profile!.organization_id,
+        p_department_id: task?.department_id || null
+      });
 
       if (error) throw error;
+
+      console.log('Loaded users:', data?.length || 0, 'users for task department:', task?.department_id);
       setUsers(data || []);
     } catch (error) {
       console.error('Kullanıcı yükleme hatası:', error);
@@ -627,7 +633,7 @@ export default function SensitiveTaskDetail() {
                 <option value="">Seçiniz...</option>
                 {users.map(user => (
                   <option key={user.id} value={user.id}>
-                    {user.full_name} - {user.role} {user.departments?.name ? `(${user.departments.name})` : ''}
+                    {user.full_name} - {user.role} {user.department_name ? `(${user.department_name})` : ''}
                   </option>
                 ))}
               </select>
@@ -648,7 +654,7 @@ export default function SensitiveTaskDetail() {
                   .filter(u => u.id !== assignForm.primary_id)
                   .map(user => (
                     <option key={user.id} value={user.id}>
-                      {user.full_name} - {user.role} {user.departments?.name ? `(${user.departments.name})` : ''}
+                      {user.full_name} - {user.role} {user.department_name ? `(${user.department_name})` : ''}
                     </option>
                   ))}
               </select>
@@ -741,7 +747,7 @@ export default function SensitiveTaskDetail() {
                   .filter(u => u.id !== task?.assigned_primary_id)
                   .map(user => (
                     <option key={user.id} value={user.id}>
-                      {user.full_name} - {user.role} {user.departments?.name ? `(${user.departments.name})` : ''}
+                      {user.full_name} - {user.role} {user.department_name ? `(${user.department_name})` : ''}
                     </option>
                   ))}
               </select>
@@ -765,7 +771,7 @@ export default function SensitiveTaskDetail() {
                   .filter(u => u.id !== rotationForm.new_primary_id && u.id !== task?.assigned_backup_id)
                   .map(user => (
                     <option key={user.id} value={user.id}>
-                      {user.full_name} - {user.role} {user.departments?.name ? `(${user.departments.name})` : ''}
+                      {user.full_name} - {user.role} {user.department_name ? `(${user.department_name})` : ''}
                     </option>
                   ))}
               </select>
