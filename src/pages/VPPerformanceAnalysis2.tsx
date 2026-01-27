@@ -21,7 +21,7 @@ import {
   getProgressColor,
   getProgressTextColor
 } from '../utils/progressCalculations';
-import { exportToPDF, generateTableHTML } from '../utils/exportHelpers';
+import { exportToPDF } from '../utils/exportHelpers';
 
 interface VPWithDepartments {
   id: string;
@@ -511,21 +511,71 @@ export default function VPPerformanceAnalysis2() {
           `;
 
           if (goal.indicators.length > 0) {
-            const indicatorHeaders = ['Kod', 'Gösterge', 'Başlangıç', 'Hedef', 'Gerçekleşme', 'İlerleme', 'Durum'];
-            const indicatorRows = goal.indicators.map(ind => {
+            content += `
+              <table style="width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 7.5pt;">
+                <thead>
+                  <tr>
+                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Kod</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Gösterge</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Başlangıç</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Hedef</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Gerçekleşme</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">İlerleme</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 4px 6px; background-color: #2563eb; color: white; font-weight: bold; font-size: 8pt;">Durum</th>
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+
+            goal.indicators.forEach((ind, idx) => {
               const indGrade = getPerformanceGrade(ind.progress);
-              return [
-                ind.code,
-                ind.name,
-                ind.yearly_baseline?.toLocaleString('tr-TR') || '0',
-                ind.yearly_target ? ind.yearly_target.toLocaleString('tr-TR') : '-',
-                ind.current_value.toLocaleString('tr-TR'),
-                `${ind.progress}%`,
-                indGrade.grade
-              ];
+              let progressColor = '#22c55e';
+              let gradeColor = '#22c55e';
+              let gradeBgColor = '#dcfce7';
+
+              if (ind.progress >= 90) {
+                progressColor = '#22c55e';
+                gradeColor = '#22c55e';
+                gradeBgColor = '#dcfce7';
+              } else if (ind.progress >= 75) {
+                progressColor = '#3b82f6';
+                gradeColor = '#3b82f6';
+                gradeBgColor = '#dbeafe';
+              } else if (ind.progress >= 60) {
+                progressColor = '#eab308';
+                gradeColor = '#eab308';
+                gradeBgColor = '#fef3c7';
+              } else if (ind.progress >= 40) {
+                progressColor = '#f97316';
+                gradeColor = '#f97316';
+                gradeBgColor = '#fed7aa';
+              } else {
+                progressColor = '#ef4444';
+                gradeColor = '#ef4444';
+                gradeBgColor = '#fee2e2';
+              }
+
+              const bgColor = idx % 2 === 1 ? '#f8fafc' : '#ffffff';
+
+              content += `
+                <tr style="background-color: ${bgColor};">
+                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.code}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.name}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.yearly_baseline?.toLocaleString('tr-TR') || '0'}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.yearly_target ? ind.yearly_target.toLocaleString('tr-TR') : '-'}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.current_value.toLocaleString('tr-TR')}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px; font-weight: 700; color: ${progressColor};">${ind.progress}%</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">
+                    <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; background-color: ${gradeBgColor}; color: ${gradeColor};">${indGrade.grade}</span>
+                  </td>
+                </tr>
+              `;
             });
 
-            content += generateTableHTML(indicatorHeaders, indicatorRows);
+            content += `
+                </tbody>
+              </table>
+            `;
           } else {
             content += '<p style="font-size: 9px; color: #64748b; text-align: center; margin: 8px 0;">Bu hedef için gösterge tanımlanmamış</p>';
           }
