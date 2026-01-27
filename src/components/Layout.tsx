@@ -342,7 +342,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
       icon: Workflow,
       items: [
         { icon: GitBranch, label: 'İş Akış Şemaları', path: 'workflows' },
-        { icon: FileText, label: 'Şablon Seçimi', path: 'workflow-templates' },
+        { icon: FileText, label: 'Şablon Seçimi', path: 'workflows/new' },
       ],
     },
     {
