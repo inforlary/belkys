@@ -132,6 +132,10 @@ import ActiveSessions from './pages/ActiveSessions';
 import SystemHealth from './pages/SystemHealth';
 import SystemUpdates from './pages/SystemUpdates';
 import PresidentDashboard from './pages/PresidentDashboard';
+import WorkflowList from './pages/WorkflowList';
+import WorkflowTemplateSelection from './pages/WorkflowTemplateSelection';
+import WorkflowForm from './pages/WorkflowForm';
+import WorkflowDetail from './pages/WorkflowDetail';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -160,6 +164,12 @@ function AppContent() {
 const renderPage = () => {
     console.log('[App.tsx] renderPage called with currentPath:', currentPath);
 
+    if (currentPath === 'workflows/create/blank' || currentPath.startsWith('workflows/create/')) {
+      return <WorkflowForm />;
+    }
+    if (currentPath.startsWith('workflows/') && currentPath !== 'workflows' && currentPath !== 'workflows/new') {
+      return <WorkflowDetail />;
+    }
     if (currentPath.startsWith('budget-proposals/') && currentPath.includes('/edit')) {
       return <BudgetProposalEdit />;
     }
@@ -359,6 +369,10 @@ const renderPage = () => {
         return <PerformanceCards />;
       case 'strategic-plan-evaluation':
         return <StrategicPlanEvaluation />;
+      case 'workflows':
+        return <WorkflowList />;
+      case 'workflows/new':
+        return <WorkflowTemplateSelection />;
       case 'risks':
         return <RiskManagement />;
       case 'risks/register':

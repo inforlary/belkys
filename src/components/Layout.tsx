@@ -332,6 +332,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: TrendingUp, label: 'Süreç Yönetimi', path: 'internal-control/processes' },
         { icon: BarChart3, label: 'Süreç KPI Takip', path: 'internal-control/process-kpis' },
         { icon: AlertCircle, label: 'DÖF Yönetimi', path: 'internal-control/dof' },
+        { icon: GitBranch, label: 'İş Akış Şemaları', path: 'workflows' },
         { icon: FileText, label: 'Raporlar', path: 'internal-control/reports' },
       ],
     },
