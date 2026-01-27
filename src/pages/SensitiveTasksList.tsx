@@ -67,10 +67,11 @@ export default function SensitiveTasksList() {
       if (tasksResult.error) throw tasksResult.error;
       if (departmentsResult.error) throw departmentsResult.error;
 
-      setTasks(tasksResult.data as unknown as SensitiveTask[]);
-      setDepartments(departmentsResult.data);
+      setTasks((tasksResult.data || []) as unknown as SensitiveTask[]);
+      setDepartments(departmentsResult.data || []);
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
+      alert('Veri yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
     } finally {
       setLoading(false);
     }

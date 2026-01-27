@@ -49,7 +49,7 @@ export default function SensitiveTasksDashboard() {
 
       if (error) throw error;
 
-      const taskList = tasks as unknown as SensitiveTask[];
+      const taskList = (tasks || []) as unknown as SensitiveTask[];
 
       setStats({
         total_tasks: taskList.length,
@@ -110,6 +110,7 @@ export default function SensitiveTasksDashboard() {
       setAlerts(alertList);
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
+      alert('Veri yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
     } finally {
       setLoading(false);
     }
