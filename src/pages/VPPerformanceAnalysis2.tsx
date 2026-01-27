@@ -17,12 +17,11 @@ import type { Profile, Department } from '../types/database';
 import * as XLSX from 'xlsx';
 import {
   calculateIndicatorProgress,
-  calculateGoalProgress,
-  getProgressColor,
-  getProgressTextColor
+  calculateGoalProgress
 } from '../utils/progressCalculations';
 import { calculateCurrentValueFromEntries } from '../utils/indicatorCalculations';
 import { exportToPDF } from '../utils/exportHelpers';
+import { getStatusConfigByPercentage } from '../utils/indicatorStatus';
 
 interface VPWithDepartments {
   id: string;
@@ -425,6 +424,24 @@ export default function VPPerformanceAnalysis2() {
     XLSX.writeFile(workbook, `VP_Performans_Analizi_${selectedYear}.xlsx`);
   };
 
+  const getColorFromTailwind = (tailwindClass: string): string => {
+    const colorMap: Record<string, string> = {
+      'text-purple-600': '#9333ea',
+      'bg-purple-50': '#faf5ff',
+      'text-green-700': '#15803d',
+      'bg-green-100': '#dcfce7',
+      'text-green-600': '#16a34a',
+      'bg-green-50': '#f0fdf4',
+      'text-yellow-600': '#ca8a04',
+      'bg-yellow-50': '#fefce8',
+      'text-red-600': '#dc2626',
+      'bg-red-50': '#fef2f2',
+      'text-amber-800': '#92400e',
+      'bg-amber-100': '#fef3c7'
+    };
+    return colorMap[tailwindClass] || '#000000';
+  };
+
   const handleExportPDF = () => {
     if (vpPerformances.length === 0) return;
 
@@ -436,15 +453,8 @@ export default function VPPerformanceAnalysis2() {
     `;
 
     vpPerformances.forEach((vp, vpIndex) => {
-      const vpGrade = getPerformanceGrade(vp.overall_performance);
-      const vpColorClass = vpGrade.color.replace('text-', '');
-      let vpColor = '#2563eb';
-
-      if (vpColorClass.includes('green')) vpColor = '#22c55e';
-      else if (vpColorClass.includes('blue')) vpColor = '#3b82f6';
-      else if (vpColorClass.includes('yellow')) vpColor = '#eab308';
-      else if (vpColorClass.includes('orange')) vpColor = '#f97316';
-      else if (vpColorClass.includes('red')) vpColor = '#ef4444';
+      const vpStatusConfig = getStatusConfigByPercentage(vp.overall_performance);
+      const vpColor = getColorFromTailwind(vpStatusConfig.color);
 
       if (vpIndex > 0) {
         content += '<div style="page-break-before: always;"></div>';
@@ -475,22 +485,17 @@ export default function VPPerformanceAnalysis2() {
       `;
 
       vp.departments.forEach((dept) => {
-        const deptGrade = getPerformanceGrade(dept.performance_percentage);
-        let deptBgColor = '#f8fafc';
-
-        if (deptGrade.grade === 'Mükemmel') deptBgColor = '#dcfce7';
-        else if (deptGrade.grade === 'Çok İyi') deptBgColor = '#dbeafe';
-        else if (deptGrade.grade === 'İyi') deptBgColor = '#fef3c7';
-        else if (deptGrade.grade === 'Geliştirilmeli') deptBgColor = '#fed7aa';
-        else if (deptGrade.grade === 'Yetersiz') deptBgColor = '#fee2e2';
+        const deptStatusConfig = getStatusConfigByPercentage(dept.performance_percentage);
+        const deptBgColor = getColorFromTailwind(deptStatusConfig.bgColor);
+        const deptColor = getColorFromTailwind(deptStatusConfig.color);
 
         content += `
-          <div style="background: ${deptBgColor}; border-left: 4px solid ${vpColor}; padding: 10px 14px; margin: 12px 0; border-radius: 4px;">
+          <div style="background: ${deptBgColor}; border-left: 4px solid ${deptColor}; padding: 10px 14px; margin: 12px 0; border-radius: 4px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #1e293b;">${dept.department_name}</h3>
               <div style="text-align: right;">
-                <span style="font-size: 16px; font-weight: 700; color: ${vpColor};">%${dept.performance_percentage}</span>
-                <span style="font-size: 9px; color: #64748b; margin-left: 6px;">${deptGrade.grade}</span>
+                <span style="font-size: 16px; font-weight: 700; color: ${deptColor};">%${dept.performance_percentage}</span>
+                <span style="font-size: 9px; color: #64748b; margin-left: 6px;">${deptStatusConfig.label}</span>
               </div>
             </div>
             <div style="margin-top: 4px; font-size: 9px; color: #64748b;">
@@ -500,7 +505,8 @@ export default function VPPerformanceAnalysis2() {
         `;
 
         dept.goals.forEach((goal) => {
-          const goalGrade = getPerformanceGrade(goal.progress);
+          const goalStatusConfig = getStatusConfigByPercentage(goal.progress);
+          const goalColor = getColorFromTailwind(goalStatusConfig.color);
 
           content += `
             <div style="margin: 10px 0 10px 20px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
@@ -510,7 +516,7 @@ export default function VPPerformanceAnalysis2() {
                   <span style="font-size: 10px; color: #475569; margin-left: 6px;">${goal.title}</span>
                 </div>
                 <div style="text-align: right; margin-left: 10px;">
-                  <span style="font-size: 12px; font-weight: 700; color: ${vpColor};">%${goal.progress}</span>
+                  <span style="font-size: 12px; font-weight: 700; color: ${goalColor};">%${goal.progress}</span>
                 </div>
               </div>
               <div style="font-size: 8px; color: #64748b; margin-bottom: 6px;">
@@ -536,33 +542,9 @@ export default function VPPerformanceAnalysis2() {
             `;
 
             goal.indicators.forEach((ind, idx) => {
-              const indGrade = getPerformanceGrade(ind.progress);
-              let progressColor = '#22c55e';
-              let gradeColor = '#22c55e';
-              let gradeBgColor = '#dcfce7';
-
-              if (ind.progress >= 90) {
-                progressColor = '#22c55e';
-                gradeColor = '#22c55e';
-                gradeBgColor = '#dcfce7';
-              } else if (ind.progress >= 75) {
-                progressColor = '#3b82f6';
-                gradeColor = '#3b82f6';
-                gradeBgColor = '#dbeafe';
-              } else if (ind.progress >= 60) {
-                progressColor = '#eab308';
-                gradeColor = '#eab308';
-                gradeBgColor = '#fef3c7';
-              } else if (ind.progress >= 40) {
-                progressColor = '#f97316';
-                gradeColor = '#f97316';
-                gradeBgColor = '#fed7aa';
-              } else {
-                progressColor = '#ef4444';
-                gradeColor = '#ef4444';
-                gradeBgColor = '#fee2e2';
-              }
-
+              const statusConfig = getStatusConfigByPercentage(ind.progress);
+              const progressColor = getColorFromTailwind(statusConfig.color);
+              const gradeBgColor = getColorFromTailwind(statusConfig.bgColor);
               const bgColor = idx % 2 === 1 ? '#f8fafc' : '#ffffff';
 
               content += `
@@ -574,7 +556,7 @@ export default function VPPerformanceAnalysis2() {
                   <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">${ind.current_value.toLocaleString('tr-TR')}</td>
                   <td style="border: 1px solid #cbd5e1; padding: 4px 6px; font-weight: 700; color: ${progressColor};">${ind.progress}%</td>
                   <td style="border: 1px solid #cbd5e1; padding: 4px 6px;">
-                    <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; background-color: ${gradeBgColor}; color: ${gradeColor};">${indGrade.grade}</span>
+                    <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; background-color: ${gradeBgColor}; color: ${progressColor};">${statusConfig.label}</span>
                   </td>
                 </tr>
               `;
@@ -616,14 +598,6 @@ export default function VPPerformanceAnalysis2() {
       content,
       `VP_Performans_Analizi_${selectedYear}_${new Date().toISOString().split('T')[0]}`
     );
-  };
-
-  const getPerformanceGrade = (percentage: number) => {
-    if (percentage >= 90) return { grade: 'Mükemmel', color: 'text-green-600', bgColor: 'bg-green-100' };
-    if (percentage >= 75) return { grade: 'Çok İyi', color: 'text-blue-600', bgColor: 'bg-blue-100' };
-    if (percentage >= 60) return { grade: 'İyi', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
-    if (percentage >= 40) return { grade: 'Geliştirilmeli', color: 'text-orange-600', bgColor: 'bg-orange-100' };
-    return { grade: 'Yetersiz', color: 'text-red-600', bgColor: 'bg-red-100' };
   };
 
   if (!profile) return null;
@@ -684,7 +658,7 @@ export default function VPPerformanceAnalysis2() {
         <div className="space-y-4">
           {vpPerformances.map(vp => {
             const isVPExpanded = expandedVPs.has(vp.vp_id);
-            const performanceGrade = getPerformanceGrade(vp.overall_performance);
+            const vpStatusConfig = getStatusConfigByPercentage(vp.overall_performance);
 
             return (
               <Card key={vp.vp_id}>
@@ -714,11 +688,11 @@ export default function VPPerformanceAnalysis2() {
                         </div>
                         <div className="text-center">
                           <p className="text-sm text-gray-600">Genel Performans</p>
-                          <p className={`text-3xl font-bold ${performanceGrade.color}`}>
+                          <p className={`text-3xl font-bold ${vpStatusConfig.color}`}>
                             %{vp.overall_performance}
                           </p>
-                          <span className={`text-xs px-2 py-1 rounded-full ${performanceGrade.bgColor} ${performanceGrade.color}`}>
-                            {performanceGrade.grade}
+                          <span className={`text-xs px-2 py-1 rounded-full ${vpStatusConfig.bgColor} ${vpStatusConfig.color}`}>
+                            {vpStatusConfig.label}
                           </span>
                         </div>
                         {isVPExpanded ? (
@@ -732,7 +706,7 @@ export default function VPPerformanceAnalysis2() {
                     <div className="mt-4">
                       <div className="w-full bg-gray-200 rounded-full h-3">
                         <div
-                          className={`h-3 rounded-full ${getProgressColor(vp.overall_performance)}`}
+                          className={`h-3 rounded-full ${vpStatusConfig.progressBarColor}`}
                           style={{ width: `${Math.min(100, vp.overall_performance)}%` }}
                         ></div>
                       </div>
@@ -743,7 +717,7 @@ export default function VPPerformanceAnalysis2() {
                     <div className="mt-6 space-y-3">
                       {vp.departments.map(dept => {
                         const isDeptExpanded = expandedDepartments.has(dept.department_id);
-                        const deptGrade = getPerformanceGrade(dept.performance_percentage);
+                        const deptStatusConfig = getStatusConfigByPercentage(dept.performance_percentage);
 
                         return (
                           <div key={dept.department_id} className="border rounded-lg p-4 bg-gray-50">
@@ -763,11 +737,11 @@ export default function VPPerformanceAnalysis2() {
                                 </div>
                                 <div className="flex items-center gap-4">
                                   <div className="text-right">
-                                    <p className={`text-2xl font-bold ${deptGrade.color}`}>
+                                    <p className={`text-2xl font-bold ${deptStatusConfig.color}`}>
                                       %{dept.performance_percentage}
                                     </p>
-                                    <span className={`text-xs px-2 py-1 rounded-full ${deptGrade.bgColor} ${deptGrade.color}`}>
-                                      {deptGrade.grade}
+                                    <span className={`text-xs px-2 py-1 rounded-full ${deptStatusConfig.bgColor} ${deptStatusConfig.color}`}>
+                                      {deptStatusConfig.label}
                                     </span>
                                   </div>
                                   {isDeptExpanded ? (
@@ -781,7 +755,7 @@ export default function VPPerformanceAnalysis2() {
                               <div className="mt-3">
                                 <div className="w-full bg-gray-300 rounded-full h-2">
                                   <div
-                                    className={`h-2 rounded-full ${getProgressColor(dept.performance_percentage)}`}
+                                    className={`h-2 rounded-full ${deptStatusConfig.progressBarColor}`}
                                     style={{ width: `${Math.min(100, dept.performance_percentage)}%` }}
                                   ></div>
                                 </div>
@@ -791,7 +765,7 @@ export default function VPPerformanceAnalysis2() {
                             {isDeptExpanded && (
                               <div className="mt-4 space-y-3">
                                 {dept.goals.map(goal => {
-                                  const goalGrade = getPerformanceGrade(goal.progress);
+                                  const goalStatusConfig = getStatusConfigByPercentage(goal.progress);
 
                                   return (
                                     <div key={goal.id} className="bg-white rounded-lg p-4 border-2 border-blue-200">
@@ -808,11 +782,11 @@ export default function VPPerformanceAnalysis2() {
                                           </div>
                                         </div>
                                         <div className="text-right">
-                                          <p className={`text-xl font-bold ${goalGrade.color}`}>
+                                          <p className={`text-xl font-bold ${goalStatusConfig.color}`}>
                                             %{goal.progress}
                                           </p>
-                                          <span className={`text-xs px-2 py-1 rounded-full ${goalGrade.bgColor} ${goalGrade.color}`}>
-                                            {goalGrade.grade}
+                                          <span className={`text-xs px-2 py-1 rounded-full ${goalStatusConfig.bgColor} ${goalStatusConfig.color}`}>
+                                            {goalStatusConfig.label}
                                           </span>
                                         </div>
                                       </div>
@@ -820,7 +794,7 @@ export default function VPPerformanceAnalysis2() {
                                       <div className="mb-2">
                                         <div className="w-full bg-gray-200 rounded-full h-2">
                                           <div
-                                            className={`h-2 rounded-full ${getProgressColor(goal.progress)}`}
+                                            className={`h-2 rounded-full ${goalStatusConfig.progressBarColor}`}
                                             style={{ width: `${Math.min(100, goal.progress)}%` }}
                                           ></div>
                                         </div>
@@ -840,34 +814,37 @@ export default function VPPerformanceAnalysis2() {
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {goal.indicators.map(ind => (
-                                                <tr key={ind.id} className="border-t hover:bg-gray-50">
-                                                  <td className="px-3 py-2 text-sm font-medium text-gray-900">{ind.code}</td>
-                                                  <td className="px-3 py-2 text-sm text-gray-900">{ind.name}</td>
-                                                  <td className="px-3 py-2 text-sm text-right text-gray-600">
-                                                    {ind.yearly_baseline?.toLocaleString('tr-TR') || '0'} {ind.unit}
-                                                  </td>
-                                                  <td className="px-3 py-2 text-sm text-right text-gray-700">
-                                                    {ind.yearly_target?.toLocaleString('tr-TR') || '-'} {ind.unit}
-                                                  </td>
-                                                  <td className="px-3 py-2 text-sm text-right text-gray-700">
-                                                    {ind.current_value.toLocaleString('tr-TR')} {ind.unit}
-                                                  </td>
-                                                  <td className="px-3 py-2">
-                                                    <div className="flex items-center gap-2">
-                                                      <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                                        <div
-                                                          className={`h-2 rounded-full ${getProgressColor(ind.progress)}`}
-                                                          style={{ width: `${Math.min(100, ind.progress)}%` }}
-                                                        ></div>
+                                              {goal.indicators.map(ind => {
+                                                const indStatusConfig = getStatusConfigByPercentage(ind.progress);
+                                                return (
+                                                  <tr key={ind.id} className="border-t hover:bg-gray-50">
+                                                    <td className="px-3 py-2 text-sm font-medium text-gray-900">{ind.code}</td>
+                                                    <td className="px-3 py-2 text-sm text-gray-900">{ind.name}</td>
+                                                    <td className="px-3 py-2 text-sm text-right text-gray-600">
+                                                      {ind.yearly_baseline?.toLocaleString('tr-TR') || '0'} {ind.unit}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-sm text-right text-gray-700">
+                                                      {ind.yearly_target?.toLocaleString('tr-TR') || '-'} {ind.unit}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-sm text-right text-gray-700">
+                                                      {ind.current_value.toLocaleString('tr-TR')} {ind.unit}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                      <div className="flex items-center gap-2">
+                                                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                          <div
+                                                            className={`h-2 rounded-full ${indStatusConfig.progressBarColor}`}
+                                                            style={{ width: `${Math.min(100, ind.progress)}%` }}
+                                                          ></div>
+                                                        </div>
+                                                        <span className={`text-sm font-medium ${indStatusConfig.color}`}>
+                                                          %{ind.progress}
+                                                        </span>
                                                       </div>
-                                                      <span className={`text-sm font-medium ${getProgressTextColor(ind.progress)}`}>
-                                                        %{ind.progress}
-                                                      </span>
-                                                    </div>
-                                                  </td>
-                                                </tr>
-                                              ))}
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
                                             </tbody>
                                           </table>
                                         </div>
