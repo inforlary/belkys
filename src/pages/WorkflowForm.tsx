@@ -10,7 +10,10 @@ type TabType = 'basic' | 'actors' | 'steps';
 
 export default function WorkflowForm() {
   const { navigate, currentPath } = useLocation();
-  const templateId = currentPath.split('/').pop();
+  const pathParts = currentPath.split('/');
+  const isEditMode = pathParts.includes('edit');
+  const workflowId = isEditMode ? pathParts[pathParts.length - 1] : null;
+  const templateId = !isEditMode ? pathParts[pathParts.length - 1] : null;
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('basic');
   const [loading, setLoading] = useState(false);
@@ -34,10 +37,12 @@ export default function WorkflowForm() {
 
   useEffect(() => {
     fetchDepartments();
-    if (templateId && templateId !== 'blank') {
+    if (isEditMode && workflowId) {
+      loadWorkflow();
+    } else if (templateId && templateId !== 'blank') {
       loadTemplate();
     }
-  }, [templateId]);
+  }, [templateId, workflowId, isEditMode]);
 
   async function fetchDepartments() {
     if (!user) return;
@@ -59,6 +64,53 @@ export default function WorkflowForm() {
       setDepartments(data || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
+    }
+  }
+
+  async function loadWorkflow() {
+    try {
+      const { data: workflow, error: workflowError } = await supabase
+        .from('workflow_processes')
+        .select('*')
+        .eq('id', workflowId)
+        .single();
+
+      if (workflowError) throw workflowError;
+
+      const { data: actors, error: actorsError } = await supabase
+        .from('workflow_actors')
+        .select('*')
+        .eq('workflow_id', workflowId)
+        .order('order_index');
+
+      if (actorsError) throw actorsError;
+
+      const { data: steps, error: stepsError } = await supabase
+        .from('workflow_steps')
+        .select('*')
+        .eq('workflow_id', workflowId)
+        .order('order_index');
+
+      if (stepsError) throw stepsError;
+
+      setFormData({
+        code: workflow.code,
+        name: workflow.name,
+        description: workflow.description || '',
+        owner_department_id: workflow.owner_department_id || '',
+        main_process: workflow.main_process || '',
+        process: workflow.process || '',
+        sub_process: workflow.sub_process || '',
+        trigger_event: workflow.trigger_event || '',
+        outputs: workflow.outputs || '',
+        software_used: workflow.software_used || '',
+        legal_basis: workflow.legal_basis || '',
+        actors: actors || [],
+        steps: steps || []
+      });
+    } catch (error) {
+      console.error('Error loading workflow:', error);
+      alert('İş akışı yüklenirken hata oluştu');
     }
   }
 
@@ -169,32 +221,65 @@ export default function WorkflowForm() {
 
       if (!profile) throw new Error('Profile not found');
 
-      const { data: workflow, error: workflowError } = await supabase
-        .from('workflow_processes')
-        .insert({
-          organization_id: profile.organization_id,
-          code: formData.code,
-          name: formData.name,
-          description: formData.description,
-          owner_department_id: formData.owner_department_id || null,
-          main_process: formData.main_process,
-          process: formData.process,
-          sub_process: formData.sub_process,
-          trigger_event: formData.trigger_event,
-          outputs: formData.outputs,
-          software_used: formData.software_used,
-          legal_basis: formData.legal_basis,
-          created_by: user.id,
-          status: 'draft'
-        })
-        .select()
-        .single();
+      let workflow: any;
 
-      if (workflowError) throw workflowError;
+      if (isEditMode && workflowId) {
+        const { data, error: workflowError } = await supabase
+          .from('workflow_processes')
+          .update({
+            code: formData.code,
+            name: formData.name,
+            description: formData.description,
+            owner_department_id: formData.owner_department_id || null,
+            main_process: formData.main_process,
+            process: formData.process,
+            sub_process: formData.sub_process,
+            trigger_event: formData.trigger_event,
+            outputs: formData.outputs,
+            software_used: formData.software_used,
+            legal_basis: formData.legal_basis
+          })
+          .eq('id', workflowId)
+          .select()
+          .single();
+
+        if (workflowError) throw workflowError;
+        workflow = data;
+
+        await supabase.from('workflow_actors').delete().eq('workflow_id', workflowId);
+        await supabase.from('workflow_steps').delete().eq('workflow_id', workflowId);
+      } else {
+        const { data, error: workflowError } = await supabase
+          .from('workflow_processes')
+          .insert({
+            organization_id: profile.organization_id,
+            code: formData.code,
+            name: formData.name,
+            description: formData.description,
+            owner_department_id: formData.owner_department_id || null,
+            main_process: formData.main_process,
+            process: formData.process,
+            sub_process: formData.sub_process,
+            trigger_event: formData.trigger_event,
+            outputs: formData.outputs,
+            software_used: formData.software_used,
+            legal_basis: formData.legal_basis,
+            created_by: user.id,
+            status: 'draft'
+          })
+          .select()
+          .single();
+
+        if (workflowError) throw workflowError;
+        workflow = data;
+      }
 
       const actorsData = formData.actors.map(a => ({
         workflow_id: workflow.id,
-        ...a
+        order_index: a.order_index,
+        title: a.title,
+        department: a.department,
+        role: a.role
       }));
 
       const { data: insertedActors, error: actorsError } = await supabase
@@ -204,14 +289,20 @@ export default function WorkflowForm() {
 
       if (actorsError) throw actorsError;
 
-      const actorIdMap = new Map(insertedActors.map((a, i) => [`temp-${i}`, a.id]));
+      const actorIdMap = new Map();
+      insertedActors.forEach((actor, i) => {
+        actorIdMap.set(`temp-${i}`, actor.id);
+        if (formData.actors[i].id) {
+          actorIdMap.set(formData.actors[i].id, actor.id);
+        }
+      });
 
       const stepsData = formData.steps.map(s => ({
         workflow_id: workflow.id,
         order_index: s.order_index,
         step_type: s.step_type,
         description: s.description,
-        actor_id: s.actor_id ? actorIdMap.get(s.actor_id) : null,
+        actor_id: s.actor_id ? (actorIdMap.get(s.actor_id) || actorIdMap.get(`temp-${formData.actors.findIndex(a => a.id === s.actor_id)}`)) : null,
         is_sensitive: s.is_sensitive,
         yes_target_step: s.yes_target_step,
         no_target_step: s.no_target_step
@@ -223,6 +314,7 @@ export default function WorkflowForm() {
 
       if (stepsError) throw stepsError;
 
+      alert(isEditMode ? 'İş akışı güncellendi' : 'İş akışı oluşturuldu');
       navigate(`/workflows/${workflow.id}`);
     } catch (error: any) {
       console.error('Error saving workflow:', error);
@@ -243,7 +335,9 @@ export default function WorkflowForm() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Yeni İş Akış Şeması</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isEditMode ? 'İş Akış Şeması Düzenle' : 'Yeni İş Akış Şeması'}
+            </h1>
             <p className="text-gray-600 mt-1">İş sürecinizi tanımlayın ve görselleştirin</p>
           </div>
         </div>

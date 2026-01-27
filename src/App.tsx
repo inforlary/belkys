@@ -167,6 +167,9 @@ const renderPage = () => {
     if (currentPath === 'workflows/create/blank' || currentPath.startsWith('workflows/create/')) {
       return <WorkflowForm />;
     }
+    if (currentPath.startsWith('workflows/edit/')) {
+      return <WorkflowForm />;
+    }
     if (currentPath.startsWith('workflows/') && currentPath !== 'workflows' && currentPath !== 'workflows/new') {
       return <WorkflowDetail />;
     }

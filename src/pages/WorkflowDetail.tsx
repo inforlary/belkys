@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Edit, Download, AlertTriangle, Calendar, User, Building2 } from 'lucide-react';
+import { ArrowLeft, Edit, Download, AlertTriangle, Calendar, User, Building2, CheckCircle, XCircle, Trash2, Send } from 'lucide-react';
 import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
 import { WorkflowProcess, WorkflowActor, WorkflowStep, STATUS_LABELS, STATUS_COLORS } from '../types/workflow';
 import { useWorkflowLayout } from '../hooks/useWorkflowLayout';
 import { generateWorkflowPDF } from '../utils/workflowPDF';
+import Modal from '../components/ui/Modal';
 import StartNode from '../components/workflow-nodes/StartNode';
 import EndNode from '../components/workflow-nodes/EndNode';
 import ProcessNode from '../components/workflow-nodes/ProcessNode';
@@ -30,11 +32,15 @@ const edgeTypes = {
 
 export default function WorkflowDetail() {
   const { navigate, currentPath } = useLocation();
+  const { user, profile } = useAuth();
   const id = currentPath.split('/').pop();
   const [workflow, setWorkflow] = useState<WorkflowProcess | null>(null);
   const [actors, setActors] = useState<WorkflowActor[]>([]);
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const { nodes: layoutNodes, edges: layoutEdges, swimlanes } = useWorkflowLayout(actors, steps);
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
@@ -92,6 +98,99 @@ export default function WorkflowDetail() {
     }
   };
 
+  const handleSubmitForApproval = async () => {
+    if (!workflow) return;
+    try {
+      const { error } = await supabase
+        .from('workflow_processes')
+        .update({
+          status: 'pending_approval',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', workflow.id);
+
+      if (error) throw error;
+      alert('İş akışı onaya gönderildi');
+      fetchWorkflowData();
+    } catch (error) {
+      console.error('Error submitting workflow:', error);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!workflow || !user) return;
+    try {
+      const { error } = await supabase
+        .from('workflow_processes')
+        .update({
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', workflow.id);
+
+      if (error) throw error;
+      alert('İş akışı onaylandı');
+      fetchWorkflowData();
+    } catch (error) {
+      console.error('Error approving workflow:', error);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!workflow || !user || !rejectionReason.trim()) {
+      alert('Lütfen red nedeni giriniz');
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('workflow_processes')
+        .update({
+          status: 'draft',
+          rejection_reason: rejectionReason,
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', workflow.id);
+
+      if (error) throw error;
+      alert('İş akışı reddedildi');
+      setShowRejectModal(false);
+      setRejectionReason('');
+      fetchWorkflowData();
+    } catch (error) {
+      console.error('Error rejecting workflow:', error);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!workflow) return;
+    try {
+      const { error } = await supabase
+        .from('workflow_processes')
+        .delete()
+        .eq('id', workflow.id);
+
+      if (error) throw error;
+      alert('İş akışı silindi');
+      navigate('/workflows');
+    } catch (error) {
+      console.error('Error deleting workflow:', error);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  const isAdmin = profile?.role?.toLowerCase() === 'admin' || profile?.is_super_admin;
+  const isDirector = profile?.role?.toLowerCase() === 'director';
+  const canApprove = isAdmin || isDirector;
+  const canDelete = isAdmin || isDirector;
+  const canEdit = workflow?.status === 'draft' || canApprove;
+
   const sensitiveSteps = steps.filter(s => s.is_sensitive);
 
   if (loading) {
@@ -138,13 +237,55 @@ export default function WorkflowDetail() {
             <Download className="w-5 h-5" />
             PDF İndir
           </button>
-          <button
-            onClick={() => navigate(`/workflows/${id}/edit`)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Edit className="w-5 h-5" />
-            Düzenle
-          </button>
+
+          {workflow.status === 'draft' && (
+            <button
+              onClick={handleSubmitForApproval}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+            >
+              <Send className="w-5 h-5" />
+              Onaya Gönder
+            </button>
+          )}
+
+          {workflow.status === 'pending_approval' && canApprove && (
+            <>
+              <button
+                onClick={handleApprove}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Onayla
+              </button>
+              <button
+                onClick={() => setShowRejectModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                <XCircle className="w-5 h-5" />
+                Reddet
+              </button>
+            </>
+          )}
+
+          {canEdit && (
+            <button
+              onClick={() => navigate(`/workflows/edit/${id}`)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Edit className="w-5 h-5" />
+              Düzenle
+            </button>
+          )}
+
+          {canDelete && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              <Trash2 className="w-5 h-5" />
+              Sil
+            </button>
+          )}
         </div>
       </div>
 
@@ -304,8 +445,102 @@ export default function WorkflowDetail() {
               </div>
             </div>
           </div>
+
+          {workflow.approved_at && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <h3 className="text-lg font-semibold text-green-900">Onay Bilgisi</h3>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-green-700">Onay Tarihi:</span>
+                  <p className="font-medium text-green-900 mt-1">
+                    {new Date(workflow.approved_at).toLocaleDateString('tr-TR')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {workflow.rejection_reason && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <XCircle className="w-5 h-5 text-red-600" />
+                <h3 className="text-lg font-semibold text-red-900">Red Nedeni</h3>
+              </div>
+              <div className="space-y-2 text-sm">
+                <p className="text-red-800">{workflow.rejection_reason}</p>
+                {workflow.reviewed_at && (
+                  <p className="text-red-600 text-xs mt-2">
+                    {new Date(workflow.reviewed_at).toLocaleDateString('tr-TR')}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      <Modal isOpen={showRejectModal} onClose={() => setShowRejectModal(false)} title="İş Akışını Reddet">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Red Nedeni <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Lütfen reddetme nedeninizi açıklayın..."
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setShowRejectModal(false)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={!rejectionReason.trim()}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Reddet
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="İş Akışını Sil">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-red-800 font-medium">Bu işlem geri alınamaz!</p>
+              <p className="text-sm text-red-700 mt-1">
+                İş akış şeması ve tüm ilişkili veriler kalıcı olarak silinecektir.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Sil
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
