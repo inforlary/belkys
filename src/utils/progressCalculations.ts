@@ -108,6 +108,11 @@ export function calculateIndicatorProgress(
       break;
     }
 
+    case 'sum_only': {
+      progress = (sumOfEntries / targetValue) * 100;
+      break;
+    }
+
     default: {
       const currentValue = baselineValue + sumOfEntries;
       const denominator = targetValue - baselineValue;
