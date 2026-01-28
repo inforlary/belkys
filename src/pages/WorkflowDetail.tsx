@@ -59,11 +59,16 @@ export default function WorkflowDetail() {
 
   async function fetchWorkflowData() {
     try {
+      console.log('Fetching workflow with ID:', id);
+
       const { data: workflowData, error: workflowError } = await supabase
         .from('workflow_processes')
         .select('*, departments(name), bpm_processes(id, code, name), qm_processes(id, code, name, qm_process_categories(name))')
         .eq('id', id)
         .single();
+
+      console.log('Workflow data:', workflowData);
+      console.log('Workflow error:', workflowError);
 
       if (workflowError) throw workflowError;
       setWorkflow(workflowData);
@@ -204,7 +209,19 @@ export default function WorkflowDetail() {
   if (!workflow) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">İş akış şeması bulunamadı</div>
+        <div className="text-center space-y-2">
+          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
+          <div className="text-gray-900 font-medium">İş akış şeması bulunamadı</div>
+          <div className="text-sm text-gray-500">
+            İş akışı silinmiş olabilir veya erişim yetkiniz olmayabilir.
+          </div>
+          <button
+            onClick={() => navigate('/workflows')}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            İş Akışları Listesine Dön
+          </button>
+        </div>
       </div>
     );
   }
