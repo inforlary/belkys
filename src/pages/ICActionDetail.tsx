@@ -22,6 +22,17 @@ interface Action {
   expected_output: string;
   required_resources: string;
   metadata: any;
+  action_type?: string;
+  linked_module?: string;
+  target_quantity?: number;
+  current_quantity?: number;
+  approval_status?: string;
+  period_year?: number;
+  compliance_level?: string;
+  approved_by_unit_id?: string;
+  approved_by_unit_date?: string;
+  approved_by_management_id?: string;
+  approved_by_management_date?: string;
   ic_standards?: {
     code: string;
     name: string;
@@ -670,46 +681,144 @@ export default function ICActionDetail() {
           </div>
         </div>
 
-        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div className="mb-3">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="font-medium text-slate-700">İlerleme: {action.progress_percent}%</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="font-medium text-slate-700">İlerleme: {action.progress_percent}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-green-600 h-full rounded-full transition-all"
+                  style={{ width: `${action.progress_percent}%` }}
+                />
+              </div>
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-              <div
-                className="bg-green-600 h-full rounded-full transition-all"
-                style={{ width: `${action.progress_percent}%` }}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-600">Durum:</span>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(action.status)}`}>
-                {getStatusLabel(action.status)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-600">Öncelik:</span>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityBadge(action.priority)}`}>
-                {getPriorityLabel(action.priority)}
-              </span>
-            </div>
-            <div className="border-l border-slate-300 pl-4">
-              <span className="text-slate-600">Başlangıç: </span>
-              <span className="font-medium">{action.start_date ? new Date(action.start_date).toLocaleDateString('tr-TR') : '-'}</span>
-            </div>
-            <div>
-              <span className="text-slate-600">Hedef: </span>
-              <span className="font-medium">{new Date(action.target_date).toLocaleDateString('tr-TR')}</span>
-            </div>
-            <div>
-              <span className="text-slate-600">Kalan: </span>
-              <span className={`font-medium ${getRemainingDays() < 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                {getRemainingDays()} gün
-              </span>
+            <div className="flex items-center flex-wrap gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600">Durum:</span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(action.status)}`}>
+                  {getStatusLabel(action.status)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600">Öncelik:</span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityBadge(action.priority)}`}>
+                  {getPriorityLabel(action.priority)}
+                </span>
+              </div>
             </div>
           </div>
+
+          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-slate-600">Başlangıç: </span>
+                <span className="font-medium">{action.start_date ? new Date(action.start_date).toLocaleDateString('tr-TR') : '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-600">Hedef: </span>
+                <span className="font-medium">{new Date(action.target_date).toLocaleDateString('tr-TR')}</span>
+              </div>
+              <div>
+                <span className="text-slate-600">Kalan: </span>
+                <span className={`font-medium ${getRemainingDays() < 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                  {getRemainingDays()} gün
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {action.action_type && (
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <div className="text-xs text-slate-600 mb-1">Eylem Tipi</div>
+              <div className="flex items-center gap-2">
+                {action.action_type === 'tek_seferlik' && <span className="text-2xl">📋</span>}
+                {action.action_type === 'donemsel' && <span className="text-2xl">📅</span>}
+                {action.action_type === 'surekli' && <span className="text-2xl">♾️</span>}
+                {action.action_type === 'baglantili' && <span className="text-2xl">🔗</span>}
+                <span className="text-lg font-semibold text-slate-900">
+                  {action.action_type === 'tek_seferlik' && 'Tek Seferlik'}
+                  {action.action_type === 'donemsel' && 'Dönemsel'}
+                  {action.action_type === 'surekli' && 'Sürekli'}
+                  {action.action_type === 'baglantili' && 'Bağlantılı'}
+                </span>
+              </div>
+              {action.period_year && (
+                <div className="text-xs text-slate-600 mt-2">Dönem: {action.period_year}</div>
+              )}
+            </div>
+          )}
+
+          {action.approval_status && (
+            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+              <div className="text-xs text-slate-600 mb-1">Onay Durumu</div>
+              <div className="flex items-center gap-2">
+                {action.approval_status === 'taslak' && <span className="text-2xl">📝</span>}
+                {action.approval_status === 'birim_onayinda' && <span className="text-2xl">⏳</span>}
+                {action.approval_status === 'yonetim_onayinda' && <span className="text-2xl">⌛</span>}
+                {action.approval_status === 'onaylandi' && <span className="text-2xl">✅</span>}
+                {action.approval_status === 'reddedildi' && <span className="text-2xl">❌</span>}
+                <span className="text-lg font-semibold text-slate-900">
+                  {action.approval_status === 'taslak' && 'Taslak'}
+                  {action.approval_status === 'birim_onayinda' && 'Birim Onayında'}
+                  {action.approval_status === 'yonetim_onayinda' && 'Yönetim Onayında'}
+                  {action.approval_status === 'onaylandi' && 'Onaylandı'}
+                  {action.approval_status === 'reddedildi' && 'Reddedildi'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {action.action_type === 'baglantili' && action.linked_module && (
+            <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+              <div className="text-xs text-slate-600 mb-1">Bağlantılı Modül</div>
+              <div className="flex items-center gap-2 mb-2">
+                {action.linked_module === 'risk_management' && <span className="text-2xl">⚠️</span>}
+                {action.linked_module === 'quality_management' && <span className="text-2xl">🎯</span>}
+                {action.linked_module === 'project_management' && <span className="text-2xl">📊</span>}
+                {action.linked_module === 'strategic_plan' && <span className="text-2xl">🎯</span>}
+                <span className="text-sm font-semibold text-slate-900">
+                  {action.linked_module === 'risk_management' && 'Risk Yönetimi'}
+                  {action.linked_module === 'quality_management' && 'Kalite Yönetimi'}
+                  {action.linked_module === 'project_management' && 'Proje Yönetimi'}
+                  {action.linked_module === 'strategic_plan' && 'Stratejik Plan'}
+                </span>
+              </div>
+              {action.target_quantity !== undefined && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-600">İlerleme</span>
+                    <span className="font-medium">{action.current_quantity || 0} / {action.target_quantity}</span>
+                  </div>
+                  <div className="w-full bg-orange-200 rounded-full h-2">
+                    <div
+                      className="bg-orange-600 h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(((action.current_quantity || 0) / action.target_quantity) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {action.action_type === 'surekli' && action.compliance_level && (
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+              <div className="text-xs text-slate-600 mb-1">Uygunluk Seviyesi</div>
+              <div className="flex items-center gap-2">
+                {action.compliance_level === 'uygun' && <span className="text-2xl">✅</span>}
+                {action.compliance_level === 'kismen_uygun' && <span className="text-2xl">⚠️</span>}
+                {action.compliance_level === 'uygun_degil' && <span className="text-2xl">❌</span>}
+                <span className="text-lg font-semibold text-slate-900">
+                  {action.compliance_level === 'uygun' && 'Uygun'}
+                  {action.compliance_level === 'kismen_uygun' && 'Kısmen Uygun'}
+                  {action.compliance_level === 'uygun_degil' && 'Uygun Değil'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -876,6 +985,89 @@ export default function ICActionDetail() {
                         ⚠️ Henüz risk faaliyeti tanımlanmamış. Lütfen Risk Modülünde faaliyet tanımlamaya başlayın.
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {action.approval_status && action.approval_status !== 'taslak' && (
+                <div className="bg-white border border-slate-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Onay Süreci</h3>
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+
+                    <div className="relative space-y-6">
+                      <div className="flex items-start gap-4">
+                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${
+                          action.approval_status === 'taslak'
+                            ? 'bg-gray-200 text-gray-600'
+                            : 'bg-green-500 text-white'
+                        }`}>
+                          {action.approval_status === 'taslak' ? '1' : '✓'}
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <div className="font-semibold text-slate-900">Taslak</div>
+                          <div className="text-sm text-slate-600">Eylem oluşturuldu</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4">
+                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${
+                          ['birim_onayinda', 'yonetim_onayinda', 'onaylandi'].includes(action.approval_status || '')
+                            ? action.approval_status === 'birim_onayinda'
+                              ? 'bg-yellow-500 text-white animate-pulse'
+                              : 'bg-green-500 text-white'
+                            : action.approval_status === 'reddedildi'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {['yonetim_onayinda', 'onaylandi'].includes(action.approval_status || '') ? '✓' :
+                           action.approval_status === 'reddedildi' ? '✗' : '2'}
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <div className="font-semibold text-slate-900">Birim Onayı</div>
+                          {action.approved_by_unit_id && action.approved_by_unit_date && (
+                            <div className="text-sm text-slate-600">
+                              ✓ Onaylandı - {new Date(action.approved_by_unit_date).toLocaleDateString('tr-TR')}
+                            </div>
+                          )}
+                          {action.approval_status === 'birim_onayinda' && (
+                            <div className="text-sm text-yellow-700 font-medium">⏳ Onay bekleniyor</div>
+                          )}
+                          {action.approval_status === 'reddedildi' && !action.approved_by_unit_id && (
+                            <div className="text-sm text-red-600 font-medium">❌ Reddedildi</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4">
+                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${
+                          action.approval_status === 'onaylandi'
+                            ? 'bg-green-500 text-white'
+                            : action.approval_status === 'yonetim_onayinda'
+                            ? 'bg-yellow-500 text-white animate-pulse'
+                            : action.approval_status === 'reddedildi' && action.approved_by_unit_id
+                            ? 'bg-red-500 text-white'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {action.approval_status === 'onaylandi' ? '✓' :
+                           (action.approval_status === 'reddedildi' && action.approved_by_unit_id) ? '✗' : '3'}
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <div className="font-semibold text-slate-900">Yönetim Onayı</div>
+                          {action.approved_by_management_id && action.approved_by_management_date && (
+                            <div className="text-sm text-slate-600">
+                              ✓ Onaylandı - {new Date(action.approved_by_management_date).toLocaleDateString('tr-TR')}
+                            </div>
+                          )}
+                          {action.approval_status === 'yonetim_onayinda' && (
+                            <div className="text-sm text-yellow-700 font-medium">⏳ Onay bekleniyor</div>
+                          )}
+                          {action.approval_status === 'reddedildi' && action.approved_by_unit_id && (
+                            <div className="text-sm text-red-600 font-medium">❌ Reddedildi</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

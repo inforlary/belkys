@@ -48,6 +48,17 @@ interface Action {
   collaborating_departments?: string[];
   responsible_special_units?: string[];
   collaborating_special_units?: string[];
+  action_type?: string;
+  linked_module?: string;
+  target_quantity?: number;
+  current_quantity?: number;
+  approval_status?: string;
+  period_year?: number;
+  compliance_level?: string;
+  approved_by_unit_id?: string;
+  approved_by_unit_date?: string;
+  approved_by_management_id?: string;
+  approved_by_management_date?: string;
 }
 
 interface ActionPlan {
@@ -130,6 +141,9 @@ export default function ICActions() {
   const [selectedCollaboratingDeptId, setSelectedCollaboratingDeptId] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedActionType, setSelectedActionType] = useState<string>('');
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<string>('');
+  const [selectedLinkedModule, setSelectedLinkedModule] = useState<string>('');
 
   const [sortColumn, setSortColumn] = useState<string>('delay');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -638,8 +652,20 @@ export default function ICActions() {
       );
     }
 
+    if (selectedActionType) {
+      filtered = filtered.filter(a => a.action_type === selectedActionType);
+    }
+
+    if (selectedApprovalStatus) {
+      filtered = filtered.filter(a => a.approval_status === selectedApprovalStatus);
+    }
+
+    if (selectedLinkedModule) {
+      filtered = filtered.filter(a => a.linked_module === selectedLinkedModule);
+    }
+
     return filtered;
-  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, selectedResponsibleDeptId, selectedCollaboratingDeptId, searchTerm]);
+  }, [actions, selectedComponentId, selectedStandardId, selectedDepartmentId, selectedResponsibleDeptId, selectedCollaboratingDeptId, searchTerm, selectedActionType, selectedApprovalStatus, selectedLinkedModule]);
 
   const filteredActions = useMemo(() => {
     let filtered = baseFilteredActions;
@@ -1563,6 +1589,66 @@ export default function ICActions() {
     return 'bg-gray-100 text-gray-800';
   };
 
+  const getActionTypeBadge = (actionType?: string) => {
+    if (!actionType) return null;
+
+    const typeConfig = {
+      'tek_seferlik': { label: 'Tek Seferlik', color: 'bg-blue-100 text-blue-700' },
+      'donemsel': { label: 'Dönemsel', color: 'bg-purple-100 text-purple-700' },
+      'surekli': { label: 'Sürekli', color: 'bg-green-100 text-green-700' },
+      'baglantili': { label: 'Bağlantılı', color: 'bg-orange-100 text-orange-700' }
+    };
+
+    const config = typeConfig[actionType as keyof typeof typeConfig] || { label: actionType, color: 'bg-gray-100 text-gray-700' };
+
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const getApprovalStatusBadge = (approvalStatus?: string) => {
+    if (!approvalStatus) return null;
+
+    const statusConfig = {
+      'taslak': { label: 'Taslak', color: 'bg-gray-100 text-gray-700', icon: '📝' },
+      'birim_onayinda': { label: 'Birim Onayında', color: 'bg-yellow-100 text-yellow-700', icon: '⏳' },
+      'yonetim_onayinda': { label: 'Yönetim Onayında', color: 'bg-amber-100 text-amber-700', icon: '⌛' },
+      'onaylandi': { label: 'Onaylandı', color: 'bg-green-100 text-green-700', icon: '✅' },
+      'reddedildi': { label: 'Reddedildi', color: 'bg-red-100 text-red-700', icon: '❌' }
+    };
+
+    const config = statusConfig[approvalStatus as keyof typeof statusConfig] || { label: approvalStatus, color: 'bg-gray-100 text-gray-700', icon: '' };
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        <span>{config.icon}</span>
+        {config.label}
+      </span>
+    );
+  };
+
+  const getLinkedModuleBadge = (linkedModule?: string) => {
+    if (!linkedModule) return null;
+
+    const moduleConfig = {
+      'risk_management': { label: 'Risk Yönetimi', color: 'bg-red-100 text-red-700', icon: '⚠️' },
+      'quality_management': { label: 'Kalite Yönetimi', color: 'bg-blue-100 text-blue-700', icon: '🎯' },
+      'project_management': { label: 'Proje Yönetimi', color: 'bg-purple-100 text-purple-700', icon: '📊' },
+      'strategic_plan': { label: 'Stratejik Plan', color: 'bg-green-100 text-green-700', icon: '🎯' }
+    };
+
+    const config = moduleConfig[linkedModule as keyof typeof moduleConfig] || { label: linkedModule, color: 'bg-gray-100 text-gray-700', icon: '🔗' };
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        <span>{config.icon}</span>
+        {config.label}
+      </span>
+    );
+  };
+
   const getProgressDisplay = (action: Action) => {
     if (action.status === 'COMPLETED') {
       return (
@@ -1910,6 +1996,45 @@ export default function ICActions() {
               <option value="NO_ACTION">Mevcut Durum Sağlanıyor</option>
             </select>
 
+            <select
+              value={selectedActionType}
+              onChange={(e) => setSelectedActionType(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Tüm Eylem Tipleri</option>
+              <option value="tek_seferlik">Tek Seferlik</option>
+              <option value="donemsel">Dönemsel</option>
+              <option value="surekli">Sürekli</option>
+              <option value="baglantili">Bağlantılı</option>
+            </select>
+
+            <select
+              value={selectedApprovalStatus}
+              onChange={(e) => setSelectedApprovalStatus(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Tüm Onay Durumları</option>
+              <option value="taslak">Taslak</option>
+              <option value="birim_onayinda">Birim Onayında</option>
+              <option value="yonetim_onayinda">Yönetim Onayında</option>
+              <option value="onaylandi">Onaylandı</option>
+              <option value="reddedildi">Reddedildi</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <select
+              value={selectedLinkedModule}
+              onChange={(e) => setSelectedLinkedModule(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Tüm Modüller</option>
+              <option value="risk_management">Risk Yönetimi</option>
+              <option value="quality_management">Kalite Yönetimi</option>
+              <option value="project_management">Proje Yönetimi</option>
+              <option value="strategic_plan">Stratejik Plan</option>
+            </select>
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -1978,6 +2103,15 @@ export default function ICActions() {
                 <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[200px]">
                   Öngörülen Eylemler
                 </th>
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  Eylem Tipi
+                </th>
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  Onay Durumu
+                </th>
+                <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  Bağlantılı Modül
+                </th>
                 <th className="border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 min-w-[150px]">
                   Sorumlu Birimler
                 </th>
@@ -2002,7 +2136,7 @@ export default function ICActions() {
               {hierarchicalData.map(componentData => (
                 <>
                   <tr key={`comp-${componentData.component.code}`}>
-                    <td colSpan={11} className="border border-gray-300 bg-red-600 px-3 py-2 text-center text-white font-bold text-sm">
+                    <td colSpan={14} className="border border-gray-300 bg-red-600 px-3 py-2 text-center text-white font-bold text-sm">
                       {componentData.component.name.toUpperCase()}
                     </td>
                   </tr>
@@ -2011,7 +2145,7 @@ export default function ICActions() {
                     .map(standardData => (
                     <>
                       <tr key={`std-${standardData.standard.code}`}>
-                        <td colSpan={11} className="border border-gray-300 bg-red-500 px-3 py-2 text-white font-semibold text-sm">
+                        <td colSpan={14} className="border border-gray-300 bg-red-500 px-3 py-2 text-white font-semibold text-sm">
                           {standardData.standard.code} - {standardData.standard.name}
                         </td>
                       </tr>
@@ -2042,6 +2176,26 @@ export default function ICActions() {
                               <div className="font-medium text-gray-900 mb-1">{action.title}</div>
                               {action.status !== 'NO_ACTION' && action.description && (
                                 <div className="text-gray-600 text-xs">{action.description}</div>
+                              )}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs text-center">
+                              {action.status === 'NO_ACTION' ? '-' : getActionTypeBadge(action.action_type)}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs text-center">
+                              {action.status === 'NO_ACTION' ? '-' : getApprovalStatusBadge(action.approval_status)}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2 text-xs text-center">
+                              {action.status === 'NO_ACTION' ? '-' : (
+                                action.action_type === 'baglantili' ? (
+                                  <div className="space-y-1">
+                                    {getLinkedModuleBadge(action.linked_module)}
+                                    {action.target_quantity && (
+                                      <div className="text-xs text-gray-600">
+                                        Hedef: {action.target_quantity} / Mevcut: {action.current_quantity || 0}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : '-'
                               )}
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-xs">
