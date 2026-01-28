@@ -23,7 +23,6 @@ interface Profile {
     module_quality_management: boolean;
     module_project_management: boolean;
     module_workflow_management: boolean;
-    module_process_management: boolean;
     module_settings: boolean;
     module_administration: boolean;
   } | null;
@@ -115,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (profileData && !profileData.is_super_admin && profileData.organization_id) {
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
-          .select('is_active, module_strategic_planning, module_activity_reports, module_budget_performance, module_internal_control, module_risk_management, module_quality_management, module_project_management, module_workflow_management, module_process_management, module_settings, module_administration')
+          .select('is_active, module_strategic_planning, module_activity_reports, module_budget_performance, module_internal_control, module_risk_management, module_quality_management, module_project_management, module_workflow_management, module_settings, module_administration')
           .eq('id', profileData.organization_id)
           .maybeSingle();
 
@@ -150,7 +149,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               module_quality_management: orgData.module_quality_management,
               module_project_management: orgData.module_project_management,
               module_workflow_management: orgData.module_workflow_management,
-              module_process_management: orgData.module_process_management,
               module_settings: orgData.module_settings,
               module_administration: orgData.module_administration,
             } : null
@@ -167,7 +165,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               module_quality_management: orgData.module_quality_management,
               module_project_management: orgData.module_project_management,
               module_workflow_management: orgData.module_workflow_management,
-              module_process_management: orgData.module_process_management,
               module_settings: orgData.module_settings,
               module_administration: orgData.module_administration,
             } : null

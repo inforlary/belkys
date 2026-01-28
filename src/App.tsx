@@ -140,12 +140,6 @@ import SensitiveTasksDashboard from './pages/SensitiveTasksDashboard';
 import SensitiveTasksList from './pages/SensitiveTasksList';
 import SensitiveTaskDetail from './pages/SensitiveTaskDetail';
 import SensitiveTasksReports from './pages/SensitiveTasksReports';
-import BPMDashboard from './pages/BPMDashboard';
-import BPMCategories from './pages/BPMCategories';
-import BPMProcessList from './pages/BPMProcessList';
-import BPMProcessForm from './pages/BPMProcessForm';
-import BPMProcessDetail from './pages/BPMProcessDetail';
-import BPMApprovals from './pages/BPMApprovals';
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -185,15 +179,6 @@ const renderPage = () => {
     }
     if (currentPath.startsWith('workflows/') && currentPath !== 'workflows' && currentPath !== 'workflows/new') {
       return <WorkflowDetail />;
-    }
-    if (currentPath === 'process-management/new') {
-      return <BPMProcessForm />;
-    }
-    if (currentPath.match(/^process-management\/[^/]+\/edit$/)) {
-      return <BPMProcessForm />;
-    }
-    if (currentPath.startsWith('process-management/') && currentPath !== 'process-management/dashboard' && currentPath !== 'process-management/list' && currentPath !== 'process-management/categories' && currentPath !== 'process-management/approvals') {
-      return <BPMProcessDetail />;
     }
     if (currentPath.startsWith('budget-proposals/') && currentPath.includes('/edit')) {
       return <BudgetProposalEdit />;
@@ -398,14 +383,6 @@ const renderPage = () => {
         return <WorkflowList />;
       case 'workflows/new':
         return <WorkflowTemplateSelection />;
-      case 'process-management/dashboard':
-        return <BPMDashboard />;
-      case 'process-management/list':
-        return <BPMProcessList />;
-      case 'process-management/categories':
-        return <BPMCategories />;
-      case 'process-management/approvals':
-        return <BPMApprovals />;
       case 'sensitive-tasks':
         return <SensitiveTasksDashboard />;
       case 'sensitive-tasks/list':

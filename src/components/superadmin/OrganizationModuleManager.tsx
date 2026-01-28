@@ -31,7 +31,6 @@ interface Organization {
   module_quality_management: boolean;
   module_project_management: boolean;
   module_workflow_management: boolean;
-  module_process_management: boolean;
   module_settings: boolean;
   module_administration: boolean;
 }
@@ -46,7 +45,6 @@ interface Module {
     'module_quality_management' |
     'module_project_management' |
     'module_workflow_management' |
-    'module_process_management' |
     'module_settings' |
     'module_administration'
   >;
@@ -112,13 +110,6 @@ const MODULES: Module[] = [
     description: 'İş akışları ve süreç şemaları',
     icon: <Workflow className="w-5 h-5" />,
     color: 'pink'
-  },
-  {
-    key: 'module_process_management',
-    name: 'Süreç Yönetimi',
-    description: 'Kurumsal süreç yönetimi',
-    icon: <GitBranch className="w-5 h-5" />,
-    color: 'emerald'
   },
   {
     key: 'module_settings',
