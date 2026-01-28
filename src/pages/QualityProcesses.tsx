@@ -28,7 +28,7 @@ interface Process {
   category: ProcessCategory | null;
   process_owner: { full_name: string } | null;
   owner_department: { name: string } | null;
-  related_goal: { code: string; name: string } | null;
+  related_goal: { code: string; title: string } | null;
   kpis?: ProcessKPI[];
   has_workflow?: boolean;
 }
@@ -66,7 +66,7 @@ interface Risk {
 interface Goal {
   id: string;
   code: string;
-  name: string;
+  title: string;
   department_id: string | null;
 }
 
@@ -145,7 +145,7 @@ export default function QualityProcesses() {
         category:qm_process_categories(id, name, description),
         process_owner:profiles!qm_processes_process_owner_id_fkey(full_name),
         owner_department:departments(name),
-        related_goal:goals(code, name)
+        related_goal:goals(code, title)
       `)
       .eq('organization_id', profile?.organization_id)
       .order('code');
@@ -243,7 +243,7 @@ export default function QualityProcesses() {
   const loadGoals = async () => {
     const { data, error } = await supabase
       .from('goals')
-      .select('id, code, name, department_id')
+      .select('id, code, title, department_id')
       .eq('organization_id', profile?.organization_id)
       .order('code');
 
@@ -887,7 +887,7 @@ export default function QualityProcesses() {
                       <option value="">Seçiniz...</option>
                       {filteredGoals.map(goal => (
                         <option key={goal.id} value={goal.id}>
-                          {goal.code} - {goal.name}
+                          {goal.code} - {goal.title}
                         </option>
                       ))}
                     </select>
@@ -989,7 +989,7 @@ export default function QualityProcesses() {
                         <span className="font-medium text-gray-700">Stratejik Hedef:</span>
                         <div className="mt-1 p-2 bg-blue-50 border border-blue-200 rounded">
                           <span className="text-blue-900 font-medium">{viewingProcess.related_goal.code}</span>
-                          <span className="text-blue-800 ml-2">{viewingProcess.related_goal.name}</span>
+                          <span className="text-blue-800 ml-2">{viewingProcess.related_goal.title}</span>
                         </div>
                       </div>
                     )}
