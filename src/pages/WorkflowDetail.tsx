@@ -9,6 +9,7 @@ import { WorkflowProcess, WorkflowActor, WorkflowStep, STATUS_LABELS, STATUS_COL
 import { useWorkflowLayout } from '../hooks/useWorkflowLayout';
 import { generateWorkflowPDF } from '../utils/workflowPDF';
 import Modal from '../components/ui/Modal';
+import ApprovalWorkflowButtons from '../components/ui/ApprovalWorkflowButtons';
 import StartNode from '../components/workflow-nodes/StartNode';
 import EndNode from '../components/workflow-nodes/EndNode';
 import ProcessNode from '../components/workflow-nodes/ProcessNode';
@@ -300,35 +301,6 @@ export default function WorkflowDetail() {
             PDF İndir
           </button>
 
-          {workflow.status === 'draft' && (
-            <button
-              onClick={handleSubmitForApproval}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
-            >
-              <Send className="w-5 h-5" />
-              Onaya Gönder
-            </button>
-          )}
-
-          {workflow.status === 'pending_approval' && canApprove && (
-            <>
-              <button
-                onClick={handleApprove}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                <CheckCircle className="w-5 h-5" />
-                Onayla
-              </button>
-              <button
-                onClick={() => setShowRejectModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                <XCircle className="w-5 h-5" />
-                Reddet
-              </button>
-            </>
-          )}
-
           {canEdit && (
             <button
               onClick={() => navigate(`/workflows/edit/${id}`)}
@@ -350,6 +322,22 @@ export default function WorkflowDetail() {
           )}
         </div>
       </div>
+
+      {workflow && profile?.id && workflow.qm_process && (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <ApprovalWorkflowButtons
+            itemId={workflow.id}
+            itemType="workflow"
+            status={workflow.status || 'draft'}
+            createdBy={workflow.created_by}
+            currentUserId={profile.id}
+            userRole={profile.role}
+            userDepartmentId={profile.department_id}
+            itemDepartmentId={workflow.qm_process?.owner_department?.id}
+            onStatusChange={fetchWorkflowData}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-6">

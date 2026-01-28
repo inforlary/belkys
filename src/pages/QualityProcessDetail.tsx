@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
 import { ArrowLeft, FileText, TrendingUp, AlertTriangle } from 'lucide-react';
+import ApprovalWorkflowButtons from '../components/ui/ApprovalWorkflowButtons';
 
 export default function QualityProcessDetail() {
   const { profile } = useAuth();
@@ -70,6 +71,22 @@ export default function QualityProcessDetail() {
           <p className="text-gray-600 mt-1">{process.category}</p>
         </div>
       </div>
+
+      {process && profile?.id && (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <ApprovalWorkflowButtons
+            itemId={processId}
+            itemType="qm_process"
+            status={process.status || 'DRAFT'}
+            createdBy={process.created_by}
+            currentUserId={profile.id}
+            userRole={profile.role}
+            userDepartmentId={profile.department_id}
+            itemDepartmentId={process.owner_department_id}
+            onStatusChange={loadProcess}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">

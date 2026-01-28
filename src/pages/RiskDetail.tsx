@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import RiskControlsTab from '../components/risk/RiskControlsTab';
 import RiskTreatmentsTab from '../components/risk/RiskTreatmentsTab';
 import RiskIndicatorsTab from '../components/risk/RiskIndicatorsTab';
+import ApprovalWorkflowButtons from '../components/ui/ApprovalWorkflowButtons';
 
 interface DepartmentImpact {
   id?: string;
@@ -36,6 +37,7 @@ export default function RiskDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'controls' | 'treatments' | 'indicators'>('controls');
+  const [riskData, setRiskData] = useState<any>(null);
 
   const [categories, setCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -168,6 +170,8 @@ export default function RiskDetail() {
 
     const hasTargetRisk = data.target_probability !== null && data.target_impact !== null;
     setEnableTargetRisk(hasTargetRisk);
+
+    setRiskData(data);
 
     setFormData({
       code: data.code,
@@ -669,6 +673,22 @@ export default function RiskDetail() {
           </button>
         )}
       </div>
+
+      {riskData && profile?.id && (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+          <ApprovalWorkflowButtons
+            itemId={riskId || ''}
+            itemType="risk"
+            status={riskData.approval_status || 'DRAFT'}
+            createdBy={riskData.identified_by_id}
+            currentUserId={profile.id}
+            userRole={profile.role}
+            userDepartmentId={profile.department_id}
+            itemDepartmentId={riskData.owner_department_id}
+            onStatusChange={loadData}
+          />
+        </div>
+      )}
 
       {/* ÖZET KAR TLAR */}
       <div className="grid grid-cols-4 gap-4">
