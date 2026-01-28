@@ -43,6 +43,20 @@ export default function ApprovalWorkflowButtons({
   const canDirectorReview = isDirector && isSameDepartment && currentStatus === 'IN_REVIEW' && !isCreator;
   const canAdminApprove = isAdmin && currentStatus === 'PENDING_APPROVAL' && !isCreator;
 
+  console.log('ApprovalWorkflowButtons Debug:', {
+    itemType,
+    currentStatus,
+    isCreator,
+    isDirector,
+    isAdmin,
+    userDepartmentId,
+    itemDepartmentId,
+    isSameDepartment,
+    canSubmit,
+    canDirectorReview,
+    canAdminApprove
+  });
+
   const getFunctionNames = () => {
     switch (itemType) {
       case 'risk':
