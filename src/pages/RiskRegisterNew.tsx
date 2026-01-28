@@ -88,8 +88,17 @@ export default function RiskRegisterNew() {
       loadData();
       generateCode();
       loadCollaborationParams();
+
+      // Auto-fill department for non-admin users
+      const isAdminOrSuperAdmin = profile?.role === 'admin' || profile?.role === 'ADMIN' || profile?.role === 'super_admin';
+      if (!isAdminOrSuperAdmin && profile?.department_id && !formData.owner_department_id) {
+        setFormData(prev => ({
+          ...prev,
+          owner_department_id: profile.department_id
+        }));
+      }
     }
-  }, [profile?.organization_id]);
+  }, [profile?.organization_id, profile?.department_id, profile?.role]);
 
   const loadCollaborationParams = () => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
@@ -762,16 +771,28 @@ export default function RiskRegisterNew() {
                 <select
                   value={formData.owner_department_id}
                   onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
+                  disabled={profile?.role !== 'admin' && profile?.role !== 'ADMIN' && profile?.role !== 'super_admin'}
                 >
                   <option value="">Seçiniz</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
+                  {departments
+                    .filter(dept =>
+                      profile?.role === 'admin' || profile?.role === 'ADMIN' || profile?.role === 'super_admin'
+                        ? true
+                        : dept.id === profile?.department_id
+                    )
+                    .map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
                 </select>
+                {(profile?.role !== 'admin' && profile?.role !== 'ADMIN' && profile?.role !== 'super_admin') && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Sadece kendi biriminiz için risk oluşturabilirsiniz
+                  </p>
+                )}
               </div>
             )}
 
@@ -785,16 +806,28 @@ export default function RiskRegisterNew() {
                   <select
                     value={formData.owner_department_id}
                     onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
+                    disabled={profile?.role !== 'admin' && profile?.role !== 'ADMIN' && profile?.role !== 'super_admin'}
                   >
                     <option value="">Seçiniz</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </option>
-                    ))}
+                    {departments
+                      .filter(dept =>
+                        profile?.role === 'admin' || profile?.role === 'ADMIN' || profile?.role === 'super_admin'
+                          ? true
+                          : dept.id === profile?.department_id
+                      )
+                      .map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </option>
+                      ))}
                   </select>
+                  {(profile?.role !== 'admin' && profile?.role !== 'ADMIN' && profile?.role !== 'super_admin') && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Sadece kendi biriminiz için risk oluşturabilirsiniz
+                    </p>
+                  )}
                 </div>
 
                 <div>

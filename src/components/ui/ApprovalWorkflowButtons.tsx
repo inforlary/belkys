@@ -70,9 +70,18 @@ export default function ApprovalWorkflowButtons({
     setLoading(true);
     try {
       const functions = getFunctionNames();
-      const { data, error } = await supabase.rpc(functions.submit, {
-        [`${itemType}_id`]: itemId
-      });
+
+      // Build correct parameter name based on item type
+      const params: any = {};
+      if (itemType === 'risk') {
+        params.risk_id = itemId;
+      } else if (itemType === 'qm_process') {
+        params.process_id = itemId;
+      } else if (itemType === 'workflow') {
+        params.workflow_id = itemId;
+      }
+
+      const { data, error } = await supabase.rpc(functions.submit, params);
 
       if (error) throw error;
 
@@ -99,11 +108,22 @@ export default function ApprovalWorkflowButtons({
     setLoading(true);
     try {
       const functions = getFunctionNames();
-      const { data, error } = await supabase.rpc(functions.directorReview, {
-        [`${itemType}_id`]: itemId,
+
+      // Build correct parameter name based on item type
+      const params: any = {
         action: action,
         rejection_reason_text: action === 'reject' ? rejectionReason : null
-      });
+      };
+
+      if (itemType === 'risk') {
+        params.risk_id = itemId;
+      } else if (itemType === 'qm_process') {
+        params.process_id = itemId;
+      } else if (itemType === 'workflow') {
+        params.workflow_id = itemId;
+      }
+
+      const { data, error } = await supabase.rpc(functions.directorReview, params);
 
       if (error) throw error;
 
@@ -132,11 +152,22 @@ export default function ApprovalWorkflowButtons({
     setLoading(true);
     try {
       const functions = getFunctionNames();
-      const { data, error } = await supabase.rpc(functions.adminApprove, {
-        [`${itemType}_id`]: itemId,
+
+      // Build correct parameter name based on item type
+      const params: any = {
         action: action,
         rejection_reason_text: action === 'reject' ? rejectionReason : null
-      });
+      };
+
+      if (itemType === 'risk') {
+        params.risk_id = itemId;
+      } else if (itemType === 'qm_process') {
+        params.process_id = itemId;
+      } else if (itemType === 'workflow') {
+        params.workflow_id = itemId;
+      }
+
+      const { data, error } = await supabase.rpc(functions.adminApprove, params);
 
       if (error) throw error;
 

@@ -38,6 +38,14 @@ export default function QMProcessApprovals() {
   const loadPendingProcesses = async () => {
     try {
       setLoading(true);
+
+      // Load processes based on user role
+      // Directors see IN_REVIEW processes (for their department - handled by RLS)
+      // Admins see PENDING_APPROVAL processes (all in organization)
+      const statusFilter = profile?.role === 'director' || profile?.role === 'DIRECTOR'
+        ? 'IN_REVIEW'
+        : 'PENDING_APPROVAL';
+
       const { data, error } = await supabase
         .from('qm_processes')
         .select(`
@@ -47,7 +55,7 @@ export default function QMProcessApprovals() {
           owner_department:departments(name, code)
         `)
         .eq('organization_id', profile?.organization_id)
-        .eq('status', 'PENDING_APPROVAL')
+        .eq('status', statusFilter)
         .order('submitted_at', { ascending: true });
 
       if (error) throw error;
@@ -65,14 +73,23 @@ export default function QMProcessApprovals() {
     }
 
     try {
-      const { error } = await supabase.rpc('approve_qm_process', {
+      // Use appropriate function based on role
+      const isDirector = profile?.role === 'director' || profile?.role === 'DIRECTOR';
+      const functionName = isDirector ? 'director_approve_qm_process' : 'admin_final_approve_qm_process';
+
+      const { data, error } = await supabase.rpc(functionName, {
         process_id: processId,
-        approver_id: profile?.id,
-        approve: true
+        action: 'approve'
       });
 
       if (error) throw error;
-      alert('Süreç başarıyla onaylandı');
+
+      if (data && !data.success) {
+        alert(data.message || 'Onaylama işlemi başarısız oldu');
+        return;
+      }
+
+      alert(data?.message || 'Süreç başarıyla onaylandı');
       loadPendingProcesses();
       setShowDetailModal(false);
     } catch (error: any) {
@@ -96,15 +113,24 @@ export default function QMProcessApprovals() {
     }
 
     try {
-      const { error } = await supabase.rpc('approve_qm_process', {
+      // Use appropriate function based on role
+      const isDirector = profile?.role === 'director' || profile?.role === 'DIRECTOR';
+      const functionName = isDirector ? 'director_approve_qm_process' : 'admin_final_approve_qm_process';
+
+      const { data, error } = await supabase.rpc(functionName, {
         process_id: rejectingProcess.id,
-        approver_id: profile?.id,
-        approve: false,
-        reason: rejectionReason
+        action: 'reject',
+        rejection_reason_text: rejectionReason
       });
 
       if (error) throw error;
-      alert('Süreç reddedildi');
+
+      if (data && !data.success) {
+        alert(data.message || 'Reddetme işlemi başarısız oldu');
+        return;
+      }
+
+      alert(data?.message || 'Süreç reddedildi');
       loadPendingProcesses();
       setShowRejectionModal(false);
       setShowDetailModal(false);
@@ -148,12 +174,19 @@ export default function QMProcessApprovals() {
     );
   }
 
+  const isDirector = profile?.role === 'director' || profile?.role === 'DIRECTOR';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">QM Süreç Onayları</h1>
-          <p className="mt-2 text-gray-600">Onay bekleyen süreçleri görüntüleyin ve onaylayın</p>
+          <p className="mt-2 text-gray-600">
+            {isDirector
+              ? 'Biriminize ait onay bekleyen süreçleri görüntüleyin ve onaylayın'
+              : 'Onay bekleyen süreçleri görüntüleyin ve onaylayın'
+            }
+          </p>
         </div>
         <div className="bg-blue-50 px-4 py-2 rounded-lg">
           <div className="text-sm text-gray-600">Bekleyen Onay</div>
