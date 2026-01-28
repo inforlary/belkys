@@ -233,8 +233,8 @@ export default function WorkflowDetail() {
   const isAdmin = profile?.role?.toLowerCase() === 'admin' || profile?.is_super_admin;
   const isDirector = profile?.role?.toLowerCase() === 'director';
   const canApprove = isAdmin || isDirector;
-  const canDelete = isAdmin || isDirector;
-  const canEdit = workflow?.status === 'draft' || canApprove;
+  const canDelete = isAdmin;
+  const canEdit = isAdmin;
 
   const sensitiveSteps = steps.filter(s => s.is_sensitive);
 
