@@ -37,7 +37,14 @@ export default function WorkflowList() {
 
       const { data, error } = await supabase
         .from('workflow_processes')
-        .select('*, departments(name)')
+        .select(`
+          *,
+          qm_process:qm_processes(
+            code,
+            name,
+            owner_department:departments(name, code)
+          )
+        `)
         .eq('organization_id', profile.organization_id)
         .order('created_at', { ascending: false });
 
@@ -170,6 +177,18 @@ export default function WorkflowList() {
                 </div>
                 {workflow.description && (
                   <p className="text-sm text-gray-600 line-clamp-2 mb-3">{workflow.description}</p>
+                )}
+                {workflow.qm_process && (
+                  <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                    <div className="text-xs text-blue-900 font-medium mb-1">
+                      QM Süreci: {workflow.qm_process.code}
+                    </div>
+                    {workflow.qm_process.owner_department && (
+                      <div className="text-xs text-blue-700">
+                        Birim: {workflow.qm_process.owner_department.name}
+                      </div>
+                    )}
+                  </div>
                 )}
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span>Versiyon {workflow.version}</span>

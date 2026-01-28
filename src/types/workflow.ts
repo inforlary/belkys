@@ -9,8 +9,15 @@ export interface WorkflowProcess {
   name: string;
   description?: string;
   status: WorkflowStatus;
-  owner_department_id?: string;
-  qm_process_id?: string;
+  qm_process_id: string;
+  qm_process?: {
+    code: string;
+    name: string;
+    owner_department?: {
+      name: string;
+      code: string;
+    };
+  };
   trigger_event?: string;
   outputs?: string;
   software_used?: string;
@@ -76,7 +83,6 @@ export interface WorkflowFormData {
   code: string;
   name: string;
   description: string;
-  owner_department_id: string;
   qm_process_id: string;
   trigger_event: string;
   outputs: string;

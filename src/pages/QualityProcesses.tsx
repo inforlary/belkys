@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Edit, Trash2, Eye, BarChart3, X, TrendingUp, GitBranch } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, BarChart3, X, TrendingUp, GitBranch, Send, RotateCcw } from 'lucide-react';
 
 interface ProcessCategory {
   id: string;
@@ -83,6 +83,7 @@ export default function QualityProcesses() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showKPIModal, setShowKPIModal] = useState(false);
@@ -289,19 +290,61 @@ export default function QualityProcesses() {
         code: newCode,
         name: '',
         category_id: '',
-        owner_department_id: '',
+        owner_department_id: profile?.department_id || '',
         purpose: '',
         scope: '',
         inputs: '',
         outputs: '',
         resources: '',
         description: '',
-        status: 'ACTIVE',
+        status: 'DRAFT',
         related_risks: [],
         related_goal_id: ''
       });
     }
     setShowModal(true);
+  };
+
+  const handleSubmitForApproval = async (processId: string) => {
+    if (!confirm('Bu süreci onaya göndermek istediğinize emin misiniz?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .rpc('submit_qm_process_for_approval', {
+          process_id: processId,
+          submitter_id: profile?.id
+        });
+
+      if (error) throw error;
+      alert('Süreç başarıyla onaya gönderildi');
+      loadProcesses();
+    } catch (error: any) {
+      console.error('Error submitting for approval:', error);
+      alert('Onaya gönderme sırasında hata oluştu: ' + error.message);
+    }
+  };
+
+  const handleRevertToDraft = async (processId: string) => {
+    if (!confirm('Bu süreci tekrar düzenlemek için taslağa almak istediğinize emin misiniz?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .rpc('revert_qm_process_to_draft', {
+          process_id: processId,
+          user_id: profile?.id
+        });
+
+      if (error) throw error;
+      alert('Süreç taslağa alındı');
+      loadProcesses();
+    } catch (error: any) {
+      console.error('Error reverting to draft:', error);
+      alert('Taslağa alma sırasında hata oluştu: ' + error.message);
+    }
   };
 
   const handleSaveProcess = async () => {
@@ -510,16 +553,20 @@ export default function QualityProcesses() {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          p.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'all' || p.category_id === filterCategory;
-    return matchesSearch && matchesCategory;
+    const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
+    return matchesSearch && matchesCategory && matchesStatus;
   });
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      ACTIVE: { label: 'Aktif', color: 'bg-green-100 text-green-800' },
-      DRAFT: { label: 'Taslak', color: 'bg-yellow-100 text-yellow-800' },
+      DRAFT: { label: 'Taslak', color: 'bg-gray-100 text-gray-800' },
+      PENDING_APPROVAL: { label: 'Onay Bekliyor', color: 'bg-yellow-100 text-yellow-800' },
+      APPROVED: { label: 'Onaylandı', color: 'bg-green-100 text-green-800' },
+      REJECTED: { label: 'Reddedildi', color: 'bg-red-100 text-red-800' },
+      ACTIVE: { label: 'Onaylandı', color: 'bg-green-100 text-green-800' },
       INACTIVE: { label: 'Pasif', color: 'bg-gray-100 text-gray-800' }
     };
-    const { label, color } = statusMap[status as keyof typeof statusMap] || statusMap.ACTIVE;
+    const { label, color} = statusMap[status as keyof typeof statusMap] || { label: status, color: 'bg-gray-100 text-gray-800' };
     return <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${color}`}>{label}</span>;
   };
 
@@ -582,6 +629,17 @@ export default function QualityProcesses() {
             {categories.map(cat => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">Tüm Durumlar</option>
+            <option value="DRAFT">Taslak</option>
+            <option value="PENDING_APPROVAL">Onay Bekliyor</option>
+            <option value="APPROVED">Onaylandı</option>
+            <option value="REJECTED">Reddedildi</option>
           </select>
         </div>
       </div>
@@ -651,7 +709,25 @@ export default function QualityProcesses() {
                       >
                         <BarChart3 className="w-4 h-4" />
                       </button>
-                      {process.has_workflow ? (
+                      {process.status === 'DRAFT' && process.created_by === profile?.id && (
+                        <button
+                          onClick={() => handleSubmitForApproval(process.id)}
+                          className="text-green-600 hover:text-green-700"
+                          title="Onaya Gönder"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                      )}
+                      {process.status === 'REJECTED' && process.created_by === profile?.id && (
+                        <button
+                          onClick={() => handleRevertToDraft(process.id)}
+                          className="text-orange-600 hover:text-orange-700"
+                          title="Taslağa Al"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      )}
+                      {process.status === 'APPROVED' && process.has_workflow && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -662,37 +738,37 @@ export default function QualityProcesses() {
                         >
                           <GitBranch className="w-4 h-4" />
                         </button>
-                      ) : (
-                        isAdmin && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/workflows/new?qm_process_id=${process.id}`);
-                            }}
-                            className="text-blue-600 hover:text-blue-700"
-                            title="İş Akışı Oluştur"
-                          >
-                            <GitBranch className="w-4 h-4" />
-                          </button>
-                        )
+                      )}
+                      {process.status === 'APPROVED' && !process.has_workflow && isAdmin && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/workflows/new?qm_process_id=${process.id}`);
+                          }}
+                          className="text-blue-600 hover:text-blue-700"
+                          title="İş Akışı Oluştur"
+                        >
+                          <GitBranch className="w-4 h-4" />
+                        </button>
+                      )}
+                      {(isAdmin || (process.status === 'DRAFT' && process.created_by === profile?.id)) && (
+                        <button
+                          onClick={() => handleOpenModal(process)}
+                          className="text-gray-600 hover:text-gray-700"
+                          title="Düzenle"
+                          disabled={process.status !== 'DRAFT' && !isAdmin}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
                       )}
                       {isAdmin && (
-                        <>
-                          <button
-                            onClick={() => handleOpenModal(process)}
-                            className="text-gray-600 hover:text-gray-700"
-                            title="Düzenle"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(process)}
-                            className="text-red-600 hover:text-red-700"
-                            title="Sil"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
+                        <button
+                          onClick={() => handleDelete(process)}
+                          className="text-red-600 hover:text-red-700"
+                          title="Sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                   </td>
@@ -765,30 +841,37 @@ export default function QualityProcesses() {
                   <select
                     value={formData.owner_department_id}
                     onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={!isAdmin && !editingProcess}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Seçiniz...</option>
                     {departments.map(dept => (
                       <option key={dept.id} value={dept.id}>{dept.name}</option>
                     ))}
                   </select>
+                  {!isAdmin && !editingProcess && (
+                    <p className="mt-1 text-xs text-gray-500">Birim otomatik olarak atanmıştır</p>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Durum
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="ACTIVE">Aktif</option>
-                  <option value="DRAFT">Taslak</option>
-                  <option value="INACTIVE">Pasif</option>
-                </select>
-              </div>
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Durum
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="DRAFT">Taslak</option>
+                    <option value="PENDING_APPROVAL">Onay Bekliyor</option>
+                    <option value="APPROVED">Onaylandı</option>
+                    <option value="REJECTED">Reddedildi</option>
+                  </select>
+                </div>
+              )}
 
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">TANIM</h3>

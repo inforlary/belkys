@@ -25,7 +25,6 @@ export default function WorkflowForm() {
     code: '',
     name: '',
     description: '',
-    owner_department_id: '',
     qm_process_id: '',
     trigger_event: '',
     outputs: '',
@@ -83,8 +82,9 @@ export default function WorkflowForm() {
 
       const { data, error } = await supabase
         .from('qm_processes')
-        .select('id, code, name, description, status')
+        .select('id, code, name, description, status, owner_department:departments(name)')
         .eq('organization_id', profile.organization_id)
+        .eq('status', 'APPROVED')
         .order('code');
 
       if (error) {
@@ -129,7 +129,6 @@ export default function WorkflowForm() {
         code: workflow.code,
         name: workflow.name,
         description: workflow.description || '',
-        owner_department_id: workflow.owner_department_id || '',
         qm_process_id: workflow.qm_process_id || '',
         trigger_event: workflow.trigger_event || '',
         outputs: workflow.outputs || '',
@@ -160,7 +159,6 @@ export default function WorkflowForm() {
           code: 'Otomatik üretilecek',
           name: qmProcess.name,
           description: qmProcess.purpose || '',
-          owner_department_id: qmProcess.owner_department_id || '',
           qm_process_id: qmProcess.id,
           trigger_event: qmProcess.inputs || '',
           outputs: qmProcess.outputs || ''
@@ -318,8 +316,7 @@ export default function WorkflowForm() {
             code: workflowCode,
             name: formData.name,
             description: formData.description,
-            owner_department_id: formData.owner_department_id || null,
-            qm_process_id: formData.qm_process_id || null,
+            qm_process_id: formData.qm_process_id,
             trigger_event: formData.trigger_event,
             outputs: formData.outputs,
             software_used: formData.software_used,
@@ -342,8 +339,7 @@ export default function WorkflowForm() {
             code: workflowCode,
             name: formData.name,
             description: formData.description,
-            owner_department_id: formData.owner_department_id || null,
-            qm_process_id: formData.qm_process_id || null,
+            qm_process_id: formData.qm_process_id,
             trigger_event: formData.trigger_event,
             outputs: formData.outputs,
             software_used: formData.software_used,
@@ -511,40 +507,18 @@ export default function WorkflowForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Süreç Sahibi Birim</label>
-                    <select
-                      value={formData.owner_department_id}
-                      onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Seçiniz</option>
-                      {departments.map(dept => (
-                        <option key={dept.id} value={dept.id}>{dept.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {formData.qm_process_id && (
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-green-800">
-                        <span className="font-medium">Kalite Süreci:</span> Bu iş akışı bir kalite sürecinden oluşturuldu.
-                        Süreç bilgileri otomatik olarak doldurulmuştur.
-                      </p>
-                    </div>
-                  )}
-
-                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      İlişkili Süreç (Opsiyonel)
+                      QM Süreci <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={formData.qm_process_id}
                       onChange={(e) => setFormData({ ...formData, qm_process_id: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
                     >
-                      <option value="">Süreç seçiniz (Opsiyonel)</option>
+                      <option value="">QM Süreci Seçiniz...</option>
                       {qmProcesses.length === 0 ? (
-                        <option disabled>Henüz süreç oluşturulmamış</option>
+                        <option disabled>Henüz onaylanmış QM süreci yok</option>
                       ) : (
                         qmProcesses.map(process => (
                           <option key={process.id} value={process.id}>
@@ -555,10 +529,33 @@ export default function WorkflowForm() {
                       )}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Kalite Yönetimi Modülü &gt; Süreç Yönetimi'nden oluşturduğunuz süreçler
-                      {qmProcesses.length > 0 && ` (${qmProcesses.length} süreç bulundu)`}
+                      Sadece onaylanmış QM süreçleri gösterilmektedir
+                      {qmProcesses.length > 0 && ` (${qmProcesses.length} onaylı süreç)`}
                     </p>
                   </div>
+
+                  {formData.qm_process_id && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800 font-medium mb-1">
+                        Seçili QM Süreci
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        {(() => {
+                          const selectedProcess = qmProcesses.find(p => p.id === formData.qm_process_id);
+                          return selectedProcess ? (
+                            <>
+                              <strong>{selectedProcess.code}</strong> - {selectedProcess.name}
+                              {selectedProcess.owner_department && (
+                                <span className="block mt-1 text-xs">
+                                  Sorumlu Birim: <strong>{selectedProcess.owner_department.name}</strong>
+                                </span>
+                              )}
+                            </>
+                          ) : 'Yükleniyor...';
+                        })()}
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Süreç Açıklaması</label>
