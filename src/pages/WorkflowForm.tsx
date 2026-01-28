@@ -152,10 +152,9 @@ export default function WorkflowForm() {
       if (error) throw error;
 
       if (qmProcess) {
-        const newCode = await generateWorkflowCode();
         setFormData(prev => ({
           ...prev,
-          code: newCode,
+          code: 'Otomatik üretilecek',
           name: qmProcess.name,
           description: qmProcess.purpose || '',
           owner_department_id: qmProcess.owner_department_id || '',
@@ -287,8 +286,8 @@ export default function WorkflowForm() {
   const handleSubmit = async () => {
     if (!user) return;
 
-    if (!formData.code || !formData.name || formData.actors.length === 0 || formData.steps.length === 0) {
-      alert('Lütfen tüm zorunlu alanları doldurun (Süreç Kodu, Süreç Adı, Görevliler ve Adımlar)');
+    if (!formData.name || formData.actors.length === 0 || formData.steps.length === 0) {
+      alert('Lütfen tüm zorunlu alanları doldurun (Süreç Adı, Görevliler ve Adımlar)');
       return;
     }
 
@@ -302,13 +301,18 @@ export default function WorkflowForm() {
 
       if (!profile) throw new Error('Profile not found');
 
+      let workflowCode = formData.code;
+      if (!workflowCode || workflowCode === 'Otomatik üretilecek') {
+        workflowCode = await generateWorkflowCode();
+      }
+
       let workflow: any;
 
       if (isEditMode && workflowId) {
         const { data, error: workflowError } = await supabase
           .from('workflow_processes')
           .update({
-            code: formData.code,
+            code: workflowCode,
             name: formData.name,
             description: formData.description,
             owner_department_id: formData.owner_department_id || null,
@@ -333,7 +337,7 @@ export default function WorkflowForm() {
           .from('workflow_processes')
           .insert({
             organization_id: profile.organization_id,
-            code: formData.code,
+            code: workflowCode,
             name: formData.name,
             description: formData.description,
             owner_department_id: formData.owner_department_id || null,
@@ -519,16 +523,26 @@ export default function WorkflowForm() {
                     </select>
                   </div>
 
+                  {formData.qm_process_id && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        <span className="font-medium">Kalite Süreci:</span> Bu iş akışı bir kalite sürecinden oluşturuldu.
+                        Süreç bilgileri otomatik olarak doldurulmuştur.
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      İlişkili İç Kontrol Süreci <span className="text-red-500">*</span>
+                      İlişkili BPM Süreci (Opsiyonel)
                     </label>
                     <select
                       value={formData.bpm_process_id}
                       onChange={(e) => setFormData({ ...formData, bpm_process_id: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={!!formData.qm_process_id}
                     >
-                      <option value="">Süreç seçiniz</option>
+                      <option value="">Seçiniz (Opsiyonel)</option>
                       {bpmProcesses.map(process => (
                         <option key={process.id} value={process.id}>
                           {process.code} - {process.name}
@@ -536,7 +550,7 @@ export default function WorkflowForm() {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">Bu iş akışının bağlı olduğu iç kontrol sürecini seçiniz</p>
+                    <p className="text-xs text-gray-500 mt-1">İsterseniz bir BPM süreci ile ilişkilendirebilirsiniz</p>
                   </div>
 
                   <div>

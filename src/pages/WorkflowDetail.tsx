@@ -61,7 +61,7 @@ export default function WorkflowDetail() {
     try {
       const { data: workflowData, error: workflowError } = await supabase
         .from('workflow_processes')
-        .select('*, departments(name), bpm_processes(id, code, name, bpm_categories(name)), qm_processes(id, code, name, category:qm_process_categories(name))')
+        .select('*, departments(name), bpm_processes(id, code, name, bpm_categories(name)), qm_processes(id, code, name, qm_process_categories(name))')
         .eq('id', id)
         .single();
 
@@ -304,9 +304,9 @@ export default function WorkflowDetail() {
                     >
                       {(workflow as any).qm_processes.code} - {(workflow as any).qm_processes.name}
                     </button>
-                    {(workflow as any).qm_processes.category?.name && (
+                    {(workflow as any).qm_processes.qm_process_categories?.name && (
                       <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
-                        {(workflow as any).qm_processes.category.name}
+                        {(workflow as any).qm_processes.qm_process_categories.name}
                       </span>
                     )}
                   </div>
