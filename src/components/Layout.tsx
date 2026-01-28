@@ -5,6 +5,7 @@ import { Building2, LayoutDashboard, Target, Flag, BarChart3, Briefcase, Menu, X
 import { useLocation } from '../hooks/useLocation';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
+import ICActionNotificationBell from './ICActionNotificationBell';
 
 interface LayoutProps {
   children: ReactNode;
@@ -331,6 +332,8 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
         { icon: LayoutDashboard, label: 'Dashboard', path: 'internal-control/dashboard' },
         { icon: ClipboardCheck, label: 'Eylem Planları', path: 'internal-control/action-plans' },
         { icon: ListChecks, label: 'Tüm Eylemler', path: 'internal-control/actions' },
+        { icon: TrendingUp, label: 'Eylem Takip', path: 'internal-control/action-tracking' },
+        { icon: FileText, label: 'Eylem Raporları', path: 'internal-control/action-reports' },
         { icon: TrendingUp, label: 'Süreç Yönetimi', path: 'internal-control/processes' },
         { icon: BarChart3, label: 'Süreç KPI Takip', path: 'internal-control/process-kpis' },
         { icon: AlertCircle, label: 'DÖF Yönetimi', path: 'internal-control/dof' },
@@ -756,6 +759,7 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
             <div className="flex items-center space-x-4">
               {!profile?.is_super_admin && <GlobalSearch />}
               {!profile?.is_super_admin && <NotificationBell />}
+              {!profile?.is_super_admin && <ICActionNotificationBell />}
               {!profile?.is_super_admin && latestNotification && unreadNotifications > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center gap-3">
                   <div className="flex-1">
