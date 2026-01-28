@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { BarChart3, PieChart, CheckCircle, Clock, AlertTriangle, FileText, Eye, TrendingUp } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
+import LinkedModulesWidget from '../components/internal-control/LinkedModulesWidget';
 
 interface DashboardStats {
   total: number;
@@ -557,6 +558,8 @@ export default function ICActionTracking() {
           )}
         </div>
       </div>
+
+      <LinkedModulesWidget />
     </div>
   );
 }

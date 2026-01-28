@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useLocation } from '../hooks/useLocation';
+import LinkedModulesWidget from '../components/internal-control/LinkedModulesWidget';
 import {
   Shield,
   CheckCircle2,
@@ -986,6 +987,8 @@ export default function InternalControlDashboard() {
           </div>
         </div>
       </div>
+
+      <LinkedModulesWidget />
     </div>
   );
 }
