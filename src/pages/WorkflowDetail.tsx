@@ -61,7 +61,7 @@ export default function WorkflowDetail() {
     try {
       const { data: workflowData, error: workflowError } = await supabase
         .from('workflow_processes')
-        .select('*, departments(name), bpm_processes(id, code, name, bpm_categories(name)), qm_processes(id, code, name, qm_process_categories(name))')
+        .select('*, departments(name), bpm_processes(id, code, name), qm_processes(id, code, name, qm_process_categories(name))')
         .eq('id', id)
         .single();
 
@@ -314,19 +314,14 @@ export default function WorkflowDetail() {
               )}
               {(workflow as any).bpm_processes && (
                 <div className="col-span-2">
-                  <span className="text-gray-600">İlişkili BPM Süreci:</span>
-                  <div className="mt-1 flex items-center gap-2">
+                  <span className="text-gray-600">İlişkili Süreç:</span>
+                  <div className="mt-1">
                     <button
                       onClick={() => navigate(`/bpm-processes/${(workflow as any).bpm_processes.id}`)}
                       className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
                     >
                       {(workflow as any).bpm_processes.code} - {(workflow as any).bpm_processes.name}
                     </button>
-                    {(workflow as any).bpm_processes.bpm_categories?.name && (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                        {(workflow as any).bpm_processes.bpm_categories.name}
-                      </span>
-                    )}
                   </div>
                 </div>
               )}

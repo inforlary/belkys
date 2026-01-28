@@ -84,7 +84,7 @@ export default function WorkflowForm() {
 
       const { data } = await supabase
         .from('bpm_processes')
-        .select('id, code, name, category_id, bpm_categories(name)')
+        .select('id, code, name, description, category_id')
         .eq('organization_id', profile.organization_id)
         .in('status', ['approved', 'active'])
         .order('code');
@@ -534,7 +534,7 @@ export default function WorkflowForm() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      İlişkili BPM Süreci (Opsiyonel)
+                      İlişkili Süreç (Opsiyonel)
                     </label>
                     <select
                       value={formData.bpm_process_id}
@@ -542,15 +542,14 @@ export default function WorkflowForm() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       disabled={!!formData.qm_process_id}
                     >
-                      <option value="">Seçiniz (Opsiyonel)</option>
+                      <option value="">Süreç seçiniz (Opsiyonel)</option>
                       {bpmProcesses.map(process => (
                         <option key={process.id} value={process.id}>
                           {process.code} - {process.name}
-                          {process.bpm_categories?.name && ` (${process.bpm_categories.name})`}
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">İsterseniz bir BPM süreci ile ilişkilendirebilirsiniz</p>
+                    <p className="text-xs text-gray-500 mt-1">İç Kontrol Modülü &gt; Süreç Yönetimi'nden oluşturduğunuz süreçler</p>
                   </div>
 
                   <div>
