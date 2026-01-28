@@ -19,7 +19,7 @@ export default function WorkflowForm() {
   const [activeTab, setActiveTab] = useState<TabType>('basic');
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
-  const [bpmProcesses, setBpmProcesses] = useState<any[]>([]);
+  const [qmProcesses, setQmProcesses] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<WorkflowFormData>({
     code: '',
@@ -38,7 +38,7 @@ export default function WorkflowForm() {
 
   useEffect(() => {
     fetchDepartments();
-    fetchBpmProcesses();
+    fetchQmProcesses();
     if (isEditMode && workflowId) {
       loadWorkflow();
     } else if (qmProcessId) {
@@ -71,7 +71,7 @@ export default function WorkflowForm() {
     }
   }
 
-  async function fetchBpmProcesses() {
+  async function fetchQmProcesses() {
     if (!user) return;
     try {
       const { data: profile } = await supabase
@@ -83,20 +83,20 @@ export default function WorkflowForm() {
       if (!profile) return;
 
       const { data, error } = await supabase
-        .from('bpm_processes')
-        .select('id, code, name, description, category_id, status')
+        .from('qm_processes')
+        .select('id, code, name, description, status')
         .eq('organization_id', profile.organization_id)
         .order('code');
 
       if (error) {
-        console.error('Error fetching BPM processes:', error);
+        console.error('Error fetching QM processes:', error);
       } else {
-        console.log('BPM Processes loaded:', data?.length, 'processes');
+        console.log('QM Processes loaded:', data?.length, 'processes');
       }
 
-      setBpmProcesses(data || []);
+      setQmProcesses(data || []);
     } catch (error) {
-      console.error('Error fetching BPM processes:', error);
+      console.error('Error fetching QM processes:', error);
     }
   }
 
@@ -542,26 +542,25 @@ export default function WorkflowForm() {
                       İlişkili Süreç (Opsiyonel)
                     </label>
                     <select
-                      value={formData.bpm_process_id}
-                      onChange={(e) => setFormData({ ...formData, bpm_process_id: e.target.value })}
+                      value={formData.qm_process_id}
+                      onChange={(e) => setFormData({ ...formData, qm_process_id: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={!!formData.qm_process_id}
                     >
                       <option value="">Süreç seçiniz (Opsiyonel)</option>
-                      {bpmProcesses.length === 0 ? (
+                      {qmProcesses.length === 0 ? (
                         <option disabled>Henüz süreç oluşturulmamış</option>
                       ) : (
-                        bpmProcesses.map(process => (
+                        qmProcesses.map(process => (
                           <option key={process.id} value={process.id}>
                             {process.code} - {process.name}
-                            {process.status && process.status !== 'active' && ` (${process.status})`}
+                            {process.status && process.status !== 'ACTIVE' && ` (${process.status})`}
                           </option>
                         ))
                       )}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      İç Kontrol Modülü &gt; Süreç Yönetimi'nden oluşturduğunuz süreçler
-                      {bpmProcesses.length > 0 && ` (${bpmProcesses.length} süreç bulundu)`}
+                      Kalite Yönetimi Modülü &gt; Süreç Yönetimi'nden oluşturduğunuz süreçler
+                      {qmProcesses.length > 0 && ` (${qmProcesses.length} süreç bulundu)`}
                     </p>
                   </div>
 
