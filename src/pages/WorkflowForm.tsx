@@ -14,6 +14,7 @@ export default function WorkflowForm() {
   const isEditMode = pathParts.includes('edit');
   const workflowId = isEditMode ? pathParts[pathParts.length - 1] : null;
   const templateId = !isEditMode ? pathParts[pathParts.length - 1] : null;
+  const qmProcessId = new URLSearchParams(window.location.search).get('qm_process_id');
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('basic');
   const [loading, setLoading] = useState(false);
@@ -26,6 +27,7 @@ export default function WorkflowForm() {
     description: '',
     owner_department_id: '',
     bpm_process_id: '',
+    qm_process_id: '',
     trigger_event: '',
     outputs: '',
     software_used: '',
@@ -39,10 +41,12 @@ export default function WorkflowForm() {
     fetchBpmProcesses();
     if (isEditMode && workflowId) {
       loadWorkflow();
+    } else if (qmProcessId) {
+      loadFromQMProcess();
     } else if (templateId && templateId !== 'blank') {
       loadTemplate();
     }
-  }, [templateId, workflowId, isEditMode]);
+  }, [templateId, workflowId, isEditMode, qmProcessId]);
 
   async function fetchDepartments() {
     if (!user) return;
@@ -123,6 +127,7 @@ export default function WorkflowForm() {
         description: workflow.description || '',
         owner_department_id: workflow.owner_department_id || '',
         bpm_process_id: workflow.bpm_process_id || '',
+        qm_process_id: workflow.qm_process_id || '',
         trigger_event: workflow.trigger_event || '',
         outputs: workflow.outputs || '',
         software_used: workflow.software_used || '',
@@ -133,6 +138,35 @@ export default function WorkflowForm() {
     } catch (error) {
       console.error('Error loading workflow:', error);
       alert('İş akışı yüklenirken hata oluştu');
+    }
+  }
+
+  async function loadFromQMProcess() {
+    try {
+      const { data: qmProcess, error } = await supabase
+        .from('qm_processes')
+        .select('*, owner_department:departments(id, name)')
+        .eq('id', qmProcessId)
+        .single();
+
+      if (error) throw error;
+
+      if (qmProcess) {
+        const newCode = await generateWorkflowCode();
+        setFormData(prev => ({
+          ...prev,
+          code: newCode,
+          name: qmProcess.name,
+          description: qmProcess.purpose || '',
+          owner_department_id: qmProcess.owner_department_id || '',
+          qm_process_id: qmProcess.id,
+          trigger_event: qmProcess.inputs || '',
+          outputs: qmProcess.outputs || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading QM process:', error);
+      alert('Süreç bilgileri yüklenirken hata oluştu');
     }
   }
 
@@ -169,6 +203,31 @@ export default function WorkflowForm() {
       }
     } catch (error) {
       console.error('Error loading template:', error);
+    }
+  }
+
+  async function generateWorkflowCode() {
+    if (!user) return 'WF-001';
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) return 'WF-001';
+
+      const { count } = await supabase
+        .from('workflow_processes')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', profile.organization_id);
+
+      const nextNumber = (count || 0) + 1;
+      return `WF-${String(nextNumber).padStart(3, '0')}`;
+    } catch (error) {
+      console.error('Error generating workflow code:', error);
+      return 'WF-001';
     }
   }
 
@@ -228,8 +287,8 @@ export default function WorkflowForm() {
   const handleSubmit = async () => {
     if (!user) return;
 
-    if (!formData.code || !formData.name || !formData.bpm_process_id || formData.actors.length === 0 || formData.steps.length === 0) {
-      alert('Lütfen tüm zorunlu alanları doldurun (Süreç Kodu, Süreç Adı, BPM Süreci, Görevliler ve Adımlar)');
+    if (!formData.code || !formData.name || formData.actors.length === 0 || formData.steps.length === 0) {
+      alert('Lütfen tüm zorunlu alanları doldurun (Süreç Kodu, Süreç Adı, Görevliler ve Adımlar)');
       return;
     }
 
@@ -254,6 +313,7 @@ export default function WorkflowForm() {
             description: formData.description,
             owner_department_id: formData.owner_department_id || null,
             bpm_process_id: formData.bpm_process_id || null,
+            qm_process_id: formData.qm_process_id || null,
             trigger_event: formData.trigger_event,
             outputs: formData.outputs,
             software_used: formData.software_used,
@@ -278,6 +338,7 @@ export default function WorkflowForm() {
             description: formData.description,
             owner_department_id: formData.owner_department_id || null,
             bpm_process_id: formData.bpm_process_id || null,
+            qm_process_id: formData.qm_process_id || null,
             trigger_event: formData.trigger_event,
             outputs: formData.outputs,
             software_used: formData.software_used,

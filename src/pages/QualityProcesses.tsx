@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from '../hooks/useLocation';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Edit, Trash2, Eye, BarChart3, X, TrendingUp } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, BarChart3, X, TrendingUp, GitBranch } from 'lucide-react';
 
 interface ProcessCategory {
   id: string;
@@ -72,6 +73,7 @@ interface Goal {
 
 export default function QualityProcesses() {
   const { profile } = useAuth();
+  const { navigate } = useLocation();
   const [processes, setProcesses] = useState<Process[]>([]);
   const [categories, setCategories] = useState<ProcessCategory[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -649,6 +651,31 @@ export default function QualityProcesses() {
                       >
                         <BarChart3 className="w-4 h-4" />
                       </button>
+                      {process.has_workflow ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/workflows');
+                          }}
+                          className="text-green-600 hover:text-green-700"
+                          title="İş Akışı Var"
+                        >
+                          <GitBranch className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        isAdmin && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/workflows/new?qm_process_id=${process.id}`);
+                            }}
+                            className="text-blue-600 hover:text-blue-700"
+                            title="İş Akışı Oluştur"
+                          >
+                            <GitBranch className="w-4 h-4" />
+                          </button>
+                        )
+                      )}
                       {isAdmin && (
                         <>
                           <button

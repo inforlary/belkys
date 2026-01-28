@@ -61,7 +61,7 @@ export default function WorkflowDetail() {
     try {
       const { data: workflowData, error: workflowError } = await supabase
         .from('workflow_processes')
-        .select('*, departments(name), bpm_processes(id, code, name, bpm_categories(name))')
+        .select('*, departments(name), bpm_processes(id, code, name, bpm_categories(name)), qm_processes(id, code, name, category:qm_process_categories(name))')
         .eq('id', id)
         .single();
 
@@ -294,9 +294,27 @@ export default function WorkflowDetail() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Süreç Bilgileri</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
+              {(workflow as any).qm_processes && (
+                <div className="col-span-2">
+                  <span className="text-gray-600">İlişkili Kalite Süreci:</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/quality-processes`)}
+                      className="font-medium text-green-600 hover:text-green-800 hover:underline"
+                    >
+                      {(workflow as any).qm_processes.code} - {(workflow as any).qm_processes.name}
+                    </button>
+                    {(workflow as any).qm_processes.category?.name && (
+                      <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+                        {(workflow as any).qm_processes.category.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               {(workflow as any).bpm_processes && (
                 <div className="col-span-2">
-                  <span className="text-gray-600">İlişkili İç Kontrol Süreci:</span>
+                  <span className="text-gray-600">İlişkili BPM Süreci:</span>
                   <div className="mt-1 flex items-center gap-2">
                     <button
                       onClick={() => navigate(`/bpm-processes/${(workflow as any).bpm_processes.id}`)}
