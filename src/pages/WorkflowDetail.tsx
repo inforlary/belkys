@@ -74,7 +74,12 @@ export default function WorkflowDetail() {
 
       const { data: workflowData, error: workflowError } = await supabase
         .from('workflow_processes')
-        .select('*, departments(name), bpm_processes(id, code, name), qm_processes(id, code, name, qm_process_categories(name))')
+        .select(`
+          *,
+          departments(name),
+          bpm_process:bpm_processes!bpm_process_id(id, code, name),
+          qm_process:qm_processes!qm_process_id(id, code, name, qm_process_categories(name))
+        `)
         .eq('id', id)
         .single();
 
@@ -347,7 +352,7 @@ export default function WorkflowDetail() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Süreç Bilgileri</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              {(workflow as any).qm_processes && (
+              {(workflow as any).qm_process && (
                 <div className="col-span-2">
                   <span className="text-gray-600">İlişkili Kalite Süreci:</span>
                   <div className="mt-1 flex items-center gap-2">
@@ -355,25 +360,25 @@ export default function WorkflowDetail() {
                       onClick={() => navigate(`/quality-processes`)}
                       className="font-medium text-green-600 hover:text-green-800 hover:underline"
                     >
-                      {(workflow as any).qm_processes.code} - {(workflow as any).qm_processes.name}
+                      {(workflow as any).qm_process.code} - {(workflow as any).qm_process.name}
                     </button>
-                    {(workflow as any).qm_processes.qm_process_categories?.name && (
+                    {(workflow as any).qm_process.qm_process_categories?.name && (
                       <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
-                        {(workflow as any).qm_processes.qm_process_categories.name}
+                        {(workflow as any).qm_process.qm_process_categories.name}
                       </span>
                     )}
                   </div>
                 </div>
               )}
-              {(workflow as any).bpm_processes && (
+              {(workflow as any).bpm_process && (
                 <div className="col-span-2">
                   <span className="text-gray-600">İlişkili Süreç:</span>
                   <div className="mt-1">
                     <button
-                      onClick={() => navigate(`/bpm-processes/${(workflow as any).bpm_processes.id}`)}
+                      onClick={() => navigate(`/bpm-processes/${(workflow as any).bpm_process.id}`)}
                       className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      {(workflow as any).bpm_processes.code} - {(workflow as any).bpm_processes.name}
+                      {(workflow as any).bpm_process.code} - {(workflow as any).bpm_process.name}
                     </button>
                   </div>
                 </div>
