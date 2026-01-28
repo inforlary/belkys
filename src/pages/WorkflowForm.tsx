@@ -82,12 +82,17 @@ export default function WorkflowForm() {
 
       if (!profile) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('bpm_processes')
-        .select('id, code, name, description, category_id')
+        .select('id, code, name, description, category_id, status')
         .eq('organization_id', profile.organization_id)
-        .in('status', ['approved', 'active'])
         .order('code');
+
+      if (error) {
+        console.error('Error fetching BPM processes:', error);
+      } else {
+        console.log('BPM Processes loaded:', data?.length, 'processes');
+      }
 
       setBpmProcesses(data || []);
     } catch (error) {
@@ -543,13 +548,21 @@ export default function WorkflowForm() {
                       disabled={!!formData.qm_process_id}
                     >
                       <option value="">Süreç seçiniz (Opsiyonel)</option>
-                      {bpmProcesses.map(process => (
-                        <option key={process.id} value={process.id}>
-                          {process.code} - {process.name}
-                        </option>
-                      ))}
+                      {bpmProcesses.length === 0 ? (
+                        <option disabled>Henüz süreç oluşturulmamış</option>
+                      ) : (
+                        bpmProcesses.map(process => (
+                          <option key={process.id} value={process.id}>
+                            {process.code} - {process.name}
+                            {process.status && process.status !== 'active' && ` (${process.status})`}
+                          </option>
+                        ))
+                      )}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">İç Kontrol Modülü &gt; Süreç Yönetimi'nden oluşturduğunuz süreçler</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      İç Kontrol Modülü &gt; Süreç Yönetimi'nden oluşturduğunuz süreçler
+                      {bpmProcesses.length > 0 && ` (${bpmProcesses.length} süreç bulundu)`}
+                    </p>
                   </div>
 
                   <div>
