@@ -23,10 +23,14 @@ interface Process {
   category_id: string | null;
   process_owner_id: string | null;
   owner_department_id: string | null;
+  related_risks: string[] | null;
+  related_goal_id: string | null;
   category: ProcessCategory | null;
   process_owner: { full_name: string } | null;
   owner_department: { name: string } | null;
+  related_goal: { code: string; name: string } | null;
   kpis?: ProcessKPI[];
+  has_workflow?: boolean;
 }
 
 interface ProcessKPI {
@@ -52,12 +56,28 @@ interface Department {
   name: string;
 }
 
+interface Risk {
+  id: string;
+  code: string;
+  name: string;
+  owner_department_id: string | null;
+}
+
+interface Goal {
+  id: string;
+  code: string;
+  name: string;
+  department_id: string | null;
+}
+
 export default function QualityProcesses() {
   const { profile } = useAuth();
   const [processes, setProcesses] = useState<Process[]>([]);
   const [categories, setCategories] = useState<ProcessCategory[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [risks, setRisks] = useState<Risk[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -73,7 +93,6 @@ export default function QualityProcesses() {
     code: '',
     name: '',
     category_id: '',
-    process_owner_id: '',
     owner_department_id: '',
     purpose: '',
     scope: '',
@@ -81,7 +100,9 @@ export default function QualityProcesses() {
     outputs: '',
     resources: '',
     description: '',
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    related_risks: [] as string[],
+    related_goal_id: ''
   });
   const [kpiFormData, setKpiFormData] = useState({
     name: '',
@@ -105,7 +126,9 @@ export default function QualityProcesses() {
         loadProcesses(),
         loadCategories(),
         loadUsers(),
-        loadDepartments()
+        loadDepartments(),
+        loadRisks(),
+        loadGoals()
       ]);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -121,13 +144,28 @@ export default function QualityProcesses() {
         *,
         category:qm_process_categories(id, name, description),
         process_owner:profiles!qm_processes_process_owner_id_fkey(full_name),
-        owner_department:departments(name)
+        owner_department:departments(name),
+        related_goal:goals(code, name)
       `)
       .eq('organization_id', profile?.organization_id)
       .order('code');
 
     if (error) throw error;
-    setProcesses(data || []);
+
+    const processesWithWorkflow = await Promise.all((data || []).map(async (process) => {
+      const { data: workflowData } = await supabase
+        .rpc('check_process_has_workflow', {
+          process_id: process.id,
+          org_id: profile?.organization_id
+        });
+
+      return {
+        ...process,
+        has_workflow: workflowData || false
+      };
+    }));
+
+    setProcesses(processesWithWorkflow);
   };
 
   const loadCategories = async () => {
@@ -147,9 +185,11 @@ export default function QualityProcesses() {
 
   const createDefaultCategories = async () => {
     const defaultCategories = [
-      { name: 'Yönetim Süreçleri', order_index: 1 },
-      { name: 'Operasyonel Süreçler', order_index: 2 },
-      { name: 'Destek Süreçleri', order_index: 3 }
+      { name: 'Ana Hizmet Süreçleri', order_index: 1 },
+      { name: 'Yönetim Süreçleri', order_index: 2 },
+      { name: 'Destek Süreçleri', order_index: 3 },
+      { name: 'İzleme ve Değerlendirme Süreçleri', order_index: 4 },
+      { name: 'Operasyonel Süreçler', order_index: 5 }
     ];
 
     const { data, error } = await supabase
@@ -189,6 +229,28 @@ export default function QualityProcesses() {
     setDepartments(data || []);
   };
 
+  const loadRisks = async () => {
+    const { data, error } = await supabase
+      .from('risks')
+      .select('id, code, name, owner_department_id')
+      .eq('organization_id', profile?.organization_id)
+      .order('code');
+
+    if (error) throw error;
+    setRisks(data || []);
+  };
+
+  const loadGoals = async () => {
+    const { data, error } = await supabase
+      .from('goals')
+      .select('id, code, name, department_id')
+      .eq('organization_id', profile?.organization_id)
+      .order('code');
+
+    if (error) throw error;
+    setGoals(data || []);
+  };
+
   const generateProcessCode = async () => {
     const { data, error } = await supabase
       .rpc('generate_qm_process_code', { org_id: profile?.organization_id });
@@ -207,7 +269,6 @@ export default function QualityProcesses() {
         code: process.code,
         name: process.name,
         category_id: process.category_id || '',
-        process_owner_id: process.process_owner_id || '',
         owner_department_id: process.owner_department_id || '',
         purpose: process.purpose || '',
         scope: process.scope || '',
@@ -215,7 +276,9 @@ export default function QualityProcesses() {
         outputs: process.outputs || '',
         resources: process.resources || '',
         description: process.description || '',
-        status: process.status
+        status: process.status,
+        related_risks: process.related_risks || [],
+        related_goal_id: process.related_goal_id || ''
       });
     } else {
       setEditingProcess(null);
@@ -224,7 +287,6 @@ export default function QualityProcesses() {
         code: newCode,
         name: '',
         category_id: '',
-        process_owner_id: '',
         owner_department_id: '',
         purpose: '',
         scope: '',
@@ -232,7 +294,9 @@ export default function QualityProcesses() {
         outputs: '',
         resources: '',
         description: '',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        related_risks: [],
+        related_goal_id: ''
       });
     }
     setShowModal(true);
@@ -245,11 +309,27 @@ export default function QualityProcesses() {
     }
 
     try {
+      const saveData = {
+        code: formData.code,
+        name: formData.name,
+        category_id: formData.category_id,
+        owner_department_id: formData.owner_department_id,
+        purpose: formData.purpose || null,
+        scope: formData.scope || null,
+        inputs: formData.inputs || null,
+        outputs: formData.outputs || null,
+        resources: formData.resources || null,
+        description: formData.description || null,
+        status: formData.status,
+        related_risks: formData.related_risks.length > 0 ? formData.related_risks : null,
+        related_goal_id: formData.related_goal_id || null
+      };
+
       if (editingProcess) {
         const { error } = await supabase
           .from('qm_processes')
           .update({
-            ...formData,
+            ...saveData,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingProcess.id);
@@ -260,7 +340,7 @@ export default function QualityProcesses() {
         const { error } = await supabase
           .from('qm_processes')
           .insert({
-            ...formData,
+            ...saveData,
             organization_id: profile?.organization_id,
             created_by: profile?.id
           });
@@ -435,12 +515,19 @@ export default function QualityProcesses() {
     const statusMap = {
       ACTIVE: { label: 'Aktif', color: 'bg-green-100 text-green-800' },
       DRAFT: { label: 'Taslak', color: 'bg-yellow-100 text-yellow-800' },
-      INACTIVE: { label: 'Pasif', color: 'bg-gray-100 text-gray-800' },
-      ARCHIVED: { label: 'Arşiv', color: 'bg-red-100 text-red-800' }
+      INACTIVE: { label: 'Pasif', color: 'bg-gray-100 text-gray-800' }
     };
     const { label, color } = statusMap[status as keyof typeof statusMap] || statusMap.ACTIVE;
     return <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${color}`}>{label}</span>;
   };
+
+  const filteredRisks = risks.filter(risk =>
+    !formData.owner_department_id || risk.owner_department_id === formData.owner_department_id
+  );
+
+  const filteredGoals = goals.filter(goal =>
+    !formData.owner_department_id || goal.department_id === formData.owner_department_id
+  );
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
@@ -627,115 +714,38 @@ export default function QualityProcesses() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kategori <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.category_id}
-                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Seçiniz...</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Kategori <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.category_id}
+                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Seçiniz...</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Süreç Sahibi (Kişi)
-                </label>
-                <select
-                  value={formData.process_owner_id}
-                  onChange={(e) => setFormData({ ...formData, process_owner_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Seçiniz...</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>{user.full_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sorumlu Birim <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.owner_department_id}
-                  onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Seçiniz...</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>{dept.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Süreç Amacı
-                </label>
-                <textarea
-                  value={formData.purpose}
-                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kapsam
-                </label>
-                <textarea
-                  value={formData.scope}
-                  onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Girdiler
-                </label>
-                <textarea
-                  value={formData.inputs}
-                  onChange={(e) => setFormData({ ...formData, inputs: e.target.value })}
-                  rows={3}
-                  placeholder="Her satıra bir girdi yazın..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Çıktılar
-                </label>
-                <textarea
-                  value={formData.outputs}
-                  onChange={(e) => setFormData({ ...formData, outputs: e.target.value })}
-                  rows={3}
-                  placeholder="Her satıra bir çıktı yazın..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kaynaklar
-                </label>
-                <textarea
-                  value={formData.resources}
-                  onChange={(e) => setFormData({ ...formData, resources: e.target.value })}
-                  rows={2}
-                  placeholder="Personel, ekipman, yazılım vb."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sorumlu Birim <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.owner_department_id}
+                    onChange={(e) => setFormData({ ...formData, owner_department_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Seçiniz...</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -750,9 +760,160 @@ export default function QualityProcesses() {
                   <option value="ACTIVE">Aktif</option>
                   <option value="DRAFT">Taslak</option>
                   <option value="INACTIVE">Pasif</option>
-                  <option value="ARCHIVED">Arşiv</option>
                 </select>
               </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">TANIM</h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Süreç Amacı
+                    </label>
+                    <textarea
+                      value={formData.purpose}
+                      onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Kapsam
+                    </label>
+                    <textarea
+                      value={formData.scope}
+                      onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">GİRDİ / ÇIKTI</h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Girdiler
+                    </label>
+                    <textarea
+                      value={formData.inputs}
+                      onChange={(e) => setFormData({ ...formData, inputs: e.target.value })}
+                      rows={3}
+                      placeholder="Her satıra bir girdi yazın..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Çıktılar
+                    </label>
+                    <textarea
+                      value={formData.outputs}
+                      onChange={(e) => setFormData({ ...formData, outputs: e.target.value })}
+                      rows={3}
+                      placeholder="Her satıra bir çıktı yazın..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">KAYNAKLAR</h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Kaynaklar
+                  </label>
+                  <textarea
+                    value={formData.resources}
+                    onChange={(e) => setFormData({ ...formData, resources: e.target.value })}
+                    rows={2}
+                    placeholder="Personel, ekipman, yazılım vb."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">BAĞLANTILAR</h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      İlgili Riskler
+                      {!formData.owner_department_id && (
+                        <span className="text-xs text-gray-500 ml-2">(Önce sorumlu birim seçiniz)</span>
+                      )}
+                    </label>
+                    <select
+                      multiple
+                      value={formData.related_risks}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                        setFormData({ ...formData, related_risks: selected });
+                      }}
+                      disabled={!formData.owner_department_id}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[100px]"
+                    >
+                      {filteredRisks.map(risk => (
+                        <option key={risk.id} value={risk.id}>
+                          {risk.code} - {risk.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Ctrl/Cmd tuşu ile çoklu seçim yapabilirsiniz</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Stratejik Hedef
+                      {!formData.owner_department_id && (
+                        <span className="text-xs text-gray-500 ml-2">(Önce sorumlu birim seçiniz)</span>
+                      )}
+                    </label>
+                    <select
+                      value={formData.related_goal_id}
+                      onChange={(e) => setFormData({ ...formData, related_goal_id: e.target.value })}
+                      disabled={!formData.owner_department_id}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Seçiniz...</option>
+                      {filteredGoals.map(goal => (
+                        <option key={goal.id} value={goal.id}>
+                          {goal.code} - {goal.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {editingProcess && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">OTOMATİK BİLGİLER</h3>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">İş Akışı Durumu:</span>
+                      {editingProcess.has_workflow ? (
+                        <span className="inline-flex items-center px-3 py-1 text-sm font-medium text-green-800 bg-green-100 rounded-full">
+                          ✓ Var
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-3 py-1 text-sm font-medium text-gray-600 bg-gray-100 rounded-full">
+                          ✗ Yok
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
@@ -797,15 +958,60 @@ export default function QualityProcesses() {
                     <span className="ml-2 text-gray-900">{viewingProcess.category?.name || '-'}</span>
                   </div>
                   <div>
-                    <span className="font-medium text-gray-700">Süreç Sahibi:</span>
-                    <span className="ml-2 text-gray-900">{viewingProcess.process_owner?.full_name || '-'}</span>
-                  </div>
-                  <div>
                     <span className="font-medium text-gray-700">Sorumlu Birim:</span>
                     <span className="ml-2 text-gray-900">{viewingProcess.owner_department?.name || '-'}</span>
                   </div>
+                  <div>
+                    <span className="font-medium text-gray-700">İş Akışı Durumu:</span>
+                    {viewingProcess.has_workflow ? (
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 text-xs font-medium text-green-800 bg-green-100 rounded-full">
+                        ✓ Var
+                      </span>
+                    ) : (
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-full">
+                        ✗ Yok
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Durum:</span>
+                    <span className="ml-2">{getStatusBadge(viewingProcess.status)}</span>
+                  </div>
                 </div>
               </div>
+
+              {(viewingProcess.related_goal_id || (viewingProcess.related_risks && viewingProcess.related_risks.length > 0)) && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">BAĞLANTILAR</h3>
+                  <div className="space-y-3 text-sm">
+                    {viewingProcess.related_goal_id && viewingProcess.related_goal && (
+                      <div>
+                        <span className="font-medium text-gray-700">Stratejik Hedef:</span>
+                        <div className="mt-1 p-2 bg-blue-50 border border-blue-200 rounded">
+                          <span className="text-blue-900 font-medium">{viewingProcess.related_goal.code}</span>
+                          <span className="text-blue-800 ml-2">{viewingProcess.related_goal.name}</span>
+                        </div>
+                      </div>
+                    )}
+                    {viewingProcess.related_risks && viewingProcess.related_risks.length > 0 && (
+                      <div>
+                        <span className="font-medium text-gray-700">İlgili Riskler:</span>
+                        <div className="mt-1 space-y-1">
+                          {viewingProcess.related_risks.map((riskId, idx) => {
+                            const risk = risks.find(r => r.id === riskId);
+                            return risk ? (
+                              <div key={idx} className="p-2 bg-red-50 border border-red-200 rounded">
+                                <span className="text-red-900 font-medium">{risk.code}</span>
+                                <span className="text-red-800 ml-2">{risk.name}</span>
+                              </div>
+                            ) : null;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {viewingProcess.purpose && (
                 <div>
