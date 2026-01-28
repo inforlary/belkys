@@ -34,8 +34,6 @@ import BudgetReports from './pages/BudgetReports';
 import BudgetAuthorizations from './pages/BudgetAuthorizations';
 import BudgetPerformance from './pages/BudgetPerformance';
 import BudgetPerformanceForms from './pages/BudgetPerformanceForms';
-import VicePresidentPerformance from './pages/VicePresidentPerformance';
-import VPPerformanceAnalysis2 from './pages/VPPerformanceAnalysis2';
 import PerformanceMonitoring from './pages/PerformanceMonitoring';
 import PerformanceComparison from './pages/PerformanceComparison';
 import SuperAdmin from './pages/SuperAdmin';
@@ -334,10 +332,6 @@ const renderPage = () => {
         return <ProgramActivityMapping />;
       case 'mapped-economic-code-entry':
         return <MappedEconomicCodeEntry />;
-      case 'vice-president-performance':
-        return <VicePresidentPerformance />;
-      case 'vp-performance-analysis':
-        return <VPPerformanceAnalysis2 />;
       case 'performance-monitoring':
         return <PerformanceMonitoring />;
       case 'performance-comparison':

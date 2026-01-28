@@ -17,7 +17,6 @@ interface Goal {
   description: string;
   order_number: number;
   department_id: string | null;
-  vice_president_id: string | null;
   objective?: {
     title: string;
     code: string;
@@ -77,7 +76,6 @@ export default function Goals() {
     description: '',
     order_number: 1,
     department_id: '',
-    vice_president_id: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -146,8 +144,7 @@ export default function Goals() {
             risk_appetite_level,
             risk_appetite_description,
             objectives!inner(title, code),
-            departments(name),
-            vice_president:profiles!vice_president_id(full_name)
+            departments(name)
           `)
           .eq('organization_id', profile.organization_id)
           .in('objective_id', relevantObjectiveIds)
@@ -236,7 +233,6 @@ export default function Goals() {
       const dataToSave = {
         ...formData,
         department_id: formData.department_id || null,
-        vice_president_id: formData.vice_president_id || null,
       };
 
       if (editingGoal) {
@@ -295,7 +291,6 @@ export default function Goals() {
       description: goal.description,
       order_number: goal.order_number,
       department_id: goal.department_id || '',
-      vice_president_id: goal.vice_president_id || '',
     });
     setIsModalOpen(true);
   };
@@ -310,7 +305,6 @@ export default function Goals() {
       description: '',
       order_number: 1,
       department_id: '',
-      vice_president_id: '',
     });
   };
 
@@ -767,24 +761,6 @@ export default function Goals() {
                 {departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>
                     {dept.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Başkan Yardımcısı
-              </label>
-              <select
-                value={formData.vice_president_id}
-                onChange={(e) => setFormData({ ...formData, vice_president_id: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Seçiniz...</option>
-                {vicePresidents.map((vp) => (
-                  <option key={vp.id} value={vp.id}>
-                    {vp.full_name}
                   </option>
                 ))}
               </select>

@@ -395,8 +395,6 @@ const [expandedSections, setExpandedSections] = useState<string[]>([]);
     { icon: Activity, label: 'Aktivite Logları', path: 'activity-logs', adminOnly: true },
     { icon: Users, label: 'Kullanıcılar', path: 'users', adminOnly: true },
     { icon: Building, label: 'Müdürlükler', path: 'departments', adminOnly: true },
-    { icon: TrendingUp, label: 'Başkan Yrd. Performansı', path: 'vice-president-performance', adminOnly: true },
-    { icon: BarChart3, label: 'VP Performans Analizi', path: 'vp-performance-analysis', adminOnly: true },
     { icon: User, label: 'Profilim', path: 'user-profile' },
   ];
 
