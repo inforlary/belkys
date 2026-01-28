@@ -31,9 +31,9 @@ const edgeTypes = {
 };
 
 export default function WorkflowDetail() {
-  const { navigate, currentPath } = useLocation();
+  const { navigate, currentPath, getPathParam } = useLocation();
   const { user, profile } = useAuth();
-  const id = currentPath.split('/').pop();
+  const id = getPathParam(-1);
   const [workflow, setWorkflow] = useState<WorkflowProcess | null>(null);
   const [actors, setActors] = useState<WorkflowActor[]>([]);
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
@@ -41,6 +41,7 @@ export default function WorkflowDetail() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const { nodes: layoutNodes, edges: layoutEdges, swimlanes } = useWorkflowLayout(actors, steps);
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
@@ -59,7 +60,17 @@ export default function WorkflowDetail() {
 
   async function fetchWorkflowData() {
     try {
-      console.log('Fetching workflow with ID:', id);
+      console.log('=== WorkflowDetail Debug ===');
+      console.log('Current Path:', currentPath);
+      console.log('Extracted ID:', id);
+      console.log('User:', user?.id);
+      console.log('Profile:', profile?.role, profile?.organization_id);
+
+      if (!id) {
+        setErrorMessage('İş akışı ID\'si bulunamadı');
+        setLoading(false);
+        return;
+      }
 
       const { data: workflowData, error: workflowError } = await supabase
         .from('workflow_processes')
@@ -70,7 +81,22 @@ export default function WorkflowDetail() {
       console.log('Workflow data:', workflowData);
       console.log('Workflow error:', workflowError);
 
-      if (workflowError) throw workflowError;
+      if (workflowError) {
+        console.error('Workflow fetch error:', workflowError);
+        if (workflowError.code === 'PGRST116') {
+          setErrorMessage('İş akışı bulunamadı veya erişim yetkiniz yok');
+        } else {
+          setErrorMessage(`Hata: ${workflowError.message}`);
+        }
+        throw workflowError;
+      }
+
+      if (!workflowData) {
+        setErrorMessage('İş akışı verisi boş');
+        setLoading(false);
+        return;
+      }
+
       setWorkflow(workflowData);
 
       const { data: actorsData, error: actorsError } = await supabase
@@ -90,8 +116,11 @@ export default function WorkflowDetail() {
 
       if (stepsError) throw stepsError;
       setSteps(stepsData || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching workflow:', error);
+      if (!errorMessage) {
+        setErrorMessage(error?.message || 'Bilinmeyen bir hata oluştu');
+      }
     } finally {
       setLoading(false);
     }
@@ -213,7 +242,14 @@ export default function WorkflowDetail() {
           <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
           <div className="text-gray-900 font-medium">İş akış şeması bulunamadı</div>
           <div className="text-sm text-gray-500">
-            İş akışı silinmiş olabilir veya erişim yetkiniz olmayabilir.
+            {errorMessage || 'İş akışı silinmiş olabilir veya erişim yetkiniz olmayabilir.'}
+          </div>
+          <div className="mt-2 p-3 bg-gray-100 rounded text-xs text-left space-y-1">
+            <div><strong>Current Path:</strong> {currentPath}</div>
+            <div><strong>Workflow ID:</strong> {id || 'Bulunamadı'}</div>
+            <div><strong>User ID:</strong> {user?.id || 'Yok'}</div>
+            <div><strong>Org ID:</strong> {profile?.organization_id || 'Yok'}</div>
+            <div><strong>Role:</strong> {profile?.role || 'Yok'}</div>
           </div>
           <button
             onClick={() => navigate('/workflows')}
