@@ -76,8 +76,13 @@ export default function WorkflowDetail() {
         .from('workflow_processes')
         .select(`
           *,
-          departments(name),
-          qm_process:qm_processes!qm_process_id(id, code, name, qm_process_categories(name))
+          qm_process:qm_processes(
+            id,
+            code,
+            name,
+            qm_process_categories(name),
+            owner_department:departments(name, code)
+          )
         `)
         .eq('id', id)
         .single();
@@ -375,7 +380,9 @@ export default function WorkflowDetail() {
               </div>
               <div>
                 <span className="text-gray-600">Süreç Sahibi Birim:</span>
-                <p className="font-medium text-gray-900 mt-1">{(workflow as any).departments?.name || '-'}</p>
+                <p className="font-medium text-gray-900 mt-1">
+                  {workflow.qm_process?.owner_department?.name || '-'}
+                </p>
               </div>
               {workflow.description && (
                 <div className="col-span-2">
