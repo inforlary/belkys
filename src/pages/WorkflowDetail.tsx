@@ -77,7 +77,6 @@ export default function WorkflowDetail() {
         .select(`
           *,
           departments(name),
-          bpm_process:bpm_processes!bpm_process_id(id, code, name),
           qm_process:qm_processes!qm_process_id(id, code, name, qm_process_categories(name))
         `)
         .eq('id', id)
@@ -367,19 +366,6 @@ export default function WorkflowDetail() {
                         {(workflow as any).qm_process.qm_process_categories.name}
                       </span>
                     )}
-                  </div>
-                </div>
-              )}
-              {(workflow as any).bpm_process && (
-                <div className="col-span-2">
-                  <span className="text-gray-600">İlişkili Süreç:</span>
-                  <div className="mt-1">
-                    <button
-                      onClick={() => navigate(`/bpm-processes/${(workflow as any).bpm_process.id}`)}
-                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {(workflow as any).bpm_process.code} - {(workflow as any).bpm_process.name}
-                    </button>
                   </div>
                 </div>
               )}
