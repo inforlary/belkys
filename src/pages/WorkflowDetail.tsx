@@ -81,8 +81,9 @@ export default function WorkflowDetail() {
             id,
             code,
             name,
+            owner_department_id,
             qm_process_categories(name),
-            owner_department:departments(name, code)
+            owner_department:departments(id, name, code)
           )
         `)
         .eq('id', id)
@@ -333,7 +334,7 @@ export default function WorkflowDetail() {
             currentUserId={profile.id}
             userRole={profile.role}
             userDepartmentId={profile.department_id}
-            itemDepartmentId={workflow.qm_process?.owner_department?.id}
+            itemDepartmentId={(workflow.qm_process as any)?.owner_department_id || (workflow.qm_process as any)?.owner_department?.id}
             onStatusChange={fetchWorkflowData}
           />
         </div>
