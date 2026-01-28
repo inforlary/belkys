@@ -29,11 +29,16 @@ export default function QMProcessApprovals() {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectingProcess, setRejectingProcess] = useState<PendingProcess | null>(null);
 
+  const isDirector = profile?.role === 'director' || profile?.role === 'DIRECTOR';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'ADMIN';
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const hasAccess = isDirector || isAdmin || isSuperAdmin;
+
   useEffect(() => {
-    if (profile?.organization_id) {
+    if (profile?.organization_id && hasAccess) {
       loadPendingProcesses();
     }
-  }, [profile?.organization_id]);
+  }, [profile?.organization_id, hasAccess]);
 
   const loadPendingProcesses = async () => {
     try {
@@ -166,6 +171,19 @@ export default function QMProcessApprovals() {
     return diffDays;
   };
 
+  if (!hasAccess) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h3 className="text-lg font-semibold text-red-900 mb-2">Erişim Yetkiniz Yok</h3>
+          <p className="text-red-700">
+            Bu sayfaya sadece Müdürler ve Yöneticiler erişebilir.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -173,8 +191,6 @@ export default function QMProcessApprovals() {
       </div>
     );
   }
-
-  const isDirector = profile?.role === 'director' || profile?.role === 'DIRECTOR';
 
   return (
     <div className="space-y-6">
