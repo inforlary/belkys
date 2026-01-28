@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import { FileText, Download, Calendar, Filter, BarChart3, AlertTriangle, TrendingUp, FileCheck, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -61,25 +60,91 @@ export default function ICActionReports() {
     setLoading(true);
     try {
       let query = supabase
-        .from('ic_action_progress_summary')
-        .select('*')
+        .from('ic_actions')
+        .select(`
+          *,
+          departments!ic_actions_responsible_department_id_fkey(name),
+          ic_general_conditions!ic_actions_condition_id_fkey(standard_id)
+        `)
         .eq('organization_id', profile?.organization_id);
 
       if (filters.action_plan_id) query = query.eq('action_plan_id', filters.action_plan_id);
-      if (filters.component_id) query = query.eq('component_id', filters.component_id);
       if (filters.department_id) query = query.eq('responsible_department_id', filters.department_id);
       if (filters.status) query = query.eq('status', filters.status);
       if (filters.approval_status) query = query.eq('approval_status', filters.approval_status);
 
-      const { data } = await query.order('code');
+      const { data: rawData } = await query.order('code');
 
-      if (!data || data.length === 0) {
+      if (!rawData || rawData.length === 0) {
+        alert('Seçilen filtrelere uygun veri bulunamadı.');
+        return;
+      }
+
+      const standardIds = new Set<string>();
+      rawData.forEach((a: any) => {
+        const standardId = a.ic_general_conditions?.standard_id;
+        if (standardId) standardIds.add(standardId);
+      });
+
+      let componentsMap = new Map();
+      let standardsMap = new Map();
+
+      if (standardIds.size > 0) {
+        const { data: standardsData } = await supabase
+          .from('ic_standards')
+          .select('id, code, name, component_id')
+          .in('id', Array.from(standardIds));
+
+        standardsMap = new Map(standardsData?.map((s: any) => [s.id, s]) || []);
+
+        const componentIds = new Set<string>();
+        standardsData?.forEach((s: any) => {
+          if (s.component_id) componentIds.add(s.component_id);
+        });
+
+        if (componentIds.size > 0) {
+          const { data: componentsData } = await supabase
+            .from('ic_components')
+            .select('id, code, name')
+            .in('id', Array.from(componentIds));
+
+          componentsMap = new Map(componentsData?.map((c: any) => [c.id, c]) || []);
+        }
+      }
+
+      const data = rawData
+        .map((a: any) => {
+          const standardId = a.ic_general_conditions?.standard_id;
+          const standard = standardId ? standardsMap.get(standardId) : null;
+          const component = standard?.component_id ? componentsMap.get(standard.component_id) : null;
+
+          if (filters.component_id && (!component || component.id !== filters.component_id)) {
+            return null;
+          }
+
+          return {
+            code: a.code,
+            title: a.title,
+            component_code: component?.code || '-',
+            component_name: component?.name || '-',
+            standard_name: standard?.name || '-',
+            department_name: a.departments?.name || 'Belirtilmemiş',
+            status: a.status,
+            approval_status: a.approval_status,
+            progress_percent: a.progress_percent || 0,
+            start_date: a.start_date,
+            target_date: a.target_date
+          };
+        })
+        .filter(Boolean);
+
+      if (data.length === 0) {
         alert('Seçilen filtrelere uygun veri bulunamadı.');
         return;
       }
 
       if (format === 'excel') {
-        const ws = XLSX.utils.json_to_sheet(data.map(d => ({
+        const ws = XLSX.utils.json_to_sheet(data.map((d: any) => ({
           'Eylem Kodu': d.code,
           'Başlık': d.title,
           'Bileşen': d.component_name,
@@ -87,7 +152,7 @@ export default function ICActionReports() {
           'Birim': d.department_name,
           'Durum': getStatusLabel(d.status),
           'Onay Durumu': getApprovalStatusLabel(d.approval_status),
-          'İlerleme': `%${d.calculated_progress}`,
+          'İlerleme': `%${d.progress_percent}`,
           'Başlangıç': d.start_date ? new Date(d.start_date).toLocaleDateString('tr-TR') : '-',
           'Hedef Tarih': d.target_date ? new Date(d.target_date).toLocaleDateString('tr-TR') : '-'
         })));
@@ -109,14 +174,14 @@ export default function ICActionReports() {
         autoTable(doc, {
           startY: 28,
           head: [['Kod', 'Başlık', 'Bileşen', 'Birim', 'Durum', 'Onay', 'İlerleme %', 'Hedef Tarih']],
-          body: data.map(d => [
+          body: data.map((d: any) => [
             d.code,
             d.title.substring(0, 40) + (d.title.length > 40 ? '...' : ''),
             d.component_code,
             d.department_name,
             getStatusLabel(d.status),
             getApprovalStatusLabel(d.approval_status),
-            d.calculated_progress,
+            d.progress_percent,
             d.target_date ? new Date(d.target_date).toLocaleDateString('tr-TR') : '-'
           ]),
           styles: { fontSize: 8 },
@@ -137,23 +202,64 @@ export default function ICActionReports() {
     setLoading(true);
     try {
       const { data: actionsData } = await supabase
-        .from('ic_action_progress_summary')
-        .select('*')
+        .from('ic_actions')
+        .select(`
+          status,
+          progress_percent,
+          ic_general_conditions!ic_actions_condition_id_fkey(standard_id)
+        `)
         .eq('organization_id', profile?.organization_id)
-        .eq('action_plan_id', filters.action_plan_id);
+        .eq('action_plan_id', filters.action_plan_id || '');
 
       if (!actionsData || actionsData.length === 0) {
         alert('Veri bulunamadı.');
         return;
       }
 
-      const componentStats = actionsData.reduce((acc: any, curr) => {
-        const key = curr.component_code || 'Diğer';
+      const standardIds = new Set<string>();
+      actionsData.forEach((a: any) => {
+        const standardId = a.ic_general_conditions?.standard_id;
+        if (standardId) standardIds.add(standardId);
+      });
+
+      let componentsMap = new Map();
+      let standardToComponentMap = new Map();
+
+      if (standardIds.size > 0) {
+        const { data: standardsData } = await supabase
+          .from('ic_standards')
+          .select('id, code, component_id')
+          .in('id', Array.from(standardIds));
+
+        standardsData?.forEach((s: any) => {
+          if (s.component_id) {
+            standardToComponentMap.set(s.id, s.component_id);
+          }
+        });
+
+        const componentIds = new Set<string>(Array.from(standardToComponentMap.values()));
+
+        if (componentIds.size > 0) {
+          const { data: componentsData } = await supabase
+            .from('ic_components')
+            .select('id, code, name')
+            .in('id', Array.from(componentIds));
+
+          componentsMap = new Map(componentsData?.map((c: any) => [c.id, c]) || []);
+        }
+      }
+
+      const componentStats = actionsData.reduce((acc: any, curr: any) => {
+        const standardId = curr.ic_general_conditions?.standard_id;
+        const componentId = standardId ? standardToComponentMap.get(standardId) : null;
+        const component = componentId ? componentsMap.get(componentId) : null;
+        const key = component?.code || 'Diğer';
+
         if (!acc[key]) {
           acc[key] = { total: 0, completed: 0, avg_progress: 0, total_progress: 0 };
         }
         acc[key].total++;
-        acc[key].total_progress += curr.calculated_progress || 0;
+        acc[key].total_progress += curr.progress_percent || 0;
         if (curr.status === 'COMPLETED') acc[key].completed++;
         return acc;
       }, {});
@@ -203,17 +309,34 @@ export default function ICActionReports() {
   const generateOverdueReport = async (format: 'pdf' | 'excel') => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('ic_action_progress_summary')
-        .select('*')
+      const today = new Date().toISOString().split('T')[0];
+      const { data: rawData } = await supabase
+        .from('ic_actions')
+        .select(`
+          code,
+          title,
+          target_date,
+          progress_percent,
+          departments!ic_actions_responsible_department_id_fkey(name)
+        `)
         .eq('organization_id', profile?.organization_id)
-        .eq('is_overdue', true)
+        .lt('target_date', today)
+        .not('status', 'in', '(COMPLETED,CANCELLED)')
         .order('target_date');
 
-      if (!data || data.length === 0) {
+      if (!rawData || rawData.length === 0) {
         alert('Geciken eylem bulunamadı.');
         return;
       }
+
+      const data = rawData.map((d: any) => ({
+        code: d.code,
+        title: d.title,
+        department_name: d.departments?.name || 'Belirtilmemiş',
+        target_date: d.target_date,
+        overdue_days: Math.floor((new Date().getTime() - new Date(d.target_date).getTime()) / (1000 * 60 * 60 * 24)),
+        progress_percent: d.progress_percent || 0
+      }));
 
       if (format === 'excel') {
         const ws = XLSX.utils.json_to_sheet(data.map(d => ({
@@ -221,8 +344,8 @@ export default function ICActionReports() {
           'Başlık': d.title,
           'Birim': d.department_name,
           'Hedef Tarih': new Date(d.target_date).toLocaleDateString('tr-TR'),
-          'Gecikme (Gün)': Math.floor((new Date().getTime() - new Date(d.target_date).getTime()) / (1000 * 60 * 60 * 24)),
-          'İlerleme': `%${d.calculated_progress}`
+          'Gecikme (Gün)': d.overdue_days,
+          'İlerleme': `%${d.progress_percent}`
         })));
 
         const wb = XLSX.utils.book_new();
@@ -243,13 +366,13 @@ export default function ICActionReports() {
         autoTable(doc, {
           startY: 35,
           head: [['Kod', 'Başlık', 'Birim', 'Hedef Tarih', 'Gecikme (Gün)', 'İlerleme']],
-          body: data.map(d => [
+          body: data.map((d: any) => [
             d.code,
             d.title.substring(0, 40) + (d.title.length > 40 ? '...' : ''),
             d.department_name,
             new Date(d.target_date).toLocaleDateString('tr-TR'),
-            Math.floor((new Date().getTime() - new Date(d.target_date).getTime()) / (1000 * 60 * 60 * 24)),
-            `%${d.calculated_progress}`
+            d.overdue_days,
+            `%${d.progress_percent}`
           ]),
           headStyles: { fillColor: [239, 68, 68] }
         });
@@ -286,7 +409,7 @@ export default function ICActionReports() {
   };
 
   return (
-    <Layout>
+    <div className="space-y-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Eylem Planı Raporları</h1>
         <p className="text-gray-600 mt-1">İç kontrol eylem planı raporlarını oluşturun ve indirin</p>
@@ -478,6 +601,6 @@ export default function ICActionReports() {
           </div>
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }

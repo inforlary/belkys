@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Layout from '../components/Layout';
 import { BarChart3, PieChart, CheckCircle, Clock, AlertTriangle, FileText, Eye, TrendingUp } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 
@@ -82,16 +81,24 @@ export default function ICActionTracking() {
 
   const loadStats = async () => {
     const { data: actionsData } = await supabase
-      .from('ic_action_progress_summary')
-      .select('*')
+      .from('ic_actions')
+      .select('id, status, progress_percent')
       .eq('organization_id', profile?.organization_id);
 
     if (actionsData) {
       const total = actionsData.length;
       const completed = actionsData.filter(a => a.status === 'COMPLETED').length;
       const in_progress = actionsData.filter(a => a.status === 'IN_PROGRESS').length;
-      const overdue = actionsData.filter(a => a.is_overdue).length;
       const not_started = actionsData.filter(a => a.status === 'NOT_STARTED').length;
+
+      const { data: overdueData } = await supabase
+        .from('ic_actions')
+        .select('id')
+        .eq('organization_id', profile?.organization_id)
+        .lt('target_date', new Date().toISOString().split('T')[0])
+        .not('status', 'in', '(COMPLETED,CANCELLED)');
+
+      const overdue = overdueData?.length || 0;
       const completion_rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
       setStats({
@@ -106,51 +113,103 @@ export default function ICActionTracking() {
   };
 
   const loadComponentProgress = async () => {
-    const { data } = await supabase
-      .from('ic_action_progress_summary')
-      .select('component_code, component_name, calculated_progress')
-      .eq('organization_id', profile?.organization_id)
-      .not('component_code', 'is', null);
+    const { data: actionsData } = await supabase
+      .from('ic_actions')
+      .select(`
+        progress_percent,
+        ic_general_conditions!ic_actions_condition_id_fkey (
+          standard_id
+        )
+      `)
+      .eq('organization_id', profile?.organization_id);
 
-    if (data) {
-      const grouped = data.reduce((acc: any, curr) => {
-        const key = curr.component_code;
-        if (!acc[key]) {
-          acc[key] = {
-            component_code: curr.component_code,
-            component_name: curr.component_name,
-            total_actions: 0,
-            total_progress: 0
-          };
-        }
-        acc[key].total_actions++;
-        acc[key].total_progress += curr.calculated_progress || 0;
-        return acc;
-      }, {});
+    if (!actionsData) return;
 
-      const progressData = Object.values(grouped).map((g: any) => ({
-        component_code: g.component_code,
-        component_name: g.component_name,
-        total_actions: g.total_actions,
-        avg_progress: Math.round(g.total_progress / g.total_actions)
-      }));
+    const standardIds = new Set<string>();
+    actionsData.forEach((action: any) => {
+      const standardId = action.ic_general_conditions?.standard_id;
+      if (standardId) standardIds.add(standardId);
+    });
 
-      setComponentProgress(progressData);
-    }
+    if (standardIds.size === 0) return;
+
+    const { data: standardsData } = await supabase
+      .from('ic_standards')
+      .select('id, component_id')
+      .in('id', Array.from(standardIds));
+
+    const componentIds = new Set<string>();
+    const standardToComponentMap = new Map();
+    standardsData?.forEach((std: any) => {
+      if (std.component_id) {
+        componentIds.add(std.component_id);
+        standardToComponentMap.set(std.id, std.component_id);
+      }
+    });
+
+    const { data: componentsData } = await supabase
+      .from('ic_components')
+      .select('id, code, name')
+      .in('id', Array.from(componentIds));
+
+    const componentsMap = new Map(componentsData?.map((c: any) => [c.id, c]) || []);
+
+    const grouped = actionsData.reduce((acc: any, action: any) => {
+      const standardId = action.ic_general_conditions?.standard_id;
+      const componentId = standardId ? standardToComponentMap.get(standardId) : null;
+      if (!componentId) return acc;
+
+      const component = componentsMap.get(componentId);
+      if (!component) return acc;
+
+      const key = component.code;
+      if (!acc[key]) {
+        acc[key] = {
+          component_code: component.code,
+          component_name: component.name,
+          total_actions: 0,
+          total_progress: 0
+        };
+      }
+      acc[key].total_actions++;
+      acc[key].total_progress += action.progress_percent || 0;
+      return acc;
+    }, {});
+
+    const progressData = Object.values(grouped).map((g: any) => ({
+      component_code: g.component_code,
+      component_name: g.component_name,
+      total_actions: g.total_actions,
+      avg_progress: Math.round(g.total_progress / g.total_actions)
+    }));
+
+    setComponentProgress(progressData);
   };
 
   const loadOverdueActions = async () => {
+    const today = new Date().toISOString().split('T')[0];
     const { data } = await supabase
-      .from('ic_action_progress_summary')
-      .select('id, code, title, department_name, target_date')
+      .from('ic_actions')
+      .select(`
+        id,
+        code,
+        title,
+        target_date,
+        departments!ic_actions_responsible_department_id_fkey(name)
+      `)
       .eq('organization_id', profile?.organization_id)
-      .eq('is_overdue', true)
+      .lt('target_date', today)
+      .not('status', 'in', '(COMPLETED,CANCELLED)')
       .order('target_date', { ascending: true })
       .limit(10);
 
     if (data) {
-      const enriched = data.map(a => ({
-        ...a,
+      const enriched = data.map((a: any) => ({
+        id: a.id,
+        code: a.code,
+        title: a.title,
+        department_name: a.departments?.name || 'Belirtilmemiş',
+        target_date: a.target_date,
         overdue_days: Math.floor((new Date().getTime() - new Date(a.target_date).getTime()) / (1000 * 60 * 60 * 24))
       }));
       setOverdueActions(enriched);
@@ -158,17 +217,32 @@ export default function ICActionTracking() {
   };
 
   const loadDueSoonActions = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
     const { data } = await supabase
-      .from('ic_action_progress_summary')
-      .select('id, code, title, department_name, target_date')
+      .from('ic_actions')
+      .select(`
+        id,
+        code,
+        title,
+        target_date,
+        departments!ic_actions_responsible_department_id_fkey(name)
+      `)
       .eq('organization_id', profile?.organization_id)
-      .eq('is_due_soon', true)
+      .gte('target_date', today)
+      .lte('target_date', sevenDaysLater)
+      .not('status', 'in', '(COMPLETED,CANCELLED)')
       .order('target_date', { ascending: true })
       .limit(10);
 
     if (data) {
-      const enriched = data.map(a => ({
-        ...a,
+      const enriched = data.map((a: any) => ({
+        id: a.id,
+        code: a.code,
+        title: a.title,
+        department_name: a.departments?.name || 'Belirtilmemiş',
+        target_date: a.target_date,
         overdue_days: Math.floor((new Date(a.target_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
       }));
       setDueSoonActions(enriched);
@@ -213,16 +287,14 @@ export default function ICActionTracking() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">Yükleniyor...</div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Yükleniyor...</div>
+      </div>
     );
   }
 
   return (
-    <Layout>
+    <div className="space-y-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Eylem Planı Takip</h1>
         <p className="text-gray-600 mt-1">İç kontrol eylem planı ilerleme ve takip ekranı</p>
@@ -287,22 +359,26 @@ export default function ICActionTracking() {
             <BarChart3 className="w-5 h-5 text-blue-600" />
             Bileşen Bazlı İlerleme
           </h3>
-          <div className="space-y-3">
-            {componentProgress.map((comp) => (
-              <div key={comp.component_code}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="font-medium">{comp.component_code} - {comp.component_name}</span>
-                  <span className="text-gray-600">%{comp.avg_progress}</span>
+          {componentProgress.length > 0 ? (
+            <div className="space-y-3">
+              {componentProgress.map((comp) => (
+                <div key={comp.component_code}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">{comp.component_code} - {comp.component_name}</span>
+                    <span className="text-gray-600">%{comp.avg_progress}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      style={{ width: `${comp.avg_progress}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{ width: `${comp.avg_progress}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">Henüz eylem bulunmamaktadır.</p>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -463,7 +539,7 @@ export default function ICActionTracking() {
                         {getStatusLabel(action.approval_status)}
                       </span>
                     </td>
-                    <td className="py-2">{new Date(action.submitted_at).toLocaleDateString('tr-TR')}</td>
+                    <td className="py-2">{action.submitted_at ? new Date(action.submitted_at).toLocaleDateString('tr-TR') : '-'}</td>
                     <td className="py-2 text-right">
                       <button
                         onClick={() => navigate(`/ic-action-detail/${action.id}`)}
@@ -481,6 +557,6 @@ export default function ICActionTracking() {
           )}
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }
