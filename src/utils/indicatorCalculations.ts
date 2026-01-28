@@ -12,7 +12,8 @@ export type CalculationMethod =
   | 'maintenance_increasing'
   | 'maintenance_decreasing'
   | 'increasing'
-  | 'decreasing';
+  | 'decreasing'
+  | 'sum_only';
 
 interface CalculationParams {
   method: CalculationMethod;
@@ -48,6 +49,9 @@ export function calculateIndicatorValue(params: CalculationParams): number {
     case 'maintenance_increasing':
     case 'maintenance_decreasing':
       return average;
+
+    case 'sum_only':
+      return sum;
 
     case 'standard':
     default:
@@ -115,6 +119,11 @@ export function calculatePerformancePercentage(params: CalculationParams): numbe
     case 'maintenance_decreasing': {
       if (average === 0) return 0;
       return (targetValue / average) * 100;
+    }
+
+    case 'sum_only': {
+      if (targetValue === 0) return 0;
+      return (sum / targetValue) * 100;
     }
 
     case 'percentage':
@@ -191,6 +200,9 @@ export function calculateCurrentValueFromEntries(
     case 'maintenance_increasing':
     case 'maintenance_decreasing':
       return average;
+
+    case 'sum_only':
+      return sumOfEntries;
 
     default:
       return baselineValue + sumOfEntries;

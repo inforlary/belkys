@@ -402,6 +402,7 @@ export function IndicatorForm({
             <option value="percentage_decreasing">4. Yüzde Azalan Değer</option>
             <option value="maintenance_increasing">5. Artan Koruma Modeli</option>
             <option value="maintenance_decreasing">6. Azalan Koruma Modeli</option>
+            <option value="sum_only">7. Basit Toplam</option>
           </select>
         </div>
       </div>
@@ -528,6 +529,26 @@ export function IndicatorForm({
                   <p className="font-semibold mt-1 text-orange-700">İlerleme = (10/15) × 100 = %66.7</p>
                 </div>
                 <p className="text-xs text-gray-600 italic">Not: Başlangıç değeri kullanılmaz</p>
+              </div>
+            )}
+
+            {formData.calculation_method === 'sum_only' && (
+              <div className="space-y-2">
+                <p className="font-semibold">7. Basit Toplam</p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300">
+                  Mevcut Değer = Çeyrek Değerlerin Toplamı
+                </p>
+                <p className="font-mono text-sm bg-white p-2 rounded border border-blue-300 mt-2">
+                  İlerleme = (Çeyrek Toplamı / Hedef) × 100
+                </p>
+                <div className="bg-teal-50 p-2 rounded mt-2 border border-teal-200">
+                  <p className="font-semibold mb-1">Örnek: Yıllık Proje Sayısı</p>
+                  <p>• Hedef: 40 proje</p>
+                  <p>• Q1: 8, Q2: 12, Q3: 11, Q4: 9</p>
+                  <p>• Toplam: 40</p>
+                  <p className="font-semibold mt-1 text-teal-700">İlerleme = (40/40) × 100 = %100</p>
+                </div>
+                <p className="text-xs text-gray-600 italic">Not: Başlangıç değeri kullanılmaz, sadece dönemsel toplamlar hesaplanır</p>
               </div>
             )}
           </div>
