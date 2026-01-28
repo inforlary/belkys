@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Filter, FileText, Clock, CheckCircle, FileEdit } from 'lucide-react';
+import { Plus, Search, Filter, FileText, Clock, CheckCircle, FileEdit, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
 import { WorkflowProcess, WorkflowStatistics, STATUS_LABELS, STATUS_COLORS } from '../types/workflow';
+import Modal from '../components/ui/Modal';
 
 export default function WorkflowList() {
   const { navigate } = useLocation();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [workflows, setWorkflows] = useState<WorkflowProcess[]>([]);
   const [statistics, setStatistics] = useState<WorkflowStatistics>({
     total: 0,
@@ -18,6 +19,8 @@ export default function WorkflowList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowProcess | null>(null);
 
   useEffect(() => {
     fetchWorkflows();
@@ -72,6 +75,38 @@ export default function WorkflowList() {
     const matchesStatus = statusFilter === 'all' || workflow.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const isAdmin = profile?.role?.toLowerCase() === 'admin' || profile?.is_super_admin;
+
+  const handleDeleteClick = (workflow: WorkflowProcess, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setWorkflowToDelete(workflow);
+    setShowDeleteModal(true);
+  };
+
+  const handleEditClick = (workflowId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/workflows/edit/${workflowId}`);
+  };
+
+  const handleDelete = async () => {
+    if (!workflowToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('workflow_processes')
+        .delete()
+        .eq('id', workflowToDelete.id);
+
+      if (error) throw error;
+      alert('İş akışı başarıyla silindi');
+      setShowDeleteModal(false);
+      setWorkflowToDelete(null);
+      fetchWorkflows();
+    } catch (error) {
+      console.error('Error deleting workflow:', error);
+      alert('Silme işlemi sırasında bir hata oluştu');
+    }
+  };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
     <div className="bg-white rounded-lg shadow-md p-6 border-l-4" style={{ borderColor: color }}>
@@ -190,15 +225,62 @@ export default function WorkflowList() {
                     )}
                   </div>
                 )}
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
                   <span>Versiyon {workflow.version}</span>
                   <span>{new Date(workflow.created_at).toLocaleDateString('tr-TR')}</span>
                 </div>
+
+                {isAdmin && (
+                  <div className="flex gap-2 pt-3 border-t border-gray-200">
+                    <button
+                      onClick={(e) => handleEditClick(workflow.id, e)}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Düzenle
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteClick(workflow, e)}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Sil
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="İş Akışını Sil">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-red-800 font-medium">Bu işlem geri alınamaz!</p>
+              <p className="text-sm text-red-700 mt-1">
+                <strong>{workflowToDelete?.name}</strong> iş akış şeması ve tüm ilişkili veriler kalıcı olarak silinecektir.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Sil
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
