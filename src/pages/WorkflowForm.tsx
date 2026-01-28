@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, X, Plus, Trash2, AlertCircle, GripVertical } from 'lucide-react';
+import { ArrowLeft, Save, X, Plus, Trash2, AlertCircle, AlertTriangle, GripVertical } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../hooks/useLocation';
@@ -678,19 +678,27 @@ export default function WorkflowForm() {
                                     ))}
                                   </select>
                                 </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                <div className={`p-3 rounded-lg border-2 ${step.is_sensitive ? 'bg-orange-50 border-orange-300' : 'border-gray-200'}`}>
+                                  <label className="flex items-start gap-2 cursor-pointer">
                                     <input
                                       type="checkbox"
                                       checked={step.is_sensitive}
                                       onChange={(e) => updateStep(index, 'is_sensitive', e.target.checked)}
-                                      className="mr-2"
+                                      className="mt-0.5 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                                     />
-                                    Hassas Görev
+                                    <div className="flex-1">
+                                      <span className="text-sm font-medium text-gray-900">Hassas Görev</span>
+                                      <p className="text-xs text-gray-600 mt-0.5">
+                                        Yolsuzluk riski taşıyan görevler için işaretleyin
+                                      </p>
+                                      {step.is_sensitive && (
+                                        <div className="flex items-center gap-1 mt-2 text-xs font-medium text-orange-700">
+                                          <AlertTriangle className="w-3.5 h-3.5" />
+                                          <span>Onaylandıktan sonra Hassas Görevler modülüne aktarılacaktır</span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </label>
-                                  <div className="text-xs text-orange-600 mt-1">
-                                    {step.is_sensitive && '⚠️ Hassas görev olarak işaretlendi'}
-                                  </div>
                                 </div>
                               </div>
                             </div>

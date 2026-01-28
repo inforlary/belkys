@@ -292,19 +292,53 @@ export default function SensitiveTasksDashboard() {
       )}
 
       {stats.total_tasks === 0 && (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center">
-          <AlertTriangle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Henüz Hassas Görev Yok</h3>
-          <p className="text-slate-600 mb-4">
-            İş akış şemalarında hassas olarak işaretlenen adımlar otomatik olarak buraya aktarılacaktır.
-          </p>
-          <button
-            onClick={() => navigate('/workflows')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            İş Akış Şemalarına Git
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8">
+          <div className="text-center mb-6">
+            <AlertTriangle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Henüz Hassas Görev Yok</h3>
+            <p className="text-slate-600">
+              İş akış şemalarında hassas olarak işaretlenen adımlar otomatik olarak buraya aktarılacaktır.
+            </p>
+          </div>
+
+          <div className="bg-white border border-slate-300 rounded-xl p-6 mb-6">
+            <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-blue-600" />
+              Hassas Görev Oluşturma Adımları
+            </h4>
+            <ol className="space-y-3 text-sm text-slate-700">
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                <span><strong>İş Akışı Yönetimi</strong> modülüne gidin ve yeni bir iş akış şeması oluşturun</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                <span>Adımlar eklerken, yolsuzluk riski taşıyan adımları <strong>"Hassas Görev"</strong> olarak işaretleyin</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                <span>İş akışını <strong>"Onaya Gönder"</strong> butonuna tıklayarak onaya gönderin</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">4</span>
+                <span>Admin veya Müdür olarak iş akışını <strong>onaylayın</strong></span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">✓</span>
+                <span>Onaylandıktan sonra hassas adımlar otomatik olarak bu modüle aktarılacaktır</span>
+              </li>
+            </ol>
+          </div>
+
+          <div className="text-center">
+            <button
+              onClick={() => navigate('/workflows')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              İş Akış Şemalarına Git
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

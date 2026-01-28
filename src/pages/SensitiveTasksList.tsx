@@ -8,8 +8,7 @@ import {
   Eye,
   Edit,
   AlertTriangle,
-  UserX,
-  ChevronRight
+  UserX
 } from 'lucide-react';
 import {
   SensitiveTask,
@@ -225,10 +224,37 @@ export default function SensitiveTasksList() {
             <tbody className="divide-y divide-slate-200">
               {filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
-                    <AlertTriangle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <p className="text-lg font-medium text-slate-700">Görev bulunamadı</p>
-                    <p className="text-sm mt-2">Filtreleri değiştirmeyi deneyin</p>
+                  <td colSpan={9} className="px-6 py-16 text-center text-slate-500">
+                    {tasks.length === 0 ? (
+                      <div className="max-w-2xl mx-auto">
+                        <AlertTriangle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-lg font-medium text-slate-700 mb-2">Henüz Hassas Görev Yok</p>
+                        <p className="text-sm text-slate-600 mb-6">
+                          İş akış şemalarında hassas olarak işaretlenen adımlar otomatik olarak buraya aktarılacaktır.
+                        </p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                          <p className="text-sm font-medium text-blue-900 mb-2">Nasıl Oluşturulur?</p>
+                          <ol className="text-xs text-blue-800 space-y-1 list-decimal list-inside">
+                            <li>İş Akışı Yönetimi modülünden yeni bir iş akış şeması oluşturun</li>
+                            <li>Adımları eklerken hassas olanları "Hassas Görev" olarak işaretleyin</li>
+                            <li>İş akışını onaya gönderin ve onaylayın</li>
+                            <li>Hassas adımlar otomatik olarak bu listeye eklenecektir</li>
+                          </ol>
+                        </div>
+                        <button
+                          onClick={() => navigate('/workflows')}
+                          className="mt-4 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                          İş Akış Şemalarına Git
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <AlertTriangle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-lg font-medium text-slate-700">Görev bulunamadı</p>
+                        <p className="text-sm mt-2">Filtreleri değiştirmeyi deneyin</p>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (
