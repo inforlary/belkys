@@ -61,7 +61,7 @@ export default function WorkflowDetail() {
     try {
       const { data: workflowData, error: workflowError } = await supabase
         .from('workflow_processes')
-        .select('*, departments(name)')
+        .select('*, departments(name), bpm_processes(id, code, name, bpm_categories(name))')
         .eq('id', id)
         .single();
 
@@ -294,21 +294,31 @@ export default function WorkflowDetail() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Süreç Bilgileri</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Ana Süreç:</span>
-                <p className="font-medium text-gray-900 mt-1">{workflow.main_process || '-'}</p>
-              </div>
-              <div>
-                <span className="text-gray-600">Süreç:</span>
-                <p className="font-medium text-gray-900 mt-1">{workflow.process || '-'}</p>
-              </div>
-              <div>
-                <span className="text-gray-600">Alt Süreç:</span>
-                <p className="font-medium text-gray-900 mt-1">{workflow.sub_process || '-'}</p>
-              </div>
+              {(workflow as any).bpm_processes && (
+                <div className="col-span-2">
+                  <span className="text-gray-600">İlişkili İç Kontrol Süreci:</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/bpm-processes/${(workflow as any).bpm_processes.id}`)}
+                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {(workflow as any).bpm_processes.code} - {(workflow as any).bpm_processes.name}
+                    </button>
+                    {(workflow as any).bpm_processes.bpm_categories?.name && (
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                        {(workflow as any).bpm_processes.bpm_categories.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               <div>
                 <span className="text-gray-600">Versiyon:</span>
                 <p className="font-medium text-gray-900 mt-1">v{workflow.version}</p>
+              </div>
+              <div>
+                <span className="text-gray-600">Süreç Sahibi Birim:</span>
+                <p className="font-medium text-gray-900 mt-1">{(workflow as any).departments?.name || '-'}</p>
               </div>
               {workflow.description && (
                 <div className="col-span-2">

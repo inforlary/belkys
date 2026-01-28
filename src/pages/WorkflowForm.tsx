@@ -18,15 +18,14 @@ export default function WorkflowForm() {
   const [activeTab, setActiveTab] = useState<TabType>('basic');
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [bpmProcesses, setBpmProcesses] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<WorkflowFormData>({
     code: '',
     name: '',
     description: '',
     owner_department_id: '',
-    main_process: '',
-    process: '',
-    sub_process: '',
+    bpm_process_id: '',
     trigger_event: '',
     outputs: '',
     software_used: '',
@@ -37,6 +36,7 @@ export default function WorkflowForm() {
 
   useEffect(() => {
     fetchDepartments();
+    fetchBpmProcesses();
     if (isEditMode && workflowId) {
       loadWorkflow();
     } else if (templateId && templateId !== 'blank') {
@@ -64,6 +64,30 @@ export default function WorkflowForm() {
       setDepartments(data || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
+    }
+  }
+
+  async function fetchBpmProcesses() {
+    if (!user) return;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) return;
+
+      const { data } = await supabase
+        .from('bpm_processes')
+        .select('id, code, name, category_id, bpm_categories(name)')
+        .eq('organization_id', profile.organization_id)
+        .in('status', ['approved', 'active'])
+        .order('code');
+
+      setBpmProcesses(data || []);
+    } catch (error) {
+      console.error('Error fetching BPM processes:', error);
     }
   }
 
@@ -98,9 +122,7 @@ export default function WorkflowForm() {
         name: workflow.name,
         description: workflow.description || '',
         owner_department_id: workflow.owner_department_id || '',
-        main_process: workflow.main_process || '',
-        process: workflow.process || '',
-        sub_process: workflow.sub_process || '',
+        bpm_process_id: workflow.bpm_process_id || '',
         trigger_event: workflow.trigger_event || '',
         outputs: workflow.outputs || '',
         software_used: workflow.software_used || '',
@@ -206,8 +228,8 @@ export default function WorkflowForm() {
   const handleSubmit = async () => {
     if (!user) return;
 
-    if (!formData.code || !formData.name || formData.actors.length === 0 || formData.steps.length === 0) {
-      alert('Lütfen tüm zorunlu alanları doldurun');
+    if (!formData.code || !formData.name || !formData.bpm_process_id || formData.actors.length === 0 || formData.steps.length === 0) {
+      alert('Lütfen tüm zorunlu alanları doldurun (Süreç Kodu, Süreç Adı, BPM Süreci, Görevliler ve Adımlar)');
       return;
     }
 
@@ -231,9 +253,7 @@ export default function WorkflowForm() {
             name: formData.name,
             description: formData.description,
             owner_department_id: formData.owner_department_id || null,
-            main_process: formData.main_process,
-            process: formData.process,
-            sub_process: formData.sub_process,
+            bpm_process_id: formData.bpm_process_id || null,
             trigger_event: formData.trigger_event,
             outputs: formData.outputs,
             software_used: formData.software_used,
@@ -257,9 +277,7 @@ export default function WorkflowForm() {
             name: formData.name,
             description: formData.description,
             owner_department_id: formData.owner_department_id || null,
-            main_process: formData.main_process,
-            process: formData.process,
-            sub_process: formData.sub_process,
+            bpm_process_id: formData.bpm_process_id || null,
             trigger_event: formData.trigger_event,
             outputs: formData.outputs,
             software_used: formData.software_used,
@@ -406,10 +424,11 @@ export default function WorkflowForm() {
                     <input
                       type="text"
                       value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Örn: IK-001"
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                      placeholder="Otomatik üretilecek (WF-001)"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Kayıt sırasında otomatik oluşturulacaktır</p>
                   </div>
 
                   <div>
@@ -440,6 +459,26 @@ export default function WorkflowForm() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      İlişkili İç Kontrol Süreci <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.bpm_process_id}
+                      onChange={(e) => setFormData({ ...formData, bpm_process_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Süreç seçiniz</option>
+                      {bpmProcesses.map(process => (
+                        <option key={process.id} value={process.id}>
+                          {process.code} - {process.name}
+                          {process.bpm_categories?.name && ` (${process.bpm_categories.name})`}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Bu iş akışının bağlı olduğu iç kontrol sürecini seçiniz</p>
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Süreç Açıklaması</label>
                     <textarea
                       value={formData.description}
@@ -447,36 +486,6 @@ export default function WorkflowForm() {
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Sürecin kısa açıklaması"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Ana Süreç</label>
-                    <input
-                      type="text"
-                      value={formData.main_process}
-                      onChange={(e) => setFormData({ ...formData, main_process: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Süreç</label>
-                    <input
-                      type="text"
-                      value={formData.process}
-                      onChange={(e) => setFormData({ ...formData, process: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Alt Süreç / İş Akışı Adı</label>
-                    <input
-                      type="text"
-                      value={formData.sub_process}
-                      onChange={(e) => setFormData({ ...formData, sub_process: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
 

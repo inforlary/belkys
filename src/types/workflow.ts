@@ -10,9 +10,7 @@ export interface WorkflowProcess {
   description?: string;
   status: WorkflowStatus;
   owner_department_id?: string;
-  main_process?: string;
-  process?: string;
-  sub_process?: string;
+  bpm_process_id?: string;
   trigger_event?: string;
   outputs?: string;
   software_used?: string;
@@ -79,9 +77,7 @@ export interface WorkflowFormData {
   name: string;
   description: string;
   owner_department_id: string;
-  main_process: string;
-  process: string;
-  sub_process: string;
+  bpm_process_id: string;
   trigger_event: string;
   outputs: string;
   software_used: string;
